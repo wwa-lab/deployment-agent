@@ -164,5 +164,5 @@ Optionally prefix by domain for large breakdowns: `BE-001`, `FE-001`, `INT-001`,
 
 ## Output File
 
-Write the result to `docs/tasks.md` by default.
+Write the result to `docs/06-tasks/tasks.md` by default.
 If the user explicitly requests a different location, follow the user's requested path.

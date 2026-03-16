@@ -287,5 +287,5 @@ Before finalizing the output, verify:
 
 ## Output
 
-Save the final document as `docs/architecture.md` by default.
+Save the final document as `docs/04-architecture/architecture.md` by default.
 If the user requests a different location, follow the user's requested path.

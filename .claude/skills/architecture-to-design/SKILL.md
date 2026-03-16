@@ -53,7 +53,7 @@ Produce a `design.md` using the **Output Structure** defined below.
 
 ### Step 4: Deliver the Output
 
-- Write the output as `docs/design.md` by default
+- Write the output as `docs/05-design/design.md` by default
 - If the user explicitly requests a different path, follow the user's requested location
 - If generating inline is more appropriate, produce the full structured document in the response
 
