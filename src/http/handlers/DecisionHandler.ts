@@ -4,6 +4,7 @@ import { ReleaseFlowProgressionService } from "../../domain/decision/ReleaseFlow
 import { TaskService } from "../../domain/task/TaskService";
 import { DecisionRequestDtoSchema, TaskDto } from "../../contracts/dtos";
 import { requireRole } from "../middleware/auth";
+import { ValidationError } from "../../errors/AppError";
 
 /**
  * Decision handler – REST endpoint for applying task decisions.
@@ -29,7 +30,7 @@ export function registerDecisionRoutes(
       // Validate request body
       const parseResult = DecisionRequestDtoSchema.safeParse(req.body);
       if (!parseResult.success) {
-        throw new Error(`Invalid decision request: ${JSON.stringify(parseResult.error.errors)}`);
+        throw new ValidationError("Invalid decision request", parseResult.error.errors);
       }
 
       const { decision, comment } = parseResult.data;

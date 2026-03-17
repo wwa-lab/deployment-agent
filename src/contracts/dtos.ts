@@ -24,6 +24,7 @@ export interface TaskExecutionHistoryDto {
   executionStatus: ExecutionStatus;
   inputSnapshot: Record<string, unknown> | null;
   resultSummary: Record<string, unknown> | null;
+  resultLogs: string | null;
   startTime: string; // ISO UTC
   endTime: string | null; // ISO UTC
 }

@@ -14,7 +14,6 @@ export function aggregateTasksToRequestStatus(
 ): RequestStatus {
   if (taskStatuses.length === 0) return "Pending";
 
-  if (taskStatuses.some((s) => s === "Executing")) return "Running";
   if (
     taskStatuses.every(
       (s) => s === "Approved" || s === "Skipped"
@@ -23,6 +22,12 @@ export function aggregateTasksToRequestStatus(
     return "Completed";
   if (taskStatuses.some((s) => s === "Rejected")) return "Rejected";
   if (taskStatuses.some((s) => s === "Failed")) return "Failed";
+  if (
+    taskStatuses.some(
+      (s) => s === "Executing" || s === "Awaiting_Review" || s === "Ready_For_Execution"
+    )
+  )
+    return "Running";
 
   return "Pending";
 }
@@ -61,6 +66,12 @@ export function toSummaryStatus(
     status === "Ready_For_Execution"
   ) {
     return "Running";
+  }
+  if (
+    status === "Rejected" ||
+    status === "Failed"
+  ) {
+    return "Done";
   }
   return "Pending";
 }

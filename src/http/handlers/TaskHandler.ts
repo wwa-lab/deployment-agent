@@ -54,6 +54,7 @@ export function registerTaskRoutes(
       executionStatus: execution.executionStatus,
       inputSnapshot: execution.inputSnapshot,
       resultSummary: execution.resultSummary,
+      resultLogs: execution.resultLogs ?? null,
       startTime: execution.startTime.toISOString(),
       endTime: execution.endTime?.toISOString() ?? null,
     };

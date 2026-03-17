@@ -41,9 +41,33 @@ describe("aggregateTasksToRequestStatus", () => {
     ).toBe("Pending");
   });
 
-  it("Running takes priority over Rejected for display (Executing present)", () => {
+  it("Rejected takes priority over Running (Executing present)", () => {
     expect(
       aggregateTasksToRequestStatus(["Executing", "Rejected"])
+    ).toBe("Rejected");
+  });
+
+  it("returns Running if any task is Awaiting_Review", () => {
+    expect(
+      aggregateTasksToRequestStatus(["Approved", "Awaiting_Review"])
+    ).toBe("Running");
+  });
+
+  it("returns Running if any task is Ready_For_Execution with non-terminal siblings", () => {
+    expect(
+      aggregateTasksToRequestStatus(["Approved", "Ready_For_Execution"])
+    ).toBe("Running");
+  });
+
+  it("returns Running for mixed Pending and Awaiting_Review", () => {
+    expect(
+      aggregateTasksToRequestStatus(["Pending", "Awaiting_Review"])
+    ).toBe("Running");
+  });
+
+  it("returns Pending when tasks are all Ready_For_Execution", () => {
+    expect(
+      aggregateTasksToRequestStatus(["Ready_For_Execution", "Ready_For_Execution"])
     ).toBe("Running");
   });
 });
@@ -119,11 +143,15 @@ describe("toSummaryStatus", () => {
     expect(toSummaryStatus("Pending")).toBe("Pending");
   });
 
-  it("maps Rejected to Pending (no separate fail bucket in summary)", () => {
-    expect(toSummaryStatus("Rejected")).toBe("Pending");
+  it("maps Rejected to Done (terminal state)", () => {
+    expect(toSummaryStatus("Rejected")).toBe("Done");
   });
 
-  it("maps Failed to Pending", () => {
-    expect(toSummaryStatus("Failed")).toBe("Pending");
+  it("maps Failed to Done (terminal state)", () => {
+    expect(toSummaryStatus("Failed")).toBe("Done");
+  });
+
+  it("maps Running (flow/request status) to Running", () => {
+    expect(toSummaryStatus("Running")).toBe("Running");
   });
 });
