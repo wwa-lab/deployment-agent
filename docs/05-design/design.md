@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a detailed, implementation-friendly design for the Deployment Agent system, transforming the high-level architecture into concrete module and interface specifications suitable for Spring Boot 3 backend, Vue 3 frontend, and Oracle persistence. The design covers all MVP workflows and integration points necessary for controlled, human-in-the-loop deployment request processing.
+This document provides a detailed, implementation-friendly design for the Deployment Agent system, transforming the high-level architecture into concrete module and interface specifications suitable for Node.js / TypeScript / Fastify 4 / TypeORM 0.3 backend, Vue 3 frontend, and Oracle persistence. The design covers all MVP workflows and integration points necessary for controlled, human-in-the-loop deployment request processing.
 
 ---
 
@@ -34,7 +34,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 - [Assumption] Oracle is the primary transactional store for all workflow state and immutable audit records
 - [Assumption] Result payloads (execution logs) are stored in Oracle CLOB columns or a dedicated result table within the same database
 - [Assumption] Vue 3 frontend state management uses a framework like Pinia or provide/inject for Release Flow, Request, and Task context
-- [Assumption] Spring Boot 3 uses Spring Data JPA with standard repository patterns for Oracle persistence
+- [Assumption] TypeORM 0.3 uses repository patterns with optional EntityManager for transaction participation
 - [Assumption] WWA authentication and authorization infrastructure is reused; user identity is available in request context
 - [Assumption] Secrets (Jenkins credentials, Ansible credentials) are stored in a managed secret store external to Oracle (TBD: Vault, env vars, or platform secret service)
 - [Assumption] Configuration values (URLs, endpoints) are stored in Oracle Configuration Item table and cached in memory with periodic refresh
@@ -54,7 +54,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 7. Audit Logger – event-based audit trail recording
 8. Result Storage – execution result persistence and retrieval
 9. Vue 3 UI Modules – workspace navigation, summary, details, task views, dialogs
-10. Spring Boot Controllers – HTTP endpoint implementations
+10. Fastify Route Handlers – HTTP endpoint implementations
 
 **Out-of-Scope Details**:
 - Detailed database DDL and indexing strategy (to be finalized in implementation)
@@ -67,7 +67,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 
 **Design Boundaries**:
 - Frontend → Backend: HTTP/REST API with JSON payloads
-- Backend → Oracle: ORM/JPA with standard persistence patterns
+- Backend → Oracle: TypeORM with repository patterns
 - Backend → External Systems: Synchronous HTTP calls to Jenkins/Ansible; asynchronous callbacks from those systems
 - Backend → Secret Store: Envelope pattern for credential access (out of scope for now)
 - Audit Logger: Event capture occurs at domain layer; persistence in Oracle
@@ -104,7 +104,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 - **Idempotency**: Rerun of same Excel file with same Stage updates existing records, matched by `(project_id, stage, task_group_id, step_seq)`
 - **Validation**: Required fields, date formats, `execution_type` must be `MANUAL` or `AUTO`
 - **Error Reporting**: Accumulated errors returned to user with row number and field name
-- **Transactionality**: Use Spring transaction boundaries to ensure atomicity
+- **Transactionality**: Use `DataSource.transaction()` to ensure atomicity
 
 **MANUAL vs AUTO task treatment on import**:
 - Both `MANUAL` and `AUTO` tasks are created in the same `Pending` state on import
@@ -429,7 +429,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 
 ### HTTP Endpoints
 
-All endpoints use Spring Boot 3 patterns: resource-oriented, explicit DTOs, validation through request validators, centralized error handling, server-side RBAC.
+All endpoints use Fastify patterns: resource-oriented route handlers, explicit TypeScript DTOs, validation through Zod schemas, centralized Fastify error handler, server-side RBAC via `requireRole()`.
 
 #### Upload Endpoint
 - **Path**: `POST /api/deployment-agent/upload`
@@ -596,10 +596,14 @@ Represents one atomic execution step from the AMH_HCC_task template. One row = o
 
 - **State Transitions**:
   - Pending → Ready_For_Execution (on import or progression rule)
-  - Ready_For_Execution → Executing (auto-triggered)
-  - Executing → Awaiting_Review (callback from engine)
-  - Awaiting_Review → Approved | Rejected | Skipped (decision)
-  - Awaiting_Review → Executing (rerun decision)
+  - Pending → Skipped (TL skip decision)
+  - Ready_For_Execution → Executing (auto-triggered or manual record-result)
+  - Ready_For_Execution → Skipped (TL skip decision)
+  - Executing → Awaiting_Review (callback from engine or manual result recording)
+  - Executing → Failed (execution failure)
+  - Awaiting_Review → Approved | Rejected (TL decision)
+  - Rejected → Ready_For_Execution (TL rerun decision; creates new execution history)
+  - Failed → Ready_For_Execution (TL rerun decision; creates new execution history)
 
 #### Task Execution History
 - **Attributes**:
@@ -892,8 +896,8 @@ Execution sequencing in MVP is controlled solely by `step_seq` within `task_grou
 **Steps**:
 1. UI collects decision choice and submits to Decision Endpoint
 2. Decision Controller validates:
-   - User role (TL or Admin)
-   - Task exists and current state is Awaiting_Review
+   - User role (TL only)
+   - Task exists and current state is valid for the decision (Awaiting_Review for approve/reject; Rejected/Failed for rerun; Pending/Ready_For_Execution for skip)
 3. Decision Engine processes:
    - **Approve**:
      - Update Task status → Approved
@@ -905,10 +909,10 @@ Execution sequencing in MVP is controlled solely by `step_seq` within `task_grou
      - Update Task status → Rejected
      - Update Release Flow status → Rejected
      - Skip all remaining tasks in Release Flow
-   - **Rerun**:
+   - **Rerun** (only from `Rejected` or `Failed` state):
      - Create new Task Execution History record (attempt_number + 1)
-     - Update Task status → Executing
-     - Trigger Execution Service to re-run external job
+     - Update Task status → Ready_For_Execution
+     - Execution pipeline picks up the task again (auto-trigger or manual record-result)
    - **Skip**:
      - Update Task status → Skipped
      - Determine next task; update similarly to Approve
@@ -1003,11 +1007,11 @@ Execution sequencing in MVP is controlled solely by `step_seq` within `task_grou
 
 **Enforcement**:
 - Frontend (Vue 3) enforces visibility via conditional rendering (usability only)
-- Backend (Spring Boot) enforces authorization in every controller via `@PreAuthorize` or similar
+- Backend (Fastify) enforces authorization in every handler via `requireRole()` middleware
 - Authorization rule examples:
-  - Edit Task: `@PreAuthorize("hasRole('ROLE_TL') or hasRole('ROLE_DEVOPS_ADMIN')")`
-  - Update Config: `@PreAuthorize("hasRole('ROLE_DEVOPS_ADMIN')")`
-  - View Audit: `@PreAuthorize("hasRole('ROLE_AUDIT') or hasRole('ROLE_MANAGEMENT')")`
+  - Edit Task: `requireRole(req, "task_edit", "TL")`
+  - Update Config: `requireRole(req, "config_update", "DEVOPS_ADMIN")`
+  - View Audit: `requireRole(req, "audit_log_view", "AUDIT", "MANAGEMENT", "DEVOPS_ADMIN")`
 
 **Assumption**: User identity and roles available from WWA authentication context (automatically injected by platform)
 

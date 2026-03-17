@@ -3,17 +3,20 @@
 The MVP implementation is based on the following technology stack:
 
 - **Frontend**: Vue 3
-- **Backend**: Spring Boot 3
-- **Database**: Oracle
+- **Backend**: Node.js / TypeScript / Fastify 4 / TypeORM 0.3
+- **Database**: Oracle (production); sql.js in-memory SQLite (tests)
+- **Validation**: Zod
+
+> *Note: The original architecture assumed Spring Boot 3. Implementation adopted a Node.js stack. All references in this document reflect the implemented stack.*
 
 ### Technology Usage Notes
 - Vue 3 is used to implement the WWA-embedded Deployment Agent workspace UI, including summary views, detail views, upload dialogs, task actions, configuration pages, and audit log viewing.
-- Spring Boot 3 is used to implement API endpoints, orchestration services, validation logic, integration adapters, audit logging, and callback handling.
+- Fastify 4 with TypeORM 0.3 is used to implement API endpoints, orchestration services, validation logic, integration adapters, audit logging, and callback handling. Zod is used for request body validation.
 - Oracle is used as the primary transactional persistence store for Release Flow, Request, Task, Task Execution History, Configuration Item, and Audit Log entities unless a specific storage concern is explicitly separated.
 
 ### Architectural Implications
-- Frontend-backend interaction should follow a clear API contract suitable for Vue 3 + Spring Boot 3 integration.
-- Backend modules should be designed in a way that maps cleanly to Spring Boot 3 service, controller, repository, and integration packages.
+- Frontend-backend interaction follows a clear REST API contract suitable for Vue 3 + Fastify integration.
+- Backend modules are designed with a layered architecture: domain services, repositories (TypeORM), and HTTP handlers (Fastify route handlers). Shared types live in `src/contracts/`.
 - Oracle schema design must support hierarchical workflow entities, append-only audit logging, and efficient querying for summary/detail screens.
 - Large execution logs or result payloads may remain outside core transactional tables if Oracle table growth or query performance becomes a concern; detailed design must confirm whether result payloads are stored in Oracle CLOB columns or externalized storage.
 
@@ -32,10 +35,10 @@ The MVP implementation is based on the following technology stack:
 - Credentials and secret storage mechanism is open and must be resolved during implementation (Vault, environment variables, or managed secret store).
 
 ### Auto-Execution Design Note
-The current architecture assumes that tasks may transition automatically from `Ready_For_Execution` to `Executing` as part of backend orchestration.  
+The current architecture assumes that tasks may transition automatically from `Ready_For_Execution` to `Executing` as part of backend orchestration.
 If this assumption is rejected and execution must be user-triggered instead, the design phase must introduce:
 - an explicit Execute action in the Vue 3 UI,
-- a dedicated execution command API in Spring Boot 3,
+- a dedicated execution trigger API endpoint in Fastify,
 - updated permission and state-transition rules,
 - revised test scenarios for manual execution gating.
 
@@ -48,7 +51,7 @@ This decision must be confirmed before detailed design begins.
 ### Conceptual Entities
 | Entity | Description | Key Attributes |
 |---|---|---|
-| Release Flow | Top-level deployment journey across stages | release_flow_id, project_id (from template `Project ID`), project_name (from `Project Name`), release_id (source TBD — not in AMH_HCC_task data rows; see OQ-25), current_stage (SIT/UAT/PROD — source TBD; see OQ-25), flow_status, review_status, review_owner, created_at, updated_at |
+| Release Flow | Top-level deployment journey across stages | release_flow_id, project_id (from template `Project ID`), project_name (from `Project Name`), release_id (system-generated: `{stage}-{normalized_project_name}-{seq}`), current_stage (SIT/UAT/PROD — from upload UI), flow_status, review_status, review_owner, created_at, updated_at |
 | Request | Stage-scoped unit within Release Flow | request_id, release_flow_id, stage, request_status, created_at, updated_at |
 | Task | Atomic executable step within Request; one row per AMH_HCC_task template row | task_id (PK), request_id (FK), task_group_id, task_group_name, step_seq, task_name, execution_type, input_parameters (JSON: {script, parameters}), expected_output, task_status, current_result_summary, latest_execution_id, start_time, end_time, last_updated_at — plus display columns: owner, planned_start_time, planned_end_time — plus import_metadata (JSON blob for activity_category/common/dependencies/validation) |
 | Task Execution History | Rerun history entry (one record per execution; same logical task may have multiple) | execution_id, task_id, attempt_number, execution_status, input_snapshot, result_summary, result_logs, start_time, end_time |
@@ -56,11 +59,14 @@ This decision must be confirmed before detailed design begins.
 | Audit Log Entry | Immutable record of operator action | audit_log_id, operator_id, operator_role, action_type (upload, edit, view_result, approve, reject, rerun, skip), timestamp, release_flow_id (nullable), request_id (nullable), task_id (nullable), context_payload |
 
 ### Rerun History Model
-For MVP, a logical task keeps the same `task_id` across reruns.  
-Each rerun creates a new `Task Execution History` record with an incremented `attempt_number`.  
-The Task entity represents the current logical step, while Task Execution History represents each concrete execution attempt.  
-The Result Viewer should default to the latest execution attempt.  
+For MVP, a logical task keeps the same `task_id` across reruns.
+Each rerun creates a new `Task Execution History` record with an incremented `attempt_number`.
+The Task entity represents the current logical step, while Task Execution History represents each concrete execution attempt.
+The Result Viewer should default to the latest execution attempt.
 UI support for switching across attempts is a Design phase responsibility and does not change the underlying storage model.
+
+### Rerun State Transition
+When a TL decides to rerun a task, the task must be in a terminal-error state (`Rejected` or `Failed`). The rerun transitions the task back to `Ready_For_Execution`, creates a new `TaskExecutionHistory` record, and the execution pipeline picks it up again. This is intentionally conservative — a task must be explicitly rejected before it can be rerun.
 
 ### Excel Template Field-to-Domain Mapping
 
@@ -99,7 +105,7 @@ Fields are classified as: **Core** (workflow/execution control), **Display** (UI
 ---
 
 ### Persistence Note for Oracle
-Oracle is the system-of-record database for workflow state and auditability.  
+Oracle is the system-of-record database for workflow state and auditability.
 Detailed design must confirm:
 - table structure and indexing strategy,
 - use of Oracle `CLOB` for result logs if stored in-database,
@@ -116,7 +122,7 @@ Detailed design must confirm:
 - **Responsibility**: Execution Callback Handler receives callback, validates correlation, updates Task status, stores results, triggers Decision Engine if task reaches `Awaiting_Review`.
 
 ### Callback Contract Note
-A formal callback contract is required before implementation.  
+A formal callback contract is required before implementation.
 The design phase must produce an API contract artifact for the callback endpoint that defines:
 - request schema,
 - response schema,
@@ -133,54 +139,55 @@ Minimum security expectation:
 - replay / duplicate protection,
 - request correlation via execution identifier.
 
-For Spring Boot 3 implementation, this callback should be modeled as a dedicated controller endpoint with explicit request validation and idempotent processing behavior.
+For Fastify implementation, this callback should be modeled as a dedicated route handler with explicit Zod request validation and idempotent processing behavior.
 
 ---
 
 ## API / Interface Boundaries
 
 ### Design Handoff Note
-The endpoint list in this architecture document defines boundary ownership and interaction intent only.  
+The endpoint list in this architecture document defines boundary ownership and interaction intent only.
 Detailed request/response schemas, validation contracts, error models, and role-specific authorization behavior are Design phase artifacts.
 
 The design phase must produce:
 - OpenAPI specifications for synchronous HTTP endpoints,
-- JSON schema or equivalent request validation definitions,
+- JSON schema or equivalent request validation definitions (Zod schemas in practice),
 - callback contract specification for execution result delivery,
-- frontend-backend contract alignment suitable for Vue 3 and Spring Boot 3 integration.
+- frontend-backend contract alignment suitable for Vue 3 and Fastify integration.
 
 ### Major Inbound Interfaces (Frontend → Backend)
 | Endpoint / Resource | Consumer | Purpose |
 |---|---|---|
 | POST /api/deployment-agent/upload | Upload UI | Submit Excel file with selected stage for import; accepts `stage` (SIT/UAT/PROD) as required parameter alongside the file |
-| GET /api/deployment-agent/release-flows | Summary UI | Retrieve Release Flow list (with optional filters) |
-| GET /api/deployment-agent/release-flows/{id} | Details UI | Retrieve Release Flow details |
-| GET /api/deployment-agent/release-flows/{id}/requests/{requestId}/tasks | Task UI | Retrieve task list for selected Request |
-| POST /api/deployment-agent/tasks/{id}/edit | Task Input Editor | Update task input parameters |
-| POST /api/deployment-agent/tasks/{id}/decision | Decision UI | Submit Approve / Reject / Rerun / Skip decision |
-| GET /api/deployment-agent/tasks/{id}/result | Result Viewer | Retrieve execution result (summary + logs) |
+| GET /api/deployment-agent/release-flows | Summary UI | Retrieve Release Flow list (with optional filters, paginated) |
+| GET /api/deployment-agent/release-flows/:id | Details UI | Retrieve Release Flow details with nested requests and tasks |
+| GET /api/deployment-agent/tasks?requestId=X | Task UI | Retrieve task list for selected Request |
+| GET /api/deployment-agent/tasks/:id | Task UI | Retrieve single task detail |
+| PUT /api/deployment-agent/tasks/:id/input | Task Input Editor | Update task input parameters (TL role) |
+| POST /api/deployment-agent/tasks/:id/decision | Decision UI | Submit Approve / Reject / Rerun / Skip decision (TL role) |
+| GET /api/deployment-agent/tasks/:id/executions | Result Viewer | Retrieve execution history with result summary and logs |
 | GET /api/deployment-agent/config | Config UI | Retrieve current configuration items |
 | POST /api/deployment-agent/config | Config UI | Create/update configuration item (DevOps Admin only) |
-| GET /api/deployment-agent/audit-logs | Audit UI | Retrieve recent audit log list (role-gated) |
+| GET /api/deployment-agent/audit-logs | Audit UI | Retrieve recent audit log list (role-gated: AUDIT/MANAGEMENT/DEVOPS_ADMIN) |
 
 ### API Style Note
-For Spring Boot 3 implementation, API design should prefer:
-- resource-oriented controller grouping,
-- explicit DTOs for request and response payloads,
-- validation through standard request validation mechanisms,
-- centralized error handling,
-- server-side RBAC enforcement regardless of client-side UI visibility.
+For Fastify implementation, API design follows:
+- resource-oriented route handler grouping,
+- explicit DTOs (TypeScript interfaces) for request and response payloads,
+- validation through Zod schemas,
+- centralized Fastify error handler mapping AppError types to HTTP status codes,
+- server-side RBAC enforcement via `requireRole()` middleware regardless of client-side UI visibility.
 
 ---
 
 ## Frontend and Backend Enforcement Note
 
-Frontend role-awareness in Vue 3 is a usability feature, not a security boundary.  
-The UI may hide or disable actions based on role, state, and ownership context, but all enforcement must also occur server-side in Spring Boot 3 APIs.
+Frontend role-awareness in Vue 3 is a usability feature, not a security boundary.
+The UI may hide or disable actions based on role, state, and ownership context, but all enforcement must also occur server-side in Fastify APIs.
 
 This means:
 - Vue 3 controls visibility and user guidance,
-- Spring Boot 3 enforces authorization, validation, and state-transition legality,
+- Fastify handlers enforce authorization, validation, and state-transition legality,
 - Oracle persists only validated and authorized state changes.
 
 ---
@@ -200,8 +207,8 @@ Design phase must decide whether Result Storage is implemented as:
 
 For MVP, the architecture assumes:
 - Task stores current summary metadata and latest execution reference,
-- Task Execution History stores attempt-level summary metadata,
-- full raw logs are stored in a result-oriented persistence structure.
+- Task Execution History stores attempt-level summary metadata and result logs,
+- full raw logs are stored in `result_logs` column (TEXT/CLOB) on TaskExecutionHistory entity.
 
 ---
 
@@ -251,7 +258,7 @@ The following items must be confirmed before design is finalized:
 
 1. ~~OQ-25 (Stage/Release ID source)~~ — **Resolved**: Stage from upload UI; Release ID system-generated
 2. ~~OQ-28 (Execution Type values)~~ — **Resolved**: `MANUAL` | `AUTO`
-3. **MANUAL task execution UX decision** — how does the operator record manual completion? Determines T8 implementation path
+3. ~~MANUAL task execution UX decision~~ — **Resolved**: inline "Record Result" button; TL enters result; transitions to `Awaiting_Review`
 4. **Task input schema per `execution_type`** — defines editable fields per MANUAL and AUTO; MANUAL tasks may have different editable input fields than AUTO tasks
 5. **Integration adapter specifications** (Jenkins and Ansible API contracts, callback payload format)
 6. **Secret store architecture decision** (Vault, env vars, managed service, or other)

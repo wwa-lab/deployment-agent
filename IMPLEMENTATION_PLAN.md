@@ -1,7 +1,7 @@
 # Deployment Agent MVP — Implementation Plan
 
 **Last Updated**: 2026-03-17 | **Status**: Phase 1 Complete, Phase 2 Ready
-**Tests**: 136 passing | **TypeCheck**: ✅ | **Lint**: ✅
+**Tests**: 145 passing | **TypeCheck**: ✅ | **Lint**: ✅
 **Primary source of truth for task scope**: `docs/06-tasks/tasks.md`
 
 ---
@@ -114,7 +114,7 @@
 | **T10.2** Task Controllers | `GET /tasks?requestId=X`; `GET /tasks/:id`; `PUT /tasks/:id/input` (TL); `GET /tasks/:id/executions` |
 | **T10.3** Error Handling | Centralized Fastify error handler: AppError → HTTP; TypeORM OptimisticLock → 409; no stack leak |
 | **T10.5** DTOs | TaskDto (all fields), ReleaseFlowListItemDto/DetailDto (projectId/projectName), RequestDto, TaskExecutionHistoryDto, AuditLogEntryDto, PaginatedResponseDto<T>, DecisionRequestDtoSchema (Zod) |
-| **T13.1** Unit Tests | 136 tests, 12 test files — see §6 for breakdown |
+| **T13.1** Unit Tests | 145 tests, 10 test files — see §6 for breakdown |
 
 ### Phase 1 Fidelity Fix Pass — ✅ Applied
 
@@ -130,6 +130,21 @@ The following corrections were applied after initial implementation to align the
 | `TaskService.create()` refactored to accept `CreateTaskInput` interface | Supports Import Service calling convention |
 | `seedTask()` in testDataSource updated with all new field defaults | Test correctness |
 | TaskService tests updated — `create()` tests now verify all new fields | Test fidelity |
+
+### Fidelity Fix Pass #2 — ✅ Applied
+
+The following corrections were applied after the consistency review to fix aggregation bugs and API contract gaps:
+
+| What changed | Why |
+|---|---|
+| `aggregateTasksToRequestStatus()` — added `Awaiting_Review` and `Ready_For_Execution` as "Running" triggers | Tasks in these states were incorrectly aggregating to "Pending"; spec §9.5 defines them as active states |
+| `aggregateTasksToRequestStatus()` — Rejected/Failed now take priority over Running | Rejected/Failed are terminal-error states and should not be masked by Running |
+| `toSummaryStatus()` — Rejected/Failed now map to "Done" instead of "Pending" | Terminal states should never display as "Pending"; "Done" is the least misleading 3-value option |
+| `TaskExecutionHistoryDto` — added `resultLogs: string | null` field | Entity has `resultLogs` but it was not exposed via API, blocking Result Viewer (FR-33) |
+| `TaskHandler` execution mapper — added `resultLogs` mapping | DTO field needs corresponding data |
+| `DecisionHandler` — throws `ValidationError` instead of generic `Error` on invalid request body | Generic `Error` bypasses centralized error handler and returns 500 instead of 400 |
+| Aggregation tests — added 5 new edge-case tests, updated 2 existing | Awaiting_Review/Ready_For_Execution/Rejected/Failed aggregation paths were untested |
+| Test counts updated in §6 and verification checklist | Previous count (136) was stale; actual is 145 |
 
 ---
 
@@ -279,12 +294,12 @@ Add `findByIdWithFullHierarchy(id)` using TypeORM `createQueryBuilder` with left
 ## 6. Test Status
 
 ```
-Test Files: 12 (all passing)
-Total Tests: 136 passing
+Test Files: 10 (all passing)
+Total Tests: 145 passing
 
 tests/domain/task/
   taskStateMachine.test.ts              18 tests  (all transitions, valid and invalid)
-  TaskService.test.ts                   21 tests  (CRUD, state machine, input editing, audit, optimistic lock)
+  TaskService.test.ts                   23 tests  (CRUD, state machine, input editing, audit, optimistic lock)
   TaskExecutionHistoryService.test.ts   14 tests  (creation, attempt numbering, snapshots, completion)
   taskInputValidation.test.ts            7 tests  (accept valid JSON, reject undefined)
 
@@ -293,8 +308,8 @@ tests/domain/decision/
   ReleaseFlowProgressionService.test.ts  7 tests  (request completion, SIT→UAT→PROD, flow completion, auto-ready)
 
 tests/domain/releaseflow/
-  ReleaseFlowService.test.ts            18 tests  (create, getById, list, advanceStage, recompute)
-  releaseFlowAggregation.test.ts        24 tests  (bottom-up aggregation pure functions)
+  ReleaseFlowService.test.ts            20 tests  (create, getById, list, advanceStage, recompute)
+  releaseFlowAggregation.test.ts        29 tests  (bottom-up aggregation, summary status, edge cases)
 
 tests/domain/audit/
   AuditLoggerService.test.ts             5 tests  (append, swallow failure)
@@ -491,7 +506,7 @@ tests/
 | Backend API: 8 endpoints registered and wired | ✅ |
 | Error handling: centralized Fastify handler | ✅ |
 | DTO separation: no entity leaks to HTTP layer | ✅ |
-| 136 tests passing | ✅ |
+| 145 tests passing | ✅ |
 | TypeScript clean | ✅ |
 | ESLint clean | ✅ |
 | Upload/import implemented | ❌ Next batch |

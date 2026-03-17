@@ -89,7 +89,7 @@ Resolve remaining implementation blockers before feature development begins.
 
 ### Phase 1 — Foundation & Persistence
 - Oracle schema definition
-- JPA entities and repositories
+- TypeORM entities and repositories
 - transaction and locking model
 - test database setup
 - configuration and audit foundations
@@ -169,7 +169,7 @@ They are not optional.
 **Owner**: DevOps / Infrastructure  
 **Description**:
 - Select runtime secret provider for Jenkins / Ansible credentials
-- Confirm Spring Boot 3 integration approach
+- Confirm Fastify / TypeORM integration approach
 
 **Blocks**
 - T8.1
@@ -207,7 +207,7 @@ They are not optional.
 **Priority**: Must  
 **Owner**: Platform / Backend  
 **Description**:
-- Confirm how user identity and role are exposed to Spring Boot 3 services
+- Confirm how user identity and role are exposed to Fastify handlers (currently via X-User-Id/X-User-Role headers)
 - Confirm role names / claims mapping
 
 **Blocks**
@@ -237,7 +237,7 @@ They are not optional.
 ## 6. Task Breakdown by Domain
 
 ### Domain 1: Persistence & Data Layer
-Foundation tasks for Oracle schema, JPA entities, repositories, locking, and test infrastructure.
+Foundation tasks for Oracle schema, TypeORM entities, repositories, locking, and test infrastructure.
 
 ### Domain 2: Configuration Management
 Configuration CRUD, validation, and admin endpoints.
@@ -283,7 +283,7 @@ Unit, integration, contract, security, frontend, and E2E tests.
 
 ## Domain 1: Persistence & Data Layer
 
-### T1.1: Define Oracle Schema and JPA Entities
+### T1.1: Define Oracle Schema and TypeORM Entities
 **Priority**: Must
 **Owner**: Backend / Database
 **Depends on**: RESOLVE-Q6 (for Release Flow `release_id` and `stage` source confirmation)
@@ -297,7 +297,7 @@ Unit, integration, contract, security, frontend, and E2E tests.
   - ConfigurationItem
   - AuditLogEntry
 - Define PKs, FKs, indexes
-- Create Spring Boot 3 JPA entities
+- Create TypeORM entities with decorators
 - Ensure parent-child hierarchy is represented correctly
 - Include version fields for optimistic locking where needed
 
@@ -335,11 +335,11 @@ Unit, integration, contract, security, frontend, and E2E tests.
 
 ---
 
-### T1.2: Implement JPA Repositories
+### T1.2: Implement TypeORM Repositories
 **Priority**: Must  
 **Owner**: Backend  
 **Description**:
-- Create Spring Data JPA repositories for all core entities
+- Create TypeORM repositories for all core entities (with optional EntityManager for transactions)
 - Add key custom query methods:
   - find Release Flows with filters
   - find Requests by stage

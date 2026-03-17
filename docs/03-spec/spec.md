@@ -211,7 +211,7 @@ Minimum attributes:
 
 ### 6.2 Workflow Boundaries
 - **Entry point**: Developer uploads a deployment request in Deployment Agent
-- **Exit point**: Release Flow reaches a terminal state (`Completed`, `Rejected`, or `Cancelled`)
+- **Exit point**: Release Flow reaches a terminal state (`Completed`, `Rejected`, or `Failed`)
 - **Core control rule**: No flow progression after execution completion is allowed without explicit human decision
 
 ---
@@ -389,10 +389,11 @@ Valid values:
 Valid values:
 - `Pending`
 - `Running`
-- `Awaiting_Review`
 - `Completed`
+- `Failed`
 - `Rejected`
-- `Cancelled`
+
+> *Previous draft included `Awaiting_Review` and `Cancelled`. These were removed: `Awaiting_Review` is a task-level concern only; `Cancelled` is out of scope for MVP.*
 
 #### `stage_summary_status`
 Used only for summary display. Valid values:
@@ -404,10 +405,12 @@ Used only for summary display. Valid values:
 Valid values:
 - `Pending`
 - `Running`
-- `Awaiting_Review`
 - `Completed`
+- `Failed`
+- `Skipped`
 - `Rejected`
-- `Cancelled`
+
+> *Previous draft included `Awaiting_Review` and `Cancelled`. These were removed: `Awaiting_Review` is a task-level concern; `Cancelled` is out of scope. `Skipped` was added to support requests where all tasks are skipped.*
 
 ### 9.3 Task Status
 Valid values:
@@ -417,40 +420,47 @@ Valid values:
 - `Awaiting_Review`
 - `Approved`
 - `Rejected`
-- `Rerun_Queued`
 - `Skipped`
 - `Failed`
 
+> *Previous draft included `Rerun_Queued`. This was removed — the implemented rerun path transitions from `Rejected` or `Failed` back to `Ready_For_Execution` without an intermediate queued state.*
+
 ### 9.4 Task State Transitions
 
-- `Pending` → `Ready_For_Execution`
-- `Ready_For_Execution` → `Executing`
-- `Executing` → `Awaiting_Review`
-- `Awaiting_Review` → `Approved`
-- `Awaiting_Review` → `Rejected`
-- `Awaiting_Review` → `Rerun_Queued`
-- `Rerun_Queued` → `Executing`
-- `Awaiting_Review` → `Skipped`
-- `Executing` → `Failed`
+- `Pending` → `Ready_For_Execution` (on import or auto-progression)
+- `Pending` → `Skipped` (TL skip decision)
+- `Ready_For_Execution` → `Executing` (auto-triggered or manual record-result)
+- `Ready_For_Execution` → `Skipped` (TL skip decision)
+- `Executing` → `Awaiting_Review` (callback or manual result recording)
+- `Executing` → `Failed` (execution failure)
+- `Awaiting_Review` → `Approved` (TL approve decision)
+- `Awaiting_Review` → `Rejected` (TL reject decision)
+- `Rejected` → `Ready_For_Execution` (TL rerun decision; creates new execution history)
+- `Failed` → `Ready_For_Execution` (TL rerun decision; creates new execution history)
+
+> *Previous draft used `Awaiting_Review → Rerun_Queued → Executing` for reruns. The implemented model requires the task to be in a terminal-error state (`Rejected` or `Failed`) before rerun, transitioning back to `Ready_For_Execution`. This is intentionally conservative — explicit rejection before rerun.*
 
 ### 9.5 Stage Summary Aggregation Rule
 For MVP, stage summary status shall be calculated as follows:
 
 - **Done**
-  - all tasks in the stage are in terminal-success-like states:
+  - all tasks in the stage are in terminal states:
     - `Approved`
     - `Skipped`
+    - `Rejected`
+    - `Failed`
 - **Running**
-  - any task in the stage is in:
+  - any task in the stage is in an active state:
     - `Executing`
     - `Awaiting_Review`
-    - `Rerun_Queued`
+    - `Ready_For_Execution` (at least one task has been promoted)
 - **Pending**
   - all tasks in the stage are still in:
     - `Pending`
-    - `Ready_For_Execution`
 
-If mixed states exist and at least one task is in a running-like state, the stage summary shall be `Running`. `[ASSUMPTION]`
+If mixed states exist and at least one task is in a running-like or active state, the stage summary shall be `Running`. `[ASSUMPTION]`
+
+> *`Rejected` and `Failed` are terminal states and map to `Done` in summary display (the stage will not progress further). `Ready_For_Execution` is treated as active/running because at least one task has been promoted from its initial state.*
 
 ### 9.6 Reject Handling
 For MVP, when a TL selects `Reject`:
