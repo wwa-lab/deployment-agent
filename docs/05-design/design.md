@@ -19,7 +19,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 - External integration with Jenkins and Ansible via callback webhook
 
 **Key Assumptions Carried Forward**:
-- Vue 3 UI + Spring Boot 3 API + Oracle persistence
+- Vue 3 UI + **Node.js / TypeScript / Fastify 4 / TypeORM 0.3** API + Oracle persistence *(implemented stack; original assumption was Spring Boot 3)*
 - Fixed Excel template for MVP (dynamic schema out of scope)
 - Task reruns create new execution history records (same task_id, incremented attempt_number)
 - Atomic file-level import (no partial import)
@@ -58,7 +58,8 @@ This document provides a detailed, implementation-friendly design for the Deploy
 
 **Out-of-Scope Details**:
 - Detailed database DDL and indexing strategy (to be finalized in implementation)
-- Exact Excel template schema (to be provided separately)
+- Semantics of ambiguous template fields (`Common`, `Status`, `Validation`, `Dependencies`, `Execution Type` valid values) — pending OQ-25 through OQ-30
+- Source of `Release ID` and `Stage` in workbook — pending OQ-25
 - Secret store technology selection (to be decided)
 - Performance tuning and caching policies
 - Advanced filtering, export, and reporting UI
@@ -78,29 +79,64 @@ This document provides a detailed, implementation-friendly design for the Deploy
 ### 1. Upload & Import Service
 
 **Responsibilities**:
-- Receive Excel file from frontend
-- Parse Excel using fixed schema
-- Validate all rows and cells against schema
-- Extract deployment request data (Release ID, Project, Stage, Task definitions)
-- Determine Release Flow grouping (new vs. update) using grouping rule
-- Determine Release ID fallback if missing
-- Create or update Release Flow, Request, and Task records atomically
+- Receive `(file, stage)` from the upload request — Stage is a required request parameter provided by the user at upload time; it is never read from Excel rows
+- Parse the **AMH_HCC_task** sheet using the fixed column schema
+- Validate all rows and cells against the known field list
+- Extract `Project ID` and `Project Name` for Release Flow grouping
+- Look up active Release Flow by `project_id`:
+  - If none exists: create new Release Flow; generate `release_id` as `{stage}-{normalized_project_name}-{seq}`
+  - If one exists: attach new Request to it for the selected Stage
+- Create Request for the selected Stage within the Release Flow
+- Create one Task per data row under the Request
 - Create audit log entry for the upload action
 - Return structured import result with summary (created/updated count, errors)
 
 **Key Interactions**:
-- Receives HTTP file upload from frontend
+- Receives HTTP multipart upload with `file` and `stage` parameters
 - Calls Release Flow Service to create/lookup/update Release Flow
-- Calls Task Management Service to create/update tasks
+- Calls Task Management Service to create Tasks (one per row)
 - Calls Audit Logger to record upload event
-- Calls Configuration Service to read Excel template configuration (if dynamic in future)
 
 **Internal Design Concerns**:
+- **Stage source**: Stage is always from the HTTP upload parameter; never derived from file content
+- **Release ID generation**: `{stage}-{normalized_project_name}-{seq}` where `{seq}` is padded-sequential per project; generated once on new Release Flow creation
 - **Atomicity**: Import is atomic at file level; all rows succeed or fail together
-- **Idempotency**: Rerun of same Excel file updates existing records (not duplicates)
-- **Validation**: Multi-pass validation (schema, business rules)
-- **Error Reporting**: Accumulated errors returned to user with line numbers and field names
+- **Idempotency**: Rerun of same Excel file with same Stage updates existing records, matched by `(project_id, stage, task_group_id, step_seq)`
+- **Validation**: Required fields, date formats, `execution_type` must be `MANUAL` or `AUTO`
+- **Error Reporting**: Accumulated errors returned to user with row number and field name
 - **Transactionality**: Use Spring transaction boundaries to ensure atomicity
+
+**MANUAL vs AUTO task treatment on import**:
+- Both `MANUAL` and `AUTO` tasks are created in the same `Pending` state on import
+- `execution_type` is stored on the Task entity and determines the execution path at runtime
+- No state-machine difference during import; difference manifests at the execution phase
+
+#### Excel Template Field Parsing Specification
+
+| Template Column | Action | Parsed Into | Required | Validation Rule |
+|---|---|---|---|---|
+| `Project ID` | Map | `release_flow.project_id` | Yes | Non-blank string |
+| `Project Name` | Map | `release_flow.project_name` | Yes | Non-blank string |
+| `Task ID` | Map | `task.task_group_id` | Yes | Non-blank string; groups rows for display |
+| `Task Name` | Map | `task.task_group_name` | Yes | Non-blank string |
+| `Step seq#` | Map | `task.step_seq` | Yes | Positive integer; unique within `task_group_id` |
+| `Step` | Map | `task.task_name` | Yes | Non-blank string |
+| `Execution Type` | Map | `task.execution_type` | Yes | Must be `MANUAL` or `AUTO` (case-insensitive); reject otherwise |
+| `Script to be executed` | Map | `task.input_parameters.script` | Conditional | Required when execution is automated |
+| `Parameter (input)` | Map | `task.input_parameters.parameters` | No | String or parseable JSON |
+| `Parameter (Expected Output)` | Map | `task.expected_output` | No | String; shown during result review |
+| `Owner` | Map | `task.owner` | No | String |
+| `Planned Start date/time` | Map | `task.planned_start_time` | No | ISO 8601 or Excel date format |
+| `Planned End date/time` | Map | `task.planned_end_time` | No | ISO 8601 or Excel date format |
+| `Activity category` | Store in metadata | `task.import_metadata.activity_category` | No | No validation |
+| `Common` | Store in metadata | `task.import_metadata.common` | No | No validation |
+| `Dependencies` | Store in metadata | `task.import_metadata.dependencies` | No | No validation |
+| `Validation` | Store in metadata | `task.import_metadata.validation` | No | No validation |
+| `Status` | **Ignore** | not stored | — | Template tracking artefact; system sets Task to `Pending`; this column is never read |
+| `Start date/time` | **Drop** | not stored | — | Runtime value; system generates `start_time` at execution start |
+| `End date/time` | **Drop** | not stored | — | Runtime value; system generates `end_time` from callback |
+| `Release ID` | **System-generated** — not parsed from template | `release_flow.release_id` | N/A | Generated as `{stage}-{normalized_project_name}-{seq}` when Release Flow is first created |
+| `Stage` | **From HTTP upload `stage` parameter** — not from template rows | `request.stage` | Yes (from request param) | SIT \| UAT \| PROD; validated from the upload request, not from Excel |
 
 ---
 
@@ -308,18 +344,28 @@ This document provides a detailed, implementation-friendly design for the Deploy
 #### 9.4 Task Details and Results View
 - **Purpose**: Display tasks for selected Request with actions
 - **Components**:
-  - Task table with columns: Task Name, Status, Result Summary, Start Time, End Time
-  - Action dropdown per row: Edit, View Result, Decision (Approve/Reject/Rerun/Skip)
-  - Result modal: displays result summary and option to view raw logs
+  - Task table with columns: Task Name, Execution Type, Status, Result Summary, Start Time, End Time
+  - Action controls per row (shown based on task state and user role):
+    - **Edit** — for Pending / Ready_For_Execution tasks (TL only)
+    - **View Result** — for tasks with available result output
+    - **Record Result** — for MANUAL tasks in `Ready_For_Execution` state; opens inline form to enter actual result/output; on submit the system creates execution history and transitions task to `Awaiting_Review`
+    - **Decision** dropdown — for tasks in `Awaiting_Review` state: Approve / Reject / Rerun / Skip (TL only)
+  - Result modal: displays result summary, `expected_output` for comparison, and option to view raw logs
+- **MANUAL task visual indicator**: rows with `execution_type = MANUAL` should display a clear visual label so the TL knows no automated execution will occur
 
 #### 9.5 Upload Dialog
-- **Purpose**: Initiate Excel file import
+- **Purpose**: Initiate Excel file import with stage selection
 - **Components**:
+  - **Stage selector** (required dropdown: SIT / UAT / PROD) — must be selected before upload is enabled
   - File input control
   - Download Template button
   - View Sample button
-  - Upload button (disabled until file selected)
+  - Upload button (disabled until both Stage is selected and file is chosen)
   - Import status message (success/error detail)
+- **Behavior**:
+  - Stage selection is a prerequisite; upload is blocked without it
+  - Stage is submitted as a request parameter alongside the file; it is not read from the Excel content
+  - On success, display release_id of the created/updated Release Flow
 
 #### 9.6 Task Edit Dialog
 - **Purpose**: Edit task input parameters
@@ -327,6 +373,19 @@ This document provides a detailed, implementation-friendly design for the Deploy
   - Form fields for editable input parameters (per task type)
   - Validation feedback (real-time or on submit)
   - Save and Cancel buttons
+
+#### 9.6b Record Result Dialog (MANUAL tasks only)
+- **Purpose**: Allow operator to record the outcome of a manually-executed step
+- **Triggered by**: "Record Result" button on a MANUAL task row in `Ready_For_Execution` state
+- **Components**:
+  - Read-only display of `input_parameters.script`, `input_parameters.parameters`, and `expected_output` as reference context
+  - Text area or form field for operator to enter the actual result/output
+  - Save and Cancel buttons
+- **Behavior on Save**:
+  - System creates a `TaskExecutionHistory` record with `execution_type = MANUAL`, `attempt_number` incremented, and the entered result as `result_summary`
+  - System transitions task from `Ready_For_Execution` to `Awaiting_Review`
+  - Task row refreshes; Decision actions become available
+- **Authorization**: TL (same role as decision-making)
 
 #### 9.7 Decision Dialog
 - **Purpose**: Confirm and submit task-level decision
@@ -374,13 +433,13 @@ All endpoints use Spring Boot 3 patterns: resource-oriented, explicit DTOs, vali
 
 #### Upload Endpoint
 - **Path**: `POST /api/deployment-agent/upload`
-- **Purpose**: Submit Excel file for import
-- **Input**: Multipart form with file field
+- **Purpose**: Submit Excel file for import at a specified stage
+- **Input**: Multipart form with `file` field and required `stage` field (`SIT` | `UAT` | `PROD`)
 - **Output**:
-  - 200 OK: `{ success: true, message: "...", importLog: {...}, releaseFlowIds: [...] }`
+  - 200 OK: `{ success: true, message: "...", importLog: {...}, releaseFlowId: "...", releaseId: "...", stage: "..." }`
   - 400 Bad Request: `{ success: false, errors: [...], details: "..." }`
-- **Validation**: File size, file format (XLSX), schema compliance
-- **Authorization**: Any authenticated user (Developer, TL, Admin)
+- **Validation**: Stage required and valid; file required; file format (XLSX); schema compliance; `execution_type` must be `MANUAL` or `AUTO`
+- **Authorization**: Developer, TL (any authenticated user with upload permission)
 
 #### Release Flow List Endpoint
 - **Path**: `GET /api/deployment-agent/release-flows`
@@ -470,9 +529,10 @@ All endpoints use Spring Boot 3 patterns: resource-oriented, explicit DTOs, vali
 #### Release Flow
 - **Attributes**:
   - release_flow_id (PK)
-  - project
-  - release_id (nullable; fallback rule applied if missing)
-  - current_stage (SIT | UAT | PROD)
+  - project_id (from template `Project ID`; primary grouping key)
+  - project_name (from template `Project Name`; display)
+  - release_id (from workbook structure per OQ-25; nullable; fallback applied if absent)
+  - current_stage (SIT | UAT | PROD; from workbook structure per OQ-25)
   - flow_status (Pending | Running | Completed | Failed | Rejected)
   - review_status (Pending_Review | Approved | Rejected)
   - review_owner (user_id)
@@ -501,22 +561,42 @@ All endpoints use Spring Boot 3 patterns: resource-oriented, explicit DTOs, vali
   - Can be `Failed` if critical task fails
 
 #### Task
-- **Attributes**:
-  - task_id (PK)
+Represents one atomic execution step from the AMH_HCC_task template. One row = one Task.
+
+- **Core workflow attributes**:
+  - task_id (PK, system-generated)
   - request_id (FK)
-  - task_name
-  - task_type (e.g., deploy, smoke_test, database_migration)
+  - task_group_id (VARCHAR; from template `Task ID`; groups related steps for display ordering)
+  - task_group_name (VARCHAR; from template `Task Name`; display label)
+  - step_seq (INTEGER; from template `Step seq#`; execution ordering within task_group_id)
+  - task_name (VARCHAR; from template `Step`; name of this atomic step)
+  - execution_type (VARCHAR; enum: `MANUAL` | `AUTO`; determines execution path at runtime — MANUAL = human-executed externally; AUTO = system-submitted to pipeline)
+  - input_parameters (CLOB/JSON: `{ "script": "...", "parameters": "..." }` from template fields)
+  - expected_output (VARCHAR; nullable; from template `Parameter (Expected Output)`; shown during result review)
   - task_status (Pending | Ready_For_Execution | Executing | Awaiting_Review | Approved | Rejected | Skipped | Failed)
-  - input_parameters (JSON)
-  - current_result_summary (JSON, nullable)
+  - current_result_summary (CLOB, nullable)
   - latest_execution_id (FK to Task Execution History, nullable)
-  - start_time (nullable)
-  - end_time (nullable)
+  - start_time (TIMESTAMP, nullable; populated by execution service — NOT from template)
+  - end_time (TIMESTAMP, nullable; populated from execution callback — NOT from template)
   - last_updated_at
   - editable_statuses: [Pending, Ready_For_Execution] (enforced in service layer)
+
+- **Display-only attributes** (explicit columns; no workflow role):
+  - owner (VARCHAR; nullable; from template `Owner`)
+  - planned_start_time (TIMESTAMP; nullable; from template `Planned Start date/time`; shown in task list)
+  - planned_end_time (TIMESTAMP; nullable; from template `Planned End date/time`; shown in task list)
+
+- **Raw import metadata** (single JSON blob; no business logic reads this in MVP):
+  - import_metadata (VARCHAR2/CLOB; JSON object containing `activity_category`, `common`, `dependencies`, `validation` from the template; preserved for reference only)
+
+- **Fields NOT stored** (explicitly excluded):
+  - template `Status` — ignored; system always creates Tasks in `Pending`
+  - template `Start date/time` — not imported; system generates actual start
+  - template `End date/time` — not imported; system generates actual end from callback
+
 - **State Transitions**:
-  - Pending → Ready_For_Execution (manual or via rule)
-  - Ready_For_Execution → Executing (auto-triggered or manual)
+  - Pending → Ready_For_Execution (on import or progression rule)
+  - Ready_For_Execution → Executing (auto-triggered)
   - Executing → Awaiting_Review (callback from engine)
   - Awaiting_Review → Approved | Rejected | Skipped (decision)
   - Awaiting_Review → Executing (rerun decision)
@@ -573,6 +653,75 @@ Release Flow
 Configuration Item (independent)
 Audit Log Entry (independent, soft references to Release Flow / Request / Task)
 ```
+
+### Execution Payload Mapping
+
+`execution_type` has two values and determines completely different execution paths:
+
+#### AUTO tasks (execution_type = `AUTO`)
+The Execution Service submits the task to the configured execution pipeline:
+
+| Task Field | Execution Payload Role |
+|---|---|
+| `input_parameters.script` | The script or job name to invoke |
+| `input_parameters.parameters` | Runtime parameters passed to the script |
+| `task_id` | Correlation reference for callback matching |
+| `execution_id` | System-generated per attempt; included in callback for result correlation |
+| `task_group_id` + `step_seq` | Contextual metadata for observability |
+
+The Execution Service reads `jenkins_url` / `ansible_url` from Configuration Items and submits to the appropriate endpoint. A callback is expected to mark the task result and transition to `Awaiting_Review`.
+
+#### MANUAL tasks (execution_type = `MANUAL`)
+No automated submission. The Execution Service treats MANUAL tasks differently:
+
+- Task transitions to a "manual execution required" state (or stays at `Ready_For_Execution` with a MANUAL indicator)
+- The system displays `input_parameters.script`, `input_parameters.parameters`, and `expected_output` as reference instructions to the operator
+- The operator performs execution externally
+- The TL or operator records the result through an inline "Record Result" action in the UI
+- The system then transitions the task to `Awaiting_Review` for the normal decision gate
+- No callback endpoint is triggered for MANUAL tasks
+
+> **R-07 resolved**: MANUAL task result recording uses an inline "Record Result" button in the Task Details row. Clicking it opens a form where the operator enters the actual result/output. On form submission, the system creates a `TaskExecutionHistory` record and transitions the task to `Awaiting_Review`.
+
+---
+
+### Expected Output and Verification Handling
+
+`expected_output` (from template `Parameter (Expected Output)`) is a first-class field in the result review step.
+
+**Design decision**:
+- `expected_output` is stored on the Task entity and displayed side-by-side with the actual execution result in the Result Viewer
+- The TL manually compares actual vs. expected output during the verification step of the core workflow
+- The system does **not** auto-pass or auto-fail based on expected_output; the human decision gate is the authoritative verification mechanism in MVP
+
+---
+
+### Dependency, Validation, and Common Handling
+
+`Dependencies`, `Validation`, and `Common` from the template are **raw metadata fields with no workflow behavior in MVP**.
+
+**Design decision for all three**:
+- Stored in the `import_metadata` JSON blob on the Task entity
+- No gating logic, no automated processing, no state-transition control
+- These fields are preserved for future reference or post-MVP enhancement only
+- No open questions remain for these fields — the decision is final for MVP scope
+
+Execution sequencing in MVP is controlled solely by `step_seq` within `task_group_id`. No additional dependency resolution engine is needed.
+
+---
+
+### Scheduling Field Usage
+
+`planned_start_time` and `planned_end_time` (from template `Planned Start date/time` / `Planned End date/time`) are display-only fields.
+
+**Design decision**:
+- Stored as explicit timestamp columns on the Task entity for UI display in the task list
+- The system does **not** auto-start, delay, or gate execution based on planned dates in MVP
+- `start_time` (actual) is populated by the Execution Service when execution begins
+- `end_time` (actual) is populated from the execution callback when execution completes
+- Template `Start date/time` and `End date/time` columns are **not imported** — they are runtime values that the system generates, not planning inputs from the spreadsheet
+
+---
 
 ### State Aggregation Rules
 

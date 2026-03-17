@@ -118,9 +118,10 @@ Represents a deployment journey across one or more stages.
 
 Minimum attributes:
 - `release_flow_id`
-- `project`
-- `release_id`
-- `current_stage`
+- `project_id` — from template `Project ID`
+- `project_name` — from template `Project Name`
+- `release_id` — source TBD (not explicitly in AMH_HCC_task data rows; see OQ-25)
+- `current_stage` — SIT | UAT | PROD (source TBD; see OQ-25)
 - `flow_status`
 - `review_status`
 - `review_owner`
@@ -139,20 +140,33 @@ Minimum attributes:
 - `updated_at`
 
 #### Task
-Represents an executable step within a Request.
+Represents one atomic executable step within a Request.
+One row in the AMH_HCC_task template = one system Task.
 
-Minimum attributes:
-- `task_id`
-- `request_id`
-- `task_name`
-- `task_type`
+Core workflow attributes:
+- `task_id` — system-generated primary key
+- `request_id` — FK to parent Request
+- `task_group_id` — from template `Task ID`; groups related steps for display and ordering
+- `task_group_name` — from template `Task Name`; display label for the group
+- `step_seq` — from template `Step seq#`; execution ordering within the task group
+- `task_name` — from template `Step`; name of this atomic step
+- `execution_type` — from template `Execution Type`; enum: `MANUAL` | `AUTO`; determines execution path (MANUAL = human-executed externally with system reference display; AUTO = system submits to execution pipeline)
+- `input_parameters` — JSON `{ "script": "...", "parameters": "..." }` from template fields
+- `expected_output` — from template `Parameter (Expected Output)`; shown during result review
 - `task_status`
-- `input_parameters`
-- `result_summary`
-- `result_logs`
-- `start_time`
-- `end_time`
+- `current_result_summary`
+- `start_time` — actual execution start (system-generated; not from template)
+- `end_time` — actual execution end (system-generated from callback; not from template)
+- `latest_execution_id`
 - `last_updated_at`
+
+Display-only attributes (stored as explicit columns; do not control workflow):
+- `owner` — from template `Owner`
+- `planned_start_time` — from template `Planned Start date/time`
+- `planned_end_time` — from template `Planned End date/time`
+
+Raw import metadata (stored as JSON blob; no workflow behavior in MVP):
+- `import_metadata` — JSON containing `activity_category`, `common`, `dependencies`, `validation` from the template; preserved for reference but not processed by any business logic
 
 #### Audit Log Entry
 Represents an immutable record of an operator action.
@@ -217,10 +231,12 @@ Minimum attributes:
 ### 7.2 Request Upload and Validation
 
 - **FR-06**: The system shall provide an `Upload Excel` action in the Deployment Agent workspace.
-- **FR-07**: Selecting `Upload Excel` shall open a dialog containing `Download Template`, `View Sample`, and `Upload`.
-- **FR-08**: The system shall accept Excel files conforming to the fixed MVP template.
-- **FR-09**: The system shall validate uploaded Excel data against the fixed template schema.
-- **FR-10**: On successful validation, the system shall start import processing.
+- **FR-07**: Selecting `Upload Excel` shall open a dialog containing a Stage selector (SIT / UAT / PROD), a file picker, `Download Template`, `View Sample`, and `Upload`.
+- **FR-07a**: The upload dialog Stage selector shall be a required input. The user must select Stage before submitting the file.
+- **FR-07b**: Stage is not read from the Excel file; it is always provided explicitly by the user at upload time.
+- **FR-08**: The system shall accept Excel files conforming to the fixed MVP template (AMH_HCC_task sheet).
+- **FR-09**: The system shall validate uploaded Excel data against the fixed template schema. Stage-related columns are not validated from row data (Stage comes from the upload dialog Stage selector).
+- **FR-10**: On successful validation, the system shall start import processing using the user-selected Stage as the target stage for the imported data.
 - **FR-11**: On successful import completion, the system shall display a success message and provide access to the related import log.
 - **FR-12**: On validation failure, the system shall reject the upload and display actionable validation errors.
 - **FR-13**: Validation errors shall identify the relevant field or row when such context is available.
@@ -228,12 +244,16 @@ Minimum attributes:
 
 ### 7.3 Release Flow Creation and Update
 
-- **FR-15**: After successful import, the system shall create or update one or more Release Flow records.
-- **FR-16**: A single uploaded Excel file may produce multiple Release Flow records.
-- **FR-17**: The system shall transform imported Excel data into a Release Flow / Request / Task hierarchy.
-- **FR-18**: The system shall apply a defined grouping rule to determine whether import data creates a new Release Flow or updates an existing Release Flow.
-- **FR-19**: If `Release ID` is missing, the system shall apply a defined fallback rule.
-- **FR-20**: The grouping rule and fallback rule are required architecture inputs and must be explicitly documented before implementation.
+- **FR-15**: After successful import, the system shall create or update exactly one Release Flow record per uploaded file.
+- **FR-15a**: A single uploaded Excel file produces one Release Flow (for the `Project ID` in the file), one Request (for the selected Stage), and one Task per data row.
+- **FR-16**: The system shall group uploaded data into a Release Flow by `Project ID` (from the Excel `Project ID` column).
+- **FR-17**: The system shall transform imported Excel data into a Release Flow / Request / Task hierarchy:
+  - Release Flow: grouped by `project_id`; created if no active Release Flow exists for the project
+  - Request: created for the user-selected Stage within the Release Flow
+  - Task: one per Excel data row, in `step_seq` order
+- **FR-18**: If an active Release Flow already exists for the project, the system shall attach a new Request for the selected Stage to that Release Flow rather than creating a new Release Flow.
+- **FR-19**: Release ID shall be system-generated when a new Release Flow is created. The format shall be `{stage}-{normalized_project_name}-{seq}` where `{seq}` is a zero-padded sequential counter per project.
+- **FR-20**: Release ID shall remain fixed for the lifetime of the Release Flow. It shall not change when additional stages (UAT, PROD) are uploaded to the same Release Flow.
 
 ### 7.4 Release Flow Summary
 
@@ -443,23 +463,41 @@ For MVP, when a TL selects `Reject`:
 ## 10. Data / Configuration Requirements
 
 ### 10.1 Excel Template Schema
-The MVP depends on a fixed Excel template schema.
 
-The final schema must define:
-- field name
-- data type
-- required / optional
-- validation rule
-- example value
+The MVP uses a fixed Excel template based on the **AMH_HCC_task** (steps table) sheet.
 
-**Minimum required fields** for architecture planning:
-- `Project`
-- `Release ID` (may be blank if fallback rule applies)
-- `Stage`
-- `Task Name`
-- task input fields required by task type
+Each row in the template represents one atomic step within a logical task group. Multiple rows may share the same `Task ID` to form one logical task; `Step seq#` defines execution ordering within that group.
 
-A formal template schema artifact should be attached or referenced before implementation begins.
+#### AMH_HCC_task Field Definitions
+
+The table below classifies each field by its intended use in the MVP system. Fields are not treated equally just because they appear in the template.
+
+| Field | Import Action | System Role | Stored As |
+|---|---|---|---|
+| `Project ID` | Parse and map | **Core** — Release Flow grouping key | `release_flow.project_id` column |
+| `Project Name` | Parse and map | Display | `release_flow.project_name` column |
+| `Task ID` | Parse and map | Display grouping + ordering context | `task.task_group_id` column |
+| `Task Name` | Parse and map | Display | `task.task_group_name` column |
+| `Step seq#` | Parse and map | **Core** — execution ordering | `task.step_seq` column |
+| `Step` | Parse and map | **Core** — atomic step identity | `task.task_name` column |
+| `Execution Type` | Parse and map | **Core** — execution mode: `MANUAL` (human-executed externally) or `AUTO` (system-submitted to pipeline) | `task.execution_type` column (enum: MANUAL \| AUTO) |
+| `Script to be executed` | Parse and map | **Core** — execution payload | `task.input_parameters.script` (JSON) |
+| `Parameter (input)` | Parse and map | **Core** — execution payload | `task.input_parameters.parameters` (JSON) |
+| `Parameter (Expected Output)` | Parse and map | **Core** — result verification comparison | `task.expected_output` column |
+| `Owner` | Parse and map | Display | `task.owner` column |
+| `Planned Start date/time` | Parse and map | Display only; does NOT gate or trigger execution | `task.planned_start_time` column |
+| `Planned End date/time` | Parse and map | Display only; does NOT gate or trigger execution | `task.planned_end_time` column |
+| `Activity category` | Parse and store | Raw metadata; no workflow behavior in MVP | `task.import_metadata` JSON blob |
+| `Common` | Parse and store | Raw metadata; no workflow behavior in MVP | `task.import_metadata` JSON blob |
+| `Dependencies` | Parse and store | Raw metadata; no gating logic in MVP | `task.import_metadata` JSON blob |
+| `Validation` | Parse and store | Raw metadata; no automated validation in MVP | `task.import_metadata` JSON blob |
+| `Status` | **Ignored on import** | Template tracking artifact; system always creates Tasks in `Pending` | Not stored |
+| `Start date/time` | **Dropped** | System generates actual start from execution | Not stored from template |
+| `End date/time` | **Dropped** | System generates actual end from callback | Not stored from template |
+| `Release ID` | **System-generated** — not from template | **Core** — Release Flow identification; format: `{stage}-{normalized_project_name}-{seq}` | `release_flow.release_id` column |
+| `Stage` | **From upload UI** — not from template rows | **Core** — Request stage; user selects SIT/UAT/PROD in upload dialog | `request.stage` column |
+
+> All previously open questions (OQ-25: Stage/Release ID source; OQ-28: Execution Type values) are now resolved by confirmed business rules. No open questions remain for the Excel template interpretation.
 
 ### 10.2 Task Input Schema
 Task input editing requires a task input schema.
@@ -570,10 +608,12 @@ The architecture solution must ensure:
 
 | ID | Description | Type | Impact | Recommendation |
 |---|---|---|---|---|
-| R-01 | Excel template schema is not fully frozen | Gap | High | Freeze and attach schema before implementation |
-| R-02 | Release Flow grouping rule may affect import logic and deduplication | Gap | High | Confirm grouping rule before design freeze |
-| R-03 | Release ID fallback rule is not finalized | Gap | High | Define explicit fallback rule |
-| R-04 | Task input schema is not yet attached | Gap | High | Create referenced schema artifact |
+| R-01 | ~~Excel template schema ambiguity~~ **Resolved**: AMH_HCC_task field list confirmed; Stage from UI upload; Release ID system-generated; Execution Type = MANUAL \| AUTO. All field semantics resolved. | Closed | — | No action required |
+| R-02 | ~~Release ID / Stage source unknown~~ **Resolved**: Stage from upload UI; Release ID = `{stage}-{normalized_project_name}-{seq}` | Closed | — | No action required |
+| R-03 | ~~Execution Type valid values unknown~~ **Resolved**: MANUAL \| AUTO | Closed | — | No action required |
+| R-05 | Editable task statuses are currently based on working assumption | Assumption | Medium | Validate during architecture review |
+| R-06 | Review Owner cardinality (single user vs group) not finalized | Unclear | Medium | Confirm in design |
+| R-07 | ~~MANUAL task execution UX~~ **Resolved**: inline "Record Result" button in Task Details row; form to enter actual result; system transitions to `Awaiting_Review` | Closed | — | No action required |
 | R-05 | Editable task statuses are currently based on working assumption | Assumption | Medium | Validate during architecture review |
 | R-06 | Result display detail beyond minimum output may expand later | Scope | Medium | Keep minimum guarantee in MVP |
 | R-07 | Review Owner cardinality (single user vs group) is not finalized | Unclear | Medium | Confirm in design |
@@ -633,6 +673,10 @@ The following are explicitly out of scope for MVP:
 | OQ-22 | What credential / secret storage solution will architecture adopt? | Architecture |
 | OQ-23 | Is initial execution always auto-triggered from `Ready_For_Execution`? | Product / Architecture |
 | OQ-24 | What is the final SLA / performance target for MVP operations? | Product / Engineering |
+| OQ-25 | ~~Where do Release ID and Stage come from?~~ **Resolved**: Stage is selected by user at upload time; Release ID is system-generated (`{stage}-{normalized_project_name}-{seq}`). | Closed |
+| OQ-28 | ~~What are the valid values for Execution Type?~~ **Resolved**: `MANUAL` \| `AUTO`. MANUAL = human-executed externally; AUTO = system-submitted to pipeline. | Closed |
+
+> All template-related open questions (OQ-25 through OQ-30) are now resolved. No open questions block Excel template implementation.
 
 ---
 
@@ -640,13 +684,13 @@ The following are explicitly out of scope for MVP:
 
 The following decisions should be confirmed before implementation design is finalized:
 
-1. Frozen Excel template schema
-2. Release Flow grouping rule
-3. Release ID fallback rule
+1. ~~Source of Release ID and Stage~~ — **Resolved**: Stage from UI upload; Release ID system-generated (`{stage}-{normalized_project_name}-{seq}`)
+2. ~~Execution Type valid values~~ — **Resolved**: `MANUAL` | `AUTO`
+3. ~~MANUAL task execution UX (R-07)~~ — **Resolved**: inline "Record Result" button in the Task Details row; opens a form to enter actual result/output; system transitions task to `Awaiting_Review`
 4. Final confirmation of editable task statuses
-5. Attached task input schema
+5. Task input schema per `execution_type` (MANUAL vs AUTO may have different editable fields)
 6. Final confirmation of third configuration item
-7. Final confirmation of initial execution trigger behavior
+7. Final confirmation of initial execution trigger behavior for AUTO tasks
 
 These items are tracked in `Open Questions` and `Risks / Ambiguities` and are not hidden assumptions.
 

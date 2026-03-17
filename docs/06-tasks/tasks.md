@@ -7,8 +7,8 @@ The system is a human-in-the-loop deployment orchestration platform embedded in 
 
 **Implementation Stack**
 - **Frontend**: Vue 3
-- **Backend**: Spring Boot 3
-- **Database**: Oracle
+- **Backend**: Node.js / TypeScript / Fastify 4 / TypeORM 0.3 *(implemented; original doc said Spring Boot 3 — repo uses Node.js stack)*
+- **Database**: Oracle (production); sql.js in-memory SQLite for tests
 
 **MVP Workflow**
 - Upload Excel
@@ -44,30 +44,37 @@ The following decisions are already frozen in the final design and must **not** 
    - Human-in-the-loop control applies after execution, before progression.
 
 2. **Release Flow grouping rule**
-   - Group by `(project, normalized_release_id)`
+   - Group by `project_id` (from Excel `Project ID` column)
+   - Stage is selected by user at upload time; not from Excel
 
-3. **Release ID fallback rule**
-   - If Release ID is missing, backend generates:
-     - `{project}_{yyyyMMdd}_{rowGroupHash}`
+3. **Release ID generation rule**
+   - System-generated when new Release Flow is created
+   - Format: `{stage}-{normalized_project_name}-{seq}` (e.g., `sit-paymenthub-0001`)
+   - Fixed for the lifetime of the Release Flow
 
-4. **Rerun model**
+4. **Execution Type model**
+   - `MANUAL`: human-executed externally; system displays reference instructions; TL records result
+   - `AUTO`: system submits to execution pipeline; result received via callback
+   - Both paths converge at `Awaiting_Review` for the human decision gate
+
+5. **Rerun model**
    - Same logical `task_id`
    - New `TaskExecutionHistory` record per rerun
    - `attempt_number` increments
 
-5. **Summary display status**
+6. **Summary display status**
    - Summary tables use only:
      - `Done`
      - `Running`
      - `Pending`
 
-6. **RBAC contract**
+7. **RBAC contract**
    - **Developer**: upload + view
    - **TL**: view + edit task input + decide
    - **DevOps Admin**: configuration management + operational viewing
    - **Audit / Management**: audit log viewing
 
-7. **Configuration update policy**
+8. **Configuration update policy**
    - Configuration changes apply to **future executions only**
    - They do not affect in-flight tasks already in `Executing`
 
@@ -122,27 +129,16 @@ Resolve remaining implementation blockers before feature development begins.
 These are pre-implementation tasks.  
 They are not optional.
 
-### RESOLVE-Q1: Freeze Excel Template Schema
-**Priority**: Must  
-**Owner**: Product / Requirements  
-**Description**:
-- Provide final Excel schema for MVP
-- Define:
-  - field names
-  - required / optional
-  - data types
-  - validation rules
-  - example rows
+### RESOLVE-Q1: Confirm Remaining Excel Template Blockers
+**Status**: ✅ FULLY RESOLVED — no action required
 
-**Blocks**
-- T6.1
-- T6.2
-- T6.3
+**Resolution summary**:
+- `Execution Type` valid values → **`MANUAL` | `AUTO`** (confirmed)
+- `Stage` source → **user selects at upload time** via upload dialog dropdown (confirmed)
+- `Release ID` source → **system-generated** as `{stage}-{normalized_project_name}-{seq}` (confirmed)
+- `Common`, `Status`, `Validation`, `Dependencies` → stored as raw metadata or ignored (resolved by design decision)
 
-**Acceptance Criteria**
-- Schema artifact is published and versioned
-- Engineering can validate uploads against it
-- No core import column remains undefined
+**No blockers remain from this task. Implementation can proceed.**
 
 ---
 
@@ -226,6 +222,18 @@ They are not optional.
 
 ---
 
+### RESOLVE-Q6: Confirm Release ID and Stage Source in Workbook
+**Status**: ✅ FULLY RESOLVED — no action required
+
+**Resolution summary**:
+- **Stage**: NOT from the workbook. User selects Stage (SIT / UAT / PROD) in the upload dialog at upload time. Passed as a required HTTP parameter alongside the file.
+- **Release ID**: NOT from the workbook. System-generated when a new Release Flow is created, using format `{stage}-{normalized_project_name}-{seq}` (e.g., `sit-paymenthub-0001`). Remains fixed for the lifetime of the Release Flow.
+- **Release Flow grouping key**: `project_id` from the Excel `Project ID` column. If an active Release Flow already exists for the project, new stage uploads attach to it. Otherwise a new Release Flow is created.
+
+**No blockers remain from this task. Implementation can proceed.**
+
+---
+
 ## 6. Task Breakdown by Domain
 
 ### Domain 1: Persistence & Data Layer
@@ -276,13 +284,15 @@ Unit, integration, contract, security, frontend, and E2E tests.
 ## Domain 1: Persistence & Data Layer
 
 ### T1.1: Define Oracle Schema and JPA Entities
-**Priority**: Must  
-**Owner**: Backend / Database  
+**Priority**: Must
+**Owner**: Backend / Database
+**Depends on**: RESOLVE-Q6 (for Release Flow `release_id` and `stage` source confirmation)
+
 **Description**:
 - Create Oracle DDL for:
-  - Release Flow
+  - Release Flow (now uses `project_id` + `project_name` instead of generic `project`)
   - Request
-  - Task
+  - Task (see expanded field list below)
   - TaskExecutionHistory
   - ConfigurationItem
   - AuditLogEntry
@@ -291,10 +301,36 @@ Unit, integration, contract, security, frontend, and E2E tests.
 - Ensure parent-child hierarchy is represented correctly
 - Include version fields for optimistic locking where needed
 
+**Task entity columns — core workflow**:
+- `task_group_id` (VARCHAR; from `Task ID`; index for group queries)
+- `task_group_name` (VARCHAR; from `Task Name`)
+- `step_seq` (INTEGER; from `Step seq#`; composite unique key with `task_group_id`)
+- `task_name` (VARCHAR; from `Step`)
+- `execution_type` (VARCHAR; enum `MANUAL` | `AUTO`; index for execution-path branching)
+- `input_parameters` (CLOB; JSON with `script` and `parameters`)
+- `expected_output` (VARCHAR2 or CLOB; nullable; from `Parameter (Expected Output)`)
+
+**Task entity columns — display only**:
+- `owner` (VARCHAR; nullable; from `Owner`)
+- `planned_start_time` (TIMESTAMP; nullable)
+- `planned_end_time` (TIMESTAMP; nullable)
+
+**Task entity columns — raw import metadata** (single JSON blob; replaces individual columns for low-value fields):
+- `import_metadata` (VARCHAR2 4000 or CLOB; JSON containing `activity_category`, `common`, `dependencies`, `validation`; no business logic accesses this in MVP)
+
+**NOT added to schema**:
+- No `template_status` column — this value is not stored
+- No `start_time_from_template` or `end_time_from_template` — template runtime fields are ignored
+
+**Release Flow entity**:
+- `project_id` (VARCHAR; from `Project ID`; replaces generic `project` field)
+- `project_name` (VARCHAR; from `Project Name`)
+
 **Acceptance Criteria**
 - Entities compile and map correctly
-- Oracle schema supports all MVP entities
+- Oracle schema supports all MVP entities including all template-derived Task fields
 - Foreign key constraints enforce integrity
+- Composite index on `(task_group_id, step_seq)` exists on Task table
 - Indexing plan documented
 
 ---
@@ -597,51 +633,96 @@ Unit, integration, contract, security, frontend, and E2E tests.
 ## Domain 6: Upload & Import Service
 
 ### T6.1: Implement Excel Parsing and Validation
-**Priority**: Must  
-**Owner**: Backend  
+**Priority**: Must
+**Owner**: Backend
+**Blocked by**: nothing — all blockers resolved
+
 **Description**:
-- Parse XLSX file using fixed schema
-- Validate structure, required fields, and field formats
-- Accumulate row-level validation errors
+Parse XLSX file using the **AMH_HCC_task** sheet. Apply the following import rules per column:
+
+**Map to domain fields** (required unless noted):
+- `Project ID` → `release_flow.project_id` (required; non-blank)
+- `Project Name` → `release_flow.project_name` (required; non-blank)
+- `Task ID` → `task.task_group_id` (required; non-blank)
+- `Task Name` → `task.task_group_name` (required; non-blank)
+- `Step seq#` → `task.step_seq` (required; positive integer; unique within `Task ID`)
+- `Step` → `task.task_name` (required; non-blank)
+- `Execution Type` → `task.execution_type` (required; must be `MANUAL` or `AUTO`, case-insensitive; reject any other value)
+- `Script to be executed` → `task.input_parameters.script` (conditional; required when execution is automated)
+- `Parameter (input)` → `task.input_parameters.parameters` (optional)
+- `Parameter (Expected Output)` → `task.expected_output` (optional)
+- `Owner` → `task.owner` (optional)
+- `Planned Start date/time` → `task.planned_start_time` (optional; validate date format)
+- `Planned End date/time` → `task.planned_end_time` (optional; validate date format)
+
+**Store in `import_metadata` JSON blob** (no validation, no business logic):
+- `Activity category`, `Common`, `Dependencies`, `Validation`
+
+**Ignore completely** (do not read or store):
+- `Status` — system always creates Tasks in `Pending` regardless of this column
+- `Start date/time` — system-generated at execution; not from template
+- `End date/time` — system-generated from callback; not from template
+
+**Not parsed from Excel** (obtained from other sources):
+- `Stage` → read from the HTTP upload request parameter (not from Excel); validated as SIT | UAT | PROD
+- `Release ID` → system-generated when a new Release Flow is created; not parsed from Excel at all
 
 **Acceptance Criteria**
-- Valid files parse successfully
-- Invalid files return structured errors
-- Errors identify row and field where possible
+- Valid files parse successfully; one Task created per data row
+- Required columns validated; row + column identified in errors
+- `Step seq#` uniqueness enforced within `Task ID` group
+- `Execution Type` validated: must be `MANUAL` or `AUTO`; any other value produces a row-level error
+- `Status`, `Start date/time`, `End date/time` are NOT imported
+- `Activity category`, `Common`, `Dependencies`, `Validation` are stored as-is in `import_metadata` JSON
+- Stage is taken from HTTP request parameter, not from Excel rows
+- Release ID is never read from Excel; generation is handled in T6.2
 
 ---
 
-### T6.2: Implement Release Flow Grouping and Upsert Logic
-**Priority**: Must  
-**Owner**: Backend  
+### T6.2: Implement Release Flow Grouping and Release ID Generation
+**Priority**: Must
+**Owner**: Backend
+**Blocked by**: nothing — all blockers resolved
+
 **Description**:
-- Implement grouping by:
-  - `(project, normalized_release_id)`
-- Apply deterministic fallback when Release ID is missing
-- Create or update Release Flow hierarchy accordingly
-- Ensure repeated imports do not create duplicates incorrectly
+- Group uploaded data by `project_id` (from the Excel `Project ID` column)
+- Look up active Release Flow by `project_id`:
+  - **If none exists**: create new Release Flow; generate `release_id` as `{stage}-{normalized_project_name}-{seq}` where `{seq}` is a zero-padded sequential counter per project (e.g., `0001`)
+  - **If one exists**: attach a new Request to the existing Release Flow for the selected Stage
+- Create Request with `stage` = user-selected stage from upload parameter
+- Tasks are matched for upsert by `(release_flow_id, stage, task_group_id, step_seq)` on re-upload
+- Ensure repeated uploads of the same file + stage combination update existing records rather than creating duplicates
+- Release ID once generated remains fixed for the Release Flow lifetime
 
 **Acceptance Criteria**
-- Grouping rule matches locked design
-- Missing Release ID handled deterministically
-- Repeated upload does not create unintended duplicates
+- Release Flow created if none exists for the project; Release ID generated in correct format
+- Existing Release Flow found by `project_id`; new Request attached for selected Stage
+- Stage comes from HTTP upload parameter, not from Excel rows
+- Release ID is never read or parsed from Excel
+- Repeated upload with same project + stage updates tasks, does not create duplicates
+- Release ID format is `{stage}-{normalized_project_name}-{seq}` (e.g., `sit-paymenthub-0001`)
 
 ---
 
 ### T6.3: Implement Upload Controller and Endpoint
-**Priority**: Must  
-**Owner**: Backend  
+**Priority**: Must
+**Owner**: Backend
+**Blocked by**: nothing — all blockers resolved
+
 **Description**:
-- Implement upload endpoint
-- Call Import Service
-- Return success summary or structured validation errors
-- Audit upload result
+- Implement `POST /api/deployment-agent/upload` as multipart upload
+- Accept required parameters: `file` (XLSX) and `stage` (SIT | UAT | PROD)
+- Validate `stage` parameter before passing to Import Service; reject with 400 if missing or invalid
+- Call Import Service with `(file, stage)` tuple
+- Return success summary including `releaseFlowId`, `releaseId`, `stage`, and row count; or structured validation errors with row and field detail
+- Audit the upload event (success or failure)
 
 **Acceptance Criteria**
-- Upload endpoint matches design contract
-- Authenticated upload works
-- Import results are returned correctly
-- Upload action is audited
+- Endpoint accepts `file` + `stage` as required multipart parameters
+- Missing or invalid `stage` returns 400 before any file processing
+- Import results (release_id, stage, counts) returned on success
+- Structured validation errors with row/field detail returned on failure
+- Upload action is audited regardless of outcome
 
 ---
 
@@ -706,33 +787,82 @@ Unit, integration, contract, security, frontend, and E2E tests.
 ## Domain 8: Execution Service & Adapters
 
 ### T8.1: Implement Execution Service Orchestration
-**Priority**: Must  
-**Owner**: Backend / Integration  
+**Priority**: Must
+**Owner**: Backend / Integration
+
 **Description**:
-- Implement execution submission orchestration
+The Execution Service must handle two distinct paths based on `execution_type`:
+
+**AUTO tasks** (`execution_type = AUTO`):
 - Auto-trigger execution when task enters `Ready_For_Execution`
-- Resolve config and secret dependencies
-- Prepare execution payload and create execution correlation
+- Build execution payload from `input_parameters.script` and `input_parameters.parameters`
+- Read `jenkins_url` or `ansible_url` from Configuration Items
+- Submit payload to execution endpoint; create `TaskExecutionHistory` record with generated `execution_id`
+- Transition task to `Executing`; await callback
+
+**MANUAL tasks** (`execution_type = MANUAL`):
+- When task enters `Ready_For_Execution`, no automated submission occurs
+- Display `input_parameters.script`, `input_parameters.parameters`, and `expected_output` as reference instructions via a "Record Result" button in the Task Details row
+- Operator performs execution externally; then clicks "Record Result" to enter actual output
+- System creates `TaskExecutionHistory` record with `execution_type = MANUAL`, incremented `attempt_number`, and entered result as `result_summary`
+- System transitions task from `Ready_For_Execution` directly to `Awaiting_Review`
+- No callback endpoint involved for MANUAL tasks
 
 **Acceptance Criteria**
-- Execution can be submitted from ready state
-- Correlation between task and execution attempt is created
-- No manual execute endpoint is required for MVP
+- AUTO tasks: submitted to execution endpoint on `Ready_For_Execution`; `execution_id` correlation created
+- MANUAL tasks: not submitted to execution endpoint; displayed as reference instructions
+- Both paths: `TaskExecutionHistory` record created per execution attempt
+- Both paths: task eventually reaches `Awaiting_Review` for the decision gate
+- No MANUAL task ever reaches an external execution endpoint
 
 ---
 
-### T8.2: Implement Jenkins / Ansible Adapter Abstraction
-**Priority**: Must  
-**Owner**: Backend / Integration  
+### T8.2: Implement Execution Adapter for AUTO Tasks
+**Priority**: Must
+**Owner**: Backend / Integration
+**Blocked by**: nothing — all blockers resolved
+
 **Description**:
-- Create adapter abstraction for execution engines
-- Route execution by task type
-- Support request submission and error handling
+- The execution adapter applies only to `AUTO` tasks; MANUAL tasks bypass this entirely
+- Create an adapter that submits `input_parameters.script` and `input_parameters.parameters` to the configured execution endpoint (`jenkins_url` or `ansible_url` from Configuration Items)
+- The adapter is selected based on configuration, not on `execution_type` value (MANUAL/AUTO is a mode, not an adapter selector)
+- Include `execution_id` and `task_id` in the submission payload for callback correlation
+- Handle submission errors: log, mark task as `Failed`, do not leave task stuck in `Executing`
 
 **Acceptance Criteria**
-- Adapter routing works
-- Execution request abstraction supports both integrations
-- Submission failures are handled consistently
+- Only AUTO tasks are submitted through this adapter
+- MANUAL tasks never reach this adapter
+- Adapter reads endpoint URL from Configuration Items at runtime
+- `execution_id` is included in submission payload for callback correlation
+- Submission failures are handled: task transitions to `Failed` with error detail
+- Adapter is abstracted enough to support future additional endpoints
+
+---
+
+### T8.1b: Implement Record Result Endpoint for MANUAL Tasks
+**Priority**: Must
+**Owner**: Backend
+
+**Description**:
+- Implement `POST /api/deployment-agent/tasks/{id}/record-result`
+- Accepts `{ resultSummary: "..." }` payload from TL
+- Guards: task must be MANUAL and in `Ready_For_Execution` state; TL role required
+- Creates `TaskExecutionHistory` record with:
+  - `execution_type = MANUAL`
+  - `attempt_number` incremented from previous attempt (or 1 if first)
+  - `result_summary` = operator-entered value
+  - `start_time` = `last_updated_at` of task (or provided by caller)
+  - `end_time` = now
+- Transitions task status from `Ready_For_Execution` to `Awaiting_Review`
+- Updates `latest_execution_id` on Task
+- Creates audit log entry for the record-result action
+
+**Acceptance Criteria**
+- Endpoint only accepts MANUAL tasks in the correct state; rejects AUTO tasks or wrong state
+- TL authorization enforced server-side
+- `TaskExecutionHistory` created with correct fields
+- Task transitions to `Awaiting_Review`
+- Audit log entry created
 
 ---
 
@@ -935,33 +1065,70 @@ Unit, integration, contract, security, frontend, and E2E tests.
 ---
 
 ### T11.4: Implement Task Details View
-**Priority**: Must  
-**Owner**: Frontend  
+**Priority**: Must
+**Owner**: Frontend
+
 **Description**:
 - Display task list for selected Request
-- Render status and action visibility by task state and role
-- Support result viewing
+- Show `Execution Type` column (MANUAL / AUTO) with visual indicator for MANUAL tasks
+- Render action controls per row based on task state and role:
+  - **Edit**: Pending / Ready_For_Execution tasks (TL only)
+  - **Record Result**: MANUAL tasks in `Ready_For_Execution` state (TL only); opens Record Result dialog
+  - **View Result**: tasks with result output
+  - **Decision** (Approve/Reject/Rerun/Skip): tasks in `Awaiting_Review` (TL only)
+- Support result viewing with `expected_output` shown alongside actual result for comparison
 
 **Acceptance Criteria**
-- Task list renders correctly
-- Action visibility is correct
-- Result access works
+- MANUAL tasks show "Record Result" button when in `Ready_For_Execution`; AUTO tasks do not
+- Decision actions appear only for `Awaiting_Review` tasks
+- `expected_output` is displayed in the result view for comparison
+- Action visibility is correct by task state and user role
 
 ---
 
 ### T11.5: Implement Upload Dialog
-**Priority**: Must  
-**Owner**: Frontend  
+**Priority**: Must
+**Owner**: Frontend
+
 **Description**:
-- File select
-- upload action
-- validation feedback
-- import success/error display
-- refresh summary after success
+- **Stage selector** (required dropdown: SIT / UAT / PROD) — must be selected before Upload is enabled
+- File picker control
+- Download Template button
+- View Sample button
+- Upload button (disabled until both Stage is selected AND file is chosen)
+- Submit both `stage` parameter and `file` as multipart to upload endpoint
+- Show validation feedback: row-level errors with field and row number
+- Show import success: display `release_id` and stage of the created/updated Release Flow
+- Refresh Release Flow Summary list after successful import
 
 **Acceptance Criteria**
-- Upload flow works end-to-end
-- Success and error states display correctly
+- Stage selector is a required field; Upload button blocked without selection
+- Stage is submitted as request parameter alongside the file
+- Success state shows `release_id` and stage confirmation
+- Validation errors shown with row and column detail
+- Summary list refreshes after successful import
+
+---
+
+### T11.5b: Implement Record Result Dialog (MANUAL tasks)
+**Priority**: Must
+**Owner**: Frontend
+
+**Description**:
+- Dialog triggered by "Record Result" button on MANUAL tasks in `Ready_For_Execution` state
+- Display read-only reference panel: `task_name`, `input_parameters.script`, `input_parameters.parameters`, `expected_output`
+- Text area for operator to enter actual result/output
+- Save and Cancel buttons
+- On Save: call `POST /api/deployment-agent/tasks/{id}/record-result`
+- On success: close dialog; refresh task row; task should now show `Awaiting_Review` with Decision actions
+- On error: display error message inline
+
+**Acceptance Criteria**
+- Dialog shows reference info (script, params, expected output) read-only
+- Operator can enter actual result text
+- Save submits to backend record-result endpoint
+- Task row refreshes to `Awaiting_Review` after success
+- Error displayed if submission fails
 
 ---
 
@@ -1280,13 +1447,17 @@ Unit, integration, contract, security, frontend, and E2E tests.
 
 ## 11. Implementation Readiness Matrix
 
-| Blocker | Affected Tasks | Owner | Required By |
-|---|---|---|---|
-| Excel schema | T6.1, T6.2, T6.3 | Product | Phase 2 |
-| Callback authentication | T9.2, T13.5 | DevOps / Security | Phase 3 |
-| Secret store technology | T8.1, T8.2 | DevOps / Infra | Phase 3 |
-| Oracle result storage decision | T9.1, T9.3, T13.4 | DBA / Backend | Phase 3 |
-| WWA auth context contract | T10.4, T12.2, T13.5 | Platform | Phase 1 |
+| Blocker | Affected Tasks | Owner | Required By | Status |
+|---|---|---|---|---|
+| Stage source in workbook (RESOLVE-Q6 / OQ-25) | T6.1, T6.2, T6.3 | — | — | ✅ Resolved: Stage from upload UI selector |
+| Release ID source (RESOLVE-Q6 / OQ-25) | T6.2, T1.1 | — | — | ✅ Resolved: System-generated `{stage}-{project}-{seq}` |
+| `Execution Type` valid values (OQ-28) | T6.1, T8.1, T8.2 | — | — | ✅ Resolved: `MANUAL` \| `AUTO` |
+| `Common`, `Status`, `Validation`, `Dependencies` semantics | — | — | — | ✅ Resolved: raw metadata or ignored |
+| MANUAL task execution UX (R-07) | T8.1, T11.4, T11.6 | — | — | ✅ Resolved: inline "Record Result" button → form → `Awaiting_Review` |
+| Callback authentication | T9.2, T13.5 | DevOps / Security | Phase 3 | Open |
+| Secret store technology | T8.2 | DevOps / Infra | Phase 3 | Open |
+| Oracle result storage decision | T9.1, T9.3, T13.4 | DBA / Backend | Phase 3 | Open |
+| WWA auth context contract | T10.4, T12.2, T13.5 | Platform | Phase 1 | Open |
 
 ---
 

@@ -48,9 +48,9 @@ This decision must be confirmed before detailed design begins.
 ### Conceptual Entities
 | Entity | Description | Key Attributes |
 |---|---|---|
-| Release Flow | Top-level deployment journey across stages | release_flow_id, project, release_id, current_stage (SIT/UAT/PROD), flow_status, review_status, review_owner, created_at, updated_at |
+| Release Flow | Top-level deployment journey across stages | release_flow_id, project_id (from template `Project ID`), project_name (from `Project Name`), release_id (source TBD — not in AMH_HCC_task data rows; see OQ-25), current_stage (SIT/UAT/PROD — source TBD; see OQ-25), flow_status, review_status, review_owner, created_at, updated_at |
 | Request | Stage-scoped unit within Release Flow | request_id, release_flow_id, stage, request_status, created_at, updated_at |
-| Task | Executable step within Request | task_id, request_id, task_name, task_type, task_status, input_parameters, current_result_summary, latest_execution_id, start_time, end_time, last_updated_at |
+| Task | Atomic executable step within Request; one row per AMH_HCC_task template row | task_id (PK), request_id (FK), task_group_id, task_group_name, step_seq, task_name, execution_type, input_parameters (JSON: {script, parameters}), expected_output, task_status, current_result_summary, latest_execution_id, start_time, end_time, last_updated_at — plus display columns: owner, planned_start_time, planned_end_time — plus import_metadata (JSON blob for activity_category/common/dependencies/validation) |
 | Task Execution History | Rerun history entry (one record per execution; same logical task may have multiple) | execution_id, task_id, attempt_number, execution_status, input_snapshot, result_summary, result_logs, start_time, end_time |
 | Configuration Item | Managed configuration (Jenkins URL, Ansible URL, Execution Callback Endpoint) | config_key, config_value, description, updated_by, updated_at |
 | Audit Log Entry | Immutable record of operator action | audit_log_id, operator_id, operator_role, action_type (upload, edit, view_result, approve, reject, rerun, skip), timestamp, release_flow_id (nullable), request_id (nullable), task_id (nullable), context_payload |
@@ -61,6 +61,42 @@ Each rerun creates a new `Task Execution History` record with an incremented `at
 The Task entity represents the current logical step, while Task Execution History represents each concrete execution attempt.  
 The Result Viewer should default to the latest execution attempt.  
 UI support for switching across attempts is a Design phase responsibility and does not change the underlying storage model.
+
+### Excel Template Field-to-Domain Mapping
+
+The real template is **AMH_HCC_task** (steps table). One row = one system **Task**.
+Multiple rows sharing the same `Task ID` form one logical task group (display-only grouping).
+
+Fields are classified as: **Core** (workflow/execution control), **Display** (UI only), **Metadata** (stored opaque), or **Dropped** (not imported).
+
+| Template Field | Action | Domain Entity | Attribute | Decision |
+|---|---|---|---|---|
+| `Project ID` | Map | Release Flow | `project_id` | **Core** — Release Flow grouping key |
+| `Project Name` | Map | Release Flow | `project_name` | Display |
+| `Task ID` | Map | Task | `task_group_id` | Display grouping + ordering context (NOT a new entity level) |
+| `Task Name` | Map | Task | `task_group_name` | Display |
+| `Step seq#` | Map | Task | `step_seq` | **Core** — execution ordering |
+| `Step` | Map | Task | `task_name` | **Core** — atomic step identity |
+| `Execution Type` | Map | Task | `execution_type` | **Core** — execution mode: `MANUAL` (human-executed externally) \| `AUTO` (system-submitted to pipeline) |
+| `Script to be executed` | Map | Task | `input_parameters.script` (JSON) | **Core** — execution payload |
+| `Parameter (input)` | Map | Task | `input_parameters.parameters` (JSON) | **Core** — execution payload |
+| `Parameter (Expected Output)` | Map | Task | `expected_output` | **Core** — result verification comparison |
+| `Owner` | Map | Task | `owner` | Display |
+| `Planned Start date/time` | Map | Task | `planned_start_time` | Display only; does NOT control execution |
+| `Planned End date/time` | Map | Task | `planned_end_time` | Display only; does NOT control execution |
+| `Activity category` | Store as metadata | Task | `import_metadata` JSON | Metadata — no workflow behavior |
+| `Common` | Store as metadata | Task | `import_metadata` JSON | Metadata — no workflow behavior |
+| `Dependencies` | Store as metadata | Task | `import_metadata` JSON | Metadata — no gating in MVP |
+| `Validation` | Store as metadata | Task | `import_metadata` JSON | Metadata — no automated validation in MVP |
+| `Status` | **Ignore on import** | — | not stored | System always creates Tasks in `Pending`; template status bypasses human gate |
+| `Start date/time` | **Drop** | — | not imported | System generates `start_time` at execution |
+| `End date/time` | **Drop** | — | not imported | System generates `end_time` from callback |
+| `Release ID` | **System-generated** — not from template | Release Flow | `release_id` | **Core** — generated as `{stage}-{normalized_project_name}-{seq}` when Release Flow is first created |
+| `Stage` | **From upload UI parameter** — not from template rows | Request | `stage` | **Core** — user selects SIT \| UAT \| PROD in the upload dialog; passed as a request parameter to the import endpoint |
+
+> **Import Responsibility**: The Import Service receives `(file, stage)` as inputs. Stage is the user-selected stage from the upload dialog — never read from Excel rows. Release ID is generated internally when a new Release Flow is created. The Import Service groups uploads by `project_id` and creates/attaches to Release Flows accordingly.
+
+---
 
 ### Persistence Note for Oracle
 Oracle is the system-of-record database for workflow state and auditability.  
@@ -116,7 +152,7 @@ The design phase must produce:
 ### Major Inbound Interfaces (Frontend → Backend)
 | Endpoint / Resource | Consumer | Purpose |
 |---|---|---|
-| POST /api/deployment-agent/upload | Upload UI | Submit Excel file for import |
+| POST /api/deployment-agent/upload | Upload UI | Submit Excel file with selected stage for import; accepts `stage` (SIT/UAT/PROD) as required parameter alongside the file |
 | GET /api/deployment-agent/release-flows | Summary UI | Retrieve Release Flow list (with optional filters) |
 | GET /api/deployment-agent/release-flows/{id} | Details UI | Retrieve Release Flow details |
 | GET /api/deployment-agent/release-flows/{id}/requests/{requestId}/tasks | Task UI | Retrieve task list for selected Request |
@@ -213,20 +249,14 @@ The following items must be confirmed before design is finalized:
 
 ## Artifacts Required Before Implementation
 
-1. **Frozen Excel template schema** (JSON Schema or spreadsheet with field definitions)
-2. **Task input schema** (defining editable fields, types, and validation per task type)
-3. **Release Flow grouping rule** (logic for determining new vs. update)
-4. **Release ID fallback rule** (handling missing Release ID)
+1. ~~OQ-25 (Stage/Release ID source)~~ — **Resolved**: Stage from upload UI; Release ID system-generated
+2. ~~OQ-28 (Execution Type values)~~ — **Resolved**: `MANUAL` | `AUTO`
+3. **MANUAL task execution UX decision** — how does the operator record manual completion? Determines T8 implementation path
+4. **Task input schema per `execution_type`** — defines editable fields per MANUAL and AUTO; MANUAL tasks may have different editable input fields than AUTO tasks
 5. **Integration adapter specifications** (Jenkins and Ansible API contracts, callback payload format)
 6. **Secret store architecture decision** (Vault, env vars, managed service, or other)
-7. **Execution callback endpoint OpenAPI specification**
-   - request schema
-   - response schema
-   - error codes
-   - security model
-   - retry semantics
-8. **Configuration items validation schema**
-   - format rules
-   - required/optional flags
-   - update policy
+7. **Execution callback endpoint OpenAPI specification** (request schema, response schema, error codes, security model, retry semantics)
+8. **Configuration items validation schema** (format rules, required/optional flags, update policy)
 9. **Performance baseline tests** or acceptance criteria (target response times)
+
+> Fields `Common`, `Status`, `Validation`, and `Dependencies` do **not** require pre-implementation artifacts. Their behavior is resolved by architecture decision (stored as raw metadata or ignored).
