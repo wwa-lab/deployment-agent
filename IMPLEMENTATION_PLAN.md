@@ -1,362 +1,502 @@
-# Deployment Agent MVP — Updated Implementation Plan
+# Deployment Agent MVP — Implementation Plan
 
-**Status**: Batches 1-4 Complete (136 tests passing) | Date: 2026-03-17
+**Last Updated**: 2026-03-17 | **Status**: Phase 1 Complete, Phase 2 Ready
+**Tests**: 136 passing | **TypeCheck**: ✅ | **Lint**: ✅
+**Primary source of truth for task scope**: `docs/06-tasks/tasks.md`
 
 ---
 
-## Current Schema (Updated)
+## 1. Finalized Schema (Current Repo State)
 
-### Task Entity (Enhanced)
-```typescript
-- id: string (UUID)
-- requestId: string (FK → Request)
-- taskGroupId: string          // Template grouping
-- taskGroupName: string        // Human-readable group
-- stepSeq: number              // Execution order within group
-- taskName: string
-- executionType: ExecutionType // "AUTO" | "MANUAL"
-- taskStatus: TaskStatus       // State machine: Pending→Ready→Executing→Awaiting_Review→Approved/Rejected/Skipped/Failed
-- inputParametersJson: string  // JSON workflow parameters
-- expectedOutput: string | null
-- owner: string | null         // Manual execution owner
-- plannedStartTime: Date | null
-- plannedEndTime: Date | null
-- importMetadataJson: string | null  // Template metadata from Excel import
-- currentResultSummaryJson: string | null
-- latestExecutionId: string | null
-- startTime: Date | null
-- endTime: Date | null
-- version: number              // @VersionColumn for optimistic locking
+### Task Entity (`DA_TASK`)
+| Column | Type | Source |
+|--------|------|--------|
+| `id` | UUID PK | Generated |
+| `request_id` | varchar FK | Parent Request |
+| `task_group_id` | varchar | Excel `Task ID` |
+| `task_group_name` | varchar | Excel `Task Name` |
+| `step_seq` | integer | Excel `Step seq#` |
+| `task_name` | varchar | Excel `Step` |
+| `execution_type` | varchar | `MANUAL` \| `AUTO` |
+| `task_status` | varchar | State machine |
+| `input_parameters` | text (JSON) | `{script, parameters}` |
+| `expected_output` | text | Excel `Parameter (Expected Output)` |
+| `owner` | varchar | Excel `Owner` |
+| `planned_start_time` | datetime | Excel `Planned Start date/time` |
+| `planned_end_time` | datetime | Excel `Planned End date/time` |
+| `import_metadata` | text (JSON) | Raw blob: `activity_category`, `common`, `dependencies`, `validation` |
+| `current_result_summary` | text (JSON) | Latest execution result |
+| `latest_execution_id` | varchar | FK → TaskExecutionHistory |
+| `start_time` | datetime | Actual execution start |
+| `end_time` | datetime | Actual execution end |
+| `last_updated_at` | datetime | Auto |
+| `version` | integer | Optimistic lock |
+
+**NOT in schema** (per finalized design decision):
+- `template_status` — not stored
+- `start_time_from_template` / `end_time_from_template` — ignored
+
+### ReleaseFlow Entity (`DA_RELEASE_FLOW`)
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | Generated |
+| `project_id` | varchar | Excel `Project ID`; grouping key |
+| `project_name` | varchar | Excel `Project Name` |
+| `release_id` | varchar | System-generated: `{stage}-{normalized_project_name}-{seq}` |
+| `normalized_release_id` | varchar | Grouping key with `project_id` (unique index) |
+| `current_stage` | varchar | `SIT` \| `UAT` \| `PROD` |
+| `flow_status` | varchar | `Pending \| Running \| Completed \| Failed \| Rejected` |
+| `review_status` | varchar | `Pending_Review \| Approved \| Rejected` |
+| `review_owner` | varchar | Nullable |
+| `version` | integer | Optimistic lock |
+
+### Other Entities
+- **Request** (`DA_REQUEST`): `id`, `release_flow_id`, `stage`, `request_status`, `version`
+- **TaskExecutionHistory** (`DA_TASK_EXECUTION_HISTORY`): `id`, `task_id`, `attempt_number`, `execution_status`, `input_snapshot` (JSON), `result_summary` (JSON), `result_logs` (CLOB/TEXT), `start_time`, `end_time`; unique index on `(task_id, attempt_number)`
+- **AuditLogEntry** (`DA_AUDIT_LOG_ENTRY`): append-only; `id`, `operator_id`, `operator_role`, `action_type`, `timestamp`, `release_flow_id`, `request_id`, `task_id`, `context_payload`
+- **ConfigurationItem** (`DA_CONFIGURATION_ITEM`): `config_key` (PK), `config_value`, `description`, `updated_by`, `updated_at`
+
+---
+
+## 2. Locked Design Rules (Must Not Change)
+
+1. **Stage source**: User selects SIT / UAT / PROD at upload time — not from Excel
+2. **Release ID generation**: `{stage}-{normalized_project_name}-{seq}` (e.g., `sit-paymenthub-0001`); system-generated; not from Excel
+3. **Release Flow grouping**: by `project_id` from Excel; same project re-uploads attach new stage to same flow
+4. **Execution Type**: `MANUAL` executes externally (TL records result inline); `AUTO` submits to pipeline (receives callback)
+5. **Rerun model**: same `task_id`, new `TaskExecutionHistory` row with incremented `attempt_number`
+6. **Summary display**: only `Done` / `Running` / `Pending` (no raw enum exposure)
+7. **RBAC**: Developer = upload + view; TL = view + edit input + decide; DevOps Admin = config + operational view; Audit/Management = audit log view
+8. **Config update scope**: applies to future executions only; does not affect in-flight tasks
+
+---
+
+## 3. Phase 0 — Design Resolution Status
+
+| Blocker | Status | Notes |
+|---------|--------|-------|
+| RESOLVE-Q1 (Excel schema) | ✅ Resolved | All field mappings finalized; see T6.1 for exact rules |
+| RESOLVE-Q6 (Stage/Release ID source) | ✅ Resolved | Stage from upload param; Release ID system-generated |
+| RESOLVE-Q2 (Callback auth) | ❓ Pending | Blocks T9.1, T9.2, T9.4 |
+| RESOLVE-Q3 (Secret store) | ❓ Pending | Blocks T8.1 (AUTO execution), T8.2 |
+| RESOLVE-Q4 (Oracle result storage) | ❓ Pending | Blocks T9.3; note: `result_logs` CLOB already in TaskExecutionHistory |
+| RESOLVE-Q5 (WWA auth context) | ❓ Pending | Blocks full T10.4; middleware placeholder exists |
+
+> **Key change from previous plan**: T6.1, T6.2, T6.3, and T8.1b are **not blocked** by any unresolved RESOLVE tasks. They can be implemented now.
+
+---
+
+## 4. What Is Already Implemented
+
+### Phase 1 (Foundation) — ✅ Complete
+
+| Task | What's in the repo |
+|------|--------------------|
+| **T1.1** Schema & Entities | All TypeORM entities: Task (full extended schema), ReleaseFlow (`projectId`/`projectName`), Request, TaskExecutionHistory, AuditLogEntry, ConfigurationItem |
+| **T1.2** Repositories | TaskRepository, TaskExecutionHistoryRepository, ReleaseFlowRepository, RequestRepository, AuditLogRepository, ConfigurationRepository |
+| **T1.3** Transactions & Locking | `@VersionColumn` on Task/ReleaseFlow/Request; `DataSource.transaction()` in DecisionEngine; all repos accept optional `EntityManager` |
+| **T1.5** Test DB Setup | `tests/helpers/testDataSource.ts` with `seedReleaseFlow()`, `seedRequest()`, `seedTask()` (full field set), `seedTaskExecutionHistory()`; `clearAllTables()`; in-memory sql.js |
+| **T2.1** Configuration Service | ConfigurationService with get/list/upsert, validation per key (URLs, HTTPS), audit on update |
+| **T2.2** Configuration Controller | `GET/POST /api/deployment-agent/config`; DEVOPS_ADMIN auth on write |
+| **T3.1** Audit Log Entity | AuditLogEntryEntity; append-only AuditLogRepository |
+| **T3.2** Audit Logger Service | AuditLoggerService.log(); all audit failures swallowed; participates in caller transaction |
+| **T3.3** Audit Log Endpoint | `GET /api/deployment-agent/audit-logs`; AUDIT/MANAGEMENT/DEVOPS_ADMIN auth; paginated + filtered |
+| **T4.1** ReleaseFlow Service | ReleaseFlowService: create, getById, list, findByGroupKey, recomputeAndPersistStatus (bottom-up), advanceStage |
+| **T4.2** Request Service | RequestService: create, getById, listByReleaseFlow, findByStage, updateStatus |
+| **T5.1** Task Service CRUD | TaskService: create(CreateTaskInput), getById, listByRequestId, updateStatus (state machine + audit) |
+| **T5.2** Execution History Service | TaskExecutionHistoryService: createExecution (auto-attempt, input snapshot), findByTaskId, findLatest, completeExecution |
+| **T5.3** Task Input Editing | TaskService.editInput(): state guard (Pending/Ready only), JSON validation, audit |
+| **T5.4** Result Metadata Update | TaskService.updateResultMetadata(): sets currentResultSummary + latestExecutionId atomically |
+| **T7.1** Decision Engine | DecisionEngine.applyDecision(): approve/reject/rerun/skip; TL-only; full transaction; audit |
+| **T7.2** Progression | ReleaseFlowProgressionService: request completion, stage advancement (SIT→UAT→PROD), flow completion, auto-ready next pending task, bottom-up recompute |
+| **T7.3** Decision Controller | `POST /api/deployment-agent/tasks/:id/decision`; TL auth; returns updated TaskDto |
+| **T10.1** ReleaseFlow Controllers | `GET /api/deployment-agent/release-flows` (paginated, filterable by projectId); `GET /api/deployment-agent/release-flows/:id` (detail with nested requests/tasks) |
+| **T10.2** Task Controllers | `GET /tasks?requestId=X`; `GET /tasks/:id`; `PUT /tasks/:id/input` (TL); `GET /tasks/:id/executions` |
+| **T10.3** Error Handling | Centralized Fastify error handler: AppError → HTTP; TypeORM OptimisticLock → 409; no stack leak |
+| **T10.5** DTOs | TaskDto (all fields), ReleaseFlowListItemDto/DetailDto (projectId/projectName), RequestDto, TaskExecutionHistoryDto, AuditLogEntryDto, PaginatedResponseDto<T>, DecisionRequestDtoSchema (Zod) |
+| **T13.1** Unit Tests | 136 tests, 12 test files — see §6 for breakdown |
+
+### Phase 1 Fidelity Fix Pass — ✅ Applied
+
+The following corrections were applied after initial implementation to align the repo with the finalized design documents:
+
+| What changed | Why |
+|---|---|
+| Task entity — added `taskGroupId`, `taskGroupName`, `stepSeq`, `executionType`, `expectedOutput`, `owner`, `plannedStartTime`, `plannedEndTime`, `importMetadataJson` | Schema finalization aligned with Excel import field list |
+| ReleaseFlow entity — split `project` into `projectId` + `projectName` | Matches RESOLVE-Q6: grouping key is `project_id` from Excel |
+| `ExecutionType` enum added (`MANUAL` \| `AUTO`) | Required by T6.1/T8.1 field |
+| All DTOs updated to include new task and release flow fields | API contract alignment |
+| All handler mappers (`mapTaskToDto()`) updated to include new fields with ISO date strings | Handler fidelity |
+| `TaskService.create()` refactored to accept `CreateTaskInput` interface | Supports Import Service calling convention |
+| `seedTask()` in testDataSource updated with all new field defaults | Test correctness |
+| TaskService tests updated — `create()` tests now verify all new fields | Test fidelity |
+
+---
+
+## 5. What Remains — By Priority
+
+### 5A. Next Batch (Unblocked, High Priority)
+
+#### T6.1 — Excel Parsing & Validation
+**File**: `src/domain/import/ExcelParserService.ts`
+
+Parse the `AMH_HCC_task` sheet. Rules:
+
+| Excel Column | Action | Target Field |
+|---|---|---|
+| `Project ID` | Required, non-blank | `release_flow.project_id` |
+| `Project Name` | Required, non-blank | `release_flow.project_name` |
+| `Task ID` | Required, non-blank | `task.task_group_id` |
+| `Task Name` | Required, non-blank | `task.task_group_name` |
+| `Step seq#` | Required; positive integer; unique within `Task ID` | `task.step_seq` |
+| `Step` | Required, non-blank | `task.task_name` |
+| `Execution Type` | Required; `MANUAL` or `AUTO` (case-insensitive); reject any other | `task.execution_type` |
+| `Script to be executed` | Required when AUTO; optional when MANUAL | `task.input_parameters.script` |
+| `Parameter (input)` | Optional | `task.input_parameters.parameters` |
+| `Parameter (Expected Output)` | Optional | `task.expected_output` |
+| `Owner` | Optional | `task.owner` |
+| `Planned Start date/time` | Optional; validate format | `task.planned_start_time` |
+| `Planned End date/time` | Optional; validate format | `task.planned_end_time` |
+| `Activity category`, `Common`, `Dependencies`, `Validation` | No validation; store as-is | `task.import_metadata` JSON blob |
+| `Status`, `Start date/time`, `End date/time` | **Ignore completely** | (not stored) |
+
+**Tests**: `tests/domain/import/ExcelParserService.test.ts`
+- Valid file parses correctly
+- Required field missing → row-level error with row + column detail
+- Invalid Execution Type → row error
+- `Step seq#` uniqueness enforced within `Task ID`
+- Ignored columns are not stored
+
+#### T6.2 — Release Flow Grouping & Release ID Generation
+**File**: `src/domain/import/ImportService.ts`
+
+- Group parsed rows by `project_id`
+- Look up active Release Flow by `project_id` (`findByGroupKey`)
+  - **None exists**: create new ReleaseFlow; generate `release_id` = `{stage}-{normalized_project_id}-{seq}` (zero-padded 4 digits, e.g., `sit-paymenthub-0001`); `seq` is per-project counter from DB
+  - **Exists**: attach new Request to that Release Flow for the selected stage
+- Create Request with stage from upload parameter
+- Upsert tasks by `(release_flow_id, stage, task_group_id, step_seq)` on re-upload
+- Entire import runs in a single transaction; roll back on any error
+
+**Tests**: `tests/domain/import/ImportService.test.ts`
+- New project → new Release Flow + ID generated in correct format
+- Existing project → new Request attached to same flow
+- Re-upload same project + stage → tasks updated, not duplicated
+- Transaction rollback on parse error
+
+#### T6.3 — Upload Controller & Endpoint
+**File**: `src/http/handlers/UploadHandler.ts`
+
+- `POST /api/deployment-agent/upload`
+- Accept multipart: `file` (XLSX) + `stage` (SIT | UAT | PROD)
+- Validate `stage` before file processing — return 400 if missing or invalid
+- DEVELOPER or TL role required (upload permission)
+- Return on success: `{ releaseFlowId, releaseId, stage, taskCount }`
+- Return on validation failure: structured error array with `{ row, column, message }` per error
+- Audit the upload event regardless of outcome
+
+**Register** in `buildServer()` / `ServerDeps`.
+
+**Tests**: `tests/http/handlers/UploadHandler.test.ts`
+- Missing stage → 400 before file processing
+- Invalid stage → 400
+- Valid file → 200 with release info
+- Validation errors → 422 with structured error rows
+- DEVELOPER role → allowed; unauthenticated → 401
+
+#### T8.1b — Record Result Endpoint (MANUAL Tasks)
+**File**: `src/http/handlers/RecordResultHandler.ts`
+**Service method**: add to existing `TaskService` or create `RecordResultService`
+
+- `POST /api/deployment-agent/tasks/:id/record-result`
+- Guards: task must be `MANUAL` + in `Ready_For_Execution`; TL role required
+- Creates `TaskExecutionHistory` with:
+  - `executionStatus = "Completed"`
+  - `attemptNumber` = max + 1
+  - `resultSummaryJson` = operator-entered value
+  - `startTime` = task.lastUpdatedAt (proxy for when task became ready)
+  - `endTime` = now
+- Transitions task: `Ready_For_Execution` → `Awaiting_Review`
+- Updates `task.latestExecutionId`
+- Calls `progressAfterDecision` → triggers decision context
+- Audit entry: action = `"view_result"` (or introduce `"record_result"` if preferred)
+
+**Tests**: `tests/http/handlers/RecordResultHandler.test.ts`
+- MANUAL + Ready_For_Execution → success; task is Awaiting_Review
+- AUTO task → 409 (wrong execution type)
+- Wrong state → 409 (state guard)
+- Non-TL → 403
+- History record created with correct attempt number
+
+---
+
+### 5B. Unblocked, Medium Priority
+
+#### T4.3 — Hierarchical Query Optimization
+**File**: modify `src/domain/releaseflow/ReleaseFlowRepository.ts`
+
+Add `findByIdWithFullHierarchy(id)` using TypeORM `createQueryBuilder` with left joins across ReleaseFlow → Requests → Tasks. Replaces the current N+1 pattern in `ReleaseFlowHandler`'s `mapFlowToDetailDto()`.
+
+**Tests**: existing ReleaseFlow tests cover correctness; add a hierarchy test to `tests/domain/releaseflow/`.
+
+---
+
+### 5C. Blocked — Awaiting Phase 0 Resolution
+
+| Task | Blocker | What's needed |
+|------|---------|---------------|
+| T8.1 (AUTO execution orchestration) | RESOLVE-Q3 | Secret store for Jenkins/Ansible credentials |
+| T8.2 (Execution adapter — AUTO) | RESOLVE-Q3 | Same as above |
+| T8.3 (Execution error handling) | RESOLVE-Q3 | Depends on T8.1 |
+| T9.1 (Callback handler service) | RESOLVE-Q2 | Callback auth mechanism (signed token / shared secret / mTLS) |
+| T9.2 (Callback controller) | RESOLVE-Q2 | Depends on T9.1 |
+| T9.3 (Result retrieval) | RESOLVE-Q4 | Oracle CLOB result storage strategy; `result_logs` already in TaskExecutionHistory schema as candidate location |
+| T9.4 (Callback retry strategy) | RESOLVE-Q2 | Depends on T9.1 |
+| T10.4 (Full authorization framework) | RESOLVE-Q5 | WWA auth context contract (exact header names, role claim values) |
+
+---
+
+### 5D. Frontend Phase — Awaits API Completeness
+
+> Can begin workspace shell and read-only views in parallel. Write paths (upload dialog, record-result dialog, decision dialog) should wait until relevant backends are stable.
+
+| Task | Depends on | Notes |
+|------|------------|-------|
+| T11.1 Workspace shell | — | Can start now |
+| T11.2 Release Flow summary view | T10.1 ✅ | Can start now |
+| T11.3 Release Flow detail view | T10.1 ✅ | Can start now |
+| T11.4 Task detail view | T10.2 ✅, T8.1b | Basic view now; Record Result button after T8.1b |
+| T11.5 Upload dialog | T6.3 | After upload endpoint |
+| T11.5b Record Result dialog | T8.1b | MANUAL path dialog |
+| T11.6 Task edit dialog | T10.2 ✅ | Can start now |
+| T11.7 Decision dialog | T7.3 ✅ | Can start now |
+| T11.8 Audit log view | T3.3 ✅ | Can start now |
+| T12.1 Pinia state management | T10.x ✅ | Can start now |
+| T12.2 REST client | T10.x ✅ | Can start now |
+
+---
+
+## 6. Test Status
+
+```
+Test Files: 12 (all passing)
+Total Tests: 136 passing
+
+tests/domain/task/
+  taskStateMachine.test.ts              18 tests  (all transitions, valid and invalid)
+  TaskService.test.ts                   21 tests  (CRUD, state machine, input editing, audit, optimistic lock)
+  TaskExecutionHistoryService.test.ts   14 tests  (creation, attempt numbering, snapshots, completion)
+  taskInputValidation.test.ts            7 tests  (accept valid JSON, reject undefined)
+
+tests/domain/decision/
+  DecisionEngine.test.ts                12 tests  (approve/reject/rerun/skip, role guard, state guard, audit)
+  ReleaseFlowProgressionService.test.ts  7 tests  (request completion, SIT→UAT→PROD, flow completion, auto-ready)
+
+tests/domain/releaseflow/
+  ReleaseFlowService.test.ts            18 tests  (create, getById, list, advanceStage, recompute)
+  releaseFlowAggregation.test.ts        24 tests  (bottom-up aggregation pure functions)
+
+tests/domain/audit/
+  AuditLoggerService.test.ts             5 tests  (append, swallow failure)
+
+tests/domain/configuration/
+  ConfigurationService.test.ts          10 tests  (get/upsert, validation, audit)
 ```
 
-### ReleaseFlow Entity (Updated)
-```typescript
-- id: string
-- projectId: string            // NEW: Separate from projectName
-- projectName: string          // NEW: Human-readable name
-- releaseId: string | null
-- normalizedReleaseId: string  // Grouping key
-- currentStage: Stage          // "SIT" | "UAT" | "PROD"
-- flowStatus: FlowStatus       // "Pending" | "Running" | "Completed" | "Failed" | "Rejected"
-- reviewStatus: ReviewStatus   // "Pending_Review" | "Approved" | "Rejected"
-- reviewOwner: string | null
-- requests: Request[] (1:N)
-```
-
-### ExecutionType Enum (New)
-```typescript
-export type ExecutionType = "AUTO" | "MANUAL";
-```
+**Not yet covered** (will be added with respective next-batch tasks):
+- Import / Upload service tests (T6.1, T6.2, T6.3)
+- Record Result endpoint tests (T8.1b)
+- API contract tests (T13.3)
+- Authorization / security tests (T13.5, full coverage)
+- E2E workflow tests (T13.2, T13.7)
 
 ---
 
-## Completed Implementations (4 Batches)
-
-### ✅ Batch 1: Task Domain Services (T5.1, T5.2)
-**Status**: 53 tests passing
-
-#### T5.1 — Task Service CRUD
-- `TaskService.create(input: CreateTaskInput)` — creates task in Pending, accepts all template fields
-- `TaskService.getById(taskId)` — with NotFoundError
-- `TaskService.listByRequestId(requestId)` — ordered by (taskGroupId, stepSeq)
-- `TaskService.updateStatus(taskId, newStatus, user)` — state machine validation + audit
-- State machine: Pending→Ready_For_Execution, Ready_For_Execution→Executing, Executing→Awaiting_Review, Awaiting_Review→Approved/Rejected, Rejected/Failed→Ready_For_Execution
-- Optimistic locking via @VersionColumn
-
-#### T5.2 — Task Execution History Service
-- `TaskExecutionHistoryService.createExecution(taskId)` — auto-increment attempt, snapshot input
-- `TaskExecutionHistoryService.findByTaskId(taskId)` — ordered by attemptNumber
-- `TaskExecutionHistoryService.findLatest(taskId)`
-- `TaskExecutionHistoryService.completeExecution(executionId, status, resultSummary, logs)`
-- Updates Task.latestExecutionId on creation
-
-**Tests**: 53 passing
-- taskStateMachine: 18 (all valid/invalid transitions)
-- TaskService: 21 (CRUD, state transitions, optimistic lock)
-- TaskExecutionHistoryService: 14 (creation, snapshots, completion)
-
----
-
-### ✅ Batch 2: Task Input Editing & Result Metadata (T5.3, T5.4)
-**Status**: 7 tests passing
-
-#### T5.3 — Task Input Editing
-- `TaskService.editInput(taskId, newInputJson, user)` — only in Pending/Ready_For_Execution
-- JSON validation with error details
-- Audit logging: action="edit", stores old/new values
-
-#### T5.4 — Result Metadata Update
-- `TaskService.updateResultMetadata(taskId, resultSummaryJson, executionId)`
-- Sets currentResultSummaryJson + latestExecutionId atomically
-
-**Tests**: 7 passing
-- taskInputValidation: 7 (accept all valid JSON, reject undefined)
-
----
-
-### ✅ Batch 3: Decision Engine & Progression (T7.1, T7.2)
-**Status**: 19 tests passing
-
-#### T7.1 — Decision Engine
-- `DecisionEngine.applyDecision({ taskId, decision, user, comment })` — TL-only decisions
-- Decisions: "approve" (Awaiting_Review→Approved), "reject" (Awaiting_Review→Rejected), "rerun" (Rejected/Failed→Ready_For_Execution, creates new execution), "skip" (Pending/Ready_For_Execution→Skipped)
-- Role validation: throws ForbiddenError if not TL
-- State validation: throws InvalidStateTransitionError
-- Transaction support: runs entire decision in DataSource.transaction()
-- Audit logging: logs decision type + comment + previous status
-
-#### T7.2 — Release Flow Progression
-- `ReleaseFlowProgressionService.progressAfterDecision(taskId)` — orchestrates flow progression
-- **Completion Logic**:
-  1. Check if all tasks in request are terminal (Approved/Skipped)
-  2. If yes → mark request Completed
-  3. If PROD + request completed → mark flow Completed
-  4. If < PROD + request completed → advance stage (SIT→UAT→PROD)
-- **Auto-Readying**: finds next Pending task in request → Ready_For_Execution
-- **Recomputation**: calls ReleaseFlowService.recomputeAndPersistStatus() bottom-up
-
-**Tests**: 19 passing
-- DecisionEngine: 12 (approve/reject/rerun/skip, role+state validation, audit)
-- ReleaseFlowProgressionService: 7 (completion, stage advancement, auto-ready, multi-task ordering)
-
----
-
-### ✅ Batch 4: HTTP API Layer (T7.3, T3.3, T10.1, T10.2, T10.3, T10.5)
-**Status**: Registered, handlers ready
-
-#### T10.5 — DTOs and API Contracts
-- **TaskDto**: includes taskGroupId, taskGroupName, stepSeq, executionType, expectedOutput, owner, plannedStartTime, plannedEndTime
-- **ReleaseFlowListItemDto/DetailDto**: includes projectId, projectName
-- **DecisionRequestDtoSchema**: { decision, comment? }
-- **PaginatedResponseDto<T>**: { data, total, page, size }
-- **AuditLogEntryDto**: timestamp, operatorId, operatorRole, actionType, context
-
-#### T7.3 — Decision Controller
-- `POST /api/deployment-agent/tasks/:id/decision`
-- Auth: TL role required via requireRole middleware
-- Request: DecisionRequestDtoSchema
-- Response: Updated TaskDto with all fields
-- Calls DecisionEngine.applyDecision() + ReleaseFlowProgressionService.progressAfterDecision()
-
-#### T3.3 — Audit Log Retrieval
-- `GET /api/deployment-agent/audit-logs`
-- Query params: releaseFlowId, taskId, operatorId, actionType, page (default 0), size (default 10)
-- Auth: AUDIT | MANAGEMENT | DEVOPS_ADMIN
-- Response: PaginatedResponseDto<AuditLogEntryDto>
-
-#### T10.1 — Release Flow Endpoints
-- `GET /api/deployment-agent/release-flows` — paginated list with optional projectId filter
-- `GET /api/deployment-agent/release-flows/:id` — detail with nested requests/tasks
-
-#### T10.2 — Task Endpoints
-- `GET /api/deployment-agent/tasks?requestId=X` — list by request (ordered by taskGroupId, stepSeq)
-- `GET /api/deployment-agent/tasks/:id` — detail
-- `PUT /api/deployment-agent/tasks/:id/input` — edit input (TL auth)
-- `GET /api/deployment-agent/tasks/:id/executions` — execution history with pagination
-
-#### T10.3 — Error Handling Framework
-- Centralized error handler in buildServer()
-- Zod validation errors → 400 with details
-- AppError → mapped HTTP status
-- OptimisticLockVersionMismatchError → 409
-- Unknown errors → 500 (no leak)
-
-#### Server Wiring
-- **src/http/server.ts**: ServerDeps interface with all repos/services, registered all 5 handlers
-- **src/main.ts**: Instantiates all 14+ dependencies
-- **Auth Middleware**: extractUserContext hook on all routes, requireRole enforcement
-
----
-
-## Blocked Tasks (Awaiting Phase 0)
-
-| Task | Blocker | Summary |
-|------|---------|---------|
-| **T6.1–T6.3** | RESOLVE-Q1 | Upload/Import: Excel schema parsing, XLSX→(project, release_id, task_groups, steps) upsert |
-| **T8.1–T8.3** | RESOLVE-Q3 | Execution: Secret store integration, Jenkins/Ansible adapters, error handling, timeout logic |
-| **T9.1–T9.2, T9.4** | RESOLVE-Q2 | Callback: Webhook auth, endpoint registration, result retrieval, retry strategy (exponential backoff) |
-| **T9.3** | RESOLVE-Q4 | Result retrieval: S3/database result storage, streaming large logs |
-| **T10.4** | RESOLVE-Q5 | Auth Framework: Full RBAC integration with WWA platform (resolve X-User-Id/Role headers) |
-
----
-
-## Remaining Implementation Phases
-
-### Phase 5: Frontend (T11.x, T12.x) — Awaits Blocked Tasks
-- **T11.1**: Workspace shell (Vue 3 SPA, WWA workspace navigation)
-- **T11.2–T11.3**: Release Flow views (summary table, detail panel with nested requests/tasks)
-- **T11.4**: Task views (list with status badges, result viewer)
-- **T11.5–T11.7**: Dialogs (upload, task edit, decision: approve/reject/rerun/skip)
-- **T11.8**: Audit log (read-only, paginated, filterable)
-- **T12.1**: State management (Pinia stores: flow, request, task, config, audit, user)
-- **T12.2**: REST client (API wrappers, auth headers, error handling)
-
-### Phase 6: Integration Tests (T13.x)
-- **T13.4**: Result persistence (lifecycle: create flow → upload tasks → execute → callback → store result)
-- **T13.5**: Full workflow test (multi-stage with manual approval gates)
-- **T13.7**: Error scenarios (concurrent updates, state violations, auth failures)
-
----
-
-## Test Summary
+## 7. Critical Path
 
 ```
-✅ Test Files: 10 passed
-✅ Total Tests: 136 passing
-✅ Typecheck: No errors
-✅ Lint: No errors
-
-Test Breakdown:
-  - taskStateMachine.test.ts: 18 tests
-  - TaskService.test.ts: 21 tests (including NEW optimistic lock test)
-  - TaskExecutionHistoryService.test.ts: 14 tests
-  - taskInputValidation.test.ts: 7 tests
-  - DecisionEngine.test.ts: 12 tests
-  - ReleaseFlowProgressionService.test.ts: 7 tests
-  + 4 existing test files: 57 tests (ReleaseFlowService, AuditLogger, Config, Aggregation)
+[Complete] Foundation (T1.x, T2.x, T3.x, T4.x, T5.x, T7.x, T10.1-10.3, T10.5)
+    │
+    ▼
+[NEXT BATCH] Upload & Import + MANUAL record-result
+    T6.1 Excel Parser
+    T6.2 Import Service + Release ID generation
+    T6.3 Upload Endpoint
+    T8.1b Record Result Endpoint
+    ───────────────────────
+    T4.3 Hierarchy query optim. (parallel, low risk)
+    │
+    ▼
+[BLOCKED — awaiting RESOLVE-Q3] AUTO Execution
+    T8.1 Execution orchestration (AUTO path)
+    T8.2 Execution adapter
+    T8.3 Error handling
+    │
+    ▼
+[BLOCKED — awaiting RESOLVE-Q2] Callback Handling
+    T9.1 Callback handler service
+    T9.2 Callback endpoint
+    T9.4 Retry strategy
+    │
+    ▼
+[BLOCKED — awaiting RESOLVE-Q4] Result Retrieval
+    T9.3 Result retrieval service + endpoint
+    │
+    ▼
+[BLOCKED — awaiting RESOLVE-Q5] Full Auth
+    T10.4 WWA auth framework integration
+    │
+    ▼
+[CAN PARALLELIZE NOW] Frontend
+    T11.x, T12.x — read views and state management can begin
+    Write dialogs unblock as upload (T6.3), record-result (T8.1b), etc. complete
+    │
+    ▼
+[LAST] Integration & E2E
+    T13.2, T13.3, T13.5, T13.7
 ```
 
 ---
 
-## Architecture Decisions
+## 8. Next Recommended Batch — Rationale
 
-### 1. **Task Creation Input Model**
-- `CreateTaskInput` interface captures all template-derived fields (taskGroupId, stepSeq, executionType, etc.)
-- Decouples Excel import schema from TaskService method signature
-- Supports future import sources (API, YAML, etc.)
+**Implement T6.1 → T6.2 → T6.3 → T8.1b in sequence.**
 
-### 2. **State Machine**
-- Pure function `isValidTaskTransition(from, to)` — no dependencies, testable
-- Terminal states: Approved, Skipped (no further transitions)
-- Rerun states: Rejected, Failed → Ready_For_Execution (new execution)
+Why this is the safest coherent next slice:
 
-### 3. **Optimistic Locking**
-- @VersionColumn auto-managed by TypeORM
-- Catches concurrent updates, prevents lost writes
-- Callers wrap in try/catch for OptimisticLockVersionMismatchError
+1. **All are unblocked** — RESOLVE-Q1 and RESOLVE-Q6 are marked resolved in tasks.md. No Phase 0 dependencies remain for these tasks.
 
-### 4. **Transaction Boundaries**
-- DecisionEngine wraps all operations in DataSource.transaction()
-- Ensures atomicity: state change + execution creation + progression
-- All repos support optional EntityManager parameter
+2. **High system value unlock** — without upload, no real Release Flows can be created in production. This is the primary user entry point.
 
-### 5. **Audit Logging**
-- AuditLoggerService: append-only (no updates/deletes)
-- Audit failures swallowed — don't block business logic
-- Audit entries capture: action, user, entity IDs, context JSON
+3. **T6.2 depends on T6.1** (parser output feeds grouping logic); T6.3 depends on T6.1+T6.2 (controller calls import service). Sequential within the batch.
 
-### 6. **DTO Mapping**
-- Separate from entities: handlers map in mapTaskToDto(), mapFlowToDetailDto()
-- ISO 8601 dates: plannedStartTime, plannedEndTime → toISOString()
-- Nullable fields: ?? null pattern ensures consistent serialization
+4. **T8.1b (Record Result)** is self-contained — it only touches Task / TaskExecutionHistory / ReleaseFlowProgressionService, all of which are already implemented and tested. It is the MANUAL-path completion for the task execution model.
 
-### 7. **HTTP Framework**
-- Fastify (not Express) with Zod validation
-- Centralized error handler: AppError → HTTP status
-- Role-based middleware: requireRole(req, action, ...roles)
+5. **T4.3 (hierarchy query)** can run in parallel with the above as a low-risk, self-contained optimization against already-stable repositories.
+
+6. **Frontend read-only views** (T11.1–T11.3, parts of T11.4, T11.7, T11.8, T12.1, T12.2) are unblocked and can run in parallel with backend upload work.
 
 ---
 
-## Critical Files
+## 9. Architecture Summary
 
-### Domain Services (New)
-```
-src/domain/task/
-  ├── taskStateMachine.ts              // Pure state validator
-  ├── TaskService.ts                   // CRUD + state transitions + input editing
-  ├── TaskExecutionHistoryService.ts   // Execution tracking + snapshots
-  └── taskInputValidation.ts           // Task input schema validation
+### Stack
+- **Runtime**: Node.js / TypeScript
+- **HTTP**: Fastify 4 (not Express; all handlers use Fastify `request`/`reply`)
+- **ORM**: TypeORM 0.3; repositories with optional EntityManager for transaction participation
+- **Validation**: Zod (DTOs + request body schemas)
+- **DB**: Oracle (production); sql.js in-memory SQLite (tests)
+- **Auth**: Header-based (`X-User-Id`, `X-User-Role`); `extractUserContext` hook; `requireRole()` per route
 
-src/domain/decision/
-  ├── DecisionEngine.ts                // TL-only decisions (approve/reject/rerun/skip)
-  └── ReleaseFlowProgressionService.ts // Flow progression after decisions
+### Architecture Boundaries (enforced)
+- HTTP handlers live in `src/http/handlers/` — no persistence logic
+- Domain logic in `src/domain/` — no HTTP concerns
+- Shared types in `src/contracts/` — entities must not leak into handler layer
+
+### Key Patterns
+| Pattern | Where |
+|---------|-------|
+| State machine (pure function) | `taskStateMachine.ts` → `isValidTaskTransition()` |
+| Bottom-up status aggregation | `releaseFlowAggregation.ts` (pure functions) |
+| Optimistic locking | `@VersionColumn` on Task, ReleaseFlow, Request |
+| Transaction wrapping | `DataSource.transaction()` in DecisionEngine; all repos accept `em?` |
+| Audit-first | `AuditLoggerService.log()` called in every state-changing operation; failures swallowed |
+| DTO separation | Entities never returned directly; mapper functions in each handler |
+| ISO date serialization | All Date fields → `.toISOString()` in DTO mappers |
+
+---
+
+## 10. File Map
+
+### Implemented
+```
+src/
+├── contracts/
+│   ├── enums.ts           ExecutionType, TaskStatus, FlowStatus, Stage, RBAC roles...
+│   ├── dtos.ts            TaskDto, ReleaseFlowDetailDto, DecisionRequestDtoSchema, Paginated...
+│   └── UserContext.ts
+├── domain/
+│   ├── task/
+│   │   ├── Task.entity.ts
+│   │   ├── TaskRepository.ts
+│   │   ├── TaskService.ts              create(CreateTaskInput), updateStatus, editInput, updateResultMetadata
+│   │   ├── taskStateMachine.ts         isValidTaskTransition()
+│   │   ├── taskInputValidation.ts      validateTaskInput()
+│   │   ├── TaskExecutionHistory.entity.ts
+│   │   ├── TaskExecutionHistoryRepository.ts
+│   │   └── TaskExecutionHistoryService.ts
+│   ├── releaseflow/
+│   │   ├── ReleaseFlow.entity.ts       projectId, projectName, releaseId...
+│   │   ├── ReleaseFlowRepository.ts
+│   │   ├── ReleaseFlowService.ts
+│   │   ├── Request.entity.ts
+│   │   ├── RequestRepository.ts
+│   │   ├── RequestService.ts
+│   │   └── releaseFlowAggregation.ts
+│   ├── decision/
+│   │   ├── DecisionEngine.ts
+│   │   └── ReleaseFlowProgressionService.ts
+│   ├── audit/
+│   │   ├── AuditLogEntry.entity.ts
+│   │   ├── AuditLogRepository.ts
+│   │   └── AuditLoggerService.ts
+│   └── configuration/
+│       ├── ConfigurationItem.entity.ts
+│       ├── ConfigurationRepository.ts
+│       └── ConfigurationService.ts
+├── http/
+│   ├── server.ts                       buildServer(ServerDeps); error handler; all routes registered
+│   ├── middleware/auth.ts              extractUserContext hook; requireRole()
+│   └── handlers/
+│       ├── ConfigurationHandler.ts    GET/POST /api/deployment-agent/config
+│       ├── ReleaseFlowHandler.ts      GET /release-flows, /release-flows/:id
+│       ├── TaskHandler.ts             GET/PUT /tasks, /tasks/:id/executions
+│       ├── DecisionHandler.ts         POST /tasks/:id/decision
+│       └── AuditLogHandler.ts         GET /audit-logs
+├── db/dataSource.ts
+├── errors/AppError.ts
+└── main.ts                            Instantiates all repos/services; passes to buildServer()
 ```
 
-### HTTP Handlers (New)
+### To Be Created (Next Batch)
 ```
-src/http/handlers/
-  ├── DecisionHandler.ts               // POST /tasks/:id/decision
-  ├── AuditLogHandler.ts               // GET /audit-logs
-  ├── ReleaseFlowHandler.ts            // GET /release-flows, /release-flows/:id
-  └── TaskHandler.ts                   // GET/PUT /tasks, /tasks/:id/executions
-```
+src/
+├── domain/import/
+│   ├── ExcelParserService.ts          T6.1
+│   └── ImportService.ts               T6.2
+└── http/handlers/
+    ├── UploadHandler.ts               T6.3
+    └── RecordResultHandler.ts         T8.1b
 
-### Contracts
-```
-src/contracts/
-  ├── dtos.ts                          // All request/response DTOs
-  ├── enums.ts                         // TaskStatus, ExecutionType, etc.
-  └── UserContext.ts                   // userId, role
-```
-
-### Tests
-```
-tests/domain/
-  ├── task/
-  │   ├── taskStateMachine.test.ts
-  │   ├── TaskService.test.ts
-  │   ├── TaskExecutionHistoryService.test.ts
-  │   └── taskInputValidation.test.ts
-  └── decision/
-      ├── DecisionEngine.test.ts
-      └── ReleaseFlowProgressionService.test.ts
-
-tests/helpers/
-  └── testDataSource.ts                // seedReleaseFlow, seedRequest, seedTask, seedTaskExecutionHistory
+tests/
+├── domain/import/
+│   ├── ExcelParserService.test.ts
+│   └── ImportService.test.ts
+└── http/handlers/
+    ├── UploadHandler.test.ts
+    └── RecordResultHandler.test.ts
 ```
 
 ---
 
-## Next Steps (If Resourcing Phase 0 Blockers)
+## 11. Verification Checklist
 
-### Immediate (No Blockers)
-1. **Query Optimization (T4.3)**: Add `findByIdWithFullHierarchy()` to ReleaseFlowRepository using left joins
-2. **Contract Tests**: Add `tests/contracts/` for API endpoint validation (curl/httpie)
-3. **Manual API Testing**: Start with `pnpm dev`, test decision endpoints via Postman
-
-### Post-Phase 0
-1. **T6.x Implementation**: Upload/import service consuming TaskService.create()
-2. **T8.x Implementation**: Execution orchestration with callbacks
-3. **T9.x Implementation**: Callback handler → result storage
-4. **T10.4 Implementation**: Full RBAC enforcement
-5. **Frontend (T11.x–T12.x)**: Vue 3 SPA consuming REST API
-
----
-
-## Verification Checklist
-
-- [x] All 136 tests passing
-- [x] TypeScript clean (no errors)
-- [x] ESLint clean (no errors)
-- [x] CLAUDE.md conventions followed
-- [x] Audit logging on all state changes
-- [x] State machine validated
-- [x] Transactions on DecisionEngine
-- [x] Optimistic locking wired
-- [x] Error handling centralized
-- [x] DTOs separate from entities
-- [x] Role-based access control on all endpoints
-- [x] All handlers registered in buildServer()
-- [x] main.ts instantiates all dependencies
-
----
-
-## Implementation Statistics
-
-| Metric | Value |
-|--------|-------|
-| New Files Created | 21 |
-| Files Modified | 4 |
-| Test Files | 10 (all passing) |
-| Tests By Category | Task: 53, Decision: 19, Other: 64 |
-| Domain Services | 6 (TaskService, TaskExecutionHistoryService, DecisionEngine, ReleaseFlowProgressionService) |
-| HTTP Handlers | 4 |
-| API Endpoints | 8 |
-| Lines Added | 2,917 |
-| Lines Removed | 308 |
-| TypeScript Errors | 0 |
-| Lint Errors | 0 |
-
----
-
-**Last Updated**: 2026-03-17 | **Status**: ✅ Production-Ready (Batches 1-4) | **Cost**: $3.74
+| Item | Status |
+|------|--------|
+| All entities finalized with correct columns | ✅ |
+| Optimistic locking on Task, ReleaseFlow, Request | ✅ |
+| State machine: frozen and tested | ✅ |
+| Decision engine: TL-only, transactional, audited | ✅ |
+| Progression: request → stage → flow, auto-ready | ✅ |
+| Backend API: 8 endpoints registered and wired | ✅ |
+| Error handling: centralized Fastify handler | ✅ |
+| DTO separation: no entity leaks to HTTP layer | ✅ |
+| 136 tests passing | ✅ |
+| TypeScript clean | ✅ |
+| ESLint clean | ✅ |
+| Upload/import implemented | ❌ Next batch |
+| Record Result (MANUAL path) implemented | ❌ Next batch |
+| AUTO execution (Jenkins/Ansible) | ❌ Blocked (RESOLVE-Q3) |
+| Callback endpoint | ❌ Blocked (RESOLVE-Q2) |
+| Full WWA auth integration | ❌ Blocked (RESOLVE-Q5) |
+| Frontend | ❌ Not started |
