@@ -1,8 +1,8 @@
 # Deployment Agent MVP — Implementation Plan
 
 **Last Updated**: 2026-03-18
-**Stack**: Java 21 / Spring Boot 3.2.4 / Spring Data JPA / H2 (test) / Oracle (prod)
-**Build**: `mvn test` (requires internet on first run to pull Spring Boot + POI artifacts)
+**Stack**: Java 21 / Spring Boot 3.2.4 / Spring Data JPA / H2 (test) / Oracle (prod) + Vue 3 / Vite / Pinia / Vue Router / Axios (frontend)
+**Build**: `mvn test` (requires internet on first run) | `cd frontend && npm install && npm run dev` (requires internet on first run)
 **Primary source of truth for task scope**: `docs/06-tasks/tasks.md`
 
 ---
@@ -15,10 +15,11 @@
 | Phase 1 | Foundation & Persistence | ✅ Complete | — |
 | Phase 2 | Core Domain Services | ⚠️ Partial | T8.1/T8.2/T8.3 blocked on RESOLVE-Q3 (secret store) |
 | Phase 3 | API & Integration Layer | ⚠️ Partial | T9.1–T9.4 blocked on RESOLVE-Q2/Q4; T10.4 blocked on RESOLVE-Q5 |
-| Phase 4 | Frontend | ❌ Not started | Unblocked — can begin now |
-| Phase 5 | Testing & Verification | ⚠️ Partial | Domain unit tests done; contract/E2E/security tests not started |
+| Phase 4 | Frontend | ✅ Complete | — |
+| Phase 5 | Testing & Verification | ⚠️ Partial | Domain unit tests done; contract/E2E/security/frontend tests not started |
 
 > **Phase 3 is not complete.** The API layer (T10.1–T10.3, T10.5) and the MANUAL execution path (T8.1b) are done, but the callback/result-retrieval integration (T9.1–T9.4) and full WWA auth (T10.4) are all blocked pending RESOLVE tasks.
+> **Phase 4 is complete.** Vue 3 frontend in `frontend/` with all T11.x + T12.x + T2.3 views, dialogs, stores, and API client.
 
 ---
 
@@ -176,24 +177,33 @@
 
 ---
 
-## 7. Phase 4 — Frontend ❌ Not Started (Unblocked)
+## 7. Phase 4 — Frontend ✅ Complete
 
-All read paths and write dialogs for the MANUAL workflow are unblocked. AUTO-path dialogs (execution status, callback result) must wait for Phase 3 completion.
+Frontend source at `frontend/`. Vue 3 + Vite + Pinia + Vue Router + Axios. Dev server proxies `/api` → Spring Boot on `:8080`.
+**To run**: `cd frontend && npm install && npm run dev` (requires internet on first run).
 
-| Task | Depends on | Status |
-|------|------------|--------|
-| T11.1 Workspace shell | — | ❌ Not started |
-| T11.2 Release Flow summary view | T10.1 ✅ | ❌ Not started |
-| T11.3 Release Flow detail view | T10.1 ✅ | ❌ Not started |
-| T11.4 Task detail view | T10.2 ✅, T8.1b ✅ | ❌ Not started |
-| T11.5 Upload dialog | T6.3 ✅ | ❌ Not started |
-| T11.5b Record Result dialog | T8.1b ✅ | ❌ Not started |
-| T11.6 Task edit dialog | T10.2 ✅ | ❌ Not started |
-| T11.7 Decision dialog | T7.3 ✅ | ❌ Not started |
-| T11.8 Audit log view | T3.3 ✅ | ❌ Not started |
-| T12.1 Vue 3 state management | T10.x ✅ | ❌ Not started |
-| T12.2 REST client integration | T10.x ✅ | ❌ Not started |
-| T2.3 Configuration admin view | T2.2 ✅ | ❌ Not started |
+| Task | Depends on | Status | File(s) |
+|------|------------|--------|---------|
+| T11.1 Workspace shell | — | ✅ Done | `views/WorkspaceLayout.vue` |
+| T11.2 Release Flow summary view | T10.1 ✅ | ✅ Done | `views/ReleaseFlowSummaryView.vue` |
+| T11.3 Release Flow detail view | T10.1 ✅ | ✅ Done | `views/ReleaseFlowDetailView.vue` |
+| T11.4 Task detail view | T10.2 ✅, T8.1b ✅ | ✅ Done | `views/ReleaseFlowDetailView.vue` (combined) |
+| T11.5 Upload dialog | T6.3 ✅ | ✅ Done | `components/UploadDialog.vue` |
+| T11.5b Record Result dialog | T8.1b ✅ | ✅ Done | `components/RecordResultDialog.vue` |
+| T11.6 Task edit dialog | T10.2 ✅ | ✅ Done | `components/TaskEditDialog.vue` |
+| T11.7 Decision dialog | T7.3 ✅ | ✅ Done | `components/DecisionDialog.vue` |
+| T11.8 Audit log view | T3.3 ✅ | ✅ Done | `views/AuditLogView.vue` |
+| T12.1 Vue 3 state management (Pinia) | T10.x ✅ | ✅ Done | `stores/releaseFlow.ts`, `task.ts`, `config.ts`, `audit.ts`, `user.ts` |
+| T12.2 REST client integration | T10.x ✅ | ✅ Done | `api/client.ts`, `releaseFlows.ts`, `tasks.ts`, `upload.ts`, `config.ts`, `audit.ts` |
+| T2.3 Configuration admin view | T2.2 ✅ | ✅ Done | `views/ConfigAdminView.vue` |
+
+**Key frontend design decisions**:
+- Role switcher in topbar for dev convenience (simulates WWA auth headers X-User-Id/X-User-Role)
+- Polling: release flow list refreshes every 10s via `startPolling()` / `stopPolling()`
+- Action visibility: Edit (TL, Pending/Ready), Record Result (TL, MANUAL+Ready), Decision (TL, Awaiting_Review)
+- Status badges: color-coded globally via `src/assets/main.css`
+- MANUAL tasks marked with purple badge; AUTO with teal badge
+- Result viewer: side-by-side result summary vs expected output
 
 ---
 
@@ -264,7 +274,7 @@ domain/fileimport/
          │
          └──[BLOCKED on RESOLVE-Q5]──► T10.4 full WWA auth integration
          │
-[❌] Phase 4 — Frontend (T11.x, T12.x) — UNBLOCKED, can start now
+[✅] Phase 4 — Frontend (T11.x, T12.x, T2.3) — COMPLETE (frontend/ directory)
          │
 [⚠️] Phase 5 — Testing (T13.1 done; T13.2–T13.7 pending)
 ```
@@ -366,6 +376,32 @@ src/test/java/com/wwa/deploymentagent/
 │   ├── audit/  AuditLoggerServiceTest
 │   ├── configuration/  ConfigurationServiceTest
 │   └── fileimport/  ExcelParserServiceTest, ImportServiceTest
+
+frontend/                          ← Vue 3 app (npm run dev → :5173, proxies /api → :8080)
+├── package.json                   (vue@3.4, pinia@2.1, vue-router@4.3, axios@1.6, vite@5.1)
+├── vite.config.ts                 (proxy /api → http://localhost:8080)
+├── src/
+│   ├── types/index.ts             (all shared TS types + enums)
+│   ├── api/
+│   │   ├── client.ts              (axios instance + X-User-Id/Role headers)
+│   │   ├── releaseFlows.ts, tasks.ts, upload.ts, config.ts, audit.ts
+│   ├── stores/
+│   │   ├── user.ts                (role/userId; isTL/isDeveloper/isDevOpsAdmin/isAuditMgmt)
+│   │   ├── releaseFlow.ts         (list, detail, polling, filters)
+│   │   ├── task.ts, config.ts, audit.ts
+│   ├── router/index.ts            (release-flows, release-flows/:id, /config, /audit)
+│   ├── views/
+│   │   ├── WorkspaceLayout.vue    (T11.1 — sidebar nav + topbar + router-view)
+│   │   ├── ReleaseFlowSummaryView.vue  (T11.2 — table, filters, pagination, Upload btn, polling)
+│   │   ├── ReleaseFlowDetailView.vue   (T11.3+T11.4 — header, stage tabs, task table, actions)
+│   │   ├── AuditLogView.vue       (T11.8 — paginated; AUDIT_MGMT only)
+│   │   └── ConfigAdminView.vue    (T2.3 — inline edit; DEVOPS_ADMIN only)
+│   ├── components/
+│   │   ├── UploadDialog.vue       (T11.5 — stage select + file picker, shows release ID on success)
+│   │   ├── RecordResultDialog.vue (T11.5b — ref panel + result textarea; MANUAL only)
+│   │   ├── TaskEditDialog.vue     (T11.6 — edit script/params; TL only)
+│   │   └── DecisionDialog.vue     (T11.7 — Approve/Reject/Rerun/Skip radio; TL only)
+│   └── assets/main.css            (global styles, badges, buttons, table, modal, spinner)
 ```
 
 ---
@@ -409,7 +445,7 @@ src/test/java/com/wwa/deploymentagent/
 | AUTO execution orchestration (T8.1–T8.3) | ❌ Blocked (RESOLVE-Q3) |
 | Callback endpoint (T9.1–T9.4) | ❌ Blocked (RESOLVE-Q2/Q4) |
 | Full WWA auth integration (T10.4) | ❌ Blocked (RESOLVE-Q5) |
-| Frontend (T11.x, T12.x, T2.3) | ❌ Not started (unblocked) |
+| Frontend (T11.x, T12.x, T2.3) | ✅ Done (`frontend/` — Vue 3/Vite/Pinia/axios) |
 | API contract tests (T13.3) | ❌ Not started |
 | Integration/E2E tests (T13.2, T13.7) | ❌ Not started |
 | Authorization/security tests (T13.5) | ❌ Not started |
