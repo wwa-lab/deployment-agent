@@ -1,7 +1,7 @@
 # Deployment Agent MVP — Implementation Plan
 
-**Last Updated**: 2026-03-17 | **Status**: Phase 1 Complete, Phase 2 Ready
-**Tests**: 145 passing | **TypeCheck**: ✅ | **Lint**: ✅
+**Last Updated**: 2026-03-18 | **Status**: Phase 2 In Progress (T6.1–T6.3, T8.1b implemented; tests require internet for first Maven run)
+**Tests**: 145 (pre-rewrite passing) + new tests for T6.1, T6.2, T8.1b (pending first compile) | **Stack**: Java/Spring Boot 3.2.4
 **Primary source of truth for task scope**: `docs/06-tasks/tasks.md`
 
 ---
@@ -509,8 +509,8 @@ tests/
 | 145 tests passing | ✅ |
 | TypeScript clean | ✅ |
 | ESLint clean | ✅ |
-| Upload/import implemented | ❌ Next batch |
-| Record Result (MANUAL path) implemented | ❌ Next batch |
+| Upload/import implemented | ✅ T6.1 ExcelParserService, T6.2 ImportService, T6.3 UploadController |
+| Record Result (MANUAL path) implemented | ✅ T8.1b RecordResultService + endpoint |
 | AUTO execution (Jenkins/Ansible) | ❌ Blocked (RESOLVE-Q3) |
 | Callback endpoint | ❌ Blocked (RESOLVE-Q2) |
 | Full WWA auth integration | ❌ Blocked (RESOLVE-Q5) |

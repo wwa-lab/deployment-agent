@@ -2,6 +2,7 @@ package com.wwa.deploymentagent.web.exception;
 
 import com.wwa.deploymentagent.contracts.dto.ErrorResponseDto;
 import com.wwa.deploymentagent.errors.AppException;
+import com.wwa.deploymentagent.errors.ImportValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +44,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(new ErrorResponseDto("VALIDATION_ERROR", "Request validation failed", details));
+    }
+
+    @ExceptionHandler(ImportValidationException.class)
+    public ResponseEntity<ErrorResponseDto> handleImportValidation(ImportValidationException ex) {
+        String details = ex.getErrors().stream()
+                .map(e -> "Row " + e.row() + " [" + e.column() + "]: " + e.message())
+                .collect(Collectors.joining("; "));
+        return ResponseEntity
+                .unprocessableEntity()
+                .body(new ErrorResponseDto("IMPORT_VALIDATION_ERROR", ex.getMessage(), details));
     }
 
     @ExceptionHandler(Exception.class)

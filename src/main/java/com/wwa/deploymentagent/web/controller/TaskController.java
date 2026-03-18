@@ -1,8 +1,10 @@
 package com.wwa.deploymentagent.web.controller;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.RecordResultRequestDto;
 import com.wwa.deploymentagent.contracts.dto.TaskDto;
 import com.wwa.deploymentagent.contracts.dto.TaskExecutionHistoryDto;
+import com.wwa.deploymentagent.domain.task.RecordResultService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
 import com.wwa.deploymentagent.domain.task.TaskService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
@@ -33,6 +35,7 @@ public class TaskController {
 
     private final TaskService taskService;
     private final TaskExecutionHistoryService executionHistoryService;
+    private final RecordResultService recordResultService;
 
     @GetMapping
     public ResponseEntity<List<TaskDto>> listByRequest(@RequestParam String requestId) {
@@ -72,5 +75,25 @@ public class TaskController {
                 .map(TaskExecutionHistoryDto::from)
                 .toList();
         return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Record the result of a MANUAL task (TL only).
+     * Guards: task must be MANUAL + in Ready_For_Execution state.
+     */
+    @PostMapping("/{id}/record-result")
+    public ResponseEntity<TaskDto> recordResult(
+            @PathVariable String id,
+            @RequestBody RecordResultRequestDto body,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+
+        UserContext user = auth.getPrincipal();
+        if (!"TL".equals(user.role())) {
+            throw new ForbiddenAppException("task:recordResult");
+        }
+
+        return ResponseEntity.ok(
+                TaskDto.from(recordResultService.recordResult(
+                        id, body.resultSummary(), body.resultLogs(), user)));
     }
 }

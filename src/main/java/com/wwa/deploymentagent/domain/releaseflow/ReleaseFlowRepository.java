@@ -37,6 +37,9 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
     Page<ReleaseFlow> findByProjectIdAndFlowStatusAndCurrentStage(
             String projectId, FlowStatus flowStatus, Stage currentStage, Pageable pageable);
 
+    /** Look up the first (active) Release Flow for a given projectId – used during import. */
+    Optional<ReleaseFlow> findFirstByProjectId(String projectId);
+
     /** Count of existing Release Flows for a given projectId – used for seq generation. */
     @Query("SELECT COUNT(rf) FROM ReleaseFlow rf WHERE rf.projectId = :projectId")
     long countByProjectId(@Param("projectId") String projectId);
