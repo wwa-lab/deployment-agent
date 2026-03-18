@@ -1,7 +1,8 @@
 # Deployment Agent MVP — Implementation Plan
 
-**Last Updated**: 2026-03-18 | **Status**: Phase 2 In Progress (T6.1–T6.3, T8.1b implemented; tests require internet for first Maven run)
-**Tests**: 145 (pre-rewrite passing) + new tests for T6.1, T6.2, T8.1b (pending first compile) | **Stack**: Java/Spring Boot 3.2.4
+**Last Updated**: 2026-03-18 | **Status**: Phase 2 Complete (T6.1–T6.3, T8.1b done)
+**Stack**: Java 21 / Spring Boot 3.2.4 / Spring Data JPA / H2 (test) / Oracle (prod)
+**Build**: `mvn test` (requires internet on first run to pull Spring Boot + POI artifacts)
 **Primary source of truth for task scope**: `docs/06-tasks/tasks.md`
 
 ---
@@ -11,49 +12,51 @@
 ### Task Entity (`DA_TASK`)
 | Column | Type | Source |
 |--------|------|--------|
-| `id` | UUID PK | Generated |
-| `request_id` | varchar FK | Parent Request |
-| `task_group_id` | varchar | Excel `Task ID` |
-| `task_group_name` | varchar | Excel `Task Name` |
-| `step_seq` | integer | Excel `Step seq#` |
-| `task_name` | varchar | Excel `Step` |
-| `execution_type` | varchar | `MANUAL` \| `AUTO` |
-| `task_status` | varchar | State machine |
-| `input_parameters` | text (JSON) | `{script, parameters}` |
-| `expected_output` | text | Excel `Parameter (Expected Output)` |
-| `owner` | varchar | Excel `Owner` |
-| `planned_start_time` | datetime | Excel `Planned Start date/time` |
-| `planned_end_time` | datetime | Excel `Planned End date/time` |
-| `import_metadata` | text (JSON) | Raw blob: `activity_category`, `common`, `dependencies`, `validation` |
-| `current_result_summary` | text (JSON) | Latest execution result |
-| `latest_execution_id` | varchar | FK → TaskExecutionHistory |
-| `start_time` | datetime | Actual execution start |
-| `end_time` | datetime | Actual execution end |
-| `last_updated_at` | datetime | Auto |
-| `version` | integer | Optimistic lock |
+| `id` | VARCHAR(36) PK | `@PrePersist` UUID |
+| `request_id` | VARCHAR(36) FK | Parent Request |
+| `task_group_id` | VARCHAR(255) | Excel `Task ID` |
+| `task_group_name` | VARCHAR(255) | Excel `Task Name` |
+| `step_seq` | INTEGER | Excel `Step seq#` |
+| `task_name` | VARCHAR(255) | Excel `Step` |
+| `execution_type` | VARCHAR(10) | `MANUAL` \| `AUTO` |
+| `task_status` | VARCHAR(30) | State machine |
+| `input_parameters` | CLOB (JSON) | `{script, parameters}` |
+| `expected_output` | CLOB | Excel `Parameter (Expected Output)` |
+| `owner` | VARCHAR(255) | Excel `Owner` |
+| `planned_start_time` | TIMESTAMP | Excel `Planned Start date/time` |
+| `planned_end_time` | TIMESTAMP | Excel `Planned End date/time` |
+| `import_metadata` | CLOB (JSON) | Raw blob: `activity_category`, `common`, `dependencies`, `validation` |
+| `current_result_summary` | CLOB (JSON) | Latest execution result |
+| `latest_execution_id` | VARCHAR(36) | FK → TaskExecutionHistory |
+| `start_time` | TIMESTAMP | Actual execution start |
+| `end_time` | TIMESTAMP | Actual execution end |
+| `last_updated_at` | TIMESTAMP | `@UpdateTimestamp` |
+| `version` | BIGINT | `@Version` optimistic lock |
 
-**NOT in schema** (per finalized design decision):
+**NOT in schema** (finalized design decision):
 - `template_status` — not stored
 - `start_time_from_template` / `end_time_from_template` — ignored
 
 ### ReleaseFlow Entity (`DA_RELEASE_FLOW`)
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | UUID PK | Generated |
-| `project_id` | varchar | Excel `Project ID`; grouping key |
-| `project_name` | varchar | Excel `Project Name` |
-| `release_id` | varchar | System-generated: `{stage}-{normalized_project_name}-{seq}` |
-| `normalized_release_id` | varchar | Grouping key with `project_id` (unique index) |
-| `current_stage` | varchar | `SIT` \| `UAT` \| `PROD` |
-| `flow_status` | varchar | `Pending \| Running \| Completed \| Failed \| Rejected` |
-| `review_status` | varchar | `Pending_Review \| Approved \| Rejected` |
-| `review_owner` | varchar | Nullable |
-| `version` | integer | Optimistic lock |
+| `id` | VARCHAR(36) PK | `@PrePersist` UUID |
+| `project_id` | VARCHAR(255) | Excel `Project ID`; grouping key |
+| `project_name` | VARCHAR(255) | Excel `Project Name` |
+| `release_id` | VARCHAR(255) | System-generated: `{stage}-{normalized_project_id}-{seq}` |
+| `normalized_release_id` | VARCHAR(255) | Part of unique index `(project_id, normalized_release_id)` |
+| `current_stage` | VARCHAR(10) | `SIT` \| `UAT` \| `PROD` |
+| `flow_status` | VARCHAR(30) | `Pending \| Running \| Completed \| Failed \| Rejected` |
+| `review_status` | VARCHAR(30) | `Pending_Review \| Approved \| Rejected` |
+| `review_owner` | VARCHAR(255) | Nullable |
+| `created_at` | TIMESTAMP | `@CreationTimestamp` |
+| `updated_at` | TIMESTAMP | `@UpdateTimestamp` |
+| `version` | BIGINT | `@Version` optimistic lock |
 
 ### Other Entities
-- **Request** (`DA_REQUEST`): `id`, `release_flow_id`, `stage`, `request_status`, `version`
-- **TaskExecutionHistory** (`DA_TASK_EXECUTION_HISTORY`): `id`, `task_id`, `attempt_number`, `execution_status`, `input_snapshot` (JSON), `result_summary` (JSON), `result_logs` (CLOB/TEXT), `start_time`, `end_time`; unique index on `(task_id, attempt_number)`
-- **AuditLogEntry** (`DA_AUDIT_LOG_ENTRY`): append-only; `id`, `operator_id`, `operator_role`, `action_type`, `timestamp`, `release_flow_id`, `request_id`, `task_id`, `context_payload`
+- **Request** (`DA_REQUEST`): `id`, `release_flow_id`, `stage`, `request_status`, `created_at`, `updated_at`, `version`; index on `(release_flow_id, stage)`
+- **TaskExecutionHistory** (`DA_TASK_EXECUTION_HISTORY`): `id`, `task_id`, `attempt_number`, `execution_status`, `input_snapshot` (CLOB/JSON), `result_summary` (CLOB/JSON), `result_logs` (CLOB), `start_time`, `end_time`; unique index on `(task_id, attempt_number)`
+- **AuditLogEntry** (`DA_AUDIT_LOG_ENTRY`): append-only; `id`, `operator_id`, `operator_role`, `action_type`, `timestamp`, `release_flow_id`, `request_id`, `task_id`, `context_payload` (CLOB/JSON)
 - **ConfigurationItem** (`DA_CONFIGURATION_ITEM`): `config_key` (PK), `config_value`, `description`, `updated_by`, `updated_at`
 
 ---
@@ -61,12 +64,12 @@
 ## 2. Locked Design Rules (Must Not Change)
 
 1. **Stage source**: User selects SIT / UAT / PROD at upload time — not from Excel
-2. **Release ID generation**: `{stage}-{normalized_project_name}-{seq}` (e.g., `sit-paymenthub-0001`); system-generated; not from Excel
+2. **Release ID generation**: `{stage}-{normalized_project_id}-{seq}` (e.g., `sit-paymenthub-0001`); system-generated; seq = count of existing flows for projectId + 1
 3. **Release Flow grouping**: by `project_id` from Excel; same project re-uploads attach new stage to same flow
-4. **Execution Type**: `MANUAL` executes externally (TL records result inline); `AUTO` submits to pipeline (receives callback)
+4. **Execution Type**: `MANUAL` executes externally (TL records result); `AUTO` submits to pipeline (receives callback)
 5. **Rerun model**: same `task_id`, new `TaskExecutionHistory` row with incremented `attempt_number`
 6. **Summary display**: only `Done` / `Running` / `Pending` (no raw enum exposure)
-7. **RBAC**: Developer = upload + view; TL = view + edit input + decide; DevOps Admin = config + operational view; Audit/Management = audit log view
+7. **RBAC**: Developer = upload + view; TL = view + edit input + decide + record result; DevOps Admin = config + operational view; Audit/Management = audit log view
 8. **Config update scope**: applies to future executions only; does not affect in-flight tasks
 
 ---
@@ -75,14 +78,12 @@
 
 | Blocker | Status | Notes |
 |---------|--------|-------|
-| RESOLVE-Q1 (Excel schema) | ✅ Resolved | All field mappings finalized; see T6.1 for exact rules |
+| RESOLVE-Q1 (Excel schema) | ✅ Resolved | All field mappings finalized and implemented in T6.1 |
 | RESOLVE-Q6 (Stage/Release ID source) | ✅ Resolved | Stage from upload param; Release ID system-generated |
 | RESOLVE-Q2 (Callback auth) | ❓ Pending | Blocks T9.1, T9.2, T9.4 |
 | RESOLVE-Q3 (Secret store) | ❓ Pending | Blocks T8.1 (AUTO execution), T8.2 |
-| RESOLVE-Q4 (Oracle result storage) | ❓ Pending | Blocks T9.3; note: `result_logs` CLOB already in TaskExecutionHistory |
-| RESOLVE-Q5 (WWA auth context) | ❓ Pending | Blocks full T10.4; middleware placeholder exists |
-
-> **Key change from previous plan**: T6.1, T6.2, T6.3, and T8.1b are **not blocked** by any unresolved RESOLVE tasks. They can be implemented now.
+| RESOLVE-Q4 (Oracle result storage) | ❓ Pending | Blocks T9.3; `result_logs` CLOB already in TaskExecutionHistory schema |
+| RESOLVE-Q5 (WWA auth context) | ❓ Pending | Blocks full T10.4; header-based placeholder exists |
 
 ---
 
@@ -90,173 +91,66 @@
 
 ### Phase 1 (Foundation) — ✅ Complete
 
-| Task | What's in the repo |
-|------|--------------------|
-| **T1.1** Schema & Entities | All TypeORM entities: Task (full extended schema), ReleaseFlow (`projectId`/`projectName`), Request, TaskExecutionHistory, AuditLogEntry, ConfigurationItem |
-| **T1.2** Repositories | TaskRepository, TaskExecutionHistoryRepository, ReleaseFlowRepository, RequestRepository, AuditLogRepository, ConfigurationRepository |
-| **T1.3** Transactions & Locking | `@VersionColumn` on Task/ReleaseFlow/Request; `DataSource.transaction()` in DecisionEngine; all repos accept optional `EntityManager` |
-| **T1.5** Test DB Setup | `tests/helpers/testDataSource.ts` with `seedReleaseFlow()`, `seedRequest()`, `seedTask()` (full field set), `seedTaskExecutionHistory()`; `clearAllTables()`; in-memory sql.js |
-| **T2.1** Configuration Service | ConfigurationService with get/list/upsert, validation per key (URLs, HTTPS), audit on update |
-| **T2.2** Configuration Controller | `GET/POST /api/deployment-agent/config`; DEVOPS_ADMIN auth on write |
-| **T3.1** Audit Log Entity | AuditLogEntryEntity; append-only AuditLogRepository |
-| **T3.2** Audit Logger Service | AuditLoggerService.log(); all audit failures swallowed; participates in caller transaction |
-| **T3.3** Audit Log Endpoint | `GET /api/deployment-agent/audit-logs`; AUDIT/MANAGEMENT/DEVOPS_ADMIN auth; paginated + filtered |
-| **T4.1** ReleaseFlow Service | ReleaseFlowService: create, getById, list, findByGroupKey, recomputeAndPersistStatus (bottom-up), advanceStage |
-| **T4.2** Request Service | RequestService: create, getById, listByReleaseFlow, findByStage, updateStatus |
-| **T5.1** Task Service CRUD | TaskService: create(CreateTaskInput), getById, listByRequestId, updateStatus (state machine + audit) |
-| **T5.2** Execution History Service | TaskExecutionHistoryService: createExecution (auto-attempt, input snapshot), findByTaskId, findLatest, completeExecution |
-| **T5.3** Task Input Editing | TaskService.editInput(): state guard (Pending/Ready only), JSON validation, audit |
-| **T5.4** Result Metadata Update | TaskService.updateResultMetadata(): sets currentResultSummary + latestExecutionId atomically |
-| **T7.1** Decision Engine | DecisionEngine.applyDecision(): approve/reject/rerun/skip; TL-only; full transaction; audit |
-| **T7.2** Progression | ReleaseFlowProgressionService: request completion, stage advancement (SIT→UAT→PROD), flow completion, auto-ready next pending task, bottom-up recompute |
-| **T7.3** Decision Controller | `POST /api/deployment-agent/tasks/:id/decision`; TL auth; returns updated TaskDto |
-| **T10.1** ReleaseFlow Controllers | `GET /api/deployment-agent/release-flows` (paginated, filterable by projectId); `GET /api/deployment-agent/release-flows/:id` (detail with nested requests/tasks) |
-| **T10.2** Task Controllers | `GET /tasks?requestId=X`; `GET /tasks/:id`; `PUT /tasks/:id/input` (TL); `GET /tasks/:id/executions` |
-| **T10.3** Error Handling | Centralized Fastify error handler: AppError → HTTP; TypeORM OptimisticLock → 409; no stack leak |
-| **T10.5** DTOs | TaskDto (all fields), ReleaseFlowListItemDto/DetailDto (projectId/projectName), RequestDto, TaskExecutionHistoryDto, AuditLogEntryDto, PaginatedResponseDto<T>, DecisionRequestDtoSchema (Zod) |
-| **T13.1** Unit Tests | 145 tests, 10 test files — see §6 for breakdown |
+| Task | Java class / file |
+|------|-------------------|
+| **T1.1** Entities | `Task`, `ReleaseFlow`, `Request`, `TaskExecutionHistory`, `AuditLogEntry`, `ConfigurationItem` — all with `@PrePersist` UUID, `@Version`, `@UpdateTimestamp` |
+| **T1.2** Repositories | Spring Data JPA interfaces: `TaskRepository`, `TaskExecutionHistoryRepository`, `ReleaseFlowRepository`, `RequestRepository`, `AuditLogRepository`, `ConfigurationRepository` |
+| **T1.3** Transactions & Locking | `@Version Long version` on Task/ReleaseFlow/Request; `@Transactional` on all service methods; `ObjectOptimisticLockingFailureException` → `OptimisticLockConflictException` → 409 |
+| **T1.5** Test DB Setup | `TestDataHelper` Spring `@Component` with `seedReleaseFlow()`, `seedRequest()`, `seedTask()`; H2 in-memory (`application-test.properties`); `@SpringBootTest @ActiveProfiles("test") @Transactional` pattern |
+| **T2.1** Configuration Service | `ConfigurationService`: get/list/upsert, key validation (URLs, HTTPS), audit on update |
+| **T2.2** Configuration Controller | `ConfigurationController`: `GET/POST /api/deployment-agent/config`; DEVOPS_ADMIN auth on write |
+| **T3.1** Audit Log Entity | `AuditLogEntry`; append-only `AuditLogRepository` |
+| **T3.2** Audit Logger Service | `AuditLoggerService.log()`: `Propagation.REQUIRES_NEW`; failures swallowed; never aborts caller |
+| **T3.3** Audit Log Endpoint | `AuditLogController`: `GET /api/deployment-agent/audit-logs`; AUDIT/MANAGEMENT/DEVOPS_ADMIN auth; paginated + filtered |
+| **T4.1** ReleaseFlow Service | `ReleaseFlowService`: `create`, `getById`, `list` (paginated+filtered), `findByGroupKey`, `recomputeAndPersistStatus` (bottom-up), `advanceStage` |
+| **T4.2** Request handling | `RequestRepository` with `findByReleaseFlowIdWithTasks`, `findByReleaseFlowId`, `findByReleaseFlowIdAndStage` |
+| **T5.1** Task Service CRUD | `TaskService`: `create(CreateTaskInput)`, `getById`, `listByRequestId`, `updateStatus` (state machine + audit), `updateResultMetadata` |
+| **T5.2** Execution History Service | `TaskExecutionHistoryService`: `createExecution` (auto-attempt + input snapshot), `findByTaskId`, `findLatest`, `completeExecution` |
+| **T5.3** Task Input Editing | `TaskService.editInput()`: state guard (Pending/Ready only), null check, audit |
+| **T7.1** Decision Engine | `DecisionEngine.applyDecision()`: approve/reject/rerun/skip; TL-only; `@Transactional`; audit |
+| **T7.2** Progression Service | `ReleaseFlowProgressionService.progressAfterDecision()`: request completion, SIT→UAT→PROD advancement, flow completion, auto-ready next Pending task, bottom-up recompute |
+| **T7.3** Decision Controller | `DecisionController`: `POST /api/deployment-agent/tasks/{id}/decision`; TL auth |
+| **T10.1** ReleaseFlow Controllers | `ReleaseFlowController`: `GET /release-flows` (paginated, filterable); `GET /release-flows/{id}` (full hierarchy) |
+| **T10.2** Task Controllers | `TaskController`: `GET /tasks?requestId=X`; `GET /tasks/{id}`; `PUT /tasks/{id}/input` (TL); `GET /tasks/{id}/executions` |
+| **T10.3** Error Handling | `GlobalExceptionHandler` (`@RestControllerAdvice`): `AppException` → HTTP; `ObjectOptimisticLockingFailureException` → 409; `ImportValidationException` → 422; no stack leak |
+| **T10.5** DTOs | Java records: `TaskDto`, `ReleaseFlowListItemDto`, `ReleaseFlowDetailDto`, `RequestDto`, `TaskExecutionHistoryDto`, `AuditLogEntryDto`, `ConfigurationItemDto`, `PaginatedResponseDto<T>`, `DecisionRequestDto`, `ErrorResponseDto` |
+| **Security** | `HeaderAuthFilter` reads `X-User-Id`/`X-User-Role`; `UserContextAuthentication`; `SecurityConfig` permits all (role checked per endpoint) |
 
-### Phase 1 Fidelity Fix Pass — ✅ Applied
+### Phase 2 (Upload & MANUAL Result) — ✅ Complete
 
-The following corrections were applied after initial implementation to align the repo with the finalized design documents:
+| Task | Java class / file |
+|------|-------------------|
+| **T6.1** Excel Parsing | `ExcelParserService`: parses `AMH_HCC_task` sheet from XLSX bytes; validates all required fields with row+column errors; enforces `Step seq#` uniqueness per `Task ID`; ignores `Status`/`Start date/time`/`End date/time` |
+| **T6.2** Import Service | `ImportService`: groups rows by `project_id`; finds or creates `ReleaseFlow` (with formatted `release_id`); finds or creates `Request` per stage; upserts tasks by `(requestId, taskGroupId, stepSeq)`; preserves execution state on re-upload; single `@Transactional` rollback on any error |
+| **T6.3** Upload Controller | `UploadController`: `POST /api/deployment-agent/upload` (multipart: `file` + `stage`); validates stage before reading file (400 on bad stage); DEVELOPER/TL only (403 otherwise); 422 with structured errors on parse failures; returns `UploadResponseDto { releaseFlowId, releaseId, stage, taskCount }` |
+| **T8.1b** Record Result | `RecordResultService`: MANUAL + `Ready_For_Execution` guard → creates `TaskExecutionHistory` (Completed, auto-incremented attempt) → transitions task to `Awaiting_Review` → audits → calls `progressAfterDecision`; endpoint: `POST /tasks/{id}/record-result` (TL only) |
 
-| What changed | Why |
-|---|---|
-| Task entity — added `taskGroupId`, `taskGroupName`, `stepSeq`, `executionType`, `expectedOutput`, `owner`, `plannedStartTime`, `plannedEndTime`, `importMetadataJson` | Schema finalization aligned with Excel import field list |
-| ReleaseFlow entity — split `project` into `projectId` + `projectName` | Matches RESOLVE-Q6: grouping key is `project_id` from Excel |
-| `ExecutionType` enum added (`MANUAL` \| `AUTO`) | Required by T6.1/T8.1 field |
-| All DTOs updated to include new task and release flow fields | API contract alignment |
-| All handler mappers (`mapTaskToDto()`) updated to include new fields with ISO date strings | Handler fidelity |
-| `TaskService.create()` refactored to accept `CreateTaskInput` interface | Supports Import Service calling convention |
-| `seedTask()` in testDataSource updated with all new field defaults | Test correctness |
-| TaskService tests updated — `create()` tests now verify all new fields | Test fidelity |
-
-### Fidelity Fix Pass #2 — ✅ Applied
-
-The following corrections were applied after the consistency review to fix aggregation bugs and API contract gaps:
-
-| What changed | Why |
-|---|---|
-| `aggregateTasksToRequestStatus()` — added `Awaiting_Review` and `Ready_For_Execution` as "Running" triggers | Tasks in these states were incorrectly aggregating to "Pending"; spec §9.5 defines them as active states |
-| `aggregateTasksToRequestStatus()` — Rejected/Failed now take priority over Running | Rejected/Failed are terminal-error states and should not be masked by Running |
-| `toSummaryStatus()` — Rejected/Failed now map to "Done" instead of "Pending" | Terminal states should never display as "Pending"; "Done" is the least misleading 3-value option |
-| `TaskExecutionHistoryDto` — added `resultLogs: string | null` field | Entity has `resultLogs` but it was not exposed via API, blocking Result Viewer (FR-33) |
-| `TaskHandler` execution mapper — added `resultLogs` mapping | DTO field needs corresponding data |
-| `DecisionHandler` — throws `ValidationError` instead of generic `Error` on invalid request body | Generic `Error` bypasses centralized error handler and returns 500 instead of 400 |
-| Aggregation tests — added 5 new edge-case tests, updated 2 existing | Awaiting_Review/Ready_For_Execution/Rejected/Failed aggregation paths were untested |
-| Test counts updated in §6 and verification checklist | Previous count (136) was stale; actual is 145 |
+### Repository additions (Phase 2)
+| Method | Where |
+|--------|-------|
+| `findFirstByProjectId(projectId)` | `ReleaseFlowRepository` — import lookup |
+| `findByReleaseFlowIdAndStage(rfId, stage)` | `RequestRepository` — re-upload upsert |
+| `findByRequestIdAndTaskGroupIdAndStepSeq(...)` | `TaskRepository` — task upsert |
 
 ---
 
 ## 5. What Remains — By Priority
 
-### 5A. Next Batch (Unblocked, High Priority)
-
-#### T6.1 — Excel Parsing & Validation
-**File**: `src/domain/import/ExcelParserService.ts`
-
-Parse the `AMH_HCC_task` sheet. Rules:
-
-| Excel Column | Action | Target Field |
-|---|---|---|
-| `Project ID` | Required, non-blank | `release_flow.project_id` |
-| `Project Name` | Required, non-blank | `release_flow.project_name` |
-| `Task ID` | Required, non-blank | `task.task_group_id` |
-| `Task Name` | Required, non-blank | `task.task_group_name` |
-| `Step seq#` | Required; positive integer; unique within `Task ID` | `task.step_seq` |
-| `Step` | Required, non-blank | `task.task_name` |
-| `Execution Type` | Required; `MANUAL` or `AUTO` (case-insensitive); reject any other | `task.execution_type` |
-| `Script to be executed` | Required when AUTO; optional when MANUAL | `task.input_parameters.script` |
-| `Parameter (input)` | Optional | `task.input_parameters.parameters` |
-| `Parameter (Expected Output)` | Optional | `task.expected_output` |
-| `Owner` | Optional | `task.owner` |
-| `Planned Start date/time` | Optional; validate format | `task.planned_start_time` |
-| `Planned End date/time` | Optional; validate format | `task.planned_end_time` |
-| `Activity category`, `Common`, `Dependencies`, `Validation` | No validation; store as-is | `task.import_metadata` JSON blob |
-| `Status`, `Start date/time`, `End date/time` | **Ignore completely** | (not stored) |
-
-**Tests**: `tests/domain/import/ExcelParserService.test.ts`
-- Valid file parses correctly
-- Required field missing → row-level error with row + column detail
-- Invalid Execution Type → row error
-- `Step seq#` uniqueness enforced within `Task ID`
-- Ignored columns are not stored
-
-#### T6.2 — Release Flow Grouping & Release ID Generation
-**File**: `src/domain/import/ImportService.ts`
-
-- Group parsed rows by `project_id`
-- Look up active Release Flow by `project_id` (`findByGroupKey`)
-  - **None exists**: create new ReleaseFlow; generate `release_id` = `{stage}-{normalized_project_id}-{seq}` (zero-padded 4 digits, e.g., `sit-paymenthub-0001`); `seq` is per-project counter from DB
-  - **Exists**: attach new Request to that Release Flow for the selected stage
-- Create Request with stage from upload parameter
-- Upsert tasks by `(release_flow_id, stage, task_group_id, step_seq)` on re-upload
-- Entire import runs in a single transaction; roll back on any error
-
-**Tests**: `tests/domain/import/ImportService.test.ts`
-- New project → new Release Flow + ID generated in correct format
-- Existing project → new Request attached to same flow
-- Re-upload same project + stage → tasks updated, not duplicated
-- Transaction rollback on parse error
-
-#### T6.3 — Upload Controller & Endpoint
-**File**: `src/http/handlers/UploadHandler.ts`
-
-- `POST /api/deployment-agent/upload`
-- Accept multipart: `file` (XLSX) + `stage` (SIT | UAT | PROD)
-- Validate `stage` before file processing — return 400 if missing or invalid
-- DEVELOPER or TL role required (upload permission)
-- Return on success: `{ releaseFlowId, releaseId, stage, taskCount }`
-- Return on validation failure: structured error array with `{ row, column, message }` per error
-- Audit the upload event regardless of outcome
-
-**Register** in `buildServer()` / `ServerDeps`.
-
-**Tests**: `tests/http/handlers/UploadHandler.test.ts`
-- Missing stage → 400 before file processing
-- Invalid stage → 400
-- Valid file → 200 with release info
-- Validation errors → 422 with structured error rows
-- DEVELOPER role → allowed; unauthenticated → 401
-
-#### T8.1b — Record Result Endpoint (MANUAL Tasks)
-**File**: `src/http/handlers/RecordResultHandler.ts`
-**Service method**: add to existing `TaskService` or create `RecordResultService`
-
-- `POST /api/deployment-agent/tasks/:id/record-result`
-- Guards: task must be `MANUAL` + in `Ready_For_Execution`; TL role required
-- Creates `TaskExecutionHistory` with:
-  - `executionStatus = "Completed"`
-  - `attemptNumber` = max + 1
-  - `resultSummaryJson` = operator-entered value
-  - `startTime` = task.lastUpdatedAt (proxy for when task became ready)
-  - `endTime` = now
-- Transitions task: `Ready_For_Execution` → `Awaiting_Review`
-- Updates `task.latestExecutionId`
-- Calls `progressAfterDecision` → triggers decision context
-- Audit entry: action = `"view_result"` (or introduce `"record_result"` if preferred)
-
-**Tests**: `tests/http/handlers/RecordResultHandler.test.ts`
-- MANUAL + Ready_For_Execution → success; task is Awaiting_Review
-- AUTO task → 409 (wrong execution type)
-- Wrong state → 409 (state guard)
-- Non-TL → 403
-- History record created with correct attempt number
-
----
-
-### 5B. Unblocked, Medium Priority
+### 5A. Unblocked, Medium Priority
 
 #### T4.3 — Hierarchical Query Optimization
-**File**: modify `src/domain/releaseflow/ReleaseFlowRepository.ts`
+**File**: modify `ReleaseFlowRepository.java`
 
-Add `findByIdWithFullHierarchy(id)` using TypeORM `createQueryBuilder` with left joins across ReleaseFlow → Requests → Tasks. Replaces the current N+1 pattern in `ReleaseFlowHandler`'s `mapFlowToDetailDto()`.
+Add `findByIdWithFullHierarchy(id)` using JPQL/`@Query` with `LEFT JOIN FETCH` across
+`ReleaseFlow → requests → tasks`. Replaces the current N+1 pattern in `ReleaseFlowController`'s
+detail endpoint.
 
-**Tests**: existing ReleaseFlow tests cover correctness; add a hierarchy test to `tests/domain/releaseflow/`.
+**Tests**: add a hierarchy-load test to `ReleaseFlowServiceTest` or a new
+`src/test/java/.../domain/releaseflow/ReleaseFlowServiceTest.java` (currently missing from test suite).
 
 ---
 
-### 5C. Blocked — Awaiting Phase 0 Resolution
+### 5B. Blocked — Awaiting Phase 0 Resolution
 
 | Task | Blocker | What's needed |
 |------|---------|---------------|
@@ -265,28 +159,28 @@ Add `findByIdWithFullHierarchy(id)` using TypeORM `createQueryBuilder` with left
 | T8.3 (Execution error handling) | RESOLVE-Q3 | Depends on T8.1 |
 | T9.1 (Callback handler service) | RESOLVE-Q2 | Callback auth mechanism (signed token / shared secret / mTLS) |
 | T9.2 (Callback controller) | RESOLVE-Q2 | Depends on T9.1 |
-| T9.3 (Result retrieval) | RESOLVE-Q4 | Oracle CLOB result storage strategy; `result_logs` already in TaskExecutionHistory schema as candidate location |
+| T9.3 (Result retrieval) | RESOLVE-Q4 | Oracle CLOB result storage strategy; `result_logs` already in `TaskExecutionHistory` schema |
 | T9.4 (Callback retry strategy) | RESOLVE-Q2 | Depends on T9.1 |
 | T10.4 (Full authorization framework) | RESOLVE-Q5 | WWA auth context contract (exact header names, role claim values) |
 
 ---
 
-### 5D. Frontend Phase — Awaits API Completeness
+### 5C. Frontend Phase — Awaits API Completeness
 
-> Can begin workspace shell and read-only views in parallel. Write paths (upload dialog, record-result dialog, decision dialog) should wait until relevant backends are stable.
+> Read-only views and workspace shell can begin now. Write dialogs unblock as backends complete.
 
 | Task | Depends on | Notes |
 |------|------------|-------|
 | T11.1 Workspace shell | — | Can start now |
 | T11.2 Release Flow summary view | T10.1 ✅ | Can start now |
 | T11.3 Release Flow detail view | T10.1 ✅ | Can start now |
-| T11.4 Task detail view | T10.2 ✅, T8.1b | Basic view now; Record Result button after T8.1b |
-| T11.5 Upload dialog | T6.3 | After upload endpoint |
-| T11.5b Record Result dialog | T8.1b | MANUAL path dialog |
+| T11.4 Task detail view | T10.2 ✅, T8.1b ✅ | Can start now; Record Result button unblocked |
+| T11.5 Upload dialog | T6.3 ✅ | Can start now |
+| T11.5b Record Result dialog | T8.1b ✅ | Can start now |
 | T11.6 Task edit dialog | T10.2 ✅ | Can start now |
 | T11.7 Decision dialog | T7.3 ✅ | Can start now |
 | T11.8 Audit log view | T3.3 ✅ | Can start now |
-| T12.1 Pinia state management | T10.x ✅ | Can start now |
+| T12.1 State management | T10.x ✅ | Can start now |
 | T12.2 REST client | T10.x ✅ | Can start now |
 
 ---
@@ -294,35 +188,41 @@ Add `findByIdWithFullHierarchy(id)` using TypeORM `createQueryBuilder` with left
 ## 6. Test Status
 
 ```
-Test Files: 10 (all passing)
-Total Tests: 145 passing
+Build: mvn test  (requires internet on first run for Maven artifact download)
+Test runtime DB: H2 in-memory (application-test.properties, MODE=Oracle)
 
-tests/domain/task/
-  taskStateMachine.test.ts              18 tests  (all transitions, valid and invalid)
-  TaskService.test.ts                   23 tests  (CRUD, state machine, input editing, audit, optimistic lock)
-  TaskExecutionHistoryService.test.ts   14 tests  (creation, attempt numbering, snapshots, completion)
-  taskInputValidation.test.ts            7 tests  (accept valid JSON, reject undefined)
+src/test/java/.../domain/task/
+  TaskStateMachineTest.java                 ~18 tests  (all transitions, valid + invalid)
+  TaskServiceTest.java                      ~23 tests  (CRUD, state machine, input editing, audit)
+  TaskExecutionHistoryServiceTest.java      ~14 tests  (creation, attempt numbering, completion)
+  RecordResultServiceTest.java               6 tests  (success path, AUTO guard, state guard, attempt#) ← NEW
 
-tests/domain/decision/
-  DecisionEngine.test.ts                12 tests  (approve/reject/rerun/skip, role guard, state guard, audit)
-  ReleaseFlowProgressionService.test.ts  7 tests  (request completion, SIT→UAT→PROD, flow completion, auto-ready)
+src/test/java/.../domain/decision/
+  DecisionEngineTest.java                   ~12 tests  (approve/reject/rerun/skip, role/state guard, audit)
+  ReleaseFlowProgressionServiceTest.java     ~7 tests  (request completion, SIT→UAT→PROD, auto-ready)
 
-tests/domain/releaseflow/
-  ReleaseFlowService.test.ts            20 tests  (create, getById, list, advanceStage, recompute)
-  releaseFlowAggregation.test.ts        29 tests  (bottom-up aggregation, summary status, edge cases)
+src/test/java/.../domain/releaseflow/
+  ReleaseFlowAggregationTest.java           ~29 tests  (bottom-up aggregation, summary status, edge cases)
+  ReleaseFlowServiceTest.java               MISSING — to be added with T4.3
 
-tests/domain/audit/
-  AuditLoggerService.test.ts             5 tests  (append, swallow failure)
+src/test/java/.../domain/audit/
+  AuditLoggerServiceTest.java                ~5 tests  (append, swallow failure)
 
-tests/domain/configuration/
-  ConfigurationService.test.ts          10 tests  (get/upsert, validation, audit)
+src/test/java/.../domain/configuration/
+  ConfigurationServiceTest.java             ~10 tests  (get/upsert, validation, audit)
+
+src/test/java/.../domain/fileimport/
+  ExcelParserServiceTest.java                7 tests  (valid parse, required-field errors, invalid exec type,
+                                                        AUTO without script, dup seq#, ignored columns,
+                                                        wrong sheet name) ← NEW
+  ImportServiceTest.java                     4 tests  (new project, existing project new stage,
+                                                        re-upload upsert, validation error rollback) ← NEW
 ```
 
-**Not yet covered** (will be added with respective next-batch tasks):
-- Import / Upload service tests (T6.1, T6.2, T6.3)
-- Record Result endpoint tests (T8.1b)
-- API contract tests (T13.3)
-- Authorization / security tests (T13.5, full coverage)
+**Not yet covered** (will be added with respective tasks):
+- `ReleaseFlowServiceTest` — missing from Phase 1 coverage (add with T4.3)
+- API contract / HTTP integration tests (T13.3)
+- Authorization / security tests (T13.5)
 - E2E workflow tests (T13.2, T13.7)
 
 ---
@@ -330,16 +230,19 @@ tests/domain/configuration/
 ## 7. Critical Path
 
 ```
-[Complete] Foundation (T1.x, T2.x, T3.x, T4.x, T5.x, T7.x, T10.1-10.3, T10.5)
+[✅ Complete] Foundation (T1.x, T2.x, T3.x, T4.x, T5.x, T7.x, T10.1-10.3, T10.5)
     │
     ▼
-[NEXT BATCH] Upload & Import + MANUAL record-result
-    T6.1 Excel Parser
-    T6.2 Import Service + Release ID generation
-    T6.3 Upload Endpoint
-    T8.1b Record Result Endpoint
-    ───────────────────────
-    T4.3 Hierarchy query optim. (parallel, low risk)
+[✅ Complete] Upload & Import + MANUAL record-result
+    T6.1 ExcelParserService
+    T6.2 ImportService + Release ID generation
+    T6.3 UploadController
+    T8.1b RecordResultService + endpoint
+    │
+    ▼
+[NEXT — unblocked] Optimization + Test Coverage
+    T4.3 Hierarchy query optimization (ReleaseFlowRepository)
+    ReleaseFlowServiceTest (missing test file)
     │
     ▼
 [BLOCKED — awaiting RESOLVE-Q3] AUTO Execution
@@ -362,9 +265,8 @@ tests/domain/configuration/
     T10.4 WWA auth framework integration
     │
     ▼
-[CAN PARALLELIZE NOW] Frontend
-    T11.x, T12.x — read views and state management can begin
-    Write dialogs unblock as upload (T6.3), record-result (T8.1b), etc. complete
+[UNBLOCKED — can parallelize now] Frontend
+    T11.x, T12.x — all read-only views + write dialogs for upload/result/decision
     │
     ▼
 [LAST] Integration & E2E
@@ -373,51 +275,51 @@ tests/domain/configuration/
 
 ---
 
-## 8. Next Recommended Batch — Rationale
+## 8. Next Recommended Work
 
-**Implement T6.1 → T6.2 → T6.3 → T8.1b in sequence.**
+**T4.3 + ReleaseFlowServiceTest** — the two remaining unblocked items.
 
-Why this is the safest coherent next slice:
+1. **T4.3** reduces N+1 on `GET /release-flows/{id}`. The current detail endpoint loads
+   requests and tasks in separate queries. A single `LEFT JOIN FETCH` query eliminates this.
+   Risk: low (read-only, no state changes).
 
-1. **All are unblocked** — RESOLVE-Q1 and RESOLVE-Q6 are marked resolved in tasks.md. No Phase 0 dependencies remain for these tasks.
+2. **ReleaseFlowServiceTest** — the only domain service without a dedicated test file.
+   Covers `create`, `getById`, `list` filters, `advanceStage`, `recomputeAndPersistStatus`.
 
-2. **High system value unlock** — without upload, no real Release Flows can be created in production. This is the primary user entry point.
+Once RESOLVE blockers are cleared, the priority order is:
+`RESOLVE-Q3 → T8.1/8.2/8.3 → RESOLVE-Q2 → T9.1/9.2/9.4 → RESOLVE-Q4 → T9.3 → RESOLVE-Q5 → T10.4`
 
-3. **T6.2 depends on T6.1** (parser output feeds grouping logic); T6.3 depends on T6.1+T6.2 (controller calls import service). Sequential within the batch.
-
-4. **T8.1b (Record Result)** is self-contained — it only touches Task / TaskExecutionHistory / ReleaseFlowProgressionService, all of which are already implemented and tested. It is the MANUAL-path completion for the task execution model.
-
-5. **T4.3 (hierarchy query)** can run in parallel with the above as a low-risk, self-contained optimization against already-stable repositories.
-
-6. **Frontend read-only views** (T11.1–T11.3, parts of T11.4, T11.7, T11.8, T12.1, T12.2) are unblocked and can run in parallel with backend upload work.
+Frontend work is fully parallelizable with all the above.
 
 ---
 
 ## 9. Architecture Summary
 
 ### Stack
-- **Runtime**: Node.js / TypeScript
-- **HTTP**: Fastify 4 (not Express; all handlers use Fastify `request`/`reply`)
-- **ORM**: TypeORM 0.3; repositories with optional EntityManager for transaction participation
-- **Validation**: Zod (DTOs + request body schemas)
-- **DB**: Oracle (production); sql.js in-memory SQLite (tests)
-- **Auth**: Header-based (`X-User-Id`, `X-User-Role`); `extractUserContext` hook; `requireRole()` per route
+- **Runtime**: Java 21
+- **Framework**: Spring Boot 3.2.4 (`spring-boot-starter-web`, `-data-jpa`, `-security`, `-validation`)
+- **ORM**: Spring Data JPA / Hibernate 6; `@SpringDataWebAutoConfiguration`
+- **DB**: Oracle (production, `ojdbc11`); H2 in-memory with `MODE=Oracle` (tests)
+- **Excel parsing**: Apache POI 5.2.5 (`poi-ooxml`)
+- **Auth**: Header-based (`X-User-Id`, `X-User-Role`); `HeaderAuthFilter` → `UserContextAuthentication`; role checked per endpoint
+- **Build**: Maven 3 / `spring-boot-maven-plugin`
 
 ### Architecture Boundaries (enforced)
-- HTTP handlers live in `src/http/handlers/` — no persistence logic
-- Domain logic in `src/domain/` — no HTTP concerns
-- Shared types in `src/contracts/` — entities must not leak into handler layer
+- Controllers live in `web/controller/` — no persistence logic, no domain logic
+- Domain logic in `domain/` — no HTTP concerns
+- Shared types (DTOs, enums, UserContext) in `contracts/` — entities never returned directly
 
 ### Key Patterns
 | Pattern | Where |
 |---------|-------|
-| State machine (pure function) | `taskStateMachine.ts` → `isValidTaskTransition()` |
-| Bottom-up status aggregation | `releaseFlowAggregation.ts` (pure functions) |
-| Optimistic locking | `@VersionColumn` on Task, ReleaseFlow, Request |
-| Transaction wrapping | `DataSource.transaction()` in DecisionEngine; all repos accept `em?` |
-| Audit-first | `AuditLoggerService.log()` called in every state-changing operation; failures swallowed |
-| DTO separation | Entities never returned directly; mapper functions in each handler |
-| ISO date serialization | All Date fields → `.toISOString()` in DTO mappers |
+| State machine (pure static) | `TaskStateMachine.isValid(from, to)` |
+| Bottom-up status aggregation | `ReleaseFlowAggregation` (pure static methods) |
+| Optimistic locking | `@Version Long version` on `Task`, `ReleaseFlow`, `Request` |
+| Transaction boundary | `@Transactional` on service methods; `Propagation.REQUIRES_NEW` in `AuditLoggerService` |
+| Audit-first | `AuditLoggerService.log()` in every state-changing op; failures swallowed (`REQUIRES_NEW`) |
+| DTO separation | Entities never returned from controllers; Java records with `static from(Entity)` |
+| JSON columns | `@Convert(converter = JsonAttributeConverter.class)` + `columnDefinition = "CLOB"` |
+| UUID generation | `@PrePersist` sets `id = UUID.randomUUID().toString()` |
 
 ---
 
@@ -425,76 +327,154 @@ Why this is the safest coherent next slice:
 
 ### Implemented
 ```
-src/
+src/main/java/com/wwa/deploymentagent/
 ├── contracts/
-│   ├── enums.ts           ExecutionType, TaskStatus, FlowStatus, Stage, RBAC roles...
-│   ├── dtos.ts            TaskDto, ReleaseFlowDetailDto, DecisionRequestDtoSchema, Paginated...
-│   └── UserContext.ts
+│   ├── UserContext.java
+│   ├── enums/
+│   │   ├── ExecutionType.java       MANUAL | AUTO
+│   │   ├── TaskStatus.java
+│   │   ├── FlowStatus.java
+│   │   ├── RequestStatus.java
+│   │   ├── Stage.java               SIT | UAT | PROD  (Stage.next())
+│   │   ├── ExecutionStatus.java
+│   │   ├── ReviewStatus.java
+│   │   ├── AuditActionType.java     upload | edit | view_result | approve | reject | rerun | skip | config_update
+│   │   ├── ConfigKey.java
+│   │   ├── Role.java
+│   │   └── SummaryStatus.java
+│   └── dto/
+│       ├── TaskDto.java
+│       ├── ReleaseFlowListItemDto.java
+│       ├── ReleaseFlowDetailDto.java
+│       ├── RequestDto.java
+│       ├── TaskExecutionHistoryDto.java
+│       ├── AuditLogEntryDto.java
+│       ├── ConfigurationItemDto.java
+│       ├── DecisionRequestDto.java
+│       ├── PaginatedResponseDto.java
+│       ├── ErrorResponseDto.java
+│       ├── UploadResponseDto.java          ← T6.3
+│       └── RecordResultRequestDto.java     ← T8.1b
 ├── domain/
 │   ├── task/
-│   │   ├── Task.entity.ts
-│   │   ├── TaskRepository.ts
-│   │   ├── TaskService.ts              create(CreateTaskInput), updateStatus, editInput, updateResultMetadata
-│   │   ├── taskStateMachine.ts         isValidTaskTransition()
-│   │   ├── taskInputValidation.ts      validateTaskInput()
-│   │   ├── TaskExecutionHistory.entity.ts
-│   │   ├── TaskExecutionHistoryRepository.ts
-│   │   └── TaskExecutionHistoryService.ts
+│   │   ├── Task.java
+│   │   ├── TaskRepository.java
+│   │   ├── TaskService.java                create, getById, listByRequestId, updateStatus, editInput, updateResultMetadata
+│   │   ├── TaskStateMachine.java           isValid(from, to) — pure static
+│   │   ├── CreateTaskInput.java
+│   │   ├── TaskExecutionHistory.java
+│   │   ├── TaskExecutionHistoryRepository.java
+│   │   ├── TaskExecutionHistoryService.java
+│   │   └── RecordResultService.java        ← T8.1b
 │   ├── releaseflow/
-│   │   ├── ReleaseFlow.entity.ts       projectId, projectName, releaseId...
-│   │   ├── ReleaseFlowRepository.ts
-│   │   ├── ReleaseFlowService.ts
-│   │   ├── Request.entity.ts
-│   │   ├── RequestRepository.ts
-│   │   ├── RequestService.ts
-│   │   └── releaseFlowAggregation.ts
+│   │   ├── ReleaseFlow.java
+│   │   ├── ReleaseFlowRepository.java      findFirstByProjectId, countByProjectId, filtered pages
+│   │   ├── ReleaseFlowService.java
+│   │   ├── ReleaseFlowAggregation.java     aggregateTasksToRequestStatus, aggregateRequestsToStageStatus, aggregateStagesToFlowStatus
+│   │   ├── Request.java
+│   │   └── RequestRepository.java          findByReleaseFlowIdWithTasks, findByReleaseFlowId, findByReleaseFlowIdAndStage
 │   ├── decision/
-│   │   ├── DecisionEngine.ts
-│   │   └── ReleaseFlowProgressionService.ts
+│   │   ├── DecisionEngine.java
+│   │   ├── DecisionType.java
+│   │   └── ReleaseFlowProgressionService.java
 │   ├── audit/
-│   │   ├── AuditLogEntry.entity.ts
-│   │   ├── AuditLogRepository.ts
-│   │   └── AuditLoggerService.ts
-│   └── configuration/
-│       ├── ConfigurationItem.entity.ts
-│       ├── ConfigurationRepository.ts
-│       └── ConfigurationService.ts
-├── http/
-│   ├── server.ts                       buildServer(ServerDeps); error handler; all routes registered
-│   ├── middleware/auth.ts              extractUserContext hook; requireRole()
-│   └── handlers/
-│       ├── ConfigurationHandler.ts    GET/POST /api/deployment-agent/config
-│       ├── ReleaseFlowHandler.ts      GET /release-flows, /release-flows/:id
-│       ├── TaskHandler.ts             GET/PUT /tasks, /tasks/:id/executions
-│       ├── DecisionHandler.ts         POST /tasks/:id/decision
-│       └── AuditLogHandler.ts         GET /audit-logs
-├── db/dataSource.ts
-├── errors/AppError.ts
-└── main.ts                            Instantiates all repos/services; passes to buildServer()
+│   │   ├── AuditLogEntry.java
+│   │   ├── AuditLogRepository.java
+│   │   └── AuditLoggerService.java
+│   ├── configuration/
+│   │   ├── ConfigurationItem.java
+│   │   ├── ConfigurationRepository.java
+│   │   └── ConfigurationService.java
+│   └── fileimport/                         ← T6.1 / T6.2
+│       ├── ParsedTaskRow.java
+│       ├── ImportError.java
+│       ├── ParseResult.java
+│       ├── ImportResult.java
+│       ├── ExcelParserService.java
+│       └── ImportService.java
+├── errors/
+│   ├── AppException.java
+│   ├── NotFoundAppException.java
+│   ├── ConflictAppException.java
+│   ├── ValidationAppException.java
+│   ├── ForbiddenAppException.java
+│   ├── UnauthorizedAppException.java
+│   ├── InvalidStateTransitionException.java
+│   ├── OptimisticLockConflictException.java
+│   └── ImportValidationException.java      ← T6.1
+├── web/
+│   ├── controller/
+│   │   ├── TaskController.java             GET/PUT /tasks, GET /executions, POST /record-result ← T8.1b
+│   │   ├── DecisionController.java         POST /tasks/{id}/decision
+│   │   ├── ReleaseFlowController.java      GET /release-flows, /release-flows/{id}
+│   │   ├── AuditLogController.java         GET /audit-logs
+│   │   ├── ConfigurationController.java    GET/POST /config
+│   │   └── UploadController.java           POST /upload  ← T6.3
+│   ├── exception/
+│   │   └── GlobalExceptionHandler.java
+│   └── security/
+│       ├── HeaderAuthFilter.java
+│       └── UserContextAuthentication.java
+├── config/
+│   └── SecurityConfig.java
+├── util/
+│   └── JsonAttributeConverter.java
+└── DeploymentAgentApplication.java
+
+src/test/java/com/wwa/deploymentagent/
+├── helper/
+│   └── TestDataHelper.java
+├── domain/
+│   ├── task/
+│   │   ├── TaskStateMachineTest.java
+│   │   ├── TaskServiceTest.java
+│   │   ├── TaskExecutionHistoryServiceTest.java
+│   │   └── RecordResultServiceTest.java    ← T8.1b
+│   ├── decision/
+│   │   ├── DecisionEngineTest.java
+│   │   └── ReleaseFlowProgressionServiceTest.java
+│   ├── releaseflow/
+│   │   └── ReleaseFlowAggregationTest.java
+│   ├── audit/
+│   │   └── AuditLoggerServiceTest.java
+│   ├── configuration/
+│   │   └── ConfigurationServiceTest.java
+│   └── fileimport/
+│       ├── ExcelParserServiceTest.java     ← T6.1
+│       └── ImportServiceTest.java          ← T6.2
 ```
 
-### To Be Created (Next Batch)
+### To Be Created (Next Work)
 ```
-src/
-├── domain/import/
-│   ├── ExcelParserService.ts          T6.1
-│   └── ImportService.ts               T6.2
-└── http/handlers/
-    ├── UploadHandler.ts               T6.3
-    └── RecordResultHandler.ts         T8.1b
+src/main/java/.../domain/releaseflow/
+└── (modify) ReleaseFlowRepository.java     T4.3 — add findByIdWithFullHierarchy
 
-tests/
-├── domain/import/
-│   ├── ExcelParserService.test.ts
-│   └── ImportService.test.ts
-└── http/handlers/
-    ├── UploadHandler.test.ts
-    └── RecordResultHandler.test.ts
+src/test/java/.../domain/releaseflow/
+└── ReleaseFlowServiceTest.java             missing test file
 ```
 
 ---
 
-## 11. Verification Checklist
+## 11. REST API Reference
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET`  | `/api/deployment-agent/release-flows` | any | List release flows (paginated, filterable) |
+| `GET`  | `/api/deployment-agent/release-flows/{id}` | any | Release flow detail with requests + tasks |
+| `GET`  | `/api/deployment-agent/tasks?requestId=X` | any | List tasks for a request |
+| `GET`  | `/api/deployment-agent/tasks/{id}` | any | Single task detail |
+| `PUT`  | `/api/deployment-agent/tasks/{id}/input` | TL | Edit task input parameters |
+| `GET`  | `/api/deployment-agent/tasks/{id}/executions` | any | Execution history for a task |
+| `POST` | `/api/deployment-agent/tasks/{id}/decision` | TL | Apply decision (approve/reject/rerun/skip) |
+| `POST` | `/api/deployment-agent/tasks/{id}/record-result` | TL | Record MANUAL task result |
+| `POST` | `/api/deployment-agent/upload` | DEV/TL | Upload XLSX file (multipart: file + stage) |
+| `GET`  | `/api/deployment-agent/audit-logs` | AUDIT/MGMT/DEVOPS | Paginated audit log |
+| `GET`  | `/api/deployment-agent/config` | any | List configuration items |
+| `POST` | `/api/deployment-agent/config` | DEVOPS_ADMIN | Upsert configuration item |
+
+---
+
+## 12. Verification Checklist
 
 | Item | Status |
 |------|--------|
@@ -503,15 +483,15 @@ tests/
 | State machine: frozen and tested | ✅ |
 | Decision engine: TL-only, transactional, audited | ✅ |
 | Progression: request → stage → flow, auto-ready | ✅ |
-| Backend API: 8 endpoints registered and wired | ✅ |
-| Error handling: centralized Fastify handler | ✅ |
-| DTO separation: no entity leaks to HTTP layer | ✅ |
-| 145 tests passing | ✅ |
-| TypeScript clean | ✅ |
-| ESLint clean | ✅ |
-| Upload/import implemented | ✅ T6.1 ExcelParserService, T6.2 ImportService, T6.3 UploadController |
-| Record Result (MANUAL path) implemented | ✅ T8.1b RecordResultService + endpoint |
-| AUTO execution (Jenkins/Ansible) | ❌ Blocked (RESOLVE-Q3) |
-| Callback endpoint | ❌ Blocked (RESOLVE-Q2) |
-| Full WWA auth integration | ❌ Blocked (RESOLVE-Q5) |
-| Frontend | ❌ Not started |
+| 12 REST endpoints wired | ✅ |
+| Error handling: GlobalExceptionHandler, no stack leak | ✅ |
+| DTO separation: no entity leaks to controller layer | ✅ |
+| Excel import (T6.1–T6.3): parse + validate + upsert | ✅ |
+| Record Result MANUAL path (T8.1b) | ✅ |
+| `ReleaseFlowServiceTest` present | ❌ Missing — add with T4.3 |
+| T4.3 Hierarchy query optimization | ❌ Next item |
+| AUTO execution (T8.1–T8.3) | ❌ Blocked (RESOLVE-Q3) |
+| Callback endpoint (T9.x) | ❌ Blocked (RESOLVE-Q2) |
+| Full WWA auth integration (T10.4) | ❌ Blocked (RESOLVE-Q5) |
+| Frontend (T11.x, T12.x) | ❌ Not started (unblocked) |
+| Integration & E2E tests (T13.x) | ❌ Not started |
