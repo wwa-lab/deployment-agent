@@ -9,5 +9,6 @@ public enum AuditActionType {
     reject,
     rerun,
     skip,
-    config_update
+    config_update,
+    auto_submit
 }

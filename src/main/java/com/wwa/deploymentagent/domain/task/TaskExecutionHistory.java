@@ -68,6 +68,32 @@ public class TaskExecutionHistory {
     @Column(name = "end_time")
     private Instant endTime;
 
+    // ─── External execution metadata (AUTO tasks) ────────────────────────────
+
+    /** External system type: "JENKINS" or "ANSIBLE". Null for MANUAL tasks. */
+    @Column(name = "external_system_type", length = 30)
+    private String externalSystemType;
+
+    /** External system's own execution/build ID. */
+    @Column(name = "external_execution_id", length = 255)
+    private String externalExecutionId;
+
+    /** URL to view the job in the external system. */
+    @Column(name = "external_job_url", length = 2000)
+    private String externalJobUrl;
+
+    /** Timestamp when the submission to the external system was made. */
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    /** Submission outcome: "SUBMITTED", "FAILED". */
+    @Column(name = "submission_status", length = 30)
+    private String submissionStatus;
+
+    /** Error message if submission failed. */
+    @Column(name = "submission_message", length = 2000)
+    private String submissionMessage;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) {

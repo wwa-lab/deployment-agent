@@ -5,21 +5,9 @@ import { useRouter } from 'vue-router'
 const userStore = useUserStore()
 const router = useRouter()
 
-const roleOptions = [
-  { value: 'DEVELOPER', label: 'Developer' },
-  { value: 'TL', label: 'Tech Lead' },
-  { value: 'DEVOPS_ADMIN', label: 'DevOps Admin' },
-  { value: 'AUDIT_MGMT', label: 'Audit Mgmt' },
-]
-
-function changeRole(event: Event) {
-  const role = (event.target as HTMLSelectElement).value as import('../types').UserRole
-  userStore.setUser(userStore.userId, role)
-  // Redirect away from restricted pages if role no longer has access
-  const currentRoute = router.currentRoute.value
-  if (currentRoute.meta.requiresRole && currentRoute.meta.requiresRole !== role) {
-    router.push('/release-flows')
-  }
+async function handleLogout() {
+  await userStore.logout()
+  router.push('/login')
 }
 </script>
 
@@ -44,7 +32,7 @@ function changeRole(event: Event) {
           Configuration
         </router-link>
         <router-link
-          v-if="userStore.isAuditMgmt"
+          v-if="userStore.canViewAudit"
           to="/audit"
           class="nav-link"
         >
@@ -58,17 +46,9 @@ function changeRole(event: Event) {
       <header class="topbar">
         <div class="topbar-title">Deployment Agent</div>
         <div class="topbar-user">
-          <span class="user-id">{{ userStore.userId }}</span>
-          <select
-            :value="userStore.role"
-            class="role-select"
-            @change="changeRole"
-          >
-            <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+          <span class="user-name">{{ userStore.displayName || userStore.userId }}</span>
           <span class="badge badge-role">{{ userStore.role }}</span>
+          <button class="btn btn-secondary btn-sm" @click="handleLogout">Logout</button>
         </div>
       </header>
       <main class="main-content">
@@ -168,19 +148,10 @@ function changeRole(event: Event) {
   gap: 10px;
 }
 
-.user-id {
-  font-size: 13px;
-  color: #64748b;
-}
-
-.role-select {
-  padding: 4px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: white;
+.user-name {
   font-size: 13px;
   color: #374151;
-  cursor: pointer;
+  font-weight: 500;
 }
 
 .main-content {

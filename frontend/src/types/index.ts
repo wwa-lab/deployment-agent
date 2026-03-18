@@ -13,7 +13,7 @@ export type TaskStatus =
   | 'Failed'
 export type ExecutionType = 'MANUAL' | 'AUTO'
 export type RequestStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Rejected'
-export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT_MGMT'
+export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT' | 'MANAGEMENT'
 
 // Task
 export interface Task {
@@ -24,7 +24,7 @@ export interface Task {
   taskName: string
   executionType: ExecutionType
   taskStatus: TaskStatus
-  inputParameters: { script?: string; parameters?: string }
+  inputParameters: { script?: string; parameters?: string; system?: string }
   expectedOutput?: string
   owner?: string
   plannedStartTime?: string
@@ -98,6 +98,12 @@ export interface TaskResult {
   status: string
   resultSummary?: Record<string, unknown>
   resultLogs?: string
+  externalSystemType?: string
+  externalExecutionId?: string
+  externalJobUrl?: string
+  submittedAt?: string
+  submissionStatus?: string
+  submissionMessage?: string
 }
 
 // Paginated
@@ -114,4 +120,11 @@ export interface UploadResponse {
   releaseId: string
   stage: Stage
   taskCount: number
+}
+
+// Auth
+export interface AuthResponse {
+  userId: string
+  role: UserRole
+  displayName: string
 }

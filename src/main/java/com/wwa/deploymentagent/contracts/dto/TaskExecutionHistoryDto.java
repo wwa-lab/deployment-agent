@@ -15,7 +15,13 @@ public record TaskExecutionHistoryDto(
         Map<String, Object> resultSummary,
         String resultLogs,
         Instant startTime,
-        Instant endTime
+        Instant endTime,
+        String externalSystemType,
+        String externalExecutionId,
+        String externalJobUrl,
+        Instant submittedAt,
+        String submissionStatus,
+        String submissionMessage
 ) {
     public static TaskExecutionHistoryDto from(TaskExecutionHistory h) {
         return new TaskExecutionHistoryDto(
@@ -27,7 +33,13 @@ public record TaskExecutionHistoryDto(
                 h.getResultSummary(),
                 h.getResultLogs(),
                 h.getStartTime(),
-                h.getEndTime()
+                h.getEndTime(),
+                h.getExternalSystemType(),
+                h.getExternalExecutionId(),
+                h.getExternalJobUrl(),
+                h.getSubmittedAt(),
+                h.getSubmissionStatus(),
+                h.getSubmissionMessage()
         );
     }
 }

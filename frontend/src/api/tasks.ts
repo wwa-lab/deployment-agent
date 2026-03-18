@@ -30,3 +30,8 @@ export async function getTaskResult(
   const response = await apiClient.get(`/tasks/${taskId}/result`, { params })
   return response.data
 }
+
+export async function submitAutoExecution(taskId: string): Promise<Task> {
+  const response = await apiClient.post(`/tasks/${taskId}/submit-auto`)
+  return response.data
+}

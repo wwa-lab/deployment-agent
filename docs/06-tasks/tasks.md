@@ -6,9 +6,9 @@ This document breaks the Deployment Agent MVP detailed design into actionable im
 The system is a human-in-the-loop deployment orchestration platform embedded in the WWA workspace. It processes Excel-based deployment requests, creates and manages Release Flows across SIT / UAT / PROD stages, integrates with external execution systems such as Jenkins and Ansible, and maintains a full audit trail for key user actions.
 
 **Implementation Stack**
-- **Frontend**: Vue 3
-- **Backend**: Node.js / TypeScript / Fastify 4 / TypeORM 0.3 *(implemented; original doc said Spring Boot 3 — repo uses Node.js stack)*
-- **Database**: Oracle (production); sql.js in-memory SQLite for tests
+- **Frontend**: Vue 3 (Composition API) / Vite 5 / Pinia / Vue Router 4 / Axios
+- **Backend**: Java 21 / Spring Boot 3.2.4 / Spring Data JPA / Maven / Lombok *(rewritten from Node.js/TypeScript to Spring Boot 3 on 2026-03-18)*
+- **Database**: Oracle (production); H2 in-memory (tests)
 
 **MVP Workflow**
 - Upload Excel
@@ -143,82 +143,32 @@ They are not optional.
 ---
 
 ### RESOLVE-Q2: Confirm Callback Authentication Mechanism
-**Priority**: Must  
-**Owner**: DevOps / Integration / Security  
-**Description**:
-- Select callback authentication model:
-  - signed token
-  - shared secret signature
-  - mutual TLS
-  - equivalent approved model
+**Status**: ⏸️ DEFERRED — no callbacks in MVP
 
-**Blocks**
-- T9.1
-- T9.2
-- T9.4
-
-**Acceptance Criteria**
-- Callback auth mechanism is chosen
-- Validation approach is documented
-- Backend can implement trusted callback verification
+**Resolution**: MVP AUTO execution uses fire-and-forget submission to Jenkins/Ansible. The task stays in `Executing` status after submission. Callback-based result ingestion is deferred to a future phase. If callbacks are needed later, this blocker must be revisited.
 
 ---
 
 ### RESOLVE-Q3: Confirm Secret Store Technology
-**Priority**: Must  
-**Owner**: DevOps / Infrastructure  
-**Description**:
-- Select runtime secret provider for Jenkins / Ansible credentials
-- Confirm Fastify / TypeORM integration approach
+**Status**: ✅ ELIMINATED (2026-03-18)
 
-**Blocks**
-- T8.1
-- T8.2
-- T9.5
-
-**Acceptance Criteria**
-- Secret store approach is chosen
-- Runtime access pattern is documented
-- No credential handling remains undefined
+**Resolution**: Jenkins/Ansible credentials (user, API token) are stored in the `DA_CONFIGURATION_ITEM` table via the Config admin page, same as other configuration values. Config keys: `jenkins_user`, `jenkins_api_token`, `ansible_user`, `ansible_api_token`. No external secret store required for MVP.
 
 ---
 
 ### RESOLVE-Q4: Confirm Oracle Result Storage Strategy
-**Priority**: Must  
-**Owner**: DBA / Backend / Architecture  
-**Description**:
-- Decide whether full raw result logs live in:
-  - dedicated Oracle result table with `CLOB`, or
-  - `TaskExecutionHistory` with `CLOB`
+**Status**: ✅ ELIMINATED (2026-03-18)
 
-**Blocks**
-- T7.3
-- T9.3
-- T12.4
-
-**Acceptance Criteria**
-- Result storage strategy is decided
-- Oracle persistence ownership is documented
-- DDL direction is unambiguous
+**Resolution**: Full execution logs stay in Jenkins/Ansible. The deployment agent stores only the external job URL (`external_job_url` column on `DA_TASK_EXECUTION_HISTORY`, VARCHAR2(2000)) so users can click through to view logs in the external system's UI. Result summaries from MANUAL tasks are stored in `result_summary` CLOB as before.
 
 ---
 
 ### RESOLVE-Q5: Confirm WWA Auth Context Contract
-**Priority**: Must  
-**Owner**: Platform / Backend  
-**Description**:
-- Confirm how user identity and role are exposed to Fastify handlers (currently via X-User-Id/X-User-Role headers)
-- Confirm role names / claims mapping
+**Status**: ✅ REPLACED (2026-03-18)
 
-**Blocks**
-- T10.4
-- T10.5
-- T12.5
+**Resolution**: WWA header auth replaced with session-based login against the company Team Book. Implementation: `TeamBookAuthenticationProvider` interface with `StubTeamBookAuthenticationProvider` for dev/test. `AuthController` provides POST /auth/login, GET /auth/me, POST /auth/logout. `SessionAuthFilter` populates SecurityContext from HttpSession. Header-based fallback (`HeaderAuthFilter`) disabled in production via `app.auth.header-fallback-enabled=false`.
 
-**Acceptance Criteria**
-- Authentication context contract is available
-- RBAC implementation can be coded against stable claims/roles
-- No role-resolution ambiguity remains
+**Remaining dependency**: Real Team Book API contract (endpoint URL, request/response format, role mapping rules, service credentials) needed for `RealTeamBookAuthenticationProvider` (@Profile("prod")). Stub is sufficient for internal UAT.
 
 ---
 

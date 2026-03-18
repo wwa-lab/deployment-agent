@@ -4,6 +4,7 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.RecordResultRequestDto;
 import com.wwa.deploymentagent.contracts.dto.TaskDto;
 import com.wwa.deploymentagent.contracts.dto.TaskExecutionHistoryDto;
+import com.wwa.deploymentagent.domain.execution.AutoExecutionService;
 import com.wwa.deploymentagent.domain.task.RecordResultService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
 import com.wwa.deploymentagent.domain.task.TaskService;
@@ -35,6 +36,7 @@ public class TaskController {
     private final TaskService taskService;
     private final TaskExecutionHistoryService executionHistoryService;
     private final RecordResultService recordResultService;
+    private final AutoExecutionService autoExecutionService;
 
     @GetMapping
     public ResponseEntity<List<TaskDto>> listByRequest(@RequestParam String requestId) {
@@ -90,5 +92,21 @@ public class TaskController {
         return ResponseEntity.ok(
                 TaskDto.from(recordResultService.recordResult(
                         id, body.resultSummary(), body.resultLogs(), user)));
+    }
+
+    /**
+     * Submit an AUTO task for external execution (TL or DEVOPS_ADMIN only).
+     * Guards: task must be AUTO + in Ready_For_Execution state.
+     */
+    @PostMapping("/{id}/submit-auto")
+    public ResponseEntity<TaskDto> submitAutoExecution(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        if (!"TL".equals(user.role()) && !"DEVOPS_ADMIN".equals(user.role())) {
+            throw new ForbiddenAppException("task:submitAutoExecution");
+        }
+
+        return ResponseEntity.ok(
+                TaskDto.from(autoExecutionService.submitAutoExecution(id, user)));
     }
 }

@@ -3,7 +3,7 @@ import { onMounted, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
-import { getTaskResult } from '../api/tasks'
+import { getTaskResult, submitAutoExecution } from '../api/tasks'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
 import RecordResultDialog from '../components/RecordResultDialog.vue'
 import DecisionDialog from '../components/DecisionDialog.vue'
@@ -64,6 +64,28 @@ function canRecordResult(task: Task): boolean {
 
 function canDecide(task: Task): boolean {
   return userStore.isTL && task.taskStatus === 'Awaiting_Review'
+}
+
+function canSubmitAuto(task: Task): boolean {
+  return (
+    (userStore.isTL || userStore.isDevOpsAdmin) &&
+    task.executionType === 'AUTO' &&
+    task.taskStatus === 'Ready_For_Execution'
+  )
+}
+
+const submittingAuto = ref<string | null>(null)
+
+async function handleSubmitAuto(task: Task) {
+  submittingAuto.value = task.id
+  try {
+    await submitAutoExecution(task.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    submittingAuto.value = null
+  }
 }
 
 function canViewResult(task: Task): boolean {
@@ -223,6 +245,14 @@ watch(() => store.detail, (val) => {
                       Record Result
                     </button>
                     <button
+                      v-if="canSubmitAuto(task)"
+                      class="btn btn-primary btn-sm"
+                      :disabled="submittingAuto === task.id"
+                      @click.stop="handleSubmitAuto(task)"
+                    >
+                      {{ submittingAuto === task.id ? 'Submitting...' : 'Submit Auto' }}
+                    </button>
+                    <button
                       v-if="canViewResult(task)"
                       class="btn btn-secondary btn-sm"
                       @click.stop="openViewResult(task)"
@@ -274,6 +304,21 @@ watch(() => store.detail, (val) => {
             <div v-if="viewingResult.result.resultLogs" style="margin-top:16px">
               <div class="result-panel-title">Logs</div>
               <pre class="result-pre log-pre">{{ viewingResult.result.resultLogs }}</pre>
+            </div>
+            <div v-if="viewingResult.result.externalJobUrl" class="external-link-section">
+              <div class="result-panel-title">External Job</div>
+              <div class="external-link-row">
+                <span class="badge badge-auto">{{ viewingResult.result.externalSystemType }}</span>
+                <a :href="viewingResult.result.externalJobUrl" target="_blank" rel="noopener" class="external-link">
+                  {{ viewingResult.result.externalJobUrl }}
+                </a>
+                <span v-if="viewingResult.result.submissionStatus" class="badge" :class="viewingResult.result.submissionStatus === 'SUBMITTED' ? 'badge-completed' : 'badge-failed'">
+                  {{ viewingResult.result.submissionStatus }}
+                </span>
+              </div>
+              <div v-if="viewingResult.result.submissionMessage && viewingResult.result.submissionStatus === 'FAILED'" class="submission-error">
+                {{ viewingResult.result.submissionMessage }}
+              </div>
             </div>
             <div class="result-meta">
               <span>Status: <strong>{{ viewingResult.result.status }}</strong></span>
@@ -436,5 +481,36 @@ watch(() => store.detail, (val) => {
   margin-top: 12px;
   font-size: 13px;
   color: #64748b;
+}
+
+.external-link-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.external-link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.external-link {
+  font-size: 13px;
+  color: #2563eb;
+  word-break: break-all;
+}
+
+.external-link:hover {
+  text-decoration: underline;
+}
+
+.submission-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #dc2626;
 }
 </style>

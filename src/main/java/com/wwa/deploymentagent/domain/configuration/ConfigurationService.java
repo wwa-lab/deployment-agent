@@ -36,8 +36,16 @@ public class ConfigurationService {
     static {
         CONFIG_VALIDATION.put(ConfigKey.jenkins_url, v ->
                 URL_PATTERN.matcher(v).matches() ? null : "jenkins_url must be a valid URI (http/https)");
+        CONFIG_VALIDATION.put(ConfigKey.jenkins_user, v ->
+                (v != null && !v.isBlank()) ? null : "jenkins_user must not be blank");
+        CONFIG_VALIDATION.put(ConfigKey.jenkins_api_token, v ->
+                (v != null && !v.isBlank()) ? null : "jenkins_api_token must not be blank");
         CONFIG_VALIDATION.put(ConfigKey.ansible_url, v ->
                 URL_PATTERN.matcher(v).matches() ? null : "ansible_url must be a valid URI (http/https)");
+        CONFIG_VALIDATION.put(ConfigKey.ansible_user, v ->
+                (v != null && !v.isBlank()) ? null : "ansible_user must not be blank");
+        CONFIG_VALIDATION.put(ConfigKey.ansible_api_token, v ->
+                (v != null && !v.isBlank()) ? null : "ansible_api_token must not be blank");
         CONFIG_VALIDATION.put(ConfigKey.execution_callback_endpoint, v ->
                 HTTPS_PATTERN.matcher(v).matches() ? null : "execution_callback_endpoint must use HTTPS");
     }

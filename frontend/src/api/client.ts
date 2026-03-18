@@ -1,29 +1,24 @@
 import axios from 'axios'
-import { useUserStore } from '../stores/user'
+import router from '../router'
 
 const apiClient = axios.create({
   baseURL: '/api/deployment-agent',
   headers: {
     'Content-Type': 'application/json',
   },
-})
-
-apiClient.interceptors.request.use((config) => {
-  // Use try/catch because store may not be initialized yet during app bootstrap
-  try {
-    const userStore = useUserStore()
-    config.headers['X-User-Id'] = userStore.userId
-    config.headers['X-User-Role'] = userStore.role
-  } catch {
-    config.headers['X-User-Id'] = 'dev-user'
-    config.headers['X-User-Role'] = 'TL'
-  }
-  return config
+  withCredentials: true,
 })
 
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      // Redirect to login on 401 (session expired or not authenticated)
+      const currentPath = window.location.pathname
+      if (currentPath !== '/login') {
+        router.push('/login')
+      }
+    }
     const message =
       error.response?.data?.message ||
       error.response?.data?.error ||

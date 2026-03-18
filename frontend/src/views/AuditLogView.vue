@@ -6,7 +6,7 @@ import { useUserStore } from '../stores/user'
 const store = useAuditStore()
 const userStore = useUserStore()
 
-const hasAccess = computed(() => userStore.isAuditMgmt)
+const hasAccess = computed(() => userStore.canViewAudit)
 
 onMounted(() => {
   if (hasAccess.value) {
@@ -37,7 +37,7 @@ function onPageChange(newPage: number) {
     </div>
 
     <div v-if="!hasAccess" class="alert alert-error">
-      Access denied. This page requires AUDIT_MGMT role.
+      Access denied. This page requires AUDIT or MANAGEMENT role.
     </div>
 
     <template v-else>

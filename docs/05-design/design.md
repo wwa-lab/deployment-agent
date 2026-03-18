@@ -30,14 +30,14 @@ This document provides a detailed, implementation-friendly design for the Deploy
 
 ## Design Assumptions
 
-- [Assumption] HTTP callbacks from remote execution engines (Jenkins/Ansible) carry execution_id for correlation
+- [Resolved] ~~HTTP callbacks from remote execution engines (Jenkins/Ansible) carry execution_id for correlation~~ → MVP uses fire-and-forget submission; no callbacks. External job URL is stored for user click-through.
 - [Assumption] Oracle is the primary transactional store for all workflow state and immutable audit records
-- [Assumption] Result payloads (execution logs) are stored in Oracle CLOB columns or a dedicated result table within the same database
-- [Assumption] Vue 3 frontend state management uses a framework like Pinia or provide/inject for Release Flow, Request, and Task context
-- [Assumption] Spring Boot 3 uses Spring Data JPA with standard repository patterns for Oracle persistence
-- [Assumption] WWA authentication and authorization infrastructure is reused; user identity is available in request context
-- [Assumption] Secrets (Jenkins credentials, Ansible credentials) are stored in a managed secret store external to Oracle (TBD: Vault, env vars, or platform secret service)
-- [Assumption] Configuration values (URLs, endpoints) are stored in Oracle Configuration Item table and cached in memory with periodic refresh
+- [Resolved] ~~Result payloads (execution logs) are stored in Oracle CLOB columns~~ → Full logs stay in Jenkins/Ansible. DA stores external job URL (VARCHAR2(2000)) for click-through. MANUAL task result summaries stored in CLOB as before.
+- [Implemented] Vue 3 frontend uses Pinia for state management (user, releaseFlow, task, config, audit stores)
+- [Implemented] Spring Boot 3.2.4 uses Spring Data JPA with repository patterns for Oracle/H2 persistence
+- [Resolved] ~~WWA authentication and authorization infrastructure is reused~~ → Replaced with session-based Team Book login. SessionAuthFilter reads UserContext from HttpSession. StubTeamBookAuthenticationProvider for dev/test; real provider pending Team Book API contract.
+- [Resolved] ~~Secrets stored in managed secret store external to Oracle~~ → Jenkins/Ansible credentials (user, API token) stored in DA_CONFIGURATION_ITEM table via Config admin page. No external secret store for MVP.
+- [Implemented] Configuration values stored in DA_CONFIGURATION_ITEM table; read at execution time by adapters
 - [Assumption] Task state transitions follow a linear, human-gated progression; no parallel branches in MVP
 
 ---
@@ -45,32 +45,33 @@ This document provides a detailed, implementation-friendly design for the Deploy
 ## Design Scope
 
 **In-Scope Modules**:
-1. Upload & Import Service – Excel parsing, validation, Release Flow creation/update
-2. Release Flow Service – state aggregation, stage progression
-3. Task Management Service – task CRUD, input editing, status transitions
-4. Decision Engine – decision processing (Approve/Reject/Rerun/Skip) and Release Flow progression
-5. Execution Callback Handler – webhook receiver for task execution results
-6. Configuration Service – configuration CRUD and retrieval
-7. Audit Logger – event-based audit trail recording
-8. Result Storage – execution result persistence and retrieval
-9. Vue 3 UI Modules – workspace navigation, summary, details, task views, dialogs
-10. Fastify Route Handlers – HTTP endpoint implementations
+1. Upload & Import Service – Excel parsing, validation, Release Flow creation/update *(implemented)*
+2. Release Flow Service – state aggregation, stage progression *(implemented)*
+3. Task Management Service – task CRUD, input editing, status transitions *(implemented)*
+4. Decision Engine – decision processing (Approve/Reject/Rerun/Skip) and Release Flow progression *(implemented)*
+5. Auto Execution Service – fire-and-forget submission to Jenkins/Ansible; external job URL storage *(implemented, replaces callback handler)*
+6. Configuration Service – configuration CRUD and retrieval *(implemented)*
+7. Audit Logger – event-based audit trail recording *(implemented)*
+8. Auth Service – session-based Team Book login, role-based access control *(implemented with stub provider)*
+9. Vue 3 UI Modules – login, workspace navigation, summary, details, task views, dialogs, auto submit, external job link *(implemented)*
+10. Spring REST Controllers – 7 HTTP endpoint controllers *(implemented)*
+
+**Deferred from MVP**:
+- Execution Callback Handler – no callbacks in MVP; tasks stay in Executing after submission
+- Result log ingestion – full logs stay in Jenkins/Ansible
 
 **Out-of-Scope Details**:
-- Detailed database DDL and indexing strategy (to be finalized in implementation)
-- Semantics of ambiguous template fields (`Common`, `Status`, `Validation`, `Dependencies`, `Execution Type` valid values) — pending OQ-25 through OQ-30
-- Source of `Release ID` and `Stage` in workbook — pending OQ-25
-- Secret store technology selection (to be decided)
 - Performance tuning and caching policies
 - Advanced filtering, export, and reporting UI
 - Parallel task execution or branching workflows
+- Real Team Book API integration (pending external contract)
 
 **Design Boundaries**:
-- Frontend → Backend: HTTP/REST API with JSON payloads
-- Backend → Oracle: TypeORM with repository patterns
-- Backend → External Systems: Synchronous HTTP calls to Jenkins/Ansible; asynchronous callbacks from those systems
-- Backend → Secret Store: Envelope pattern for credential access (out of scope for now)
-- Audit Logger: Event capture occurs at domain layer; persistence in Oracle
+- Frontend → Backend: HTTP/REST API with JSON payloads, session cookies (withCredentials)
+- Backend → Oracle: Spring Data JPA with repository patterns
+- Backend → External Systems: Synchronous HTTP calls to Jenkins/Ansible (10s connect / 30s read timeout); fire-and-forget; no callbacks
+- Backend → Team Book: TeamBookAuthenticationProvider interface; stubbed for dev/test, real implementation pending
+- Audit Logger: Event capture occurs at domain layer; persistence in Oracle; uses authenticated session identity
 
 ---
 
