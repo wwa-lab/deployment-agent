@@ -6,8 +6,6 @@ import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
-import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
-import com.wwa.deploymentagent.domain.task.TaskService;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,8 +30,6 @@ import java.util.List;
 public class ReleaseFlowController {
 
     private final ReleaseFlowService releaseFlowService;
-    private final RequestRepository requestRepository;
-    private final TaskService taskService;
 
     @GetMapping
     public ResponseEntity<PaginatedResponseDto<ReleaseFlowListItemDto>> list(
@@ -60,10 +56,10 @@ public class ReleaseFlowController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ReleaseFlowDetailDto> getById(@PathVariable String id) {
-        ReleaseFlow rf = releaseFlowService.getById(id);
-        List<Request> requests = requestRepository.findByReleaseFlowIdWithTasks(id);
+        // Single query: loads RF + requests + tasks via LEFT JOIN FETCH (T4.3)
+        ReleaseFlow rf = releaseFlowService.getByIdWithFullHierarchy(id);
 
-        List<RequestDto> requestDtos = requests.stream()
+        List<RequestDto> requestDtos = rf.getRequests().stream()
                 .map(req -> {
                     List<TaskDto> taskDtos = req.getTasks().stream()
                             .map(TaskDto::from)
@@ -72,12 +68,10 @@ public class ReleaseFlowController {
                 })
                 .toList();
 
-        ReleaseFlowDetailDto detail = new ReleaseFlowDetailDto(
+        return ResponseEntity.ok(new ReleaseFlowDetailDto(
                 rf.getId(), rf.getProjectId(), rf.getProjectName(),
                 rf.getReleaseId(), rf.getNormalizedReleaseId(),
                 rf.getCurrentStage(), rf.getFlowStatus(), rf.getReviewStatus(),
-                requestDtos);
-
-        return ResponseEntity.ok(detail);
+                requestDtos));
     }
 }

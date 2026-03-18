@@ -40,6 +40,16 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
     /** Look up the first (active) Release Flow for a given projectId – used during import. */
     Optional<ReleaseFlow> findFirstByProjectId(String projectId);
 
+    /**
+     * Load a Release Flow with its full request+task hierarchy in a single query.
+     * Uses DISTINCT to avoid duplicates from multiple JOIN FETCH paths.
+     */
+    @Query("SELECT DISTINCT rf FROM ReleaseFlow rf " +
+           "LEFT JOIN FETCH rf.requests r " +
+           "LEFT JOIN FETCH r.tasks " +
+           "WHERE rf.id = :id")
+    Optional<ReleaseFlow> findByIdWithFullHierarchy(@Param("id") String id);
+
     /** Count of existing Release Flows for a given projectId – used for seq generation. */
     @Query("SELECT COUNT(rf) FROM ReleaseFlow rf WHERE rf.projectId = :projectId")
     long countByProjectId(@Param("projectId") String projectId);

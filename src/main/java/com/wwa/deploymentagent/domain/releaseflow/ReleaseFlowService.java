@@ -35,6 +35,17 @@ public class ReleaseFlowService {
                 .orElseThrow(() -> new NotFoundAppException("ReleaseFlow", id));
     }
 
+    /**
+     * Load a Release Flow with its full request+task hierarchy in a single query.
+     * Prefer this over {@link #getById} when requests and tasks will be accessed,
+     * to avoid N+1 queries.
+     */
+    @Transactional(readOnly = true)
+    public ReleaseFlow getByIdWithFullHierarchy(String id) {
+        return releaseFlowRepository.findByIdWithFullHierarchy(id)
+                .orElseThrow(() -> new NotFoundAppException("ReleaseFlow", id));
+    }
+
     /** Paginated list with optional filters. Callers build the Pageable from query params. */
     @Transactional(readOnly = true)
     public Page<ReleaseFlow> list(String projectId, FlowStatus flowStatus, Stage stage, Pageable pageable) {
