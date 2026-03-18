@@ -3,20 +3,19 @@
 The MVP implementation is based on the following technology stack:
 
 - **Frontend**: Vue 3
-- **Backend**: Node.js / TypeScript / Fastify 4 / TypeORM 0.3
-- **Database**: Oracle (production); sql.js in-memory SQLite (tests)
-- **Validation**: Zod
-
-> *Note: The original architecture assumed Spring Boot 3. Implementation adopted a Node.js stack. All references in this document reflect the implemented stack.*
+- **Backend**: Java 21 / Spring Boot 3 / Spring Data JPA / Spring Security
+- **Database**: Oracle (production); H2 in-memory (tests)
+- **Build**: Maven 3
 
 ### Technology Usage Notes
 - Vue 3 is used to implement the WWA-embedded Deployment Agent workspace UI, including summary views, detail views, upload dialogs, task actions, configuration pages, and audit log viewing.
-- Fastify 4 with TypeORM 0.3 is used to implement API endpoints, orchestration services, validation logic, integration adapters, audit logging, and callback handling. Zod is used for request body validation.
+- Spring Boot 3 with Spring Data JPA is used to implement REST controllers, orchestration services, validation logic, integration adapters, audit logging, and callback handling. Jakarta Validation (Bean Validation 3) is used for request body validation.
 - Oracle is used as the primary transactional persistence store for Release Flow, Request, Task, Task Execution History, Configuration Item, and Audit Log entities unless a specific storage concern is explicitly separated.
 
 ### Architectural Implications
-- Frontend-backend interaction follows a clear REST API contract suitable for Vue 3 + Fastify integration.
-- Backend modules are designed with a layered architecture: domain services, repositories (TypeORM), and HTTP handlers (Fastify route handlers). Shared types live in `src/contracts/`.
+- Frontend-backend interaction follows a clear REST API contract suitable for Vue 3 + Spring MVC integration.
+- Backend modules are designed with a layered architecture: domain services, Spring Data JPA repositories, and Spring MVC REST controllers. Shared types live in the `contracts` package.
+- [Assumption] Spring Boot 3 uses Spring Data JPA with standard repository patterns for Oracle persistence.
 - Oracle schema design must support hierarchical workflow entities, append-only audit logging, and efficient querying for summary/detail screens.
 - Large execution logs or result payloads may remain outside core transactional tables if Oracle table growth or query performance becomes a concern; detailed design must confirm whether result payloads are stored in Oracle CLOB columns or externalized storage.
 
@@ -139,7 +138,7 @@ Minimum security expectation:
 - replay / duplicate protection,
 - request correlation via execution identifier.
 
-For Fastify implementation, this callback should be modeled as a dedicated route handler with explicit Zod request validation and idempotent processing behavior.
+For Spring Boot implementation, this callback should be modeled as a dedicated `@RestController` endpoint with explicit Bean Validation and idempotent processing behavior.
 
 ---
 
@@ -171,23 +170,23 @@ The design phase must produce:
 | GET /api/deployment-agent/audit-logs | Audit UI | Retrieve recent audit log list (role-gated: AUDIT/MANAGEMENT/DEVOPS_ADMIN) |
 
 ### API Style Note
-For Fastify implementation, API design follows:
-- resource-oriented route handler grouping,
-- explicit DTOs (TypeScript interfaces) for request and response payloads,
-- validation through Zod schemas,
-- centralized Fastify error handler mapping AppError types to HTTP status codes,
-- server-side RBAC enforcement via `requireRole()` middleware regardless of client-side UI visibility.
+For Spring Boot implementation, API design follows:
+- resource-oriented `@RestController` grouping,
+- explicit DTO records for request and response payloads,
+- validation through Jakarta Bean Validation (`@Valid`, `@NotNull`, etc.),
+- centralized `@RestControllerAdvice` error handler mapping `AppException` types to HTTP status codes,
+- server-side RBAC enforcement via role checks in controllers and services, regardless of client-side UI visibility.
 
 ---
 
 ## Frontend and Backend Enforcement Note
 
 Frontend role-awareness in Vue 3 is a usability feature, not a security boundary.
-The UI may hide or disable actions based on role, state, and ownership context, but all enforcement must also occur server-side in Fastify APIs.
+The UI may hide or disable actions based on role, state, and ownership context, but all enforcement must also occur server-side in Spring Boot APIs.
 
 This means:
 - Vue 3 controls visibility and user guidance,
-- Fastify handlers enforce authorization, validation, and state-transition legality,
+- Spring MVC controllers enforce authorization, validation, and state-transition legality,
 - Oracle persists only validated and authorized state changes.
 
 ---

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a detailed, implementation-friendly design for the Deployment Agent system, transforming the high-level architecture into concrete module and interface specifications suitable for Node.js / TypeScript / Fastify 4 / TypeORM 0.3 backend, Vue 3 frontend, and Oracle persistence. The design covers all MVP workflows and integration points necessary for controlled, human-in-the-loop deployment request processing.
+This document provides a detailed, implementation-friendly design for the Deployment Agent system, transforming the high-level architecture into concrete module and interface specifications suitable for Java 21 / Spring Boot 3 / Spring Data JPA backend, Vue 3 frontend, and Oracle persistence. The design covers all MVP workflows and integration points necessary for controlled, human-in-the-loop deployment request processing.
 
 ---
 
@@ -19,7 +19,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 - External integration with Jenkins and Ansible via callback webhook
 
 **Key Assumptions Carried Forward**:
-- Vue 3 UI + **Node.js / TypeScript / Fastify 4 / TypeORM 0.3** API + Oracle persistence *(implemented stack; original assumption was Spring Boot 3)*
+- Vue 3 UI + **Java 21 / Spring Boot 3 / Spring Data JPA** API + Oracle persistence
 - Fixed Excel template for MVP (dynamic schema out of scope)
 - Task reruns create new execution history records (same task_id, incremented attempt_number)
 - Atomic file-level import (no partial import)
@@ -34,7 +34,7 @@ This document provides a detailed, implementation-friendly design for the Deploy
 - [Assumption] Oracle is the primary transactional store for all workflow state and immutable audit records
 - [Assumption] Result payloads (execution logs) are stored in Oracle CLOB columns or a dedicated result table within the same database
 - [Assumption] Vue 3 frontend state management uses a framework like Pinia or provide/inject for Release Flow, Request, and Task context
-- [Assumption] TypeORM 0.3 uses repository patterns with optional EntityManager for transaction participation
+- [Assumption] Spring Boot 3 uses Spring Data JPA with standard repository patterns for Oracle persistence
 - [Assumption] WWA authentication and authorization infrastructure is reused; user identity is available in request context
 - [Assumption] Secrets (Jenkins credentials, Ansible credentials) are stored in a managed secret store external to Oracle (TBD: Vault, env vars, or platform secret service)
 - [Assumption] Configuration values (URLs, endpoints) are stored in Oracle Configuration Item table and cached in memory with periodic refresh

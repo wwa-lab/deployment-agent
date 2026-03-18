@@ -1,0 +1,76 @@
+package com.wwa.deploymentagent.web.controller;
+
+import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.TaskDto;
+import com.wwa.deploymentagent.contracts.dto.TaskExecutionHistoryDto;
+import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
+import com.wwa.deploymentagent.domain.task.TaskService;
+import com.wwa.deploymentagent.errors.ForbiddenAppException;
+import com.wwa.deploymentagent.errors.ValidationAppException;
+import com.wwa.deploymentagent.web.security.UserContextAuthentication;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Task controller – REST endpoints for Task lifecycle.
+ *
+ * <pre>
+ *   GET  /api/deployment-agent/tasks?requestId=X   – list tasks for a request
+ *   GET  /api/deployment-agent/tasks/:id            – single task detail
+ *   PUT  /api/deployment-agent/tasks/:id/input      – edit task input (TL only)
+ *   GET  /api/deployment-agent/tasks/:id/executions – execution history
+ * </pre>
+ */
+@RestController
+@RequestMapping("/api/deployment-agent/tasks")
+@RequiredArgsConstructor
+public class TaskController {
+
+    private final TaskService taskService;
+    private final TaskExecutionHistoryService executionHistoryService;
+
+    @GetMapping
+    public ResponseEntity<List<TaskDto>> listByRequest(@RequestParam String requestId) {
+        List<TaskDto> dtos = taskService.listByRequestId(requestId)
+                .stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<TaskDto> getById(@PathVariable String id) {
+        return ResponseEntity.ok(TaskDto.from(taskService.getById(id)));
+    }
+
+    @PutMapping("/{id}/input")
+    public ResponseEntity<TaskDto> editInput(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> newInput,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+
+        UserContext user = auth.getPrincipal();
+        if (!"TL".equals(user.role())) {
+            throw new ForbiddenAppException("task:editInput");
+        }
+        if (newInput == null) {
+            throw new ValidationAppException("Request body must not be null");
+        }
+
+        return ResponseEntity.ok(TaskDto.from(taskService.editInput(id, newInput, user)));
+    }
+
+    @GetMapping("/{id}/executions")
+    public ResponseEntity<List<TaskExecutionHistoryDto>> getExecutions(@PathVariable String id) {
+        List<TaskExecutionHistoryDto> dtos = executionHistoryService.findByTaskId(id)
+                .stream()
+                .map(TaskExecutionHistoryDto::from)
+                .toList();
+        return ResponseEntity.ok(dtos);
+    }
+}
