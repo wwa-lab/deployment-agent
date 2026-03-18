@@ -100,8 +100,8 @@ class ReleaseFlowServiceTest {
     @Test
     @DisplayName("list with no filters returns all flows")
     void list_noFilters_returnsAll() {
-        helper.seedReleaseFlow();
-        helper.seedReleaseFlow();
+        helper.seedReleaseFlow(); // PROJ-001
+        releaseFlowService.create("PROJ-002", "Other Project", "sit-proj002-0001", "sit-proj002-0001", Stage.SIT);
 
         Page<ReleaseFlow> result = releaseFlowService.list(null, null, null, PageRequest.of(0, 10));
 

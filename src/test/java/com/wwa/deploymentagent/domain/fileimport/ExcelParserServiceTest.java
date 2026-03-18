@@ -41,7 +41,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("valid file parses all rows with correct field values")
     void parse_validFile_returnsRows() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("PROJ-1", "ProjectOne", "TG-001", "Deploy App",
                     "1", "deploy-step", "AUTO",
                     "deploy.sh", "--env prod",
@@ -75,7 +75,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("execution type is case-insensitive (auto / MANUAL)")
     void parse_executionTypeCaseInsensitive() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "manual",
                     "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
@@ -88,7 +88,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("ignored columns (Status, Start date/time, End date/time) are not stored")
     void parse_ignoredColumnsNotStored() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "MANUAL",
                     "", "", "", "", "", "", "", "", "", "", "Running", "2025-01-01", "2025-01-02")
         ));
@@ -109,7 +109,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("required field missing → error with row and column")
     void parse_requiredFieldMissing_recordsError() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("", "ProjectOne", "TG-001", "Deploy", "1", "step", "AUTO",
                     "deploy.sh", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
@@ -124,7 +124,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("invalid execution type → error on that row")
     void parse_invalidExecutionType_recordsError() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "HYBRID",
                     "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
@@ -137,7 +137,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("AUTO task without script → error")
     void parse_autoWithoutScript_recordsError() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "AUTO",
                     "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
@@ -150,7 +150,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("duplicate step seq# within same Task ID → error")
     void parse_duplicateStepSeq_recordsError() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "first-step", "MANUAL",
                     "", "", "", "", "", "", "", "", "", "", "", "", ""),
                 row("P", "N", "TG-1", "T", "1", "second-step", "MANUAL",
@@ -166,7 +166,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("same step seq# in different Task IDs is allowed")
     void parse_sameSeqDifferentTaskId_noError() throws IOException {
-        byte[] xlsx = buildXlsx(List.of(
+        byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T1", "1", "step-a", "MANUAL",
                     "", "", "", "", "", "", "", "", "", "", "", "", ""),
                 row("P", "N", "TG-2", "T2", "1", "step-b", "MANUAL",
@@ -181,7 +181,7 @@ class ExcelParserServiceTest {
     @Test
     @DisplayName("missing sheet → error with meaningful message")
     void parse_wrongSheetName_recordsError() throws IOException {
-        byte[] xlsx = buildXlsxWithSheet("wrong_sheet_name", List.of(
+        byte[] xlsx = buildXlsxWithSheet("wrong_sheet_name", List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "MANUAL",
                     "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));

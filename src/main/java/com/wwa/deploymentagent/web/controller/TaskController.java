@@ -9,7 +9,6 @@ import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
 import com.wwa.deploymentagent.domain.task.TaskService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
-import com.wwa.deploymentagent.web.security.UserContextAuthentication;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -55,9 +54,7 @@ public class TaskController {
     public ResponseEntity<TaskDto> editInput(
             @PathVariable String id,
             @RequestBody Map<String, Object> newInput,
-            @AuthenticationPrincipal UserContextAuthentication auth) {
-
-        UserContext user = auth.getPrincipal();
+            @AuthenticationPrincipal UserContext user) {
         if (!"TL".equals(user.role())) {
             throw new ForbiddenAppException("task:editInput");
         }
@@ -85,9 +82,7 @@ public class TaskController {
     public ResponseEntity<TaskDto> recordResult(
             @PathVariable String id,
             @RequestBody RecordResultRequestDto body,
-            @AuthenticationPrincipal UserContextAuthentication auth) {
-
-        UserContext user = auth.getPrincipal();
+            @AuthenticationPrincipal UserContext user) {
         if (!"TL".equals(user.role())) {
             throw new ForbiddenAppException("task:recordResult");
         }

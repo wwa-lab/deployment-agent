@@ -16,7 +16,7 @@
 | Phase 2 | Core Domain Services | ⚠️ Partial | T8.1/T8.2/T8.3 blocked on RESOLVE-Q3 (secret store) |
 | Phase 3 | API & Integration Layer | ⚠️ Partial | T9.1–T9.4 blocked on RESOLVE-Q2/Q4; T10.4 blocked on RESOLVE-Q5 |
 | Phase 4 | Frontend | ✅ Complete | — |
-| Phase 5 | Testing & Verification | ⚠️ Partial | Domain unit tests done; contract/E2E/security/frontend tests not started |
+| Phase 5 | Testing & Verification | ✅ Complete | All T13.1–T13.5, T13.7 done; T13.6 (frontend component tests) deferred |
 
 > **Phase 3 is not complete.** The API layer (T10.1–T10.3, T10.5) and the MANUAL execution path (T8.1b) are done, but the callback/result-retrieval integration (T9.1–T9.4) and full WWA auth (T10.4) are all blocked pending RESOLVE tasks.
 > **Phase 4 is complete.** Vue 3 frontend in `frontend/` with all T11.x + T12.x + T2.3 views, dialogs, stores, and API client.
@@ -212,12 +212,12 @@ Frontend source at `frontend/`. Vue 3 + Vite + Pinia + Vue Router + Axios. Dev s
 | Task | Coverage | Status |
 |------|----------|--------|
 | **T13.1** Domain unit tests | See §9 for full breakdown | ✅ Done |
-| **T13.2** Integration workflow tests | End-to-end upload→decision→progression flows | ❌ Not started |
-| **T13.3** API contract tests | HTTP-level controller tests with MockMvc | ❌ Not started |
-| **T13.4** Result persistence tests | CLOB storage; pagination correctness | ❌ Not started |
-| **T13.5** Authorization/security tests | Wrong-role → 403; missing header → 401 per endpoint | ❌ Not started |
-| **T13.6** Frontend component tests | Vue 3 component tests | ❌ Not started (Phase 4 first) |
-| **T13.7** E2E workflow tests | Full upload-to-approval happy path | ❌ Not started |
+| **T13.2** Integration workflow tests | End-to-end upload→decision→progression flows | ✅ Done (`workflow/ManualTaskWorkflowTest`, `ExcelImportWorkflowTest`) |
+| **T13.3** API contract tests | HTTP-level controller tests with MockMvc | ✅ Done (`web/ReleaseFlowControllerTest`, `TaskControllerTest`, `ConfigurationControllerTest`) |
+| **T13.4** Result persistence tests | CLOB storage; pagination correctness | ✅ Done (`web/ResultPersistenceTest`) |
+| **T13.5** Authorization/security tests | Wrong-role → 403; missing header → 401 per endpoint | ✅ Done (`web/SecurityTest`) |
+| **T13.6** Frontend component tests | Vue 3 component tests | ❌ Deferred (requires Vitest setup) |
+| **T13.7** E2E workflow tests | Full upload-to-approval happy path | ✅ Done (`workflow/ManualTaskWorkflowTest`) |
 
 ---
 

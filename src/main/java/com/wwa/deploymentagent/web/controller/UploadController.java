@@ -7,7 +7,6 @@ import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.fileimport.ImportService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
-import com.wwa.deploymentagent.web.security.UserContextAuthentication;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,9 +35,7 @@ public class UploadController {
     public ResponseEntity<UploadResponseDto> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam("stage") String stageParam,
-            @AuthenticationPrincipal UserContextAuthentication auth) throws IOException {
-
-        UserContext user = auth.getPrincipal();
+            @AuthenticationPrincipal UserContext user) throws IOException {
         if (!"DEVELOPER".equals(user.role()) && !"TL".equals(user.role())) {
             throw new ForbiddenAppException("upload");
         }

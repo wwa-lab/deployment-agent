@@ -21,6 +21,7 @@ public class TestDataHelper {
     @Autowired private ReleaseFlowRepository releaseFlowRepository;
     @Autowired private RequestRepository requestRepository;
     @Autowired private TaskRepository taskRepository;
+    @Autowired private jakarta.persistence.EntityManager entityManager;
 
     @Transactional
     public ReleaseFlow seedReleaseFlow() {
@@ -46,7 +47,10 @@ public class TestDataHelper {
         req.setReleaseFlow(releaseFlow);
         req.setStage(stage);
         req.setRequestStatus(RequestStatus.Pending);
-        return requestRepository.save(req);
+        Request saved = requestRepository.save(req);
+        entityManager.flush();
+        entityManager.refresh(releaseFlow);
+        return saved;
     }
 
     @Transactional
@@ -67,6 +71,9 @@ public class TestDataHelper {
         task.setInputParameters(java.util.Map.of("script", "deploy.sh", "parameters", "--env staging"));
         task.setExpectedOutput("Deployment successful");
         task.setOwner("alice");
-        return taskRepository.save(task);
+        Task saved = taskRepository.save(task);
+        entityManager.flush();
+        entityManager.refresh(request);
+        return saved;
     }
 }

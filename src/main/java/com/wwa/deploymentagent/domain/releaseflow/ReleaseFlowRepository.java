@@ -45,8 +45,7 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
      * Uses DISTINCT to avoid duplicates from multiple JOIN FETCH paths.
      */
     @Query("SELECT DISTINCT rf FROM ReleaseFlow rf " +
-           "LEFT JOIN FETCH rf.requests r " +
-           "LEFT JOIN FETCH r.tasks " +
+           "LEFT JOIN FETCH rf.requests " +
            "WHERE rf.id = :id")
     Optional<ReleaseFlow> findByIdWithFullHierarchy(@Param("id") String id);
 

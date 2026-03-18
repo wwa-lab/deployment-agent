@@ -2,6 +2,7 @@ package com.wwa.deploymentagent.domain.audit;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,11 @@ class AuditLoggerServiceTest {
 
     @Autowired private AuditLoggerService auditLoggerService;
     @Autowired private AuditLogRepository auditLogRepository;
+
+    @BeforeEach
+    void setUp() {
+        auditLogRepository.deleteAll();
+    }
 
     @Test
     @DisplayName("log appends an entry with all provided fields")

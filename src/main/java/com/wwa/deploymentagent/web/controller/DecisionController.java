@@ -6,7 +6,6 @@ import com.wwa.deploymentagent.contracts.dto.TaskDto;
 import com.wwa.deploymentagent.domain.decision.DecisionEngine;
 import com.wwa.deploymentagent.domain.decision.ReleaseFlowProgressionService;
 import com.wwa.deploymentagent.domain.task.TaskService;
-import com.wwa.deploymentagent.web.security.UserContextAuthentication;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -36,9 +35,7 @@ public class DecisionController {
     public ResponseEntity<TaskDto> applyDecision(
             @PathVariable String id,
             @Valid @RequestBody DecisionRequestDto body,
-            @AuthenticationPrincipal UserContextAuthentication auth) {
-
-        UserContext user = auth.getPrincipal();
+            @AuthenticationPrincipal UserContext user) {
 
         decisionEngine.applyDecision(id, body.decision(), user, body.comment());
         progressionService.progressAfterDecision(id);

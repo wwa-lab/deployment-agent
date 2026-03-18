@@ -6,6 +6,8 @@ import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +30,9 @@ public class ReleaseFlowService {
     private final ReleaseFlowRepository releaseFlowRepository;
     private final RequestRepository requestRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     /** Retrieve a Release Flow by ID. Throws {@link NotFoundAppException} if absent. */
     @Transactional(readOnly = true)
     public ReleaseFlow getById(String id) {
@@ -40,10 +45,19 @@ public class ReleaseFlowService {
      * Prefer this over {@link #getById} when requests and tasks will be accessed,
      * to avoid N+1 queries.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public ReleaseFlow getByIdWithFullHierarchy(String id) {
-        return releaseFlowRepository.findByIdWithFullHierarchy(id)
+        ReleaseFlow rf = releaseFlowRepository.findById(id)
                 .orElseThrow(() -> new NotFoundAppException("ReleaseFlow", id));
+        // Flush and refresh to ensure all in-session changes are visible in the returned hierarchy.
+        // Collections initialized as empty during persist() would otherwise miss newly added children.
+        entityManager.flush();
+        entityManager.refresh(rf);
+        rf.getRequests().forEach(req -> {
+            entityManager.refresh(req);
+            req.getTasks().size();
+        });
+        return rf;
     }
 
     /** Paginated list with optional filters. Callers build the Pageable from query params. */

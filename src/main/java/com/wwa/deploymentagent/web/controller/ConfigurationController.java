@@ -4,7 +4,6 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.ConfigurationItemDto;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
-import com.wwa.deploymentagent.web.security.UserContextAuthentication;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -39,9 +38,7 @@ public class ConfigurationController {
     @PostMapping
     public ResponseEntity<ConfigurationItemDto> upsert(
             @Valid @RequestBody ConfigurationItemDto.UpsertRequest body,
-            @AuthenticationPrincipal UserContextAuthentication auth) {
-
-        UserContext user = auth.getPrincipal();
+            @AuthenticationPrincipal UserContext user) {
         if (!"DEVOPS_ADMIN".equals(user.role())) {
             throw new ForbiddenAppException("config:update");
         }
