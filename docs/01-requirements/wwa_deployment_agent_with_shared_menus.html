@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinBlock - WWA / Deployment Agent</title>
+  <style>
+    :root{
+      --nav:#0f2240;
+      --nav2:#10294f;
+      --nav-hover:#17345f;
+      --text:#263238;
+      --muted:#7f8c9b;
+      --line:#e8edf3;
+      --bg:#f7f9fc;
+      --blue:#4c7cf5;
+      --done:#16a34a;
+      --done-bg:#eaf8ef;
+      --running:#d08a00;
+      --running-bg:#fff4d8;
+      --pending:#7d8ca0;
+      --pending-bg:#eef2f7;
+      --approved:#15803d;
+      --approved-bg:#ecfdf3;
+      --review:#2563eb;
+      --review-bg:#eaf2ff;
+      --info-bg:#f6fbff;
+      --info-border:#d9e9ff;
+      --info-text:#305c8b;
+      --btn-soft:#f4f7fb;
+      --btn-line:#d9e1ec;
+      --success:#047857;
+      --success-bg:#ecfdf5;
+      --success-border:#a7f3d0;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial, Helvetica, sans-serif;background:var(--bg);color:var(--text);}
+    .app{display:grid;grid-template-columns:255px 1fr;min-height:100vh;}
+    .sidebar{background:linear-gradient(180deg,var(--nav),var(--nav2));color:#fff;display:flex;flex-direction:column;}
+    .brand{height:78px;display:flex;align-items:center;padding:0 24px;border-bottom:1px solid rgba(255,255,255,.08);}
+    .brand-badge{width:42px;height:42px;border-radius:50%;background:linear-gradient(180deg,#2df28a,#13c965);display:flex;align-items:center;justify-content:center;color:#0c4730;font-weight:700;font-size:22px;}
+    .menu{padding:14px 0 24px}
+    .menu-item{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#fff;padding:18px 24px;font-size:18px;border-left:3px solid transparent;position:relative;}
+    .menu-item .left{display:flex;align-items:center;gap:14px}
+    .menu-item.active{background:rgba(255,255,255,.06);border-left-color:#4ba3ff}
+    .menu-item:hover{background:var(--nav-hover)}
+    .flyout{position:absolute;left:100%;top:0;margin-left:18px;width:260px;background:linear-gradient(180deg,#274b85,#17325c);border-radius:4px;padding:18px 0;box-shadow:0 10px 24px rgba(15,34,64,.28);z-index:20;}
+    .flyout-item{display:flex;align-items:center;gap:14px;color:#ffffff;padding:18px 24px;font-size:16px;white-space:nowrap;}
+    .flyout-item.active{color:#44a6ff;font-weight:700}
+    .content{display:flex;flex-direction:column;min-width:0}
+    .topbar{height:78px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;}
+    .crumb{display:flex;align-items:center;gap:14px;font-size:18px;color:#7b8794}
+    .toolbar{display:flex;align-items:center;gap:18px;color:#55606f;font-size:18px}
+    .tabs{background:#fff;border-bottom:1px solid var(--line);padding:0 18px;display:flex;align-items:flex-end;gap:2px;overflow:auto;white-space:nowrap;}
+    .tab{padding:14px 18px;border-right:1px solid var(--line);color:#687385;background:#fff;font-size:14px}
+    .tab.active{color:#fff;background:#18c95d;border-radius:4px 4px 0 0;margin-top:6px;padding-top:10px;padding-bottom:10px;font-weight:700;}
+    .page{padding:20px 24px 28px;overflow:auto}
+    .panel,.hero{background:#fff;border:1px solid var(--line);border-radius:4px;padding:20px;margin-bottom:18px;}
+    .hero-title{font-size:28px;font-weight:700;margin:0 0 10px}
+    .hero-sub{color:#4c5b6b;line-height:1.6;font-size:15px;margin:0;max-width:1100px}
+    .info-note{margin-top:14px;border:1px solid var(--info-border);background:var(--info-bg);color:var(--info-text);border-radius:4px;padding:12px 14px;font-size:14px;}
+    .success-note{margin-bottom:18px;border:1px solid var(--success-border);background:var(--success-bg);color:var(--success);border-radius:4px;padding:12px 14px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:16px;}
+    .section-title{font-size:20px;font-weight:700;margin:0;}
+    .panel-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px;}
+    .filters{flex:1;display:grid;grid-template-columns:1fr 1fr 0.8fr 0.8fr auto auto auto;gap:12px;align-items:center;}
+    .input,.select{height:40px;border:1px solid #dfe6ee;border-radius:4px;padding:0 12px;color:#536273;background:#fff;font-size:14px;}
+    .btn{height:40px;border:none;border-radius:4px;padding:0 16px;font-size:14px;cursor:pointer;}
+    .btn.query{background:var(--blue);color:#fff;font-weight:700}
+    .btn.refresh{background:#f3f5f8;color:#616d7e;border:1px solid #e1e7ef}
+    .btn.upload{background:#ffffff;color:var(--blue);border:1px solid #cfe0ff;font-weight:700}
+    .btn.link{background:#fff;border:1px solid #dbe5f3;color:#4b5d73}
+    .summary-grid{display:grid;grid-template-columns:repeat(6,minmax(140px,1fr));gap:14px;margin-bottom:18px;}
+    .summary-card{border:1px solid var(--line);background:#fbfcfe;border-radius:4px;padding:14px 16px;}
+    .summary-label{color:#7b8794;font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px;}
+    .summary-value{font-size:18px;font-weight:700;color:#334155}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    thead th{text-align:left;font-size:13px;color:#42515f;font-weight:700;border-bottom:1px solid var(--line);padding:14px 12px;background:#fff;}
+    tbody td{padding:14px 12px;border-bottom:1px solid var(--line);font-size:14px;color:#42515f;vertical-align:top;background:#fff;}
+    tbody tr:hover td{background:#fbfdff}
+    tbody tr.selected td{background:#f7fbff}
+    .col-num{width:48px;text-align:center;color:#6f7c8d}
+    .center{text-align:center}
+    .tag{display:inline-block;min-width:96px;text-align:center;padding:6px 10px;border-radius:16px;font-size:13px;font-weight:700;white-space:nowrap;}
+    .done{color:var(--done);background:var(--done-bg)}
+    .running{color:var(--running);background:var(--running-bg)}
+    .pending{color:var(--pending);background:var(--pending-bg)}
+    .approved{color:var(--approved);background:var(--approved-bg)}
+    .review{color:var(--review);background:var(--review-bg)}
+    .sub-title{font-size:18px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+    .hint{color:#7b8794;font-size:13px;font-weight:400}
+    .result-box{border:1px solid #e7edf5;background:#fafcff;border-radius:4px;padding:10px 12px;font-size:13px;line-height:1.5;color:#475467;}
+    .result-title{font-weight:700;color:#344054;margin-bottom:4px}
+    .action-group{display:flex;gap:6px;flex-wrap:wrap}
+    .action-btn{height:30px;padding:0 10px;border:1px solid var(--btn-line);background:var(--btn-soft);color:#475467;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;}
+    .action-btn.result{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+    .decision-select{height:30px;min-width:150px;padding:0 10px;border:1px solid #d9e1ec;background:#fff;color:#475467;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;}
+    .upload-modal{position:fixed;right:28px;top:112px;width:420px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 16px 40px rgba(15,34,64,.18);z-index:30;overflow:hidden;}
+    .upload-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);font-weight:700;}
+    .upload-body{padding:18px}
+    .upload-text{font-size:14px;color:#526173;line-height:1.6;margin:0 0 14px}
+    .upload-actions-top{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+    .dropzone{border:2px dashed #cbd8ea;border-radius:8px;background:#fbfdff;padding:22px 18px;text-align:center;color:#607086;font-size:14px;margin-bottom:16px;}
+    .dropzone strong{display:block;color:#334155;margin-bottom:8px}
+    .upload-footer{display:flex;justify-content:flex-end;gap:10px;}
+    @media (max-width:1400px){
+      .filters{grid-template-columns:1fr 1fr 0.8fr 0.8fr auto auto auto}
+      .summary-grid{grid-template-columns:repeat(3,minmax(160px,1fr))}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-badge">V</div></div>
+      <div class="menu">
+        <div class="menu-item"><div class="left"><span>◈</span><span>Dashboard</span></div></div>
+        <div class="menu-item"><div class="left"><span>✦</span><span>AI Assistant</span></div><span>›</span></div>
+        <div class="menu-item"><div class="left"><span>▣</span><span>Common</span></div><span>›</span></div>
+        <div class="menu-item"><div class="left"><span>★</span><span>AMH FrontEnd</span></div><span>›</span></div>
+        <div class="menu-item"><div class="left"><span>¥</span><span>AMH BackEnd</span></div><span>›</span></div>
+        <div class="menu-item"><div class="left"><span>◔</span><span>PowerCARD</span></div><span>›</span></div>
+        <div class="menu-item"><div class="left"><span>¥</span><span>Deliverable_Status</span></div><span>›</span></div>
+        <div class="menu-item"><div class="left"><span>¥</span><span>DIY(Do It Yourself)</span></div><span>›</span></div>
+        <div class="menu-item active">
+          <div class="left"><span>◫</span><span>WWA</span></div><span>‹</span>
+          <div class="flyout">
+            <div class="flyout-item active"><span>☰</span><span>Deployment Agent</span></div>
+            <div class="flyout-item"><span>☰</span><span>Template Management</span></div>
+            <div class="flyout-item"><span>☰</span><span>Configuration Management</span></div>
+            <div class="flyout-item"><span>☰</span><span>Audit Log</span></div>
+          </div>
+        </div>
+        <div class="menu-item"><div class="left"><span>◫</span><span>Agentic SDLC</span></div><span>›</span></div>
+        <div class="menu-item"><div class="left"><span>♟</span><span>AboutUs</span></div></div>
+      </div>
+    </aside>
+
+    <section class="content">
+      <div class="topbar">
+        <div class="crumb"><span>☰</span><span>WWA / Deployment Agent</span></div>
+        <div class="toolbar">
+          <span>⌕</span><span>⛶</span>
+          <span style="background:#49d6e8;color:#083944;border-radius:8px;padding:10px 12px;">🚀</span>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab">Overview</div>
+        <div class="tab active">Deployment Agent</div>
+      </div>
+
+      <div class="page">
+        <div class="hero">
+          <h1 class="hero-title">Deployment Agent</h1>
+          <p class="hero-sub">
+            <strong>WWA</strong> stands for <strong>Work With Agent</strong>, the new operating model for task execution across the SDLC.
+            This page focuses on deployment orchestration, release flow tracking, result review, and controlled human decision before moving to the next step.
+          </p>
+          <div class="info-note">
+            Current phase uses <strong>API-based orchestration</strong> to trigger deployment tasks. Each step still requires human review to confirm the result matches the expected outcome. Summary status is shown by <strong>Release Flow</strong>, while review status is shown in request and task details.
+          </div>
+        </div>
+
+        <div class="success-note">
+          <div>
+            <strong>Upload completed:</strong> deployment_request_template_v3.xlsx imported successfully. 1 release flow created (<strong>FB-2026-001</strong>), 1 UAT request generated, and 5 tasks created.
+          </div>
+          <button class="btn link">View Import Log</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title-row">
+            <h2 class="section-title">Deployment Flow Summary</h2>
+            <div class="filters">
+              <input class="input" value="FinBlock" />
+              <input class="input" value="FB-2026-001" />
+              <select class="select"><option>All Stage</option></select>
+              <select class="select"><option>Running</option></select>
+              <button class="btn upload">Upload Excel</button>
+              <button class="btn query">Query</button>
+              <button class="btn refresh">Refresh</button>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th>PROJECT</th>
+                <th>RELEASE_ID</th>
+                <th class="center">SIT</th>
+                <th class="center">UAT</th>
+                <th class="center">PROD</th>
+                <th class="center">OVERALL_STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="selected">
+                <td class="col-num">1</td>
+                <td>FinBlock</td>
+                <td>FB-2026-001</td>
+                <td class="center"><span class="tag done">Done</span></td>
+                <td class="center"><span class="tag running">Running</span></td>
+                <td class="center"><span class="tag pending">Pending</span></td>
+                <td class="center"><span class="tag running">Running</span></td>
+              </tr>
+              <tr>
+                <td class="col-num">2</td>
+                <td>LoanSys</td>
+                <td>LS-2026-003</td>
+                <td class="center"><span class="tag done">Done</span></td>
+                <td class="center"><span class="tag done">Done</span></td>
+                <td class="center"><span class="tag pending">Pending</span></td>
+                <td class="center"><span class="tag running">Running</span></td>
+              </tr>
+              <tr>
+                <td class="col-num">3</td>
+                <td>HCC Payment</td>
+                <td>HCC-2026-008</td>
+                <td class="center"><span class="tag running">Running</span></td>
+                <td class="center"><span class="tag pending">Pending</span></td>
+                <td class="center"><span class="tag pending">Pending</span></td>
+                <td class="center"><span class="tag running">Running</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <div class="sub-title">Selected Release Flow Details <span class="hint">FinBlock / FB-2026-001</span></div>
+          <div class="summary-grid">
+            <div class="summary-card">
+              <div class="summary-label">Project</div>
+              <div class="summary-value">FinBlock</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Release ID</div>
+              <div class="summary-value">FB-2026-001</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Current Stage</div>
+              <div class="summary-value">UAT</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Current Request</div>
+              <div class="summary-value">REQ-1018</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Review Status</div>
+              <div class="summary-value">Waiting Review</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Review Owner</div>
+              <div class="summary-value">Leo</div>
+            </div>
+          </div>
+
+          <div class="sub-title">Task Details - REQ-1018 <span class="hint">Human-in-the-loop review and control</span></div>
+          <table>
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th style="width:220px;">TASK</th>
+                <th>RESULT SUMMARY</th>
+                <th style="width:105px;">START</th>
+                <th style="width:105px;">END</th>
+                <th class="center" style="width:140px;">STATUS</th>
+                <th style="width:280px;">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-num">1</td>
+                <td>Trigger Jenkins pipeline</td>
+                <td>
+                  <div class="result-box">
+                    <div class="result-title">Execution Result</div>
+                    Jenkins build #1023 completed successfully. Build package generated and archived.
+                  </div>
+                </td>
+                <td>10:00</td>
+                <td>10:02</td>
+                <td class="center"><span class="tag approved">Approved</span></td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn">Edit</button>
+                    <button class="action-btn result">View Result</button>
+                    <select class="decision-select">
+                      <option>Decision</option>
+                      <option>Approve</option>
+                      <option>Reject</option>
+                      <option>Rerun</option>
+                      <option>Skip</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="col-num">2</td>
+                <td>Launch Ansible Job</td>
+                <td>
+                  <div class="result-box">
+                    <div class="result-title">Execution Result</div>
+                    Ansible job completed with exit code 0. Application deployed to UAT nodes.
+                  </div>
+                </td>
+                <td>10:02</td>
+                <td>10:05</td>
+                <td class="center"><span class="tag approved">Approved</span></td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn">Edit</button>
+                    <button class="action-btn result">View Result</button>
+                    <select class="decision-select">
+                      <option>Decision</option>
+                      <option>Approve</option>
+                      <option>Reject</option>
+                      <option>Rerun</option>
+                      <option>Skip</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="col-num">3</td>
+                <td>Verification</td>
+                <td>
+                  <div class="result-box">
+                    <div class="result-title">Execution Result</div>
+                    7 of 8 verification checks passed. One downstream API response mismatch detected and pending human review.
+                  </div>
+                </td>
+                <td>10:06</td>
+                <td>-</td>
+                <td class="center"><span class="tag review">Waiting Review</span></td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn">Edit</button>
+                    <button class="action-btn result">View Result</button>
+                    <select class="decision-select">
+                      <option>Decision</option>
+                      <option>Approve</option>
+                      <option>Reject</option>
+                      <option>Rerun</option>
+                      <option>Skip</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="col-num">4</td>
+                <td>Post Deployment Validation</td>
+                <td>
+                  <div class="result-box">
+                    <div class="result-title">Execution Result</div>
+                    Not started yet. This task will be available after verification is approved.
+                  </div>
+                </td>
+                <td>-</td>
+                <td>-</td>
+                <td class="center"><span class="tag pending">Pending</span></td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn">Edit</button>
+                    <button class="action-btn result">View Result</button>
+                    <select class="decision-select">
+                      <option>Decision</option>
+                      <option>Approve</option>
+                      <option>Reject</option>
+                      <option>Rerun</option>
+                      <option>Skip</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="upload-modal">
+        <div class="upload-head">
+          <span>Upload Excel</span>
+          <span>✕</span>
+        </div>
+        <div class="upload-body">
+          <p class="upload-text">
+            Upload a deployment request Excel file to create or extend a release flow for the selected WWA agent. The file should include a controlled mapping key such as <strong>Release ID</strong>.
+          </p>
+          <div class="upload-actions-top">
+            <button class="btn link">Download Template</button>
+            <button class="btn link">View Sample</button>
+          </div>
+          <div class="dropzone">
+            <strong>Drag and drop Excel here</strong>
+            or click to browse file<br/>
+            Supported format: .xlsx
+          </div>
+          <div class="upload-footer">
+            <button class="btn refresh">Cancel</button>
+            <button class="btn query">Upload</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
