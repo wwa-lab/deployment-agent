@@ -106,9 +106,54 @@ Write the output as a well-structured `architecture.md`. Use the template below.
 
 ## High-Level Architecture
 
-## Architecture Diagram (Mermaid)
+### Architecture Diagram
 
-Provide a high-level Mermaid diagram showing the major components, logical layers, and key integration paths.
+**REQUIRED**: Produce a plain-text / ASCII block diagram inside a markdown fenced code block.
+
+The diagram must:
+- Show the system as layered boxes drawn with box-drawing characters (┌ ─ ┐ │ └ ┘ ├ ┤ ┬ ┴ ▼ ▲)
+- Be laid out in monospace, top-to-bottom: Users → Frontend → API / Backend → Core Domain → Database, with external systems alongside
+- Compress to **4–8 primary boxes** — group related internals into a single labeled box rather than exploding every service
+- Label connections between layers only when the protocol matters (e.g., REST / JSON, JDBC)
+- Use the spec/design as the content source — real component names at a grouped level (e.g., "Import & Workflow Engine", not individual class names)
+- Match the abstraction level of a documentation block diagram: readable in 10 seconds, not an implementation map
+
+Do NOT use Mermaid syntax. Do NOT generate a workflow, sequence diagram, or decision flowchart.
+Do NOT skip this diagram. It is essential for architecture communication and review.
+
+Example style (structure only — replace content with real system components):
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Users                                                       │
+│  Role A · Role B · Role C                                    │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ HTTPS
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Web App                                                     │
+│  [Frontend framework] · [State management] · [HTTP client]   │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ REST / JSON
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│  API Service                                                 │
+│  [Backend framework] · [Controllers] · [Auth]                │
+├──────────────────────────────────────────────────────────────┤
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐ │
+│  │  Domain Group A │  │  Domain Group B │  │  Domain Group C│ │
+│  └────────────────┘  └────────────────┘  └────────────────┘ │
+├──────────────────────────────────────────────────────────────┤
+│  Persistence · [ORM / data access layer]                     │
+└──────────────┬──────────────────────┬────────────────────────┘
+               │                      │
+               ▼                      ▼
+┌──────────────────┐      ┌────────────────────┐
+│  Database        │      │  External System   │
+└──────────────────┘      └────────────────────┘
+```
+
+### Layer Summary
 
 [Describe the major layers or subsystems and how they relate. Use a brief narrative + a logical layer breakdown. For example:]
 
@@ -282,10 +327,23 @@ Before finalizing the output, verify:
 - [ ] External integrations each have a described interaction pattern
 - [ ] Gaps in the spec are surfaced in Risks or Open Questions, not silently resolved
 - [ ] Language is concise, professional, and engineering-appropriate
+- [ ] **High-Level Architecture Diagram** (plain-text ASCII block diagram in fenced code block) is present and complete
 
 ---
 
 ## Output
 
+### Primary Output
 Save the final document as `docs/04-architecture/architecture.md` by default.
 If the user requests a different location, follow the user's requested path.
+
+### Companion Artifact: Data Flow Document
+After producing the architecture document, also produce a companion `data-flow.md` that describes how data moves through the system. This document should include:
+- ASCII block diagrams or simple text diagrams for each major data flow
+- Field mapping tables where applicable (e.g., input fields to domain entities)
+- Data objects and their lifecycle
+- End-to-end data path summary
+
+Use the same plain-text diagram style as the architecture diagram. Only use Mermaid if the user explicitly requests it.
+
+Save as `docs/04-architecture/data-flow.md` by default.

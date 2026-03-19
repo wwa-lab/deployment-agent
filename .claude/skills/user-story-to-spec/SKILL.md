@@ -179,14 +179,33 @@ For platform, workflow, and DevOps systems, prefer grouping requirements by capa
 
 ## Workflow / System Flow
 
+### User Flow Diagram
+
+**REQUIRED**: Produce a Mermaid `flowchart` diagram that visually shows the end-to-end user journey through the system. The diagram must include:
+- Entry point (how the user starts)
+- Key decision points (diamonds)
+- Branching paths (success, failure, different execution types)
+- Loop-back paths (retries, reruns)
+- Terminal states (success, failure, cancelled)
+- Use `style` directives to color-code: entry (blue), success (green), error (red), warning (yellow)
+
+```mermaid
+flowchart TD
+    A[Entry point] --> B[Step 1]
+    B --> C{Decision?}
+    C -- Yes --> D[Success path]
+    C -- No --> E[Alternative path]
+    ...
+```
+
+### Main Flow
+
 <Describe the end-to-end process as a numbered sequence or prose narrative. Cover:>
 1. What triggers the workflow
 2. Each stage in order, including decision points and branching
 3. Error and exception paths
 4. Terminal states (success, failure, cancelled, etc.)
 5. Describe behaviour and flow, not implementation architecture. Do not introduce internal components, services, classes, or database design in this section.
-
-*(If complexity warrants it, note that a sequence diagram should be produced separately.)*
 
 ---
 

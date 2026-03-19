@@ -1,0 +1,280 @@
+# Data Flow: Deployment Agent
+
+> **Source**: architecture.md, spec.md, design.md
+> **Last updated**: 2026-03-19
+
+---
+
+## Overview
+
+This document describes how data flows through the Deployment Agent system, from external inputs (Excel upload, user actions) through processing layers to persistence and external systems.
+
+---
+
+## 1. Excel Import Data Flow
+
+```mermaid
+flowchart LR
+    subgraph Input
+        Excel[Excel File<br/>AMH_HCC_task sheet]
+        Stage[Stage selector<br/>SIT / UAT / PROD]
+    end
+
+    subgraph Parse["Parse Layer"]
+        Parser[ExcelParserService]
+        Validate[Schema Validation]
+    end
+
+    subgraph Transform["Transform Layer"]
+        Import[ImportService]
+        Map[Field Mapping]
+    end
+
+    subgraph Persist["Persistence"]
+        RF[(ReleaseFlow)]
+        Req[(Request)]
+        Task[(Task)]
+        Audit[(AuditLogEntry)]
+    end
+
+    Excel --> Parser
+    Stage --> Import
+    Parser --> Validate
+    Validate -->|Valid| Import
+    Validate -->|Invalid| Error[422 Validation Error]
+    Import --> Map
+    Map --> RF
+    Map --> Req
+    Map --> Task
+    Import --> Audit
+```
+
+### Field Mapping Summary
+
+| Excel Field | Target Entity | Target Attribute | Classification |
+|---|---|---|---|
+| Project ID | ReleaseFlow | project_id | Core - grouping key |
+| Project Name | ReleaseFlow | project_name | Display |
+| Task ID | Task | task_group_id | Display grouping |
+| Task Name | Task | task_group_name | Display |
+| Step seq# | Task | step_seq | Core - ordering |
+| Step | Task | task_name | Core - identity |
+| Execution Type | Task | execution_type | Core - MANUAL/AUTO |
+| Script to be executed | Task | input_parameters.script | Core - payload |
+| Parameter (input) | Task | input_parameters.parameters | Core - payload |
+| Parameter (Expected Output) | Task | expected_output | Core - verification |
+| Owner | Task | owner | Display |
+| Planned Start/End | Task | planned_start_time/end_time | Display only |
+| Activity category, Common, Dependencies, Validation | Task | import_metadata (JSON) | Metadata blob |
+| Status, Start/End date/time | -- | Not stored | Dropped |
+| *(from UI)* Stage | Request | stage | Core |
+| *(system-generated)* Release ID | ReleaseFlow | release_id | Core |
+
+---
+
+## 2. Task Execution Data Flow
+
+### 2.1 MANUAL Execution
+
+```mermaid
+flowchart LR
+    TL[TL User] -->|Records result| API[POST /tasks/:id/record-result]
+    API --> RRS[RecordResultService]
+    RRS --> SM[TaskStateMachine<br/>validates transition]
+    RRS --> TEH[(TaskExecutionHistory<br/>result_summary + result_logs)]
+    RRS --> T[(Task<br/>status → Awaiting_Review)]
+    RRS --> AL[(AuditLogEntry<br/>action: record_result)]
+```
+
+### 2.2 AUTO Execution
+
+```mermaid
+flowchart LR
+    User[TL / DevOps Admin] -->|Submit Auto| API[POST /tasks/:id/submit-auto]
+    API --> AES[AutoExecutionService]
+    AES --> SM[TaskStateMachine<br/>validates transition]
+    AES --> TEH1[(TaskExecutionHistory<br/>created with attempt_number)]
+
+    AES --> Adapter{Adapter Selection}
+    Adapter -->|JENKINS| JA[JenkinsExecutionAdapter]
+    Adapter -->|ANSIBLE| AA[AnsibleExecutionAdapter]
+
+    JA -->|POST /job/:name/build| Jenkins[Jenkins Server]
+    Jenkins -->|Location header<br/>→ queue ID → build number| JA
+    JA --> TEH2[(TaskExecutionHistory<br/>external_execution_id<br/>external_job_url<br/>submission_status)]
+
+    AA -->|POST /api/v2/job_templates/:id/launch/| Ansible[Ansible Tower]
+    Ansible -->|JSON response<br/>→ job ID| AA
+    AA --> TEH2
+
+    AES --> AL[(AuditLogEntry<br/>action: auto_submit)]
+```
+
+### 2.3 External Execution Data Stored
+
+| Field | Source | Example |
+|---|---|---|
+| external_system_type | Adapter selection | JENKINS, ANSIBLE |
+| external_execution_id | Response from external system | Build #42, Job #789 |
+| external_job_url | Constructed from response | `https://jenkins/job/deploy/42/console` |
+| submitted_at | System clock | 2026-03-19T10:00:00Z |
+| submission_status | Adapter result | SUBMITTED, FAILED |
+| submission_message | Adapter result | "Build queued successfully" |
+
+---
+
+## 3. Decision Data Flow
+
+```mermaid
+flowchart TD
+    TL[TL User] -->|Approve / Reject / Rerun / Skip| API[POST /tasks/:id/decision]
+    API --> DE[DecisionEngine]
+
+    DE --> SM[TaskStateMachine<br/>validate transition]
+
+    DE -->|Approve| Approve[Task → Approved]
+    DE -->|Reject| Reject[Task → Rejected<br/>Request → Rejected<br/>ReleaseFlow → Rejected]
+    DE -->|Skip| Skip[Task → Skipped]
+    DE -->|Rerun| Rerun[Task → Ready_For_Execution<br/>new TaskExecutionHistory created]
+
+    Approve --> Prog[ReleaseFlowProgressionService]
+    Skip --> Prog
+
+    Prog --> Agg[ReleaseFlowAggregation<br/>recompute Request & ReleaseFlow statuses]
+    Prog --> Next{Next task exists?}
+    Next -->|Yes| Promote[Next task → Ready_For_Execution]
+    Next -->|No| Complete[Request/ReleaseFlow → Completed]
+
+    DE --> AL[(AuditLogEntry<br/>action: approve/reject/rerun/skip)]
+```
+
+### Status Aggregation Rules
+
+Statuses bubble up from Task → Request → ReleaseFlow using pure functions in `ReleaseFlowAggregation`:
+
+| Level | Computed From | Rule |
+|---|---|---|
+| Request status | All child Task statuses | All terminal → Completed/Failed/Rejected; Any active → Running; All Pending → Pending |
+| ReleaseFlow flow_status | All child Request statuses | Same aggregation logic |
+| Stage summary | Tasks in that stage | Done (all terminal), Running (any active), Pending (all pending) |
+
+---
+
+## 4. Authentication Data Flow
+
+```mermaid
+flowchart LR
+    User[User Browser] -->|POST /auth/login<br/>employeeId + password| Auth[AuthController]
+    Auth --> AS[AuthService]
+    AS --> TB[TeamBookAuthProvider]
+    TB -->|Stub: hardcoded 5 users<br/>Prod: Team Book API| Validate{Valid?}
+    Validate -->|Yes| Session[HttpSession<br/>stores UserContext<br/>employeeId, name, role]
+    Validate -->|No| Err[401 Unauthorized]
+
+    Session --> SF[SessionAuthFilter<br/>reads UserContext from session<br/>populates SecurityContext]
+    SF --> API[All /api/* requests<br/>authenticated with role]
+```
+
+### Auth Data Objects
+
+| Object | Content | Lifecycle |
+|---|---|---|
+| LoginRequestDto | employeeId, password | Request-scoped |
+| UserContext | employeeId, displayName, role | Stored in HttpSession |
+| SecurityContext | Authentication with UserContext | Per-request from session |
+
+---
+
+## 5. Configuration Data Flow
+
+```mermaid
+flowchart LR
+    Admin[DevOps Admin] -->|GET/PUT /config| CC[ConfigurationController]
+    CC --> CS[ConfigurationService]
+    CS --> Validate[Validation rules<br/>per ConfigKey]
+    CS --> DB[(ConfigurationItem table)]
+
+    subgraph Consumers["Runtime Consumers"]
+        JA[JenkinsExecutionAdapter<br/>reads jenkins_url, jenkins_user, jenkins_api_token]
+        AA[AnsibleExecutionAdapter<br/>reads ansible_url, ansible_user, ansible_api_token]
+    end
+
+    DB -.->|Read at execution time| Consumers
+    CS --> AL[(AuditLogEntry<br/>action: config_update)]
+```
+
+### Configuration Keys
+
+| Key | Consumer | Purpose |
+|---|---|---|
+| jenkins_url | JenkinsExecutionAdapter | Jenkins server base URL |
+| jenkins_user | JenkinsExecutionAdapter | Basic auth username |
+| jenkins_api_token | JenkinsExecutionAdapter | Basic auth API token |
+| ansible_url | AnsibleExecutionAdapter | Ansible Tower base URL |
+| ansible_user | AnsibleExecutionAdapter | Display/audit only |
+| ansible_api_token | AnsibleExecutionAdapter | Bearer token auth |
+
+---
+
+## 6. Audit Data Flow
+
+```mermaid
+flowchart TD
+    subgraph Sources["Audit Event Sources"]
+        Upload[Upload/Import]
+        Edit[Task Edit]
+        Result[Record Result]
+        Decision[Decision]
+        AutoSub[Auto Submit]
+        Config[Config Update]
+    end
+
+    Sources -->|AuditLoggerService.log()| ALS[AuditLoggerService<br/>REQUIRES_NEW propagation]
+    ALS --> DB[(DA_AUDIT_LOG_ENTRY)]
+
+    DB --> AuditAPI[GET /audit-logs<br/>role-gated: AUDIT, MANAGEMENT]
+    AuditAPI --> AuditView[Audit Log View<br/>read-only list]
+```
+
+### Audit Entry Structure
+
+| Field | Description |
+|---|---|
+| audit_log_id | System-generated UUID |
+| operator_id | From authenticated UserContext |
+| operator_role | From authenticated UserContext |
+| action_type | upload, edit, view_result, approve, reject, rerun, skip, auto_submit, config_update |
+| timestamp | System clock at event time |
+| release_flow_id | Nullable context reference |
+| request_id | Nullable context reference |
+| task_id | Nullable context reference |
+| context_payload | JSON with action-specific details |
+
+### Audit Isolation
+
+`AuditLoggerService` uses `Propagation.REQUIRES_NEW` to ensure audit log writes succeed independently of the business transaction. If the business operation rolls back, the audit entry is still persisted.
+
+---
+
+## 7. Summary: End-to-End Data Path
+
+```mermaid
+flowchart TB
+    Excel[Excel Upload] --> Import[Import Pipeline]
+    Import --> RF[ReleaseFlow + Request + Tasks]
+    RF --> Execution{Execution Path}
+    Execution -->|MANUAL| Manual[TL records result]
+    Execution -->|AUTO| Auto[Submit to Jenkins/Ansible]
+    Manual --> Review[Awaiting Review]
+    Auto --> Review
+    Review --> Decision[TL Decision]
+    Decision -->|Approve/Skip| Progress[Progression Engine]
+    Decision -->|Reject| Terminal[Flow Terminated]
+    Decision -->|Rerun| Execution
+    Progress --> Complete[Flow Completed]
+
+    Import -.-> Audit[(Audit Log)]
+    Manual -.-> Audit
+    Auto -.-> Audit
+    Decision -.-> Audit
+```
