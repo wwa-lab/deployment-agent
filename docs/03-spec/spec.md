@@ -338,7 +338,46 @@ Minimum attributes:
 
 ## 8. Workflow / System Flow
 
-### 8.1 Main Flow
+### 8.1 User Flow Diagram
+
+```mermaid
+flowchart TD
+    A[User accesses Deployment Agent] --> B[Developer uploads Excel file]
+    B --> C{Validation passes?}
+    C -- No --> D[Display validation errors]
+    D --> B
+    C -- Yes --> E[Import & create/update Release Flow]
+    E --> F[View Release Flow Summary]
+    F --> G[Select a Release Flow]
+    G --> H[View Release Flow Details & Tasks]
+    H --> I{Task execution_type?}
+
+    I -- MANUAL --> J[Task executed externally]
+    J --> K[TL records result via View Result]
+    I -- AUTO --> L[System submits to Jenkins/Ansible]
+    L --> M[System stores external job URL]
+    M --> K
+
+    K --> N[Task enters Awaiting_Review]
+    N --> O{TL Decision}
+    O -- Approve --> P[Advance to next task]
+    O -- Reject --> Q[Release Flow terminated]
+    O -- Rerun --> R[Task returns to Ready_For_Execution]
+    R --> I
+    O -- Skip --> S[Bypass task, advance to next]
+
+    P --> T{More tasks?}
+    S --> T
+    T -- Yes --> H
+    T -- No --> U[Release Flow reaches terminal state]
+
+    style A fill:#e1f5fe
+    style U fill:#c8e6c9
+    style Q fill:#ffcdd2
+    style D fill:#fff9c4
+```
+
+### 8.2 Main Flow
 
 1. User accesses Deployment Agent from WWA
 2. Developer uploads an Excel request file
@@ -354,12 +393,12 @@ Minimum attributes:
 12. System records audit entries for all key actions
 13. Release Flow progresses, repeats, or terminates
 
-### 8.2 Initial Execution Trigger
+### 8.3 Initial Execution Trigger
 For MVP, once a task is in `Ready_For_Execution`, execution may be initiated automatically by the orchestration flow. `[ASSUMPTION]`
 
 If this assumption changes, the system must introduce an explicit execution trigger in a future revision.
 
-### 8.3 Decision Effects
+### 8.4 Decision Effects
 - **Approve**
   - marks review outcome as approved
   - advances to next available step
