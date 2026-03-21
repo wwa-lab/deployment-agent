@@ -11,7 +11,7 @@ import java.util.Optional;
  * Accepts any non-empty password for hardcoded employee IDs.
  */
 @Component
-@Profile({"dev", "test", "default"})
+@Profile({"dev", "test", "default","local"})
 public class StubTeamBookAuthenticationProvider implements TeamBookAuthenticationProvider {
 
     private static final Map<String, TeamBookEmployee> EMPLOYEES = Map.of(
