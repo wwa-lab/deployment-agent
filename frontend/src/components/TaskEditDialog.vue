@@ -1,35 +1,89 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { editTask } from '../api/tasks'
+import { computed, reactive, ref } from 'vue'
+import { editTask, recordResult } from '../api/tasks'
 import type { Task } from '../types'
 
 const props = defineProps<{ task: Task }>()
 const emit = defineEmits<{ saved: []; close: [] }>()
 
+const originalScript = props.task.inputParameters.script ?? ''
+const originalParameters = props.task.inputParameters.parameters ?? ''
+
 const form = reactive({
-  script: props.task.inputParameters.script ?? '',
-  parameters: props.task.inputParameters.parameters ?? '',
+  script: originalScript,
+  parameters: originalParameters,
+  resultSummary: '',
+  resultLogs: '',
 })
 
 const saving = ref(false)
 const error = ref('')
-const fieldErrors = reactive<{ script?: string; parameters?: string }>({})
+const fieldErrors = reactive<{ script?: string; parameters?: string; resultSummary?: string }>({})
+
+const canSubmitManualResult = computed(
+  () =>
+    props.task.executionType === 'MANUAL' &&
+    props.task.taskStatus === 'Ready_For_Execution',
+)
+
+const hasInputChanges = computed(
+  () => form.script !== originalScript || form.parameters !== originalParameters,
+)
+
+const isSubmittingResult = computed(
+  () =>
+    canSubmitManualResult.value &&
+    (form.resultSummary.trim().length > 0 || form.resultLogs.trim().length > 0),
+)
+
+const submitLabel = computed(() =>
+  saving.value
+    ? 'Saving...'
+    : isSubmittingResult.value
+      ? 'Save & Submit Result'
+      : 'Save',
+)
 
 function validate(): boolean {
   fieldErrors.script = undefined
   fieldErrors.parameters = undefined
-  return true
+  fieldErrors.resultSummary = undefined
+
+  if (isSubmittingResult.value && !form.resultSummary.trim()) {
+    fieldErrors.resultSummary = 'Result summary is required when submitting a result.'
+  }
+
+  return !fieldErrors.resultSummary
 }
 
 async function submit() {
   if (!validate()) return
+  if (!hasInputChanges.value && !isSubmittingResult.value) {
+    error.value = canSubmitManualResult.value
+      ? 'Update the task or provide a result summary before saving.'
+      : 'No changes to save.'
+    return
+  }
+
   saving.value = true
   error.value = ''
   try {
-    await editTask(props.task.id, {
-      script: form.script,
-      parameters: form.parameters,
-    })
+    if (hasInputChanges.value) {
+      await editTask(props.task.id, {
+        script: form.script,
+        parameters: form.parameters,
+      })
+    }
+
+    if (isSubmittingResult.value) {
+      await recordResult(props.task.id, {
+        resultSummary: {
+          summary: form.resultSummary.trim(),
+        },
+        resultLogs: form.resultLogs.trim() || undefined,
+      })
+    }
+
     emit('saved')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to save task'
@@ -73,13 +127,45 @@ async function submit() {
           ></textarea>
           <span v-if="fieldErrors.parameters" class="field-error">{{ fieldErrors.parameters }}</span>
         </div>
+
+        <div v-if="canSubmitManualResult" class="manual-result-panel">
+          <div class="manual-result-title">Submit Manual Result</div>
+          <p class="manual-result-help">
+            Add the execution outcome here if this manual step has been completed. Saving with a
+            result summary will move the task to review.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">
+              Result Summary
+            </label>
+            <textarea
+              v-model="form.resultSummary"
+              class="form-control"
+              rows="4"
+              placeholder="Summarize what happened during manual execution..."
+              :class="{ 'input-error': fieldErrors.resultSummary }"
+            ></textarea>
+            <span v-if="fieldErrors.resultSummary" class="field-error">{{ fieldErrors.resultSummary }}</span>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Result Logs</label>
+            <textarea
+              v-model="form.resultLogs"
+              class="form-control"
+              rows="4"
+              placeholder="Paste any relevant output, notes, or evidence..."
+            ></textarea>
+          </div>
+        </div>
       </div>
 
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="emit('close')">Cancel</button>
         <button class="btn btn-primary" :disabled="saving" @click="submit">
           <span v-if="saving" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
-          {{ saving ? 'Saving...' : 'Save' }}
+          {{ submitLabel }}
         </button>
       </div>
     </div>
@@ -95,5 +181,25 @@ async function submit() {
   font-size: 12px;
   color: #dc2626;
   margin-top: 2px;
+}
+
+.manual-result-panel {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.manual-result-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.manual-result-help {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
 }
 </style>

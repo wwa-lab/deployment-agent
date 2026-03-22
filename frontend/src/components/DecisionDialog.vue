@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { submitDecision } from '../api/tasks'
 import type { Task } from '../types'
 
-const props = defineProps<{ task: Task }>()
+const props = defineProps<{ task: Task; initialDecision?: Decision | null }>()
 const emit = defineEmits<{ decided: []; close: [] }>()
 
 type Decision = 'Approve' | 'Reject' | 'Rerun' | 'Skip'
@@ -15,7 +15,7 @@ const decisions: { value: Decision; label: string; description: string }[] = [
   { value: 'Skip', label: 'Skip', description: 'Skip this task and continue.' },
 ]
 
-const selected = ref<Decision | null>(null)
+const selected = ref<Decision | null>(props.initialDecision ?? null)
 const submitting = ref(false)
 const error = ref('')
 const successMsg = ref('')

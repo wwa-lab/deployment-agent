@@ -1,6 +1,6 @@
 package com.wwa.deploymentagent.domain.decision;
 
-/** Supported task-level decision types (TL role required for all). */
+/** Supported task-level decision types (task owner or DEVOPS_ADMIN required). */
 public enum DecisionType {
     approve,
     reject,

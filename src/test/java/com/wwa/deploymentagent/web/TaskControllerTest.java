@@ -79,23 +79,23 @@ class TaskControllerTest {
     // ─── editInput ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("editInput_tlRole_succeeds - PUT /tasks/{id}/input with TL returns 200")
-    void editInput_tlRole_succeeds() throws Exception {
+    @DisplayName("editInput_ownerRole_succeeds - PUT /tasks/{id}/input with owner returns 200")
+    void editInput_ownerRole_succeeds() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
         Request req = helper.seedRequest(rf);
         Task task = helper.seedTask(req, TaskStatus.Pending);
 
         mockMvc.perform(put(BASE + "/" + task.getId() + "/input")
-                        .header("X-User-Id", "tl-user")
-                        .header("X-User-Role", "TL")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVELOPER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"script\": \"new_deploy.sh\"}"))
                 .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("editInput_developerRole_returns403 - PUT /tasks/{id}/input with DEVELOPER returns 403")
-    void editInput_developerRole_returns403() throws Exception {
+    @DisplayName("editInput_nonOwnerRole_returns403 - PUT /tasks/{id}/input with non-owner developer returns 403")
+    void editInput_nonOwnerRole_returns403() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
         Request req = helper.seedRequest(rf);
         Task task = helper.seedTask(req, TaskStatus.Pending);
@@ -106,6 +106,21 @@ class TaskControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"script\": \"new_deploy.sh\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("editInput_adminRole_succeeds - PUT /tasks/{id}/input with DEVOPS_ADMIN returns 200")
+    void editInput_adminRole_succeeds() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        Task task = helper.seedTask(req, TaskStatus.Pending);
+
+        mockMvc.perform(put(BASE + "/" + task.getId() + "/input")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"script\": \"admin_deploy.sh\"}"))
+                .andExpect(status().isOk());
     }
 
     // ─── getExecutions ────────────────────────────────────────────────────────

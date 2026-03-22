@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
  * <pre>
  *   POST /api/deployment-agent/tasks/:id/decision
  *   Request:  { decision: "approve"|"reject"|"rerun"|"skip", comment?: string }
- *   Auth:     TL role required (enforced in DecisionEngine)
+ *   Auth:     task owner or DEVOPS_ADMIN required (enforced in DecisionEngine)
  *   Response: Updated TaskDto
  * </pre>
  */

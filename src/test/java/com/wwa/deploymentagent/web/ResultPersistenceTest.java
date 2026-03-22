@@ -49,7 +49,7 @@ class ResultPersistenceTest {
     @Autowired private ReleaseFlowRepository releaseFlowRepository;
     @Autowired private TestDataHelper helper;
 
-    private final UserContext tlUser = new UserContext("tl-user", "TL");
+    private final UserContext ownerUser = new UserContext("emp-001", "DEVELOPER");
 
     // ─── CLOB storage roundtrip ───────────────────────────────────────────────
 
@@ -151,7 +151,7 @@ class ResultPersistenceTest {
         complexInput.put("env", nestedEnv);
         complexInput.put("timeout", 300);
 
-        taskService.editInput(task.getId(), complexInput, tlUser);
+        taskService.editInput(task.getId(), complexInput, ownerUser);
 
         // Retrieve and verify nested JSON preserved
         Task retrieved = taskService.getById(task.getId());

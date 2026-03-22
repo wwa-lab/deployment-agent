@@ -6,6 +6,7 @@ import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.errors.ConflictAppException;
+import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
 import com.wwa.deploymentagent.helper.TestDataHelper;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,13 +36,17 @@ class RecordResultServiceTest {
 
     private ReleaseFlow releaseFlow;
     private Request request;
-    private UserContext tlUser;
+    private UserContext ownerUser;
+    private UserContext adminUser;
+    private UserContext nonOwnerUser;
 
     @BeforeEach
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        tlUser = new UserContext("tl-1", "TL");
+        ownerUser = new UserContext("emp-001", "DEVELOPER");
+        adminUser = new UserContext("emp-003", "DEVOPS_ADMIN");
+        nonOwnerUser = new UserContext("dev-user", "DEVELOPER");
     }
 
     // ─── Success path ─────────────────────────────────────────────────────────
@@ -52,7 +57,7 @@ class RecordResultServiceTest {
         Task task = seedManualTask(TaskStatus.Ready_For_Execution);
         Map<String, Object> summary = Map.of("outcome", "passed");
 
-        Task result = recordResultService.recordResult(task.getId(), summary, "log output", tlUser);
+        Task result = recordResultService.recordResult(task.getId(), summary, "log output", ownerUser);
 
         assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Awaiting_Review);
         assertThat(result.getCurrentResultSummary()).containsEntry("outcome", "passed");
@@ -64,7 +69,7 @@ class RecordResultServiceTest {
     void recordResult_createsExecutionHistory() {
         Task task = seedManualTask(TaskStatus.Ready_For_Execution);
 
-        recordResultService.recordResult(task.getId(), Map.of("status", "ok"), null, tlUser);
+        recordResultService.recordResult(task.getId(), Map.of("status", "ok"), null, ownerUser);
 
         List<TaskExecutionHistory> history = executionHistoryRepository
                 .findByTaskIdOrderByAttemptNumberAsc(task.getId());
@@ -75,13 +80,23 @@ class RecordResultServiceTest {
     }
 
     @Test
+    @DisplayName("admin can record result for a manual task")
+    void recordResult_adminUser_succeeds() {
+        Task task = seedManualTask(TaskStatus.Ready_For_Execution);
+
+        Task result = recordResultService.recordResult(task.getId(), Map.of("status", "ok"), null, adminUser);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Awaiting_Review);
+    }
+
+    @Test
     @DisplayName("second record result increments attempt number")
     void recordResult_secondCall_incrementsAttemptNumber() {
         Task task = seedManualTask(TaskStatus.Ready_For_Execution);
         Map<String, Object> summary = Map.of("status", "ok");
 
         // First record
-        recordResultService.recordResult(task.getId(), summary, null, tlUser);
+        recordResultService.recordResult(task.getId(), summary, null, ownerUser);
 
         // Reset task back to Ready_For_Execution to allow second record
         task = taskRepository.findById(task.getId()).orElseThrow();
@@ -89,7 +104,7 @@ class RecordResultServiceTest {
         taskRepository.save(task);
 
         // Second record
-        recordResultService.recordResult(task.getId(), Map.of("status", "ok2"), null, tlUser);
+        recordResultService.recordResult(task.getId(), Map.of("status", "ok2"), null, ownerUser);
 
         List<TaskExecutionHistory> history = executionHistoryRepository
                 .findByTaskIdOrderByAttemptNumberAsc(task.getId());
@@ -107,7 +122,7 @@ class RecordResultServiceTest {
         assertThat(task.getExecutionType()).isEqualTo(ExecutionType.AUTO);
 
         assertThatThrownBy(() ->
-                recordResultService.recordResult(task.getId(), Map.of(), null, tlUser))
+                recordResultService.recordResult(task.getId(), Map.of(), null, ownerUser))
                 .isInstanceOf(ConflictAppException.class)
                 .hasMessageContaining("not a MANUAL task");
     }
@@ -118,16 +133,26 @@ class RecordResultServiceTest {
         Task task = seedManualTask(TaskStatus.Pending);
 
         assertThatThrownBy(() ->
-                recordResultService.recordResult(task.getId(), Map.of(), null, tlUser))
+                recordResultService.recordResult(task.getId(), Map.of(), null, ownerUser))
                 .isInstanceOf(ConflictAppException.class)
                 .hasMessageContaining("Ready_For_Execution");
+    }
+
+    @Test
+    @DisplayName("non-owner developer → throws ForbiddenAppException")
+    void recordResult_nonOwner_throwsForbidden() {
+        Task task = seedManualTask(TaskStatus.Ready_For_Execution);
+
+        assertThatThrownBy(() ->
+                recordResultService.recordResult(task.getId(), Map.of(), null, nonOwnerUser))
+                .isInstanceOf(ForbiddenAppException.class);
     }
 
     @Test
     @DisplayName("unknown task ID → throws NotFoundAppException")
     void recordResult_unknownTask_throwsNotFound() {
         assertThatThrownBy(() ->
-                recordResultService.recordResult("non-existent", Map.of(), null, tlUser))
+                recordResultService.recordResult("non-existent", Map.of(), null, ownerUser))
                 .isInstanceOf(NotFoundAppException.class);
     }
 
@@ -142,6 +167,7 @@ class RecordResultServiceTest {
         task.setTaskName("manual-step");
         task.setExecutionType(ExecutionType.MANUAL);
         task.setTaskStatus(status);
+        task.setOwner("alice");
         return taskRepository.save(task);
     }
 }

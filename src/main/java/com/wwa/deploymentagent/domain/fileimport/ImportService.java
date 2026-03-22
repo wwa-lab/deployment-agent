@@ -75,7 +75,7 @@ public class ImportService {
 
             ReleaseFlow rf = findOrCreateReleaseFlow(projectId, projectName, stage);
 
-            Request request = findOrCreateRequest(rf, stage);
+            Request request = findOrCreateRequest(rf, stage, user);
 
             for (ParsedTaskRow row : rows) {
                 upsertTask(request, row);
@@ -106,13 +106,15 @@ public class ImportService {
         return releaseFlowService.create(projectId, projectName, genReleaseId, genReleaseId, stage);
     }
 
-    private Request findOrCreateRequest(ReleaseFlow rf, Stage stage) {
+    private Request findOrCreateRequest(ReleaseFlow rf, Stage stage, UserContext user) {
         return requestRepository.findByReleaseFlowIdAndStage(rf.getId(), stage)
                 .orElseGet(() -> {
                     Request req = new Request();
                     req.setReleaseFlow(rf);
                     req.setStage(stage);
                     req.setRequestStatus(RequestStatus.Pending);
+                    req.setApplication(rf.getProjectName());
+                    req.setCreatedBy(user.userId());
                     return requestRepository.save(req);
                 });
     }

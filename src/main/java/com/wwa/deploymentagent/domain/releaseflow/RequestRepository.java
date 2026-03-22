@@ -24,4 +24,10 @@ public interface RequestRepository extends JpaRepository<Request, String> {
 
     /** Find existing Request for a specific release flow and stage – used during import upsert. */
     Optional<Request> findByReleaseFlowIdAndStage(String releaseFlowId, Stage stage);
+
+    Optional<Request> findByIdAndReleaseFlowId(String id, String releaseFlowId);
+
+    @Query("SELECT r FROM Request r LEFT JOIN FETCH r.tasks WHERE r.id = :requestId AND r.releaseFlow.id = :releaseFlowId")
+    Optional<Request> findByIdAndReleaseFlowIdWithTasks(@Param("requestId") String requestId,
+                                                        @Param("releaseFlowId") String releaseFlowId);
 }

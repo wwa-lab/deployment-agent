@@ -32,33 +32,35 @@ class DecisionEngineTest {
 
     private ReleaseFlow releaseFlow;
     private Request request;
-    private UserContext tlUser;
+    private UserContext ownerUser;
+    private UserContext adminUser;
     private UserContext devUser;
 
     @BeforeEach
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        tlUser = new UserContext("tl-user", "TL");
+        ownerUser = new UserContext("emp-001", "DEVELOPER");
+        adminUser = new UserContext("emp-003", "DEVOPS_ADMIN");
         devUser = new UserContext("dev-user", "DEVELOPER");
     }
 
     // ─── approve ─────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("approve: Awaiting_Review → Approved for TL")
+    @DisplayName("approve: Awaiting_Review → Approved for owner")
     void approve_awaitingReview_succeeds() {
         Task task = helper.seedTask(request, TaskStatus.Awaiting_Review);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.approve, tlUser, "Looks good");
+        decisionEngine.applyDecision(task.getId(), DecisionType.approve, ownerUser, "Looks good");
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Approved);
     }
 
     @Test
-    @DisplayName("approve: throws ForbiddenAppException for non-TL user")
-    void approve_nonTL_throwsForbidden() {
+    @DisplayName("approve: throws ForbiddenAppException for non-owner user")
+    void approve_nonOwner_throwsForbidden() {
         Task task = helper.seedTask(request, TaskStatus.Awaiting_Review);
 
         assertThatThrownBy(() ->
@@ -72,26 +74,37 @@ class DecisionEngineTest {
         Task task = helper.seedTask(request, TaskStatus.Pending);
 
         assertThatThrownBy(() ->
-                decisionEngine.applyDecision(task.getId(), DecisionType.approve, tlUser, null))
+                decisionEngine.applyDecision(task.getId(), DecisionType.approve, ownerUser, null))
                 .isInstanceOf(InvalidStateTransitionException.class);
     }
 
     // ─── reject ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("reject: Awaiting_Review → Rejected for TL")
+    @DisplayName("reject: Awaiting_Review → Rejected for owner")
     void reject_awaitingReview_succeeds() {
         Task task = helper.seedTask(request, TaskStatus.Awaiting_Review);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.reject, tlUser, "Issues found");
+        decisionEngine.applyDecision(task.getId(), DecisionType.reject, ownerUser, "Issues found");
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Rejected);
     }
 
     @Test
-    @DisplayName("reject: throws ForbiddenAppException for non-TL user")
-    void reject_nonTL_throwsForbidden() {
+    @DisplayName("reject: Awaiting_Review → Rejected for admin")
+    void reject_awaitingReview_adminSucceeds() {
+        Task task = helper.seedTask(request, TaskStatus.Awaiting_Review);
+
+        decisionEngine.applyDecision(task.getId(), DecisionType.reject, adminUser, "Admin override");
+
+        Task updated = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Rejected);
+    }
+
+    @Test
+    @DisplayName("reject: throws ForbiddenAppException for non-owner user")
+    void reject_nonOwner_throwsForbidden() {
         Task task = helper.seedTask(request, TaskStatus.Awaiting_Review);
 
         assertThatThrownBy(() ->
@@ -106,7 +119,7 @@ class DecisionEngineTest {
     void rerun_rejected_createsExecutionHistory() {
         Task task = helper.seedTask(request, TaskStatus.Rejected);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.rerun, tlUser, null);
+        decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null);
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Ready_For_Execution);
@@ -118,7 +131,7 @@ class DecisionEngineTest {
     void rerun_failed_createsExecutionHistory() {
         Task task = helper.seedTask(request, TaskStatus.Failed);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.rerun, tlUser, null);
+        decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null);
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Ready_For_Execution);
@@ -130,29 +143,29 @@ class DecisionEngineTest {
         Task task = helper.seedTask(request, TaskStatus.Pending);
 
         assertThatThrownBy(() ->
-                decisionEngine.applyDecision(task.getId(), DecisionType.rerun, tlUser, null))
+                decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null))
                 .isInstanceOf(InvalidStateTransitionException.class);
     }
 
     // ─── skip ────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("skip: Pending → Skipped for TL")
+    @DisplayName("skip: Pending → Skipped for owner")
     void skip_pending_succeeds() {
         Task task = helper.seedTask(request, TaskStatus.Pending);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.skip, tlUser, null);
+        decisionEngine.applyDecision(task.getId(), DecisionType.skip, ownerUser, null);
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Skipped);
     }
 
     @Test
-    @DisplayName("skip: Ready_For_Execution → Skipped for TL")
+    @DisplayName("skip: Ready_For_Execution → Skipped for owner")
     void skip_readyForExecution_succeeds() {
         Task task = helper.seedTask(request, TaskStatus.Ready_For_Execution);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.skip, tlUser, null);
+        decisionEngine.applyDecision(task.getId(), DecisionType.skip, ownerUser, null);
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Skipped);
@@ -164,7 +177,7 @@ class DecisionEngineTest {
         Task task = helper.seedTask(request, TaskStatus.Executing);
 
         assertThatThrownBy(() ->
-                decisionEngine.applyDecision(task.getId(), DecisionType.skip, tlUser, null))
+                decisionEngine.applyDecision(task.getId(), DecisionType.skip, ownerUser, null))
                 .isInstanceOf(InvalidStateTransitionException.class);
     }
 }

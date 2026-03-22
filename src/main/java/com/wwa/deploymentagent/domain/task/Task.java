@@ -80,7 +80,7 @@ public class Task {
 
     /**
      * From Excel "Execution Type": MANUAL | AUTO.
-     * MANUAL = human-executed externally; TL records result.
+     * MANUAL = human-executed externally; owner/admin records result.
      * AUTO   = system-submitted to execution pipeline; result received via callback.
      */
     @Enumerated(EnumType.STRING)

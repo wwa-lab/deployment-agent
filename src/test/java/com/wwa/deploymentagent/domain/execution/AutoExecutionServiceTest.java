@@ -10,6 +10,7 @@ import com.wwa.deploymentagent.domain.task.TaskExecutionHistory;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryRepository;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.ConflictAppException;
+import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
 import com.wwa.deploymentagent.helper.TestDataHelper;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,13 +56,17 @@ class AutoExecutionServiceTest {
 
     private ReleaseFlow releaseFlow;
     private Request request;
-    private UserContext tlUser;
+    private UserContext ownerUser;
+    private UserContext adminUser;
+    private UserContext nonOwnerUser;
 
     @BeforeEach
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        tlUser = new UserContext("tl-1", "TL");
+        ownerUser = new UserContext("emp-001", "DEVELOPER");
+        adminUser = new UserContext("emp-003", "DEVOPS_ADMIN");
+        nonOwnerUser = new UserContext("dev-user", "DEVELOPER");
 
         // Reset mock for each test
         reset(restTemplate);
@@ -89,7 +94,7 @@ class AutoExecutionServiceTest {
         when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
                 .thenReturn(mockResponse);
 
-        Task result = autoExecutionService.submitAutoExecution(task.getId(), tlUser);
+        Task result = autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
 
         assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Executing);
         assertThat(result.getLatestExecutionId()).isNotNull();
@@ -108,7 +113,7 @@ class AutoExecutionServiceTest {
         when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
                 .thenReturn(mockResponse);
 
-        autoExecutionService.submitAutoExecution(task.getId(), tlUser);
+        autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
 
         List<TaskExecutionHistory> history = executionHistoryRepository
                 .findByTaskIdOrderByAttemptNumberAsc(task.getId());
@@ -122,6 +127,24 @@ class AutoExecutionServiceTest {
     }
 
     @Test
+    @DisplayName("DEVOPS_ADMIN can submit an AUTO task")
+    void submitAuto_adminUser_succeeds() {
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
+        seedJenkinsConfig();
+
+        org.springframework.http.ResponseEntity<String> mockResponse =
+                org.springframework.http.ResponseEntity.status(201)
+                        .header("Location", "http://jenkins/queue/item/42/")
+                        .body("");
+        when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
+                .thenReturn(mockResponse);
+
+        Task result = autoExecutionService.submitAutoExecution(task.getId(), adminUser);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Executing);
+    }
+
+    @Test
     @DisplayName("adapter failure → task becomes Failed")
     void submitAuto_adapterFailure_transitionsToFailed() {
         Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
@@ -131,7 +154,7 @@ class AutoExecutionServiceTest {
         when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
                 .thenThrow(new org.springframework.web.client.ResourceAccessException("Connection refused"));
 
-        Task result = autoExecutionService.submitAutoExecution(task.getId(), tlUser);
+        Task result = autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
 
         assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Failed);
 
@@ -150,7 +173,7 @@ class AutoExecutionServiceTest {
         Task task = seedManualTask(TaskStatus.Ready_For_Execution);
 
         assertThatThrownBy(() ->
-                autoExecutionService.submitAutoExecution(task.getId(), tlUser))
+                autoExecutionService.submitAutoExecution(task.getId(), ownerUser))
                 .isInstanceOf(ConflictAppException.class)
                 .hasMessageContaining("not an AUTO task");
     }
@@ -161,16 +184,26 @@ class AutoExecutionServiceTest {
         Task task = seedAutoTask(TaskStatus.Pending);
 
         assertThatThrownBy(() ->
-                autoExecutionService.submitAutoExecution(task.getId(), tlUser))
+                autoExecutionService.submitAutoExecution(task.getId(), ownerUser))
                 .isInstanceOf(ConflictAppException.class)
                 .hasMessageContaining("Ready_For_Execution");
+    }
+
+    @Test
+    @DisplayName("non-owner developer → throws ForbiddenAppException")
+    void submitAuto_nonOwner_throwsForbidden() {
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
+
+        assertThatThrownBy(() ->
+                autoExecutionService.submitAutoExecution(task.getId(), nonOwnerUser))
+                .isInstanceOf(ForbiddenAppException.class);
     }
 
     @Test
     @DisplayName("unknown task ID → throws NotFoundAppException")
     void submitAuto_unknownTask_throwsNotFound() {
         assertThatThrownBy(() ->
-                autoExecutionService.submitAutoExecution("non-existent", tlUser))
+                autoExecutionService.submitAutoExecution("non-existent", ownerUser))
                 .isInstanceOf(NotFoundAppException.class);
     }
 
@@ -189,6 +222,7 @@ class AutoExecutionServiceTest {
         task.setExecutionType(ExecutionType.AUTO);
         task.setTaskStatus(status);
         task.setInputParameters(Map.of("script", "deploy-job", "parameters", "--env sit"));
+        task.setOwner("alice");
         return taskRepository.save(task);
     }
 
@@ -201,6 +235,7 @@ class AutoExecutionServiceTest {
         task.setTaskName("manual-step");
         task.setExecutionType(ExecutionType.MANUAL);
         task.setTaskStatus(status);
+        task.setOwner("alice");
         return taskRepository.save(task);
     }
 
