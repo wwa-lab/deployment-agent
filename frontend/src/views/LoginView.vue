@@ -20,7 +20,7 @@ async function handleLogin() {
   loading.value = true
   try {
     await userStore.login(employeeId.value, password.value)
-    router.push('/release-flows')
+    router.push('/wwa/deployment-agent')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Login failed'
   } finally {
@@ -33,7 +33,7 @@ async function handleLogin() {
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <h1 class="login-title">Deployment Agent</h1>
+        <h1 class="login-title">WWA</h1>
         <p class="login-subtitle">Sign in with your team book credentials</p>
       </div>
 

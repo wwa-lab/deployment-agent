@@ -1,9 +1,52 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useUserStore } from '../stores/user'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const userStore = useUserStore()
 const router = useRouter()
+const route = useRoute()
+
+type NavItem = {
+  key: string
+  label: string
+  to: string
+  icon: string
+  visible: boolean
+}
+
+const navItems = computed<NavItem[]>(() => [
+  {
+    key: 'deployment-agent',
+    label: 'Deployment Agent',
+    to: '/wwa/deployment-agent',
+    icon: '🚀',
+    visible: true,
+  },
+  {
+    key: 'template-management',
+    label: 'Template Management',
+    to: '/wwa/template-management',
+    icon: '🧩',
+    visible: true,
+  },
+  {
+    key: 'configuration-management',
+    label: 'Configuration Management',
+    to: '/wwa/configuration-management',
+    icon: '⚙️',
+    visible: userStore.isDevOpsAdmin,
+  },
+  {
+    key: 'audit-log',
+    label: 'Audit Log',
+    to: '/wwa/audit-log',
+    icon: '📊',
+    visible: userStore.canViewAudit,
+  },
+])
+
+const activeSectionTitle = computed(() => (route.meta.sectionTitle as string) ?? 'WWA')
 
 async function handleLogout() {
   await userStore.logout()
@@ -15,36 +58,32 @@ async function handleLogout() {
   <div class="workspace">
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <span class="logo-icon">🚀</span>
-        <span class="logo-text">Deployment Agent</span>
+        <span class="logo-icon">▣</span>
+        <div class="logo-copy">
+          <span class="logo-text">WWA</span>
+          <span class="logo-subtitle">Work With Agent</span>
+        </div>
       </div>
+      <div class="sidebar-section-label">Workspace</div>
       <nav class="sidebar-nav">
-        <router-link to="/release-flows" class="nav-link">
-          <span class="nav-icon">📋</span>
-          Release Flows
-        </router-link>
         <router-link
-          v-if="userStore.isDevOpsAdmin"
-          to="/config"
+          v-for="item in navItems.filter((item) => item.visible)"
+          :key="item.key"
+          :to="item.to"
           class="nav-link"
         >
-          <span class="nav-icon">⚙️</span>
-          Configuration
-        </router-link>
-        <router-link
-          v-if="userStore.canViewAudit"
-          to="/audit"
-          class="nav-link"
-        >
-          <span class="nav-icon">📊</span>
-          Audit Log
+          <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span>
+          <span class="nav-label">{{ item.label }}</span>
         </router-link>
       </nav>
     </aside>
 
     <div class="main-area">
       <header class="topbar">
-        <div class="topbar-title">Deployment Agent</div>
+        <div class="topbar-branding">
+          <div class="topbar-kicker">WWA</div>
+          <div class="topbar-title">{{ activeSectionTitle }}</div>
+        </div>
         <div class="topbar-user">
           <span class="user-name">{{ userStore.displayName || userStore.userId }}</span>
           <span class="badge badge-role">{{ userStore.role }}</span>
@@ -85,7 +124,42 @@ async function handleLogout() {
   font-size: 15px;
 }
 
-.logo-icon { font-size: 20px; }
+.logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font-size: 14px;
+}
+
+.logo-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logo-text {
+  color: #f8fafc;
+}
+
+.logo-subtitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.sidebar-section-label {
+  padding: 12px 16px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
 
 .sidebar-nav {
   display: flex;
@@ -104,6 +178,10 @@ async function handleLogout() {
   font-size: 14px;
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
+}
+
+.nav-label {
+  min-width: 0;
 }
 
 .nav-link:hover {
@@ -126,7 +204,7 @@ async function handleLogout() {
 }
 
 .topbar {
-  height: 52px;
+  min-height: 60px;
   background: white;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
@@ -134,6 +212,20 @@ async function handleLogout() {
   justify-content: space-between;
   padding: 0 24px;
   flex-shrink: 0;
+}
+
+.topbar-branding {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topbar-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
 }
 
 .topbar-title {

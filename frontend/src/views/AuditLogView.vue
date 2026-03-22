@@ -33,7 +33,10 @@ function onPageChange(newPage: number) {
 <template>
   <div class="audit-view">
     <div class="view-header">
-      <h1 class="view-title">Audit Log</h1>
+      <div>
+        <p class="view-eyebrow">WWA Shared Capability</p>
+        <h1 class="view-title">Audit Log</h1>
+      </div>
     </div>
 
     <div v-if="!hasAccess" class="alert alert-error">
@@ -117,10 +120,20 @@ function onPageChange(newPage: number) {
   justify-content: space-between;
 }
 
-.view-title {
-  font-size: 20px;
+.view-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
   font-weight: 700;
-  color: #1e293b;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.view-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
 }
 
 .table-container {

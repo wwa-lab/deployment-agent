@@ -29,7 +29,7 @@ function onFilterChange(key: 'project' | 'status' | 'stage', value: string) {
 }
 
 function goToDetail(id: string) {
-  router.push(`/release-flows/${id}`)
+  router.push(`/wwa/deployment-agent/release-flows/${id}`)
 }
 
 function onPageChange(newPage: number) {
@@ -56,7 +56,11 @@ const totalPages = () => Math.ceil(store.total / store.size)
 <template>
   <div class="summary-view">
     <div class="view-header">
-      <h1 class="view-title">Release Flows</h1>
+      <div>
+        <p class="view-eyebrow">WWA Agent</p>
+        <h1 class="view-title">Deployment Agent</h1>
+        <p class="view-subtitle">Track release flows, upload deployment files, and monitor stage progress.</p>
+      </div>
       <button class="btn btn-primary" @click="showUpload = true">+ Upload</button>
     </div>
 
@@ -186,12 +190,29 @@ const totalPages = () => Math.ceil(store.total / store.size)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
 
 .view-title {
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 700;
-  color: #1e293b;
+  color: #0f172a;
+  margin: 0;
+}
+
+.view-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.view-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #475569;
 }
 
 .filter-bar {

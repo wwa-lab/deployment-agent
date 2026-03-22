@@ -12,33 +12,78 @@ const router = createRouter({
     },
     {
       path: '/',
-      redirect: '/release-flows',
+      redirect: '/wwa/deployment-agent',
     },
     {
-      path: '/',
+      path: '/release-flows',
+      redirect: '/wwa/deployment-agent',
+    },
+    {
+      path: '/release-flows/:id',
+      redirect: (to) => `/wwa/deployment-agent/release-flows/${to.params.id as string}`,
+    },
+    {
+      path: '/config',
+      redirect: '/wwa/configuration-management',
+    },
+    {
+      path: '/audit',
+      redirect: '/wwa/audit-log',
+    },
+    {
+      path: '/wwa',
       component: () => import('../views/WorkspaceLayout.vue'),
       children: [
         {
-          path: 'release-flows',
-          name: 'release-flows',
+          path: '',
+          redirect: { name: 'wwa-deployment-agent' },
+        },
+        {
+          path: 'deployment-agent',
+          name: 'wwa-deployment-agent',
           component: () => import('../views/ReleaseFlowSummaryView.vue'),
+          meta: {
+            section: 'deployment-agent',
+            sectionTitle: 'Deployment Agent',
+          },
         },
         {
-          path: 'release-flows/:id',
-          name: 'release-flow-detail',
+          path: 'deployment-agent/release-flows/:id',
+          name: 'wwa-deployment-agent-detail',
           component: () => import('../views/ReleaseFlowDetailView.vue'),
+          meta: {
+            section: 'deployment-agent',
+            sectionTitle: 'Deployment Agent',
+          },
         },
         {
-          path: 'config',
-          name: 'config',
+          path: 'template-management',
+          name: 'wwa-template-management',
+          component: () => import('../views/TemplateManagementView.vue'),
+          meta: {
+            section: 'template-management',
+            sectionTitle: 'Template Management',
+          },
+        },
+        {
+          path: 'configuration-management',
+          name: 'wwa-configuration-management',
           component: () => import('../views/ConfigAdminView.vue'),
-          meta: { requiresRole: ['DEVOPS_ADMIN'] },
+          meta: {
+            section: 'configuration-management',
+            sectionTitle: 'Configuration Management',
+            requiresRole: ['DEVOPS_ADMIN'],
+          },
         },
         {
-          path: 'audit',
-          name: 'audit',
+          path: 'audit-log',
+          name: 'wwa-audit-log',
           component: () => import('../views/AuditLogView.vue'),
-          meta: { requiresRole: ['AUDIT', 'MANAGEMENT'] },
+          meta: {
+            section: 'audit-log',
+            sectionTitle: 'Audit Log',
+            requiresRole: ['AUDIT', 'MANAGEMENT'],
+          },
         },
       ],
     },
@@ -52,7 +97,7 @@ router.beforeEach(async (to) => {
   if (to.meta.public) {
     // Redirect to home if already authenticated
     if (userStore.isAuthenticated) {
-      return { name: 'release-flows' }
+      return { name: 'wwa-deployment-agent' }
     }
     return
   }
@@ -69,7 +114,7 @@ router.beforeEach(async (to) => {
   // Check role-based access
   const requiredRoles = to.meta.requiresRole as string[] | undefined
   if (requiredRoles && !requiredRoles.includes(userStore.role as string)) {
-    return { name: 'release-flows' }
+    return { name: 'wwa-deployment-agent' }
   }
 })
 
