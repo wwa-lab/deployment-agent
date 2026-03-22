@@ -18,6 +18,7 @@ export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT' | 'MANAGEME
 // Task
 export interface Task {
   id: string
+  category?: string
   taskGroupId: string
   taskGroupName: string
   stepSeq: number
@@ -36,11 +37,35 @@ export interface Task {
   lastUpdatedAt?: string
 }
 
+export interface TaskExecutionHistory {
+  id: string
+  taskId: string
+  attemptNumber: number
+  executionStatus: string
+  resultSummary?: Record<string, unknown>
+  resultLogs?: string
+  externalSystemType?: string
+  externalExecutionId?: string
+  externalJobUrl?: string
+  submittedAt?: string
+  submissionStatus?: string
+  submissionMessage?: string
+}
+
 // Request
 export interface Request {
   id: string
+  releaseFlowId: string
   stage: Stage
   requestStatus: RequestStatus
+  snowGroup?: string
+  application?: string
+  site?: string
+  createdBy?: string
+  estimatedRemainingMinutes?: number
+  createdAt?: string
+  updatedAt?: string
+  version: number
   tasks: Task[]
 }
 
@@ -120,6 +145,61 @@ export interface UploadResponse {
   releaseId: string
   stage: Stage
   taskCount: number
+}
+
+// Template management
+export interface TemplateTask {
+  id: string
+  category: string
+  taskName: string
+  step: number
+  stepName: string
+  type: ExecutionType
+  owner: string
+  estDuration: string
+  dependencies?: string
+}
+
+export interface TemplateTaskDraft {
+  category: string
+  taskName: string
+  step: number
+  stepName: string
+  type: ExecutionType
+  owner: string
+  estDurationMinutes: number
+  dependencies?: string
+}
+
+export interface TemplateRecord {
+  id: string
+  name: string
+  version: string
+  agent: string
+  category: string
+  snowGroup: string
+  application: string
+  site: string
+  estDuration: string
+  description: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  tasks: TemplateTask[]
+}
+
+export interface CreateTemplateDraft {
+  name: string
+  version: string
+  agent: string
+  category: string
+  snowGroup: string
+  application: string
+  site: string
+  estDurationMinutes: number
+  description: string
+  source: 'manual' | 'upload'
+  sourceFileName?: string
 }
 
 // Auth
