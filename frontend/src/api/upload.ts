@@ -13,3 +13,10 @@ export async function uploadFile(file: File, stage: Stage): Promise<UploadRespon
   })
   return response.data
 }
+
+export async function downloadTemplate(): Promise<Blob> {
+  const response = await apiClient.get('/upload/template', {
+    responseType: 'blob',
+  })
+  return response.data
+}
