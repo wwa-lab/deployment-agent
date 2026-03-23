@@ -30,3 +30,12 @@ dist/
 frontend/dist/
 .vite/
 frontend/.vite/
+
+# Maven / Java build artifacts
+target/
+out/
+
+# Local OS / editor noise
+.DS_Store
+*.iml
+.idea/
