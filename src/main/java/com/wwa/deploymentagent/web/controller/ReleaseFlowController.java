@@ -18,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Release Flow controller.
@@ -48,9 +49,13 @@ public class ReleaseFlowController {
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
         Page<ReleaseFlow> result = releaseFlowService.list(project, status, stage, pageable);
+        Map<String, List<Request>> requestsByReleaseFlowId = releaseFlowService.findRequestsByReleaseFlowIds(
+                result.getContent().stream().map(ReleaseFlow::getId).toList());
 
         List<ReleaseFlowListItemDto> dtos = result.getContent().stream()
-                .map(ReleaseFlowListItemDto::from)
+                .map(releaseFlow -> ReleaseFlowListItemDto.from(
+                        releaseFlow,
+                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of())))
                 .toList();
 
         return ResponseEntity.ok(new PaginatedResponseDto<>(

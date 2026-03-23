@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.web;
 
+import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import org.springframework.http.MediaType;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
@@ -59,6 +60,22 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.total").value(1));
+    }
+
+    @Test
+    @DisplayName("list_returnsStageStatuses_forAllEnvironments - GET /release-flows includes SIT/UAT/PROD request statuses")
+    void list_returnsStageStatuses_forAllEnvironments() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        helper.seedRequest(rf, com.wwa.deploymentagent.contracts.enums.Stage.SIT, RequestStatus.Completed);
+        helper.seedRequest(rf, com.wwa.deploymentagent.contracts.enums.Stage.UAT, RequestStatus.Running);
+
+        mockMvc.perform(get(BASE)
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].sitStatus").value("Completed"))
+                .andExpect(jsonPath("$.data[0].uatStatus").value("Running"))
+                .andExpect(jsonPath("$.data[0].prodStatus").value("Pending"));
     }
 
     // ─── getById ─────────────────────────────────────────────────────────────

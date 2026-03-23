@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import UploadDialog from '../components/UploadDialog.vue'
-import { ref } from 'vue'
-import type { FlowStatus, Stage } from '../types'
+import type { FlowStatus, RequestStatus, Stage } from '../types'
 
 const router = useRouter()
 const store = useReleaseFlowStore()
@@ -46,11 +45,31 @@ function statusBadgeClass(status: string) {
     Rejected: 'badge-rejected',
     Pending_Review: 'badge-pending-review',
     Approved: 'badge-approved',
+    Skipped: 'badge-skipped',
   }
   return map[status] ?? 'badge-pending'
 }
 
-const totalPages = () => Math.ceil(store.total / store.size)
+function statusLabel(status: string) {
+  const labelMap: Record<string, string> = {
+    Completed: 'Done',
+    Pending_Review: 'Pending Review',
+    Ready_For_Execution: 'Ready',
+  }
+
+  return labelMap[status] ?? status.replaceAll('_', ' ')
+}
+
+function stageStatus(flow: { sitStatus: RequestStatus; uatStatus: RequestStatus; prodStatus: RequestStatus }, stage: Stage) {
+  const stageMap: Record<Stage, RequestStatus> = {
+    SIT: flow.sitStatus,
+    UAT: flow.uatStatus,
+    PROD: flow.prodStatus,
+  }
+  return stageMap[stage]
+}
+
+const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size)))
 </script>
 
 <template>
@@ -117,11 +136,10 @@ const totalPages = () => Math.ceil(store.total / store.size)
       <table class="data-table">
         <thead>
           <tr>
-            <th>Release ID</th>
             <th>Project</th>
-            <th>Current Stage</th>
-            <th>Flow Status</th>
-            <th>Review Status</th>
+            <th>Release ID</th>
+            <th v-for="stage in stages" :key="stage" class="stage-column">{{ stage }}</th>
+            <th>Overall Status</th>
           </tr>
         </thead>
         <tbody>
@@ -131,19 +149,16 @@ const totalPages = () => Math.ceil(store.total / store.size)
             class="clickable"
             @click="goToDetail(flow.id)"
           >
-            <td class="release-id">{{ flow.releaseId }}</td>
             <td>{{ flow.projectName }}</td>
-            <td>
-              <span class="badge badge-pending">{{ flow.currentStage }}</span>
-            </td>
-            <td>
-              <span class="badge" :class="statusBadgeClass(flow.flowStatus)">
-                {{ flow.flowStatus }}
+            <td class="release-id">{{ flow.releaseId }}</td>
+            <td v-for="stage in stages" :key="`${flow.id}-${stage}`" class="stage-column">
+              <span class="badge" :class="statusBadgeClass(stageStatus(flow, stage))">
+                {{ statusLabel(stageStatus(flow, stage)) }}
               </span>
             </td>
             <td>
-              <span class="badge" :class="statusBadgeClass(flow.reviewStatus)">
-                {{ flow.reviewStatus }}
+              <span class="badge" :class="statusBadgeClass(flow.flowStatus)">
+                {{ statusLabel(flow.flowStatus) }}
               </span>
             </td>
           </tr>
@@ -153,7 +168,7 @@ const totalPages = () => Math.ceil(store.total / store.size)
       <!-- Pagination -->
       <div class="pagination">
         <span class="pagination-info">
-          {{ store.total }} total | Page {{ store.page + 1 }} of {{ totalPages() }}
+          {{ store.total }} total | Page {{ store.page + 1 }} of {{ totalPages }}
         </span>
         <div class="pagination-controls">
           <button
@@ -165,7 +180,7 @@ const totalPages = () => Math.ceil(store.total / store.size)
           </button>
           <button
             class="btn btn-secondary btn-sm"
-            :disabled="store.page >= totalPages() - 1"
+            :disabled="store.page >= totalPages - 1"
             @click="onPageChange(store.page + 1)"
           >
             Next
@@ -241,6 +256,11 @@ const totalPages = () => Math.ceil(store.total / store.size)
   font-family: monospace;
   font-size: 13px;
   color: #2563eb;
+}
+
+.stage-column {
+  text-align: center;
+  white-space: nowrap;
 }
 
 .pagination {

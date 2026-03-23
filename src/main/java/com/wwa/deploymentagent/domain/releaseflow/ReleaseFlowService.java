@@ -21,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * ReleaseFlowService – Release Flow lifecycle management and aggregation.
@@ -90,6 +92,16 @@ public class ReleaseFlowService {
         if (hasStage)
             return releaseFlowRepository.findByCurrentStage(stage, pageable);
         return releaseFlowRepository.findAll(pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<Request>> findRequestsByReleaseFlowIds(List<String> releaseFlowIds) {
+        if (releaseFlowIds == null || releaseFlowIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return requestRepository.findByReleaseFlowIds(releaseFlowIds).stream()
+                .collect(Collectors.groupingBy(request -> request.getReleaseFlow().getId()));
     }
 
     /**
