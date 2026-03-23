@@ -14,7 +14,7 @@ export const useUserStore = defineStore('user', () => {
   const isDevOpsAdmin = computed(() => role.value === 'DEVOPS_ADMIN')
   const isAudit = computed(() => role.value === 'AUDIT')
   const isManagement = computed(() => role.value === 'MANAGEMENT')
-  const canViewAudit = computed(() => role.value === 'AUDIT' || role.value === 'MANAGEMENT')
+  const canViewAudit = computed(() => isAuthenticated.value)
 
   async function login(employeeId: string, password: string) {
     const response = await apiLogin(employeeId, password)

@@ -1,9 +1,13 @@
 package com.wwa.deploymentagent.contracts.dto;
 
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
+import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
+import com.wwa.deploymentagent.domain.releaseflow.Request;
+
+import java.util.List;
 
 public record ReleaseFlowListItemDto(
         String id,
@@ -13,9 +17,12 @@ public record ReleaseFlowListItemDto(
         String normalizedReleaseId,
         Stage currentStage,
         FlowStatus flowStatus,
-        ReviewStatus reviewStatus
+        ReviewStatus reviewStatus,
+        RequestStatus sitStatus,
+        RequestStatus uatStatus,
+        RequestStatus prodStatus
 ) {
-    public static ReleaseFlowListItemDto from(ReleaseFlow rf) {
+    public static ReleaseFlowListItemDto from(ReleaseFlow rf, List<Request> requests) {
         return new ReleaseFlowListItemDto(
                 rf.getId(),
                 rf.getProjectId(),
@@ -24,7 +31,22 @@ public record ReleaseFlowListItemDto(
                 rf.getNormalizedReleaseId(),
                 rf.getCurrentStage(),
                 rf.getFlowStatus(),
-                rf.getReviewStatus()
+                rf.getReviewStatus(),
+                requestStatusFor(requests, Stage.SIT),
+                requestStatusFor(requests, Stage.UAT),
+                requestStatusFor(requests, Stage.PROD)
         );
+    }
+
+    private static RequestStatus requestStatusFor(List<Request> requests, Stage stage) {
+        if (requests == null || requests.isEmpty()) {
+            return RequestStatus.Pending;
+        }
+
+        return requests.stream()
+                .filter(request -> request.getStage() == stage)
+                .map(Request::getRequestStatus)
+                .findFirst()
+                .orElse(RequestStatus.Pending);
     }
 }

@@ -65,15 +65,15 @@ class SecurityTest {
     // ─── Role-based access: wrong role → 403 ─────────────────────────────────
 
     @Test
-    @DisplayName("editInput_wrongRole_returns403 - PUT /tasks/{id}/input with DEVOPS_ADMIN returns 403")
+    @DisplayName("editInput_wrongRole_returns403 - PUT /tasks/{id}/input with non-owner TL returns 403")
     void editInput_wrongRole_returns403() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
         Request req = helper.seedRequest(rf);
         Task task = helper.seedTask(req, TaskStatus.Pending);
 
         mockMvc.perform(put(TASKS + "/" + task.getId() + "/input")
-                        .header("X-User-Id", "admin-user")
-                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .header("X-User-Id", "emp-002")
+                        .header("X-User-Role", "TL")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"script\": \"deploy.sh\"}"))
                 .andExpect(status().isForbidden());
@@ -108,7 +108,7 @@ class SecurityTest {
     }
 
     @Test
-    @DisplayName("decision_developerRole_returns403 - POST /tasks/{id}/decision with DEVELOPER returns 403")
+    @DisplayName("decision_nonOwnerRole_returns403 - POST /tasks/{id}/decision with non-owner developer returns 403")
     void decision_developerRole_returns403() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
         Request req = helper.seedRequest(rf);

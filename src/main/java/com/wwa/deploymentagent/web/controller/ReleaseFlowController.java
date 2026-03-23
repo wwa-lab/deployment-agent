@@ -6,15 +6,19 @@ import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Release Flow controller.
@@ -45,9 +49,13 @@ public class ReleaseFlowController {
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
         Page<ReleaseFlow> result = releaseFlowService.list(project, status, stage, pageable);
+        Map<String, List<Request>> requestsByReleaseFlowId = releaseFlowService.findRequestsByReleaseFlowIds(
+                result.getContent().stream().map(ReleaseFlow::getId).toList());
 
         List<ReleaseFlowListItemDto> dtos = result.getContent().stream()
-                .map(ReleaseFlowListItemDto::from)
+                .map(releaseFlow -> ReleaseFlowListItemDto.from(
+                        releaseFlow,
+                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of())))
                 .toList();
 
         return ResponseEntity.ok(new PaginatedResponseDto<>(
@@ -73,5 +81,58 @@ public class ReleaseFlowController {
                 rf.getReleaseId(), rf.getNormalizedReleaseId(),
                 rf.getCurrentStage(), rf.getFlowStatus(), rf.getReviewStatus(),
                 requestDtos));
+    }
+
+    @PatchMapping("/{flowId}/requests/{requestId}/rundown")
+    public ResponseEntity<RequestDto> updateRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @RequestBody RequestRundownUpdateDto body,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+
+        Request request = releaseFlowService.updateRequestRundown(flowId, requestId, body);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/start")
+    public ResponseEntity<RequestDto> startRequestDeployment(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+
+        Request request = releaseFlowService.startRequestDeployment(flowId, requestId, user);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/fail")
+    public ResponseEntity<RequestDto> markRequestFailed(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+
+        Request request = releaseFlowService.markRequestFailed(flowId, requestId, user);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    private void validateRundownEditor(UserContext user) {
+        if (user == null) {
+            throw new ForbiddenAppException("update_rundown");
+        }
+        String role = user.role();
+        if (!"DEVELOPER".equals(role) && !"TL".equals(role) && !"DEVOPS_ADMIN".equals(role)) {
+            throw new ForbiddenAppException("update_rundown");
+        }
     }
 }

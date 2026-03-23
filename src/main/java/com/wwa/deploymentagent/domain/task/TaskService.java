@@ -28,6 +28,7 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final AuditLoggerService auditLogger;
+    private final TaskPermissionService taskPermissionService;
 
     /** Retrieve a task by ID. Throws {@link NotFoundAppException} if not found. */
     @Transactional(readOnly = true)
@@ -55,6 +56,7 @@ public class TaskService {
         task.setStepSeq(input.stepSeq());
         task.setTaskName(input.taskName());
         task.setExecutionType(input.executionType());
+        task.setCritical(input.critical());
         task.setTaskStatus(TaskStatus.Pending);
         task.setInputParameters(input.inputParameters());
         task.setExpectedOutput(input.expectedOutput());
@@ -107,6 +109,7 @@ public class TaskService {
     @Transactional
     public Task editInput(String taskId, Map<String, Object> newInput, UserContext user) {
         Task task = getById(taskId);
+        taskPermissionService.assertOwnerOrAdmin(task, user, "task:editInput");
 
         if (task.getTaskStatus() != TaskStatus.Pending
                 && task.getTaskStatus() != TaskStatus.Ready_For_Execution) {

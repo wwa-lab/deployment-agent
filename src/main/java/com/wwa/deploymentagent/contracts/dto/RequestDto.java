@@ -11,6 +11,14 @@ public record RequestDto(
         String releaseFlowId,
         Stage stage,
         RequestStatus requestStatus,
+        String snowGroup,
+        String application,
+        String site,
+        String createdBy,
+        Integer estimatedRemainingMinutes,
+        java.time.Instant createdAt,
+        java.time.Instant updatedAt,
+        long version,
         List<TaskDto> tasks
 ) {
     public static RequestDto from(Request request, List<TaskDto> tasks) {
@@ -19,6 +27,14 @@ public record RequestDto(
                 request.getReleaseFlow().getId(),
                 request.getStage(),
                 request.getRequestStatus(),
+                request.getSnowGroup(),
+                request.getApplication(),
+                request.getSite(),
+                request.getCreatedBy(),
+                request.getEstimatedRemainingMinutes(),
+                request.getCreatedAt(),
+                request.getUpdatedAt(),
+                request.getVersion() != null ? request.getVersion() : 0L,
                 tasks
         );
     }

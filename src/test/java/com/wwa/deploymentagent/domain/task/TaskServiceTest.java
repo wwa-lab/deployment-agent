@@ -5,6 +5,7 @@ import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.InvalidStateTransitionException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
@@ -33,15 +34,17 @@ class TaskServiceTest {
 
     private ReleaseFlow releaseFlow;
     private Request request;
-    private UserContext tlUser;
-    private UserContext devUser;
+    private UserContext ownerUser;
+    private UserContext adminUser;
+    private UserContext nonOwnerUser;
 
     @BeforeEach
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        tlUser = new UserContext("tl-user", "TL");
-        devUser = new UserContext("dev-user", "DEVELOPER");
+        ownerUser = new UserContext("emp-001", "DEVELOPER");
+        adminUser = new UserContext("emp-003", "DEVOPS_ADMIN");
+        nonOwnerUser = new UserContext("dev-user", "DEVELOPER");
     }
 
     // ─── create ──────────────────────────────────────────────────────────────
@@ -52,7 +55,7 @@ class TaskServiceTest {
         Map<String, Object> input = Map.of("script", "deploy.sh", "parameters", "--env staging");
         CreateTaskInput createInput = new CreateTaskInput(
                 request, "TG-001", "Deploy App", 1, "deploy-app",
-                ExecutionType.AUTO, input, "Deployment successful", "alice",
+                ExecutionType.AUTO, true, input, "Deployment successful", "alice",
                 null, null, null);
 
         Task task = taskService.create(createInput);
@@ -63,6 +66,7 @@ class TaskServiceTest {
         assertThat(task.getStepSeq()).isEqualTo(1);
         assertThat(task.getTaskName()).isEqualTo("deploy-app");
         assertThat(task.getExecutionType()).isEqualTo(ExecutionType.AUTO);
+        assertThat(task.isCritical()).isTrue();
         assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.Pending);
         assertThat(task.getInputParameters()).containsEntry("script", "deploy.sh");
         assertThat(task.getExpectedOutput()).isEqualTo("Deployment successful");
@@ -76,11 +80,12 @@ class TaskServiceTest {
     void create_manualTask() {
         CreateTaskInput createInput = new CreateTaskInput(
                 request, "TG-002", "Manual Step", 1, "manual-step",
-                ExecutionType.MANUAL, null, null, null, null, null, null);
+                ExecutionType.MANUAL, false, null, null, null, null, null, null);
 
         Task task = taskService.create(createInput);
 
         assertThat(task.getExecutionType()).isEqualTo(ExecutionType.MANUAL);
+        assertThat(task.isCritical()).isFalse();
         assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.Pending);
     }
 
@@ -91,7 +96,7 @@ class TaskServiceTest {
     void updateStatus_validTransition() {
         Task task = helper.seedTask(request, TaskStatus.Pending);
 
-        Task updated = taskService.updateStatus(task.getId(), TaskStatus.Ready_For_Execution, tlUser, null);
+        Task updated = taskService.updateStatus(task.getId(), TaskStatus.Ready_For_Execution, ownerUser, null);
 
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Ready_For_Execution);
     }
@@ -102,7 +107,7 @@ class TaskServiceTest {
         Task task = helper.seedTask(request, TaskStatus.Pending);
 
         assertThatThrownBy(() ->
-                taskService.updateStatus(task.getId(), TaskStatus.Approved, tlUser, null))
+                taskService.updateStatus(task.getId(), TaskStatus.Approved, ownerUser, null))
                 .isInstanceOf(InvalidStateTransitionException.class);
     }
 
@@ -110,7 +115,7 @@ class TaskServiceTest {
     @DisplayName("throws NotFoundAppException for unknown task ID")
     void updateStatus_unknownTask_throws() {
         assertThatThrownBy(() ->
-                taskService.updateStatus("non-existent-id", TaskStatus.Approved, tlUser, null))
+                taskService.updateStatus("non-existent-id", TaskStatus.Approved, ownerUser, null))
                 .isInstanceOf(NotFoundAppException.class);
     }
 
@@ -122,20 +127,30 @@ class TaskServiceTest {
         Task task = helper.seedTask(request, TaskStatus.Pending);
         Map<String, Object> newInput = Map.of("script", "new_deploy.sh");
 
-        Task updated = taskService.editInput(task.getId(), newInput, tlUser);
+        Task updated = taskService.editInput(task.getId(), newInput, ownerUser);
 
         assertThat(updated.getInputParameters()).containsEntry("script", "new_deploy.sh");
     }
 
     @Test
-    @DisplayName("edits input when task is in Ready_For_Execution state")
-    void editInput_readyState_succeeds() {
+    @DisplayName("allows admin to edit input when task is in Ready_For_Execution state")
+    void editInput_adminReadyState_succeeds() {
         Task task = helper.seedTask(request, TaskStatus.Ready_For_Execution);
         Map<String, Object> newInput = Map.of("script", "v2_deploy.sh");
 
-        Task updated = taskService.editInput(task.getId(), newInput, tlUser);
+        Task updated = taskService.editInput(task.getId(), newInput, adminUser);
 
         assertThat(updated.getInputParameters()).containsEntry("script", "v2_deploy.sh");
+    }
+
+    @Test
+    @DisplayName("throws ForbiddenAppException when non-owner developer edits input")
+    void editInput_nonOwner_throwsForbidden() {
+        Task task = helper.seedTask(request, TaskStatus.Pending);
+
+        assertThatThrownBy(() ->
+                taskService.editInput(task.getId(), Map.of("script", "x"), nonOwnerUser))
+                .isInstanceOf(ForbiddenAppException.class);
     }
 
     @Test
@@ -144,7 +159,7 @@ class TaskServiceTest {
         Task task = helper.seedTask(request, TaskStatus.Executing);
 
         assertThatThrownBy(() ->
-                taskService.editInput(task.getId(), Map.of("script", "x"), tlUser))
+                taskService.editInput(task.getId(), Map.of("script", "x"), ownerUser))
                 .isInstanceOf(ValidationAppException.class)
                 .hasMessageContaining("Executing");
     }
@@ -155,7 +170,7 @@ class TaskServiceTest {
         Task task = helper.seedTask(request, TaskStatus.Pending);
 
         assertThatThrownBy(() ->
-                taskService.editInput(task.getId(), null, tlUser))
+                taskService.editInput(task.getId(), null, ownerUser))
                 .isInstanceOf(ValidationAppException.class);
     }
 

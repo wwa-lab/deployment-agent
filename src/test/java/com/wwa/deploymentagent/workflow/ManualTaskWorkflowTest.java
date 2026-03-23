@@ -48,15 +48,13 @@ class ManualTaskWorkflowTest {
 
     private ReleaseFlow releaseFlow;
     private Request request;
-    private UserContext tlUser;
-    private UserContext devUser;
+    private UserContext ownerUser;
 
     @BeforeEach
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        tlUser = new UserContext("tl-user", "TL");
-        devUser = new UserContext("dev-user", "DEVELOPER");
+        ownerUser = new UserContext("emp-001", "DEVELOPER");
     }
 
     // ─── Full lifecycle ───────────────────────────────────────────────────────
@@ -68,19 +66,19 @@ class ManualTaskWorkflowTest {
         Task task = seedManualTask(TaskStatus.Pending);
 
         // Step 1: Advance to Ready_For_Execution
-        taskService.updateStatus(task.getId(), TaskStatus.Ready_For_Execution, tlUser, "starting execution");
+        taskService.updateStatus(task.getId(), TaskStatus.Ready_For_Execution, ownerUser, "starting execution");
         Task afterReady = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(afterReady.getTaskStatus()).isEqualTo(TaskStatus.Ready_For_Execution);
 
         // Step 2: Record result → transitions to Awaiting_Review
         Map<String, Object> resultSummary = Map.of("outcome", "passed", "duration", "120s");
         Task afterRecord = recordResultService.recordResult(
-                task.getId(), resultSummary, "Execution log output", tlUser);
+                task.getId(), resultSummary, "Execution log output", ownerUser);
         assertThat(afterRecord.getTaskStatus()).isEqualTo(TaskStatus.Awaiting_Review);
         assertThat(afterRecord.getCurrentResultSummary()).containsEntry("outcome", "passed");
 
         // Step 3: Apply approve decision
-        decisionEngine.applyDecision(task.getId(), DecisionType.approve, tlUser, "Looks good");
+        decisionEngine.applyDecision(task.getId(), DecisionType.approve, ownerUser, "Looks good");
         progressionService.progressAfterDecision(task.getId());
 
         // Step 4: Assert final state is Approved
@@ -95,7 +93,7 @@ class ManualTaskWorkflowTest {
     void manualTask_rejectDecision_setsRejectedStatus() {
         Task task = seedManualTask(TaskStatus.Awaiting_Review);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.reject, tlUser, "Issues found");
+        decisionEngine.applyDecision(task.getId(), DecisionType.reject, ownerUser, "Issues found");
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Rejected);
@@ -108,7 +106,7 @@ class ManualTaskWorkflowTest {
     void manualTask_skipDecision_setsSkippedStatus() {
         Task task = seedManualTask(TaskStatus.Pending);
 
-        decisionEngine.applyDecision(task.getId(), DecisionType.skip, tlUser, "skipping step");
+        decisionEngine.applyDecision(task.getId(), DecisionType.skip, ownerUser, "skipping step");
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Skipped);
@@ -124,7 +122,7 @@ class ManualTaskWorkflowTest {
         assertThat(autoTask.getExecutionType()).isEqualTo(ExecutionType.AUTO);
 
         assertThatThrownBy(() ->
-                recordResultService.recordResult(autoTask.getId(), Map.of("status", "ok"), null, tlUser))
+                recordResultService.recordResult(autoTask.getId(), Map.of("status", "ok"), null, ownerUser))
                 .isInstanceOf(ConflictAppException.class)
                 .hasMessageContaining("not a MANUAL task");
     }
@@ -140,6 +138,7 @@ class ManualTaskWorkflowTest {
         task.setTaskName("manual-deploy-step");
         task.setExecutionType(ExecutionType.MANUAL);
         task.setTaskStatus(status);
+        task.setOwner("alice");
         return taskRepository.save(task);
     }
 }

@@ -10,11 +10,13 @@ import java.util.Map;
 public record TaskDto(
         String id,
         String requestId,
+        String category,
         String taskGroupId,
         String taskGroupName,
         int stepSeq,
         String taskName,
         ExecutionType executionType,
+        boolean critical,
         TaskStatus taskStatus,
         Map<String, Object> inputParameters,
         String expectedOutput,
@@ -29,11 +31,15 @@ public record TaskDto(
         return new TaskDto(
                 task.getId(),
                 task.getRequest().getId(),
+                task.getImportMetadata() != null
+                        ? (String) task.getImportMetadata().get("activity_category")
+                        : null,
                 task.getTaskGroupId(),
                 task.getTaskGroupName(),
                 task.getStepSeq(),
                 task.getTaskName(),
                 task.getExecutionType(),
+                task.isCritical(),
                 task.getTaskStatus(),
                 task.getInputParameters(),
                 task.getExpectedOutput(),

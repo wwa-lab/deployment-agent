@@ -32,7 +32,7 @@ class ExcelParserServiceTest {
             "Script to be executed", "Parameter (input)",
             "Parameter (Expected Output)", "Owner",
             "Planned Start date/time", "Planned End date/time",
-            "Activity category", "Common", "Dependencies", "Validation",
+            "Activity category", "Common", "Dependencies", "Validation", "Critical",
             "Status", "Start date/time", "End date/time"
     };
 
@@ -47,7 +47,7 @@ class ExcelParserServiceTest {
                     "deploy.sh", "--env prod",
                     "OK", "alice",
                     "", "",
-                    "CAT-A", "yes", "none", "validated",
+                    "CAT-A", "yes", "none", "validated", "Y",
                     "Done", "", "")
         ));
 
@@ -64,6 +64,7 @@ class ExcelParserServiceTest {
         assertThat(r.stepSeq()).isEqualTo(1);
         assertThat(r.taskName()).isEqualTo("deploy-step");
         assertThat(r.executionType()).isEqualTo(ExecutionType.AUTO);
+        assertThat(r.critical()).isTrue();
         assertThat(r.inputParameters()).containsEntry("script", "deploy.sh");
         assertThat(r.inputParameters()).containsEntry("parameters", "--env prod");
         assertThat(r.expectedOutput()).isEqualTo("OK");
@@ -77,7 +78,7 @@ class ExcelParserServiceTest {
     void parse_executionTypeCaseInsensitive() throws IOException {
         byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "manual",
-                    "", "", "", "", "", "", "", "", "", "", "", "", "")
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
 
         ParseResult result = parser.parse(xlsx);
@@ -90,7 +91,7 @@ class ExcelParserServiceTest {
     void parse_ignoredColumnsNotStored() throws IOException {
         byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "MANUAL",
-                    "", "", "", "", "", "", "", "", "", "", "Running", "2025-01-01", "2025-01-02")
+                    "", "", "", "", "", "", "", "", "", "", "", "Running", "2025-01-01", "2025-01-02")
         ));
 
         ParseResult result = parser.parse(xlsx);
@@ -111,7 +112,7 @@ class ExcelParserServiceTest {
     void parse_requiredFieldMissing_recordsError() throws IOException {
         byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("", "ProjectOne", "TG-001", "Deploy", "1", "step", "AUTO",
-                    "deploy.sh", "", "", "", "", "", "", "", "", "", "", "", "")
+                    "deploy.sh", "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
 
         ParseResult result = parser.parse(xlsx);
@@ -126,7 +127,7 @@ class ExcelParserServiceTest {
     void parse_invalidExecutionType_recordsError() throws IOException {
         byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "HYBRID",
-                    "", "", "", "", "", "", "", "", "", "", "", "", "")
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
 
         ParseResult result = parser.parse(xlsx);
@@ -139,7 +140,7 @@ class ExcelParserServiceTest {
     void parse_autoWithoutScript_recordsError() throws IOException {
         byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "AUTO",
-                    "", "", "", "", "", "", "", "", "", "", "", "", "")
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
 
         ParseResult result = parser.parse(xlsx);
@@ -152,9 +153,9 @@ class ExcelParserServiceTest {
     void parse_duplicateStepSeq_recordsError() throws IOException {
         byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "first-step", "MANUAL",
-                    "", "", "", "", "", "", "", "", "", "", "", "", ""),
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", ""),
                 row("P", "N", "TG-1", "T", "1", "second-step", "MANUAL",
-                    "", "", "", "", "", "", "", "", "", "", "", "", "")
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
 
         ParseResult result = parser.parse(xlsx);
@@ -168,9 +169,9 @@ class ExcelParserServiceTest {
     void parse_sameSeqDifferentTaskId_noError() throws IOException {
         byte[] xlsx = buildXlsx(List.<String[]>of(
                 row("P", "N", "TG-1", "T1", "1", "step-a", "MANUAL",
-                    "", "", "", "", "", "", "", "", "", "", "", "", ""),
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", ""),
                 row("P", "N", "TG-2", "T2", "1", "step-b", "MANUAL",
-                    "", "", "", "", "", "", "", "", "", "", "", "", "")
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
 
         ParseResult result = parser.parse(xlsx);
@@ -183,12 +184,42 @@ class ExcelParserServiceTest {
     void parse_wrongSheetName_recordsError() throws IOException {
         byte[] xlsx = buildXlsxWithSheet("wrong_sheet_name", List.<String[]>of(
                 row("P", "N", "TG-1", "T", "1", "s", "MANUAL",
-                    "", "", "", "", "", "", "", "", "", "", "", "", "")
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", "")
         ));
 
         ParseResult result = parser.parse(xlsx);
         assertThat(result.hasErrors()).isTrue();
         assertThat(result.errors().get(0).column()).isEqualTo("Sheet");
+    }
+
+    @Test
+    @DisplayName("critical supports Y and defaults to false when blank")
+    void parse_criticalColumn_mapsBoolean() throws IOException {
+        byte[] xlsx = buildXlsx(List.<String[]>of(
+                row("P", "N", "TG-1", "T1", "1", "step-a", "MANUAL",
+                    "", "", "", "", "", "", "", "", "", "", "Y", "", "", ""),
+                row("P", "N", "TG-2", "T2", "1", "step-b", "MANUAL",
+                    "", "", "", "", "", "", "", "", "", "", "", "", "", "")
+        ));
+
+        ParseResult result = parser.parse(xlsx);
+        assertThat(result.hasErrors()).isFalse();
+        assertThat(result.rows()).hasSize(2);
+        assertThat(result.rows().get(0).critical()).isTrue();
+        assertThat(result.rows().get(1).critical()).isFalse();
+    }
+
+    @Test
+    @DisplayName("invalid critical value records validation error")
+    void parse_invalidCritical_recordsError() throws IOException {
+        byte[] xlsx = buildXlsx(List.<String[]>of(
+                row("P", "N", "TG-1", "T", "1", "s", "MANUAL",
+                    "", "", "", "", "", "", "", "", "", "", "MAYBE", "", "", "")
+        ));
+
+        ParseResult result = parser.parse(xlsx);
+        assertThat(result.hasErrors()).isTrue();
+        assertThat(result.errors()).anyMatch(e -> e.column().equals("Critical"));
     }
 
     // ─── XLSX builder helpers ─────────────────────────────────────────────────
@@ -230,13 +261,13 @@ class ExcelParserServiceTest {
                          String paramOutput, String owner,
                          String plannedStart, String plannedEnd,
                          String activityCat, String common,
-                         String dependencies, String validation,
+                         String dependencies, String validation, String critical,
                          String status, String startDate, String endDate) {
         return new String[]{
                 projectId, projectName, taskId, taskName, stepSeq, step, execType,
                 script, paramInput, paramOutput, owner,
                 plannedStart, plannedEnd,
-                activityCat, common, dependencies, validation,
+                activityCat, common, dependencies, validation, critical,
                 status, startDate, endDate
         };
     }

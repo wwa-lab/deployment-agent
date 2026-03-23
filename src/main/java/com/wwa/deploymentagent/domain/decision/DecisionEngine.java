@@ -5,9 +5,9 @@ import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
 import com.wwa.deploymentagent.domain.task.Task;
+import com.wwa.deploymentagent.domain.task.TaskPermissionService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
 import com.wwa.deploymentagent.domain.task.TaskService;
-import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.InvalidStateTransitionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,14 +18,14 @@ import java.util.Map;
 /**
  * DecisionEngine – Centralized decision application logic.
  *
- * <p>All decisions run within a single transaction and require TL role.
+ * <p>All decisions run within a single transaction and require task-owner or DEVOPS_ADMIN permission.
  *
  * <p>Supported decisions:
  * <ul>
- *   <li>Approve: Awaiting_Review → Approved (TL only)</li>
- *   <li>Reject:  Awaiting_Review → Rejected (TL only)</li>
- *   <li>Rerun:   Rejected/Failed → Ready_For_Execution (TL only), creates new execution history</li>
- *   <li>Skip:    Pending/Ready_For_Execution → Skipped (TL only)</li>
+ *   <li>Approve: Awaiting_Review → Approved (owner/admin)</li>
+ *   <li>Reject:  Awaiting_Review → Rejected (owner/admin)</li>
+ *   <li>Rerun:   Rejected/Failed → Ready_For_Execution (owner/admin), creates new execution history</li>
+ *   <li>Skip:    Pending/Ready_For_Execution → Skipped (owner/admin)</li>
  * </ul>
  */
 @Service
@@ -35,6 +35,7 @@ public class DecisionEngine {
     private final TaskService taskService;
     private final TaskExecutionHistoryService executionHistoryService;
     private final AuditLoggerService auditLogger;
+    private final TaskPermissionService taskPermissionService;
 
     /**
      * Apply a decision to a task.
@@ -43,11 +44,8 @@ public class DecisionEngine {
      */
     @Transactional
     public void applyDecision(String taskId, DecisionType decision, UserContext user, String comment) {
-        if (!"TL".equals(user.role())) {
-            throw new ForbiddenAppException("decision:" + decision.name());
-        }
-
         Task task = taskService.getById(taskId);
+        taskPermissionService.assertOwnerOrAdmin(task, user, "decision:" + decision.name());
         String releaseFlowId = task.getRequest().getReleaseFlow().getId();
         String requestId = task.getRequest().getId();
 

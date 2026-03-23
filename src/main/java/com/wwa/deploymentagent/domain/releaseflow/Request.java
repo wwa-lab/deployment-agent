@@ -45,6 +45,21 @@ public class Request {
     @Column(name = "request_status", length = 30, nullable = false)
     private RequestStatus requestStatus = RequestStatus.Pending;
 
+    @Column(name = "snow_group", length = 255)
+    private String snowGroup;
+
+    @Column(name = "application", length = 255)
+    private String application;
+
+    @Column(name = "site", length = 100)
+    private String site;
+
+    @Column(name = "created_by", length = 255, updatable = false)
+    private String createdBy;
+
+    @Column(name = "estimated_remaining_minutes")
+    private Integer estimatedRemainingMinutes;
+
     @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("taskGroupId ASC, stepSeq ASC")
     private List<Task> tasks = new ArrayList<>();

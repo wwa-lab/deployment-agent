@@ -47,6 +47,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- H2 JDBC (Local) -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Apache POI – Excel parsing -->
         <dependency>
             <groupId>org.apache.poi</groupId>
@@ -72,11 +79,19 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.h2database</groupId>-->
+<!--            <artifactId>h2</artifactId>-->
+<!--            <scope>test</scope>-->
+<!--        </dependency>-->
+
+
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
         </dependency>
+
     </dependencies>
 
     <build>

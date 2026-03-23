@@ -4,10 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
 import { getTaskResult, submitAutoExecution } from '../api/tasks'
+import { markRequestFailed, startRequestDeployment } from '../api/releaseFlows'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
-import RecordResultDialog from '../components/RecordResultDialog.vue'
 import DecisionDialog from '../components/DecisionDialog.vue'
+import RundownEditDialog from '../components/RundownEditDialog.vue'
+import TaskActivityDialog from '../components/TaskActivityDialog.vue'
 import type { Task, TaskResult, Request } from '../types'
+
+type DecisionOption = 'Approve' | 'Reject' | 'Rerun' | 'Skip'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,8 +21,12 @@ const userStore = useUserStore()
 const flowId = computed(() => route.params.id as string)
 
 const editingTask = ref<Task | null>(null)
-const recordingTask = ref<Task | null>(null)
 const decidingTask = ref<Task | null>(null)
+const viewingActivityTask = ref<Task | null>(null)
+const initialDecision = ref<DecisionOption | null>(null)
+const editingRundown = ref<Request | null>(null)
+const requestActionLoadingId = ref<string | null>(null)
+const refreshingDetail = ref(false)
 
 const viewingResult = ref<{ task: Task; result: TaskResult | null; loading: boolean } | null>(null)
 
@@ -47,30 +55,90 @@ function executionTypeBadgeClass(type: string): string {
   return type === 'MANUAL' ? 'badge-manual' : 'badge-auto'
 }
 
+function criticalBadgeClass(isCritical: boolean): string {
+  return isCritical ? 'badge-critical-yes' : 'badge-critical-no'
+}
+
+function criticalLabel(isCritical: boolean): string {
+  return isCritical ? 'Y' : 'N'
+}
+
+function normalizeIdentity(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function isTaskAdmin(): boolean {
+  return userStore.isDevOpsAdmin
+}
+
+function isTaskOwner(task: Task): boolean {
+  const owner = normalizeIdentity(task.owner)
+  if (!owner) return false
+
+  const displayName = userStore.displayName.replace(/\s*\(.*\)$/, '').trim()
+  const firstName = displayName.split(/\s+/)[0] ?? ''
+  const candidates = [
+    userStore.userId,
+    displayName,
+    firstName,
+  ]
+    .map((value) => normalizeIdentity(value))
+    .filter(Boolean)
+
+  return candidates.includes(owner)
+}
+
+function canModifyTask(task: Task): boolean {
+  return isTaskAdmin() || isTaskOwner(task)
+}
+
 function canEdit(task: Task): boolean {
   return (
-    userStore.isTL &&
+    canModifyTask(task) &&
     (task.taskStatus === 'Pending' || task.taskStatus === 'Ready_For_Execution')
   )
 }
 
-function canRecordResult(task: Task): boolean {
-  return (
-    userStore.isTL &&
-    task.executionType === 'MANUAL' &&
-    task.taskStatus === 'Ready_For_Execution'
-  )
+function editDisabledReason(task: Task): string | null {
+  if (canEdit(task)) return null
+  if (!canModifyTask(task)) return 'Task owner or admin only'
+  return 'Available only when task is Pending or Ready_For_Execution'
 }
 
 function canDecide(task: Task): boolean {
-  return userStore.isTL && task.taskStatus === 'Awaiting_Review'
+  return canModifyTask(task) && task.taskStatus === 'Awaiting_Review'
+}
+
+function decisionDisabledReason(task: Task): string | null {
+  if (canDecide(task)) return null
+  if (!canModifyTask(task)) return 'Task owner or admin only'
+  return 'Available only when task status is Awaiting_Review'
 }
 
 function canSubmitAuto(task: Task): boolean {
   return (
-    (userStore.isTL || userStore.isDevOpsAdmin) &&
+    canModifyTask(task) &&
     task.executionType === 'AUTO' &&
     task.taskStatus === 'Ready_For_Execution'
+  )
+}
+
+function canEditRundown(): boolean {
+  return userStore.isDeveloper || userStore.isTL || userStore.isDevOpsAdmin
+}
+
+function canStartDeployment(request: Request): boolean {
+  return (
+    canEditRundown() &&
+    request.requestStatus === 'Pending' &&
+    request.tasks.some((task) => task.taskStatus === 'Pending')
+  )
+}
+
+function canMarkRequestFailed(request: Request): boolean {
+  return (
+    canEditRundown() &&
+    !['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus)
   )
 }
 
@@ -92,6 +160,11 @@ function canViewResult(task: Task): boolean {
   return !!task.latestExecutionId
 }
 
+function viewResultDisabledReason(task: Task): string | null {
+  if (canViewResult(task)) return null
+  return 'Available after the task has execution output'
+}
+
 async function openViewResult(task: Task) {
   viewingResult.value = { task, result: null, loading: true }
   try {
@@ -104,13 +177,69 @@ async function openViewResult(task: Task) {
 
 async function onTaskSaved() {
   editingTask.value = null
-  recordingTask.value = null
   await store.refreshDetail()
 }
 
 async function onDecisionMade() {
   decidingTask.value = null
+  initialDecision.value = null
   await store.refreshDetail()
+}
+
+function closeDecisionDialog() {
+  decidingTask.value = null
+  initialDecision.value = null
+}
+
+async function onRundownSaved() {
+  editingRundown.value = null
+  await store.refreshDetail()
+}
+
+async function handleRefreshDetail() {
+  refreshingDetail.value = true
+  try {
+    await store.refreshDetail()
+  } finally {
+    refreshingDetail.value = false
+  }
+}
+
+async function handleStartDeployment(request: Request) {
+  requestActionLoadingId.value = `${request.id}:start`
+  try {
+    await startRequestDeployment(request.releaseFlowId, request.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handleMarkRequestFailed(request: Request) {
+  requestActionLoadingId.value = `${request.id}:fail`
+  try {
+    await markRequestFailed(request.releaseFlowId, request.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+function openDecision(task: Task, decision?: DecisionOption) {
+  decidingTask.value = task
+  initialDecision.value = decision ?? null
+}
+
+function handleDecisionSelect(task: Task, event: Event) {
+  const select = event.target as HTMLSelectElement
+  const decision = select.value as DecisionOption | ''
+  if (!decision) return
+  openDecision(task, decision)
+  select.value = ''
 }
 
 function activeStageIndex(requests: Request[]): number {
@@ -121,6 +250,95 @@ function activeStageIndex(requests: Request[]): number {
 }
 
 const activeTab = ref(0)
+
+const activeRequest = computed(() => {
+  const detail = store.detail
+  if (!detail || detail.requests.length === 0) return null
+  return detail.requests[activeTab.value] ?? detail.requests[0] ?? null
+})
+
+const activeRequestSummary = computed(() => {
+  const request = activeRequest.value
+  if (!request) return null
+
+  const uniqueTaskGroups = new Set(request.tasks.map((task) => task.taskGroupId))
+  const uniqueOwners = Array.from(
+    new Set(request.tasks.map((task) => task.owner).filter((owner): owner is string => !!owner)),
+  )
+  const manualCount = request.tasks.filter((task) => task.executionType === 'MANUAL').length
+  const autoCount = request.tasks.filter((task) => task.executionType === 'AUTO').length
+  const pendingReviewCount = request.tasks.filter((task) => task.taskStatus === 'Awaiting_Review').length
+  const completedTaskCount = request.tasks.filter((task) =>
+    ['Approved', 'Rejected', 'Skipped', 'Completed', 'Failed'].includes(task.taskStatus),
+  ).length
+
+  const plannedStarts = request.tasks
+    .map((task) => task.plannedStartTime)
+    .filter((time): time is string => !!time)
+    .map((time) => new Date(time))
+    .filter((date) => !Number.isNaN(date.getTime()))
+
+  const plannedEnds = request.tasks
+    .map((task) => task.plannedEndTime)
+    .filter((time): time is string => !!time)
+    .map((time) => new Date(time))
+    .filter((date) => !Number.isNaN(date.getTime()))
+
+  const plannedStart =
+    plannedStarts.length > 0
+      ? new Date(Math.min(...plannedStarts.map((date) => date.getTime())))
+      : null
+  const plannedEnd =
+    plannedEnds.length > 0
+      ? new Date(Math.max(...plannedEnds.map((date) => date.getTime())))
+      : null
+
+  const lastUpdated = request.updatedAt ? new Date(request.updatedAt) : null
+
+  const progressPercent =
+    request.tasks.length > 0 ? Math.round((completedTaskCount / request.tasks.length) * 100) : 0
+  const manualPercent =
+    request.tasks.length > 0 ? Math.round((manualCount / request.tasks.length) * 100) : 0
+  const autoPercent =
+    request.tasks.length > 0 ? Math.round((autoCount / request.tasks.length) * 100) : 0
+
+  return {
+    taskGroupCount: uniqueTaskGroups.size,
+    owners: uniqueOwners,
+    manualCount,
+    autoCount,
+    manualPercent,
+    autoPercent,
+    pendingReviewCount,
+    completedTaskCount,
+    progressPercent,
+    plannedStart,
+    plannedEnd,
+    lastUpdated,
+  }
+})
+
+function formatDateTime(value: string | Date | null | undefined): string {
+  if (!value) return '—'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function hasValue(value: string | null | undefined): boolean {
+  return !!value && value.trim().length > 0
+}
+
+function plannedWindowLabel(start: Date | null, end: Date | null): string {
+  if (!start && !end) return '—'
+  if (start && end) return `${formatDateTime(start)} to ${formatDateTime(end)}`
+  return start ? formatDateTime(start) : formatDateTime(end)
+}
 
 // Watch for detail load
 watch(() => store.detail, (val) => {
@@ -134,7 +352,7 @@ watch(() => store.detail, (val) => {
   <div class="detail-view">
     <!-- Back navigation -->
     <div class="nav-back">
-      <button class="btn btn-secondary btn-sm" @click="router.push('/release-flows')">
+      <button class="btn btn-secondary btn-sm" @click="router.push('/wwa/deployment-agent')">
         ← Back
       </button>
     </div>
@@ -199,14 +417,170 @@ watch(() => store.detail, (val) => {
           :key="req.id"
           v-show="activeTab === idx"
         >
+          <div v-if="activeRequestSummary" class="stage-rundown">
+            <div class="rundown-head">
+              <div class="rundown-title">Rundown Information</div>
+              <div class="rundown-head-actions">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="refreshingDetail"
+                  @click="handleRefreshDetail"
+                >
+                  {{ refreshingDetail ? 'Refreshing...' : 'Refresh' }}
+                </button>
+                <button
+                  v-if="canEditRundown()"
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  @click="editingRundown = req"
+                >
+                  Edit Rundown
+                </button>
+              </div>
+            </div>
+
+            <div class="rundown-section">
+              <div class="rundown-info-grid">
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Status:</span>
+                  <span class="badge" :class="statusBadgeClass(req.requestStatus)">
+                    {{ req.requestStatus }}
+                  </span>
+                </div>
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Environment:</span>
+                  <span class="badge badge-pending">{{ req.stage }}</span>
+                </div>
+                <div v-if="hasValue(req.snowGroup)" class="rundown-field">
+                  <span class="rundown-field-label">SNOW Group:</span>
+                  <span class="rundown-field-value">{{ req.snowGroup }}</span>
+                </div>
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Application:</span>
+                  <span class="rundown-field-value">{{ req.application ?? store.detail.projectName }}</span>
+                </div>
+                <div v-if="hasValue(req.site)" class="rundown-field">
+                  <span class="rundown-field-label">Site:</span>
+                  <span class="rundown-field-value">{{ req.site }}</span>
+                </div>
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Owners:</span>
+                  <span class="rundown-field-value">
+                    {{ activeRequestSummary.owners.length > 0 ? activeRequestSummary.owners.join(', ') : '—' }}
+                  </span>
+                </div>
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Execution Mix:</span>
+                  <div class="mix-value">
+                    <span class="rundown-field-value">
+                      {{ activeRequestSummary.manualCount }} manual ({{ activeRequestSummary.manualPercent }}%) /
+                      {{ activeRequestSummary.autoCount }} auto ({{ activeRequestSummary.autoPercent }}%)
+                    </span>
+                    <div class="mix-bar" aria-label="Execution mix">
+                      <div
+                        class="mix-bar-segment mix-bar-manual"
+                        :style="{ width: `${activeRequestSummary.manualPercent}%` }"
+                      ></div>
+                      <div
+                        class="mix-bar-segment mix-bar-auto"
+                        :style="{ width: `${activeRequestSummary.autoPercent}%` }"
+                      ></div>
+                    </div>
+                    <div class="mix-legend">
+                      <span class="mix-legend-item">
+                        <span class="mix-dot mix-dot-manual"></span>
+                        Manual
+                      </span>
+                      <span class="mix-legend-item">
+                        <span class="mix-dot mix-dot-auto"></span>
+                        Auto
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Planned Window:</span>
+                  <span class="rundown-field-value">
+                    {{
+                      plannedWindowLabel(
+                        activeRequestSummary.plannedStart,
+                        activeRequestSummary.plannedEnd,
+                      )
+                    }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="rundown-section">
+              <div class="rundown-section-title">Progress Overview</div>
+              <div class="rundown-progress-grid">
+                <div class="rundown-progress-block">
+                  <div class="rundown-progress-label">Overall Progress</div>
+                  <div class="rundown-progress-value">
+                    {{ activeRequestSummary.progressPercent }}%
+                  </div>
+                </div>
+                <div class="rundown-progress-block">
+                  <div class="rundown-progress-label">Estimated Remaining Time</div>
+                  <div class="rundown-progress-value">
+                    {{
+                      req.estimatedRemainingMinutes !== undefined && req.estimatedRemainingMinutes !== null
+                        ? `${req.estimatedRemainingMinutes}m`
+                        : '—'
+                    }}
+                  </div>
+                </div>
+                <div class="rundown-progress-block">
+                  <div class="rundown-progress-label">Tasks Completed</div>
+                  <div class="rundown-progress-value">
+                    {{ activeRequestSummary.completedTaskCount }} / {{ req.tasks.length }}
+                  </div>
+                </div>
+                <div class="rundown-progress-block">
+                  <div class="rundown-progress-label">Last Updated</div>
+                  <div class="rundown-progress-value">
+                    {{ formatDateTime(activeRequestSummary.lastUpdated) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rundown-section">
+              <div class="rundown-request-actions">
+                <button
+                  v-if="canStartDeployment(req)"
+                  type="button"
+                  class="btn btn-primary btn-start"
+                  :disabled="requestActionLoadingId === `${req.id}:start`"
+                  @click="handleStartDeployment(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:start` ? 'Starting...' : 'Start Deployment' }}
+                </button>
+                <button
+                  v-if="canMarkRequestFailed(req)"
+                  type="button"
+                  class="btn btn-danger"
+                  :disabled="requestActionLoadingId === `${req.id}:fail`"
+                  @click="handleMarkRequestFailed(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:fail` ? 'Marking...' : 'Mark as Failed' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div v-if="req.tasks.length === 0" class="empty-state">No tasks in this request.</div>
           <table v-else class="data-table">
             <thead>
               <tr>
-                <th>Task Group</th>
-                <th>Step</th>
+                <th>Activity Category</th>
                 <th>Task Name</th>
+                <th>Step</th>
+                <th>Step Name</th>
                 <th>Type</th>
+                <th>Critical</th>
                 <th>Status</th>
                 <th>Owner</th>
                 <th>Actions</th>
@@ -214,6 +588,7 @@ watch(() => store.detail, (val) => {
             </thead>
             <tbody>
               <tr v-for="task in req.tasks" :key="task.id">
+                <td>{{ task.category ?? '—' }}</td>
                 <td>{{ task.taskGroupName }}</td>
                 <td>{{ task.stepSeq }}</td>
                 <td>{{ task.taskName }}</td>
@@ -223,49 +598,69 @@ watch(() => store.detail, (val) => {
                   </span>
                 </td>
                 <td>
+                  <span
+                    class="badge"
+                    :class="criticalBadgeClass(task.critical)"
+                    :title="task.critical ? 'Must be reviewed before the next task can be released' : 'Does not block the next task from being released'"
+                  >
+                    {{ criticalLabel(task.critical) }}
+                  </span>
+                </td>
+                <td>
                   <span class="badge" :class="statusBadgeClass(task.taskStatus)">
                     {{ task.taskStatus }}
                   </span>
                 </td>
                 <td>{{ task.owner ?? '—' }}</td>
                 <td>
-                  <div class="action-btns">
-                    <button
-                      v-if="canEdit(task)"
-                      class="btn btn-secondary btn-sm"
-                      @click.stop="editingTask = task"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      v-if="canRecordResult(task)"
-                      class="btn btn-primary btn-sm"
-                      @click.stop="recordingTask = task"
-                    >
-                      Record Result
-                    </button>
-                    <button
-                      v-if="canSubmitAuto(task)"
-                      class="btn btn-primary btn-sm"
-                      :disabled="submittingAuto === task.id"
-                      @click.stop="handleSubmitAuto(task)"
-                    >
-                      {{ submittingAuto === task.id ? 'Submitting...' : 'Submit Auto' }}
-                    </button>
-                    <button
-                      v-if="canViewResult(task)"
-                      class="btn btn-secondary btn-sm"
-                      @click.stop="openViewResult(task)"
-                    >
-                      View Result
-                    </button>
-                    <button
-                      v-if="canDecide(task)"
-                      class="btn btn-primary btn-sm"
-                      @click.stop="decidingTask = task"
-                    >
-                      Decision
-                    </button>
+                  <div class="task-action-panel">
+                    <div class="action-btns">
+                      <span class="action-tooltip" :title="editDisabledReason(task) ?? ''">
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          :disabled="!canEdit(task)"
+                          @click.stop="canEdit(task) && (editingTask = task)"
+                        >
+                          Edit
+                        </button>
+                      </span>
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        @click.stop="viewingActivityTask = task"
+                      >
+                        Activity
+                      </button>
+                      <span class="action-tooltip" :title="viewResultDisabledReason(task) ?? ''">
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          :disabled="!canViewResult(task)"
+                          @click.stop="canViewResult(task) && openViewResult(task)"
+                        >
+                          View Result
+                        </button>
+                      </span>
+                      <button
+                        v-if="canSubmitAuto(task)"
+                        class="btn btn-primary btn-sm"
+                        :disabled="submittingAuto === task.id"
+                        @click.stop="handleSubmitAuto(task)"
+                      >
+                        {{ submittingAuto === task.id ? 'Submitting...' : 'Submit Auto' }}
+                      </button>
+                    </div>
+                    <span class="action-tooltip" :title="decisionDisabledReason(task) ?? ''">
+                      <select
+                        class="decision-select"
+                        :disabled="!canDecide(task)"
+                        @change="handleDecisionSelect(task, $event)"
+                      >
+                        <option value="">Decision</option>
+                        <option value="Approve">Approve</option>
+                        <option value="Reject">Reject</option>
+                        <option value="Rerun">Rerun</option>
+                        <option value="Skip">Skip</option>
+                      </select>
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -337,20 +732,27 @@ watch(() => store.detail, (val) => {
       @close="editingTask = null"
     />
 
-    <!-- Record Result Dialog -->
-    <RecordResultDialog
-      v-if="recordingTask"
-      :task="recordingTask"
-      @saved="onTaskSaved"
-      @close="recordingTask = null"
-    />
-
     <!-- Decision Dialog -->
     <DecisionDialog
       v-if="decidingTask"
       :task="decidingTask"
+      :initial-decision="initialDecision"
       @decided="onDecisionMade"
-      @close="decidingTask = null"
+      @close="closeDecisionDialog"
+    />
+
+    <RundownEditDialog
+      v-if="editingRundown"
+      :request="editingRundown"
+      @saved="onRundownSaved"
+      @close="editingRundown = null"
+    />
+
+    <TaskActivityDialog
+      v-if="viewingActivityTask"
+      :key="viewingActivityTask.id"
+      :task="viewingActivityTask"
+      @close="viewingActivityTask = null"
     />
   </div>
 </template>
@@ -433,10 +835,226 @@ watch(() => store.detail, (val) => {
   padding: 16px;
 }
 
+.stage-rundown {
+  margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.rundown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rundown-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.rundown-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rundown-section {
+  padding: 18px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.rundown-section:last-of-type {
+  border-bottom: none;
+}
+
+.rundown-section-title {
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.rundown-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 28px;
+}
+
+.rundown-field {
+  min-width: 0;
+}
+
+.rundown-field-label {
+  margin-right: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.rundown-field-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  word-break: break-word;
+}
+
+.mix-value {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mix-bar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.mix-bar-segment {
+  height: 100%;
+}
+
+.mix-bar-manual {
+  background: #8b5cf6;
+}
+
+.mix-bar-auto {
+  background: #0ea5e9;
+}
+
+.mix-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mix-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.mix-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.mix-dot-manual {
+  background: #8b5cf6;
+}
+
+.mix-dot-auto {
+  background: #0ea5e9;
+}
+
+.badge-critical-yes {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.badge-critical-no {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.rundown-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 28px;
+}
+
+.rundown-progress-block {
+  min-width: 0;
+}
+
+.rundown-progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.rundown-progress-value {
+  font-size: 14px;
+  color: #475569;
+}
+
+.rundown-request-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-start {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.btn-start:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+@media (max-width: 1100px) {
+  .rundown-info-grid,
+  .rundown-progress-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .rundown-info-grid,
+  .rundown-progress-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .action-btns {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.task-action-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.action-tooltip {
+  display: inline-flex;
+}
+
+.decision-select {
+  min-width: 140px;
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  color: #334155;
+  font-size: 13px;
+}
+
+.decision-select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .modal-wide {

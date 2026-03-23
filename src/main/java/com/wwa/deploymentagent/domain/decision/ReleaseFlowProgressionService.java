@@ -28,6 +28,7 @@ import java.util.Optional;
  *   <li>If request completed and stage is PROD, mark flow Completed</li>
  *   <li>If request completed and stage &lt; PROD, advance flow to next stage</li>
  *   <li>Find next Pending task in the same request → Ready_For_Execution</li>
+ *   <li>Do not release the next task while any critical task is Awaiting_Review</li>
  *   <li>Recompute flow status bottom-up</li>
  * </ol>
  */
@@ -61,6 +62,9 @@ public class ReleaseFlowProgressionService {
                 .allMatch(t -> t.getTaskStatus() == TaskStatus.Approved
                              || t.getTaskStatus() == TaskStatus.Skipped);
 
+        boolean hasBlockingCriticalReview = requestTasks.stream()
+                .anyMatch(t -> t.isCritical() && t.getTaskStatus() == TaskStatus.Awaiting_Review);
+
         if (allTasksTerminal) {
             request.setRequestStatus(RequestStatus.Completed);
             requestRepository.save(request);
@@ -72,7 +76,7 @@ public class ReleaseFlowProgressionService {
                 // Advance to next stage
                 releaseFlowService.advanceStage(releaseFlow.getId());
             }
-        } else {
+        } else if (!hasBlockingCriticalReview) {
             // Auto-ready the next Pending task
             Optional<Task> nextPending = requestTasks.stream()
                     .filter(t -> t.getTaskStatus() == TaskStatus.Pending)

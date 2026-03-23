@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { uploadFile } from '../api/upload'
+import { downloadTemplate, uploadFile } from '../api/upload'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import type { Stage, UploadResponse } from '../types'
 
@@ -11,6 +11,7 @@ const store = useReleaseFlowStore()
 const stage = ref<Stage | ''>('')
 const file = ref<File | null>(null)
 const uploading = ref(false)
+const downloadingTemplate = ref(false)
 const error = ref('')
 const successResult = ref<UploadResponse | null>(null)
 
@@ -33,6 +34,26 @@ async function submit() {
     error.value = e instanceof Error ? e.message : 'Upload failed'
   } finally {
     uploading.value = false
+  }
+}
+
+async function handleTemplateDownload() {
+  downloadingTemplate.value = true
+  error.value = ''
+  try {
+    const blob = await downloadTemplate()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'deployment-request-template.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Template download failed'
+  } finally {
+    downloadingTemplate.value = false
   }
 }
 
@@ -83,9 +104,14 @@ function close() {
           </div>
 
           <div class="template-link">
-            <a href="#" class="btn btn-secondary btn-sm" @click.prevent>
-              Download Template
-            </a>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              :disabled="downloadingTemplate"
+              @click="handleTemplateDownload"
+            >
+              {{ downloadingTemplate ? 'Downloading...' : 'Download Template' }}
+            </button>
           </div>
         </template>
       </div>

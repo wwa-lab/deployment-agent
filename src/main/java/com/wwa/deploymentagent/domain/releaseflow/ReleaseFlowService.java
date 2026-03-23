@@ -1,11 +1,17 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
+import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.RequestRundownUpdateDto;
+import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
+import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
+import com.wwa.deploymentagent.errors.ValidationAppException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * ReleaseFlowService – Release Flow lifecycle management and aggregation.
@@ -29,6 +37,8 @@ public class ReleaseFlowService {
 
     private final ReleaseFlowRepository releaseFlowRepository;
     private final RequestRepository requestRepository;
+    private final TaskRepository taskRepository;
+    private final AuditLoggerService auditLogger;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -82,6 +92,16 @@ public class ReleaseFlowService {
         if (hasStage)
             return releaseFlowRepository.findByCurrentStage(stage, pageable);
         return releaseFlowRepository.findAll(pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<Request>> findRequestsByReleaseFlowIds(List<String> releaseFlowIds) {
+        if (releaseFlowIds == null || releaseFlowIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return requestRepository.findByReleaseFlowIds(releaseFlowIds).stream()
+                .collect(Collectors.groupingBy(request -> request.getReleaseFlow().getId()));
     }
 
     /**
@@ -165,5 +185,90 @@ public class ReleaseFlowService {
             rf.setFlowStatus(FlowStatus.Running);
             releaseFlowRepository.save(rf);
         }
+    }
+
+    @Transactional
+    public Request updateRequestRundown(String releaseFlowId, String requestId, RequestRundownUpdateDto update) {
+        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+
+        if (update.estimatedRemainingMinutes() != null && update.estimatedRemainingMinutes() < 0) {
+            throw new ValidationAppException("Estimated remaining minutes must be zero or positive.");
+        }
+
+        request.setSnowGroup(normalizeBlank(update.snowGroup()));
+        request.setApplication(normalizeBlank(update.application()));
+        request.setSite(normalizeBlank(update.site()));
+        request.setEstimatedRemainingMinutes(update.estimatedRemainingMinutes());
+        Request saved = requestRepository.save(request);
+        saved.getTasks().size();
+        return saved;
+    }
+
+    @Transactional
+    public Request startRequestDeployment(String releaseFlowId, String requestId, UserContext user) {
+        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+
+        if (request.getRequestStatus() != RequestStatus.Pending) {
+            throw new ValidationAppException("Only pending requests can be started.");
+        }
+
+        request.getTasks().stream()
+                .filter(task -> task.getTaskStatus() == TaskStatus.Pending)
+                .findFirst()
+                .ifPresentOrElse(task -> {
+                    task.setTaskStatus(TaskStatus.Ready_For_Execution);
+                    taskRepository.save(task);
+                }, () -> {
+                    throw new ValidationAppException("Request has no pending tasks to start.");
+                });
+
+        recomputeAndPersistStatus(releaseFlowId);
+        Request refreshed = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        auditLogger.log(user, AuditActionType.request_start, releaseFlowId, requestId, null,
+                java.util.Map.of("stage", refreshed.getStage().name()));
+        return refreshed;
+    }
+
+    @Transactional
+    public Request markRequestFailed(String releaseFlowId, String requestId, UserContext user) {
+        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+
+        if (request.getRequestStatus() == RequestStatus.Completed
+                || request.getRequestStatus() == RequestStatus.Failed
+                || request.getRequestStatus() == RequestStatus.Rejected
+                || request.getRequestStatus() == RequestStatus.Skipped) {
+            throw new ValidationAppException("Only active requests can be marked as failed.");
+        }
+
+        boolean updatedAny = false;
+        for (var task : request.getTasks()) {
+            if (task.getTaskStatus() != TaskStatus.Approved
+                    && task.getTaskStatus() != TaskStatus.Skipped
+                    && task.getTaskStatus() != TaskStatus.Rejected
+                    && task.getTaskStatus() != TaskStatus.Failed) {
+                task.setTaskStatus(TaskStatus.Failed);
+                taskRepository.save(task);
+                updatedAny = true;
+            }
+        }
+
+        if (!updatedAny) {
+            throw new ValidationAppException("Request has no active tasks that can be failed.");
+        }
+
+        recomputeAndPersistStatus(releaseFlowId);
+        Request refreshed = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        auditLogger.log(user, AuditActionType.request_fail, releaseFlowId, requestId, null,
+                java.util.Map.of("stage", refreshed.getStage().name()));
+        return refreshed;
+    }
+
+    private String normalizeBlank(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

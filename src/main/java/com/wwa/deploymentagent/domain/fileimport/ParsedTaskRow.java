@@ -13,6 +13,7 @@ public record ParsedTaskRow(
         int stepSeq,
         String taskName,
         ExecutionType executionType,
+        boolean critical,
         Map<String, Object> inputParameters,
         String expectedOutput,
         String owner,

@@ -8,7 +8,6 @@ import com.wwa.deploymentagent.domain.execution.AutoExecutionService;
 import com.wwa.deploymentagent.domain.task.RecordResultService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
 import com.wwa.deploymentagent.domain.task.TaskService;
-import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +23,7 @@ import java.util.Map;
  * <pre>
  *   GET  /api/deployment-agent/tasks?requestId=X   – list tasks for a request
  *   GET  /api/deployment-agent/tasks/:id            – single task detail
- *   PUT  /api/deployment-agent/tasks/:id/input      – edit task input (TL only)
+ *   PUT  /api/deployment-agent/tasks/:id/input      – edit task input (owner or DEVOPS_ADMIN)
  *   GET  /api/deployment-agent/tasks/:id/executions – execution history
  * </pre>
  */
@@ -57,9 +56,6 @@ public class TaskController {
             @PathVariable String id,
             @RequestBody Map<String, Object> newInput,
             @AuthenticationPrincipal UserContext user) {
-        if (!"TL".equals(user.role())) {
-            throw new ForbiddenAppException("task:editInput");
-        }
         if (newInput == null) {
             throw new ValidationAppException("Request body must not be null");
         }
@@ -77,7 +73,7 @@ public class TaskController {
     }
 
     /**
-     * Record the result of a MANUAL task (TL only).
+     * Record the result of a MANUAL task (owner or DEVOPS_ADMIN only).
      * Guards: task must be MANUAL + in Ready_For_Execution state.
      */
     @PostMapping("/{id}/record-result")
@@ -85,27 +81,19 @@ public class TaskController {
             @PathVariable String id,
             @RequestBody RecordResultRequestDto body,
             @AuthenticationPrincipal UserContext user) {
-        if (!"TL".equals(user.role())) {
-            throw new ForbiddenAppException("task:recordResult");
-        }
-
         return ResponseEntity.ok(
                 TaskDto.from(recordResultService.recordResult(
                         id, body.resultSummary(), body.resultLogs(), user)));
     }
 
     /**
-     * Submit an AUTO task for external execution (TL or DEVOPS_ADMIN only).
+     * Submit an AUTO task for external execution (owner or DEVOPS_ADMIN only).
      * Guards: task must be AUTO + in Ready_For_Execution state.
      */
     @PostMapping("/{id}/submit-auto")
     public ResponseEntity<TaskDto> submitAutoExecution(
             @PathVariable String id,
             @AuthenticationPrincipal UserContext user) {
-        if (!"TL".equals(user.role()) && !"DEVOPS_ADMIN".equals(user.role())) {
-            throw new ForbiddenAppException("task:submitAutoExecution");
-        }
-
         return ResponseEntity.ok(
                 TaskDto.from(autoExecutionService.submitAutoExecution(id, user)));
     }

@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { PaginatedResponse, ReleaseFlowDetail, ReleaseFlowListItem } from '../types'
+import type { PaginatedResponse, ReleaseFlowDetail, ReleaseFlowListItem, Request } from '../types'
 
 export interface ListReleaseFlowsParams {
   project?: string
@@ -18,5 +18,31 @@ export async function listReleaseFlows(
 
 export async function getReleaseFlow(id: string): Promise<ReleaseFlowDetail> {
   const response = await apiClient.get(`/release-flows/${id}`)
+  return response.data
+}
+
+export interface UpdateRequestRundownInput {
+  snowGroup?: string
+  application?: string
+  site?: string
+  estimatedRemainingMinutes?: number
+}
+
+export async function updateRequestRundown(
+  flowId: string,
+  requestId: string,
+  input: UpdateRequestRundownInput
+): Promise<Request> {
+  const response = await apiClient.patch(`/release-flows/${flowId}/requests/${requestId}/rundown`, input)
+  return response.data
+}
+
+export async function startRequestDeployment(flowId: string, requestId: string): Promise<Request> {
+  const response = await apiClient.post(`/release-flows/${flowId}/requests/${requestId}/start`)
+  return response.data
+}
+
+export async function markRequestFailed(flowId: string, requestId: string): Promise<Request> {
+  const response = await apiClient.post(`/release-flows/${flowId}/requests/${requestId}/fail`)
   return response.data
 }

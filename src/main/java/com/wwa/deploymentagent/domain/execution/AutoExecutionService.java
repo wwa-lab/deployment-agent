@@ -47,6 +47,7 @@ public class AutoExecutionService {
 
     private final TaskRepository taskRepository;
     private final TaskExecutionHistoryRepository executionHistoryRepository;
+    private final TaskPermissionService taskPermissionService;
     private final List<AutoExecutionAdapter> adapters;
     private final AuditLoggerService auditLogger;
     private final ReleaseFlowProgressionService progressionService;
@@ -55,6 +56,7 @@ public class AutoExecutionService {
     public Task submitAutoExecution(String taskId, UserContext user) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NotFoundAppException("Task", taskId));
+        taskPermissionService.assertOwnerOrAdmin(task, user, "task:submitAutoExecution");
 
         if (task.getExecutionType() != ExecutionType.AUTO) {
             throw new ConflictAppException(

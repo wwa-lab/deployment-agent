@@ -69,6 +69,7 @@ public class ExcelParserService {
         String taskGroupName= getRequired(row, headers, "Task Name",    excelRow, errors);
         String taskName     = getRequired(row, headers, "Step",         excelRow, errors);
         String execTypeStr  = getRequired(row, headers, "Execution Type", excelRow, errors);
+        boolean critical    = parseCritical(row, headers, excelRow, errors);
 
         Integer stepSeq = parseStepSeq(row, headers, excelRow, errors);
 
@@ -114,7 +115,7 @@ public class ExcelParserService {
 
         rows.add(new ParsedTaskRow(
                 projectId, projectName, taskGroupId, taskGroupName,
-                stepSeq, taskName, executionType,
+                stepSeq, taskName, executionType, critical,
                 inputParams.isEmpty() ? null : inputParams,
                 expectedOutput, owner, plannedStart, plannedEnd,
                 importMeta.isEmpty() ? null : importMeta
@@ -153,6 +154,27 @@ public class ExcelParserService {
                     "Must be MANUAL or AUTO, got: " + raw));
             return null;
         }
+    }
+
+    private boolean parseCritical(Row row, Map<String, Integer> headers, int excelRow, List<ImportError> errors) {
+        if (!headers.containsKey("Critical")) {
+            return false;
+        }
+
+        String raw = getOptionalString(row, headers, "Critical");
+        if (raw == null) {
+            return false;
+        }
+
+        String normalized = raw.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "Y", "YES", "TRUE" -> true;
+            case "N", "NO", "FALSE" -> false;
+            default -> {
+                errors.add(new ImportError(excelRow, "Critical", "Must be Y or N, got: " + raw));
+                yield false;
+            }
+        };
     }
 
     // ─── Field helpers ────────────────────────────────────────────────────────

@@ -13,14 +13,27 @@ const loading = ref(false)
 
 async function handleLogin() {
   error.value = ''
-  if (!employeeId.value || !password.value) {
-    error.value = 'Please enter employee ID and password'
+  const hasEmployeeId = employeeId.value.trim().length > 0
+  const hasPassword = password.value.trim().length > 0
+
+  if (!hasEmployeeId && !hasPassword) {
+    error.value = 'Please enter employee ID and a password.'
+    return
+  }
+
+  if (!hasEmployeeId) {
+    error.value = 'Please enter employee ID.'
+    return
+  }
+
+  if (!hasPassword) {
+    error.value = 'Please enter any non-empty password for local testing.'
     return
   }
   loading.value = true
   try {
     await userStore.login(employeeId.value, password.value)
-    router.push('/release-flows')
+    router.push('/wwa/deployment-agent')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Login failed'
   } finally {
@@ -33,7 +46,7 @@ async function handleLogin() {
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <h1 class="login-title">Deployment Agent</h1>
+        <h1 class="login-title">WWA</h1>
         <p class="login-subtitle">Sign in with your team book credentials</p>
       </div>
 
@@ -62,6 +75,7 @@ async function handleLogin() {
             placeholder="Password"
             autocomplete="current-password"
           />
+          <p class="field-hint">For local testing, any non-empty password works.</p>
         </div>
 
         <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
@@ -142,6 +156,12 @@ async function handleLogin() {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .btn-full {

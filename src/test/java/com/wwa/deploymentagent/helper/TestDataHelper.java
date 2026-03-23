@@ -43,10 +43,15 @@ public class TestDataHelper {
 
     @Transactional
     public Request seedRequest(ReleaseFlow releaseFlow, Stage stage) {
+        return seedRequest(releaseFlow, stage, RequestStatus.Pending);
+    }
+
+    @Transactional
+    public Request seedRequest(ReleaseFlow releaseFlow, Stage stage, RequestStatus status) {
         Request req = new Request();
         req.setReleaseFlow(releaseFlow);
         req.setStage(stage);
-        req.setRequestStatus(RequestStatus.Pending);
+        req.setRequestStatus(status);
         Request saved = requestRepository.save(req);
         entityManager.flush();
         entityManager.refresh(releaseFlow);
@@ -60,6 +65,11 @@ public class TestDataHelper {
 
     @Transactional
     public Task seedTask(Request request, TaskStatus status) {
+        return seedTask(request, status, false);
+    }
+
+    @Transactional
+    public Task seedTask(Request request, TaskStatus status, boolean critical) {
         Task task = new Task();
         task.setRequest(request);
         task.setTaskGroupId("TG-001");
@@ -67,6 +77,7 @@ public class TestDataHelper {
         task.setStepSeq(1);
         task.setTaskName("deploy-app");
         task.setExecutionType(ExecutionType.AUTO);
+        task.setCritical(critical);
         task.setTaskStatus(status);
         task.setInputParameters(java.util.Map.of("script", "deploy.sh", "parameters", "--env staging"));
         task.setExpectedOutput("Deployment successful");
