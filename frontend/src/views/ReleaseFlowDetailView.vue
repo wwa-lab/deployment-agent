@@ -624,6 +624,12 @@ watch(() => store.detail, (val) => {
                           Edit
                         </button>
                       </span>
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        @click.stop="viewingActivityTask = task"
+                      >
+                        Activity
+                      </button>
                       <span class="action-tooltip" :title="viewResultDisabledReason(task) ?? ''">
                         <button
                           class="btn btn-secondary btn-sm"
@@ -642,12 +648,6 @@ watch(() => store.detail, (val) => {
                         {{ submittingAuto === task.id ? 'Submitting...' : 'Submit Auto' }}
                       </button>
                     </div>
-                      <button
-                        class="btn btn-secondary btn-sm"
-                        @click.stop="viewingActivityTask = task"
-                      >
-                        Activity
-                      </button>
                     <span class="action-tooltip" :title="decisionDisabledReason(task) ?? ''">
                       <select
                         class="decision-select"
@@ -747,6 +747,13 @@ watch(() => store.detail, (val) => {
       @saved="onRundownSaved"
       @close="editingRundown = null"
     />
+
+    <TaskActivityDialog
+      v-if="viewingActivityTask"
+      :key="viewingActivityTask.id"
+      :task="viewingActivityTask"
+      @close="viewingActivityTask = null"
+    />
   </div>
 </template>
 
@@ -765,13 +772,6 @@ watch(() => store.detail, (val) => {
 .detail-header {
   padding: 16px 20px;
 }
-
-    <TaskActivityDialog
-      v-if="viewingActivityTask"
-      :key="viewingActivityTask.id"
-      :task="viewingActivityTask"
-      @close="viewingActivityTask = null"
-    />
 
 .header-row {
   display: flex;
