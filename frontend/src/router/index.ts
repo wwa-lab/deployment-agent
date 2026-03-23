@@ -72,7 +72,6 @@ const router = createRouter({
           meta: {
             section: 'configuration-management',
             sectionTitle: 'Configuration Management',
-            requiresRole: ['DEVOPS_ADMIN'],
           },
         },
         {
@@ -82,7 +81,6 @@ const router = createRouter({
           meta: {
             section: 'audit-log',
             sectionTitle: 'Audit Log',
-            requiresRole: ['AUDIT', 'MANAGEMENT'],
           },
         },
       ],
@@ -109,12 +107,6 @@ router.beforeEach(async (to) => {
     if (!userStore.isAuthenticated) {
       return { name: 'login' }
     }
-  }
-
-  // Check role-based access
-  const requiredRoles = to.meta.requiresRole as string[] | undefined
-  if (requiredRoles && !requiredRoles.includes(userStore.role as string)) {
-    return { name: 'wwa-deployment-agent' }
   }
 })
 
