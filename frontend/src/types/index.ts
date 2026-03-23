@@ -14,6 +14,15 @@ export type TaskStatus =
 export type ExecutionType = 'MANUAL' | 'AUTO'
 export type RequestStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Rejected'
 export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT' | 'MANAGEMENT'
+export type ConfigKey =
+  | 'jenkins_url'
+  | 'jenkins_user'
+  | 'jenkins_api_token'
+  | 'ansible_url'
+  | 'ansible_user'
+  | 'ansible_api_token'
+  | 'execution_callback_endpoint'
+export type ConfigIntegrationId = 'jenkins' | 'ansible' | 'callback'
 
 // Task
 export interface Task {
@@ -24,6 +33,7 @@ export interface Task {
   stepSeq: number
   taskName: string
   executionType: ExecutionType
+  critical: boolean
   taskStatus: TaskStatus
   inputParameters: { script?: string; parameters?: string; system?: string }
   expectedOutput?: string
@@ -42,8 +52,11 @@ export interface TaskExecutionHistory {
   taskId: string
   attemptNumber: number
   executionStatus: string
+  inputSnapshot?: Record<string, unknown>
   resultSummary?: Record<string, unknown>
   resultLogs?: string
+  startTime?: string
+  endTime?: string
   externalSystemType?: string
   externalExecutionId?: string
   externalJobUrl?: string
@@ -75,9 +88,13 @@ export interface ReleaseFlowListItem {
   projectId: string
   projectName: string
   releaseId: string
+  normalizedReleaseId?: string
   currentStage: Stage
   flowStatus: FlowStatus
   reviewStatus: ReviewStatus
+  sitStatus: RequestStatus
+  uatStatus: RequestStatus
+  prodStatus: RequestStatus
 }
 
 // ReleaseFlow (detail)
@@ -95,11 +112,35 @@ export interface ReleaseFlowDetail {
 
 // ConfigItem
 export interface ConfigItem {
-  key: string
+  key: ConfigKey
   value: string
   description?: string
   updatedBy?: string
   updatedAt?: string
+}
+
+export interface ConfigComponentRow {
+  id: ConfigIntegrationId
+  label: string
+  category: string
+  endpointKey?: ConfigKey
+  userKey?: ConfigKey
+  secretKey?: ConfigKey
+  endpoint: string
+  serviceUser?: string
+  secretValue?: string
+  secretState: 'Configured' | 'Missing' | 'Not required'
+  description?: string
+  updatedBy?: string
+  updatedAt?: string
+  status: 'Ready' | 'Partial' | 'Needs Setup'
+}
+
+export interface ConfigComponentDraft {
+  endpoint: string
+  serviceUser?: string
+  secretValue?: string
+  description?: string
 }
 
 // AuditLogEntry
@@ -155,6 +196,7 @@ export interface TemplateTask {
   step: number
   stepName: string
   type: ExecutionType
+  critical: boolean
   owner: string
   estDuration: string
   dependencies?: string
@@ -166,6 +208,7 @@ export interface TemplateTaskDraft {
   step: number
   stepName: string
   type: ExecutionType
+  critical: boolean
   owner: string
   estDurationMinutes: number
   dependencies?: string

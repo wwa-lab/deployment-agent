@@ -1,15 +1,147 @@
 <script setup lang="ts">
-import { onMounted, computed, ref, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import ConfigComponentDialog from '../components/ConfigComponentDialog.vue'
 import { useConfigStore } from '../stores/config'
 import { useUserStore } from '../stores/user'
-import type { ConfigItem } from '../types'
+import type {
+  ConfigComponentDraft,
+  ConfigComponentRow,
+  ConfigIntegrationId,
+  ConfigItem,
+  ConfigKey,
+} from '../types'
+
+type ConfigCatalogRow = {
+  key: ConfigKey
+  label: string
+  application: string
+  owningGroup: string
+  integration: string
+  value: string
+  description?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+const COMPONENT_DEFINITIONS: Array<{
+  id: ConfigIntegrationId
+  label: string
+  category: string
+  endpointKey?: ConfigKey
+  userKey?: ConfigKey
+  secretKey?: ConfigKey
+  defaultDescription: string
+}> = [
+  {
+    id: 'jenkins',
+    label: 'Jenkins Pipeline',
+    category: 'CI/CD',
+    endpointKey: 'jenkins_url',
+    userKey: 'jenkins_user',
+    secretKey: 'jenkins_api_token',
+    defaultDescription: 'Configuration used for Jenkins-triggered deployment jobs.',
+  },
+  {
+    id: 'ansible',
+    label: 'Ansible Automation',
+    category: 'Execution',
+    endpointKey: 'ansible_url',
+    userKey: 'ansible_user',
+    secretKey: 'ansible_api_token',
+    defaultDescription: 'Configuration used for Ansible execution and result collection.',
+  },
+  {
+    id: 'callback',
+    label: 'Execution Callback',
+    category: 'Integration',
+    endpointKey: 'execution_callback_endpoint',
+    defaultDescription: 'HTTPS callback endpoint used by external tools to post execution updates.',
+  },
+]
+
+const CONFIG_CATALOG: Array<{
+  key: ConfigKey
+  label: string
+  application: string
+  owningGroup: string
+  integration: string
+}> = [
+  {
+    key: 'jenkins_url',
+    label: 'JENKINS_URL',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    integration: 'Jenkins Pipeline',
+  },
+  {
+    key: 'jenkins_user',
+    label: 'JENKINS_USER',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    integration: 'Jenkins Pipeline',
+  },
+  {
+    key: 'jenkins_api_token',
+    label: 'JENKINS_API_TOKEN',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    integration: 'Jenkins Pipeline',
+  },
+  {
+    key: 'ansible_url',
+    label: 'ANSIBLE_URL',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    integration: 'Ansible Automation',
+  },
+  {
+    key: 'ansible_user',
+    label: 'ANSIBLE_USER',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    integration: 'Ansible Automation',
+  },
+  {
+    key: 'ansible_api_token',
+    label: 'ANSIBLE_API_TOKEN',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    integration: 'Ansible Automation',
+  },
+  {
+    key: 'execution_callback_endpoint',
+    label: 'EXECUTION_CALLBACK_ENDPOINT',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    integration: 'Execution Callback',
+  },
+]
+
+const SECRET_KEYS: ConfigKey[] = ['jenkins_api_token', 'ansible_api_token']
 
 const store = useConfigStore()
 const userStore = useUserStore()
 
-const hasAccess = computed(() => userStore.isDevOpsAdmin)
+const canEdit = computed(() => userStore.isDevOpsAdmin)
 
-// Track which row is being edited
+const activeView = ref<'component' | 'raw'>('raw')
+const searchTerm = ref('')
+const statusFilter = ref<'All' | ConfigComponentRow['status']>('All')
+const filterForm = reactive({
+  owningGroup: 'All',
+  application: 'All',
+  configItem: 'All',
+})
+const appliedFilters = reactive({
+  owningGroup: 'All',
+  application: 'All',
+  configItem: 'All',
+})
+
+const editingComponentId = ref<ConfigIntegrationId | null>(null)
+const componentSaving = ref(false)
+const componentError = ref('')
+
 const editingKey = ref<string | null>(null)
 const editForm = reactive<{ value: string; description: string }>({ value: '', description: '' })
 const savingKey = ref<string | null>(null)
@@ -17,54 +149,257 @@ const rowError = ref<Record<string, string>>({})
 const rowSuccess = ref<Record<string, boolean>>({})
 
 onMounted(() => {
-  if (hasAccess.value) {
-    store.fetchConfig()
-  }
+  store.fetchConfig()
 })
 
-function startEdit(item: ConfigItem) {
-  editingKey.value = item.key
-  editForm.value = item.value
-  editForm.description = item.description ?? ''
-  rowError.value = { ...rowError.value, [item.key]: '' }
-  rowSuccess.value = { ...rowSuccess.value, [item.key]: false }
+const configItemsByKey = computed(() => {
+  return new Map(store.items.map((item) => [item.key, item]))
+})
+
+const componentRows = computed<ConfigComponentRow[]>(() => {
+  return COMPONENT_DEFINITIONS.map((definition) => {
+    const endpointItem = definition.endpointKey
+      ? configItemsByKey.value.get(definition.endpointKey)
+      : undefined
+    const userItem = definition.userKey ? configItemsByKey.value.get(definition.userKey) : undefined
+    const secretItem = definition.secretKey
+      ? configItemsByKey.value.get(definition.secretKey)
+      : undefined
+
+    const existingItems = [endpointItem, userItem, secretItem].filter(
+      (item): item is ConfigItem => Boolean(item),
+    )
+    const configuredRequiredCount = [endpointItem, userItem, secretItem].filter(
+      (item) => item && item.value.trim().length > 0,
+    ).length
+    const requiredCount = [definition.endpointKey, definition.userKey, definition.secretKey].filter(Boolean)
+      .length
+
+    let status: ConfigComponentRow['status'] = 'Needs Setup'
+    if (requiredCount > 0 && configuredRequiredCount === requiredCount) {
+      status = 'Ready'
+    } else if (configuredRequiredCount > 0) {
+      status = 'Partial'
+    }
+
+    const latestItem = [...existingItems]
+      .sort((left, right) => {
+        const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0
+        const rightTime = right.updatedAt ? new Date(right.updatedAt).getTime() : 0
+        return rightTime - leftTime
+      })[0]
+
+    return {
+      id: definition.id,
+      label: definition.label,
+      category: definition.category,
+      endpointKey: definition.endpointKey,
+      userKey: definition.userKey,
+      secretKey: definition.secretKey,
+      endpoint: endpointItem?.value ?? '',
+      serviceUser: userItem?.value,
+      secretValue: secretItem?.value,
+      secretState: definition.secretKey
+        ? secretItem?.value
+          ? 'Configured'
+          : 'Missing'
+        : 'Not required',
+      description: endpointItem?.description || definition.defaultDescription,
+      updatedBy: latestItem?.updatedBy,
+      updatedAt: latestItem?.updatedAt,
+      status,
+    }
+  })
+})
+
+const filteredComponentRows = computed(() => {
+  const query = searchTerm.value.trim().toLowerCase()
+
+  return componentRows.value.filter((row) => {
+    const matchesSearch =
+      query.length === 0 ||
+      row.label.toLowerCase().includes(query) ||
+      row.category.toLowerCase().includes(query) ||
+      row.endpoint.toLowerCase().includes(query) ||
+      (row.serviceUser ?? '').toLowerCase().includes(query) ||
+      (row.description ?? '').toLowerCase().includes(query)
+
+    const matchesStatus = statusFilter.value === 'All' || row.status === statusFilter.value
+    return matchesSearch && matchesStatus
+  })
+})
+
+const rawRows = computed<ConfigCatalogRow[]>(() => {
+  return CONFIG_CATALOG.map((entry) => {
+    const item = configItemsByKey.value.get(entry.key)
+    return {
+      ...entry,
+      value: item?.value ?? '',
+      description: item?.description,
+      updatedBy: item?.updatedBy,
+      updatedAt: item?.updatedAt,
+    }
+  })
+})
+
+const owningGroupOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.owningGroup))])
+const applicationOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.application))])
+const configItemOptions = computed(() => ['All', ...rawRows.value.map((row) => row.label)])
+
+const filteredRawRows = computed(() => {
+  return rawRows.value.filter((row) => {
+    const matchesOwningGroup =
+      appliedFilters.owningGroup === 'All' || row.owningGroup === appliedFilters.owningGroup
+    const matchesApplication =
+      appliedFilters.application === 'All' || row.application === appliedFilters.application
+    const matchesConfigItem =
+      appliedFilters.configItem === 'All' || row.label === appliedFilters.configItem
+
+    return matchesOwningGroup && matchesApplication && matchesConfigItem
+  })
+})
+
+const editingComponent = computed(() => {
+  if (!editingComponentId.value) return null
+  return componentRows.value.find((row) => row.id === editingComponentId.value) ?? null
+})
+
+function refreshConfig() {
+  store.fetchConfig()
+}
+
+function applyRawFilters() {
+  appliedFilters.owningGroup = filterForm.owningGroup
+  appliedFilters.application = filterForm.application
+  appliedFilters.configItem = filterForm.configItem
+}
+
+function resetRawFilters() {
+  filterForm.owningGroup = 'All'
+  filterForm.application = 'All'
+  filterForm.configItem = 'All'
+  applyRawFilters()
+}
+
+function selectView(view: 'component' | 'raw') {
+  activeView.value = view
+}
+
+function openComponentEditor(component: ConfigComponentRow) {
+  if (!canEdit.value) return
+  editingComponentId.value = component.id
+  componentError.value = ''
+}
+
+function closeComponentEditor() {
+  editingComponentId.value = null
+  componentSaving.value = false
+  componentError.value = ''
+}
+
+async function saveComponent(draft: ConfigComponentDraft) {
+  if (!editingComponent.value || !canEdit.value) return
+
+  componentSaving.value = true
+  componentError.value = ''
+
+  try {
+    const updates: Array<{ key: ConfigKey; value: string; description?: string }> = []
+
+    if (editingComponent.value.endpointKey) {
+      updates.push({
+        key: editingComponent.value.endpointKey,
+        value: draft.endpoint,
+        description: draft.description ?? '',
+      })
+    }
+
+    if (editingComponent.value.userKey && draft.serviceUser) {
+      updates.push({
+        key: editingComponent.value.userKey,
+        value: draft.serviceUser,
+      })
+    }
+
+    if (editingComponent.value.secretKey && draft.secretValue) {
+      updates.push({
+        key: editingComponent.value.secretKey,
+        value: draft.secretValue,
+      })
+    }
+
+    for (const update of updates) {
+      await store.saveConfig(update)
+    }
+
+    closeComponentEditor()
+  } catch (error: unknown) {
+    componentError.value =
+      error instanceof Error ? error.message : 'Failed to save component configuration'
+  } finally {
+    componentSaving.value = false
+  }
+}
+
+function startEdit(row: ConfigCatalogRow) {
+  editingKey.value = row.key
+  editForm.value = row.value
+  editForm.description = row.description ?? ''
+  rowError.value = { ...rowError.value, [row.key]: '' }
+  rowSuccess.value = { ...rowSuccess.value, [row.key]: false }
 }
 
 function cancelEdit() {
   editingKey.value = null
 }
 
-async function saveEdit(item: ConfigItem) {
-  savingKey.value = item.key
-  rowError.value = { ...rowError.value, [item.key]: '' }
+async function saveEdit(row: ConfigCatalogRow) {
+  if (!canEdit.value) return
+  savingKey.value = row.key
+  rowError.value = { ...rowError.value, [row.key]: '' }
+
   try {
     await store.saveConfig({
-      key: item.key,
+      key: row.key,
       value: editForm.value,
       description: editForm.description,
     })
-    rowSuccess.value = { ...rowSuccess.value, [item.key]: true }
+    rowSuccess.value = { ...rowSuccess.value, [row.key]: true }
     editingKey.value = null
     setTimeout(() => {
-      rowSuccess.value = { ...rowSuccess.value, [item.key]: false }
+      rowSuccess.value = { ...rowSuccess.value, [row.key]: false }
     }, 2000)
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     rowError.value = {
       ...rowError.value,
-      [item.key]: e instanceof Error ? e.message : 'Save failed',
+      [row.key]: error instanceof Error ? error.message : 'Save failed',
     }
   } finally {
     savingKey.value = null
   }
 }
 
-function formatDate(d?: string): string {
-  if (!d) return '—'
+function isSecretKey(key: ConfigKey) {
+  return SECRET_KEYS.includes(key)
+}
+
+function formatValue(item: { key: ConfigKey; value: string }) {
+  if (!item.value) return '—'
+  if (!isSecretKey(item.key)) return item.value
+  return '••••••••'
+}
+
+function formatDate(value?: string) {
+  if (!value) return '—'
   try {
-    return new Date(d).toLocaleString()
+    return new Date(value).toLocaleString()
   } catch {
-    return d
+    return value
   }
+}
+
+function displayValue(value?: string) {
+  return value && value.trim().length > 0 ? value : '—'
 }
 </script>
 
@@ -74,97 +409,305 @@ function formatDate(d?: string): string {
       <div>
         <p class="view-eyebrow">WWA Shared Capability</p>
         <h1 class="view-title">Configuration Management</h1>
+        <p class="view-subtitle">
+          Manage the shared system integrations used by Deployment Agent execution and review
+          workflows.
+        </p>
       </div>
+
+      <button class="btn btn-secondary" type="button" :disabled="store.loading" @click="refreshConfig">
+        {{ store.loading ? 'Refreshing...' : 'Refresh' }}
+      </button>
     </div>
 
-    <div v-if="!hasAccess" class="alert alert-error">
-      Access denied. This page requires DEVOPS_ADMIN role.
+    <div v-if="!canEdit" class="helper-banner helper-banner-muted">
+      You are in read-only mode. All signed-in users can review shared configuration, and only
+      <strong>DEVOPS_ADMIN</strong> can edit it. For local testing, use <strong>emp-003</strong>
+      if you want to verify editing behavior.
     </div>
 
-    <template v-else>
-      <div v-if="store.loading && store.items.length === 0" class="loading-state">
-        <span class="spinner"></span>
-        <span>Loading configuration...</span>
-      </div>
+    <div class="mode-tabs">
+        <button
+          class="mode-tab"
+          :class="{ active: activeView === 'component' }"
+          type="button"
+          @click="selectView('component')"
+        >
+          Component
+        </button>
+        <button
+          class="mode-tab"
+          :class="{ active: activeView === 'raw' }"
+          type="button"
+          @click="selectView('raw')"
+        >
+          Configuration
+        </button>
+    </div>
 
-      <div v-else-if="!store.loading && store.items.length === 0" class="empty-state">
-        No configuration items found.
-      </div>
+    <div v-if="activeView === 'component'" class="component-workspace">
+        <div class="helper-banner">
+          This view groups the current backend configuration keys into reusable integration
+          components. Use <strong>Configuration</strong> only when you need key-level edits.
+        </div>
 
-      <div v-else class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Key</th>
-              <th>Value</th>
-              <th>Description</th>
-              <th>Updated By</th>
-              <th>Updated At</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="item in store.items" :key="item.key">
+        <div v-if="store.error" class="alert alert-error">
+          {{ store.error }}
+        </div>
+
+        <div class="toolbar-card">
+          <div class="toolbar-grid">
+            <div class="toolbar-field toolbar-field-wide">
+              <label class="toolbar-label">Component Name</label>
+              <input
+                v-model="searchTerm"
+                class="form-control"
+                type="text"
+                placeholder="Search component, description, or endpoint"
+              />
+            </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Status</label>
+              <select v-model="statusFilter" class="form-control">
+                <option value="All">All Statuses</option>
+                <option value="Ready">Ready</option>
+                <option value="Partial">Partial</option>
+                <option value="Needs Setup">Needs Setup</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-header">
+            <div>
+              <h2 class="section-title">Available Components ({{ filteredComponentRows.length }})</h2>
+              <p class="section-subtitle">
+                Fixed integrations backed by the current system configuration keys.
+              </p>
+            </div>
+          </div>
+
+          <div v-if="filteredComponentRows.length === 0" class="empty-state">
+            No components matched the current filters.
+          </div>
+
+          <div v-else class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Area</th>
+                  <th>Endpoint</th>
+                  <th>Service User</th>
+                  <th>Secret</th>
+                  <th>Status</th>
+                  <th>Updated By</th>
+                  <th>Updated On</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="component in filteredComponentRows" :key="component.id">
+                  <td>
+                    <div class="component-name">{{ component.label }}</div>
+                    <div class="component-description">{{ component.description }}</div>
+                  </td>
+                  <td>{{ component.category }}</td>
+                  <td class="endpoint-cell">{{ displayValue(component.endpoint) }}</td>
+                  <td>{{ displayValue(component.serviceUser) }}</td>
+                  <td>
+                    <span class="secret-badge" :class="`secret-${component.secretState.toLowerCase().replace(/ /g, '-')}`">
+                      {{ component.secretState }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="status-badge" :class="`status-${component.status.toLowerCase().replace(/ /g, '-')}`">
+                      {{ component.status }}
+                    </span>
+                  </td>
+                  <td>{{ component.updatedBy ?? '—' }}</td>
+                  <td class="timestamp">{{ formatDate(component.updatedAt) }}</td>
+                  <td>
+                    <button
+                      class="btn btn-secondary btn-sm"
+                      type="button"
+                      :disabled="!canEdit"
+                      :title="canEdit ? '' : 'DEVOPS_ADMIN can edit configuration.'"
+                      @click="openComponentEditor(component)"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+    </div>
+
+    <div v-else class="raw-workspace">
+        <div class="helper-banner helper-banner-muted">
+          Configuration lists the fixed catalog of backend-managed settings. This view is closer to
+          a traditional admin table: filter by context, review values, and edit only when needed.
+        </div>
+
+        <div class="toolbar-card">
+          <div class="toolbar-grid toolbar-grid-config">
+            <div class="toolbar-field">
+              <label class="toolbar-label">Owning Group</label>
+              <select v-model="filterForm.owningGroup" class="form-control">
+                <option v-for="group in owningGroupOptions" :key="group" :value="group">
+                  {{ group === 'All' ? 'All Owning Groups' : group }}
+                </option>
+              </select>
+            </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Application</label>
+              <select v-model="filterForm.application" class="form-control">
+                <option v-for="application in applicationOptions" :key="application" :value="application">
+                  {{ application === 'All' ? 'All Applications' : application }}
+                </option>
+              </select>
+            </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Config Item</label>
+              <select v-model="filterForm.configItem" class="form-control">
+                <option v-for="item in configItemOptions" :key="item" :value="item">
+                  {{ item === 'All' ? 'All Config Items' : item }}
+                </option>
+              </select>
+            </div>
+
+            <div class="toolbar-actions">
+              <button class="btn btn-primary" type="button" @click="applyRawFilters">Search</button>
+              <button class="btn btn-secondary" type="button" @click="resetRawFilters">Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="store.error" class="alert alert-error">
+          {{ store.error }}
+        </div>
+
+        <div v-if="store.loading && store.items.length === 0" class="loading-state">
+          <span class="spinner"></span>
+          <span>Loading configuration...</span>
+        </div>
+
+        <div v-else-if="!store.loading && filteredRawRows.length === 0" class="empty-state">
+          No configuration items matched the current filters.
+        </div>
+
+        <div v-else class="table-card">
+          <div class="table-header">
+            <div>
+              <h2 class="section-title">Configuration Items ({{ filteredRawRows.length }})</h2>
+              <p class="section-subtitle">
+                Current backend supports a fixed set of integration keys, so this table focuses on
+                review and maintenance rather than free-form creation.
+              </p>
+            </div>
+          </div>
+
+          <div class="table-container">
+          <table class="data-table">
+            <thead>
               <tr>
-                <td class="key-cell mono">{{ item.key }}</td>
-                <td>
-                  <template v-if="editingKey === item.key">
-                    <input
-                      v-model="editForm.value"
-                      class="form-control inline-input"
-                      type="text"
-                    />
-                  </template>
-                  <template v-else>{{ item.value }}</template>
-                </td>
-                <td>
-                  <template v-if="editingKey === item.key">
-                    <input
-                      v-model="editForm.description"
-                      class="form-control inline-input"
-                      type="text"
-                      placeholder="Description..."
-                    />
-                  </template>
-                  <template v-else>{{ item.description ?? '—' }}</template>
-                </td>
-                <td>{{ item.updatedBy ?? '—' }}</td>
-                <td class="timestamp">{{ formatDate(item.updatedAt) }}</td>
-                <td>
-                  <div class="action-btns">
-                    <template v-if="editingKey === item.key">
-                      <button
-                        class="btn btn-primary btn-sm"
-                        :disabled="savingKey === item.key"
-                        @click="saveEdit(item)"
-                      >
-                        <span v-if="savingKey === item.key" class="spinner" style="width:12px;height:12px;border-width:1px;"></span>
-                        Save
-                      </button>
-                      <button class="btn btn-secondary btn-sm" @click="cancelEdit">
-                        Cancel
-                      </button>
+                <th>Application</th>
+                <th>Owning Group</th>
+                <th>Config Item</th>
+                <th>Config Value</th>
+                <th>Updated By</th>
+                <th>Updated Time</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="row in filteredRawRows" :key="row.key">
+                <tr>
+                  <td>{{ row.application }}</td>
+                  <td>{{ row.owningGroup }}</td>
+                  <td>
+                    <div class="config-item-name mono">{{ row.label }}</div>
+                    <div class="config-item-meta">{{ row.integration }}</div>
+                  </td>
+                  <td class="config-value-cell">
+                    <template v-if="editingKey === row.key">
+                      <input
+                        v-model="editForm.value"
+                        class="form-control inline-input"
+                        :type="isSecretKey(row.key) ? 'password' : 'text'"
+                      />
+                      <input
+                        v-model="editForm.description"
+                        class="form-control inline-input description-input"
+                        type="text"
+                        placeholder="Optional description..."
+                      />
                     </template>
                     <template v-else>
-                      <button class="btn btn-secondary btn-sm" @click="startEdit(item)">
-                        Edit
-                      </button>
+                      <div class="config-value-text">{{ formatValue(row) }}</div>
+                      <div class="config-item-meta">{{ row.description ?? 'No description' }}</div>
                     </template>
-                  </div>
-                </td>
-              </tr>
-              <!-- Inline feedback row -->
-              <tr v-if="rowError[item.key] || rowSuccess[item.key]">
-                <td colspan="6" style="padding:4px 14px 8px">
-                  <span v-if="rowError[item.key]" class="feedback-error">{{ rowError[item.key] }}</span>
-                  <span v-if="rowSuccess[item.key]" class="feedback-success">Saved successfully.</span>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </template>
+                  </td>
+                  <td>{{ row.updatedBy ?? '—' }}</td>
+                  <td class="timestamp">{{ formatDate(row.updatedAt) }}</td>
+                  <td>
+                    <div class="action-btns">
+                      <template v-if="editingKey === row.key">
+                        <button
+                          class="btn btn-primary btn-sm"
+                          :disabled="savingKey === row.key"
+                          @click="saveEdit(row)"
+                        >
+                          <span
+                            v-if="savingKey === row.key"
+                            class="spinner"
+                            style="width: 12px; height: 12px; border-width: 1px"
+                          ></span>
+                          Save
+                        </button>
+                        <button class="btn btn-secondary btn-sm" @click="cancelEdit">Cancel</button>
+                      </template>
+                      <template v-else>
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          :disabled="!canEdit"
+                          :title="canEdit ? '' : 'DEVOPS_ADMIN can edit configuration.'"
+                          @click="startEdit(row)"
+                        >
+                          {{ row.value ? 'Edit' : 'Set Value' }}
+                        </button>
+                      </template>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="rowError[row.key] || rowSuccess[row.key]">
+                  <td colspan="7" class="feedback-row">
+                    <span v-if="rowError[row.key]" class="feedback-error">{{ rowError[row.key] }}</span>
+                    <span v-if="rowSuccess[row.key]" class="feedback-success">Saved successfully.</span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        </div>
+    </div>
+
+    <ConfigComponentDialog
+      v-if="editingComponent"
+      :key="editingComponent.id"
+      :component="editingComponent"
+      :saving="componentSaving"
+      :error="componentError"
+      @close="closeComponentEditor"
+      @save="saveComponent"
+    />
   </div>
 </template>
 
@@ -172,13 +715,14 @@ function formatDate(d?: string): string {
 .config-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .view-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
 }
 
 .view-eyebrow {
@@ -191,17 +735,213 @@ function formatDate(d?: string): string {
 }
 
 .view-title {
+  margin: 0;
   font-size: 28px;
   font-weight: 700;
   color: #0f172a;
+}
+
+.view-subtitle {
+  margin: 8px 0 0;
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #dbe3f0;
+}
+
+.mode-tab {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mode-tab.active {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.component-workspace,
+.raw-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.helper-banner {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff, #f8fafc);
+  border: 1px solid #dbeafe;
+  color: #1e3a8a;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.helper-banner-muted {
+  color: #475569;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.toolbar-card,
+.table-card,
+.table-container {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.toolbar-card {
+  padding: 18px;
+}
+
+.toolbar-grid {
+  display: grid;
+  grid-template-columns: 2fr minmax(180px, 260px);
+  gap: 16px;
+}
+
+.toolbar-grid-config {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.toolbar-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.table-card {
+  padding: 18px;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.section-title {
   margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.section-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
 }
 
 .table-container {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   overflow: hidden;
+}
+
+.component-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.component-description {
+  margin-top: 4px;
+  max-width: 320px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.endpoint-cell {
+  max-width: 260px;
+  word-break: break-word;
+}
+
+.config-item-name {
+  font-size: 13px;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.config-item-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.config-value-cell {
+  min-width: 280px;
+}
+
+.config-value-text {
+  max-width: 420px;
+  word-break: break-word;
+  color: #0f172a;
+}
+
+.status-badge,
+.secret-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-ready {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-partial {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.status-needs-setup {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.secret-configured {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.secret-missing {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.secret-not-required {
+  color: #475569;
+  background: #e2e8f0;
 }
 
 .key-cell {
@@ -210,7 +950,9 @@ function formatDate(d?: string): string {
   white-space: nowrap;
 }
 
-.mono { font-family: monospace; }
+.mono {
+  font-family: monospace;
+}
 
 .timestamp {
   font-size: 12px;
@@ -219,13 +961,20 @@ function formatDate(d?: string): string {
 }
 
 .inline-input {
-  padding: 4px 8px;
-  min-width: 160px;
+  min-width: 180px;
+}
+
+.description-input {
+  margin-top: 8px;
 }
 
 .action-btns {
   display: flex;
   gap: 6px;
+}
+
+.feedback-row {
+  padding: 4px 14px 8px;
 }
 
 .feedback-error {
@@ -236,5 +985,26 @@ function formatDate(d?: string): string {
 .feedback-success {
   font-size: 12px;
   color: #16a34a;
+}
+
+@media (max-width: 1080px) {
+  .toolbar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-grid-config {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .view-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mode-tabs {
+    overflow-x: auto;
+  }
 }
 </style>
