@@ -8,6 +8,7 @@ import { markRequestFailed, startRequestDeployment } from '../api/releaseFlows'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
 import DecisionDialog from '../components/DecisionDialog.vue'
 import RundownEditDialog from '../components/RundownEditDialog.vue'
+import TaskActivityDialog from '../components/TaskActivityDialog.vue'
 import type { Task, TaskResult, Request } from '../types'
 
 type DecisionOption = 'Approve' | 'Reject' | 'Rerun' | 'Skip'
@@ -21,6 +22,7 @@ const flowId = computed(() => route.params.id as string)
 
 const editingTask = ref<Task | null>(null)
 const decidingTask = ref<Task | null>(null)
+const viewingActivityTask = ref<Task | null>(null)
 const initialDecision = ref<DecisionOption | null>(null)
 const editingRundown = ref<Request | null>(null)
 const requestActionLoadingId = ref<string | null>(null)
@@ -622,6 +624,12 @@ watch(() => store.detail, (val) => {
                         {{ submittingAuto === task.id ? 'Submitting...' : 'Submit Auto' }}
                       </button>
                     </div>
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        @click.stop="viewingActivityTask = task"
+                      >
+                        Activity
+                      </button>
                     <span class="action-tooltip" :title="decisionDisabledReason(task) ?? ''">
                       <select
                         class="decision-select"
@@ -739,6 +747,13 @@ watch(() => store.detail, (val) => {
 .detail-header {
   padding: 16px 20px;
 }
+
+    <TaskActivityDialog
+      v-if="viewingActivityTask"
+      :key="viewingActivityTask.id"
+      :task="viewingActivityTask"
+      @close="viewingActivityTask = null"
+    />
 
 .header-row {
   display: flex;

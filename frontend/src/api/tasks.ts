@@ -1,6 +1,11 @@
 import apiClient from './client'
 import type { Task, TaskExecutionHistory, TaskResult } from '../types'
 
+export async function listTaskExecutions(taskId: string): Promise<TaskExecutionHistory[]> {
+  const response = await apiClient.get(`/tasks/${taskId}/executions`)
+  return response.data as TaskExecutionHistory[]
+}
+
 export async function recordResult(
   taskId: string,
   body: { resultSummary: Record<string, unknown>; resultLogs?: string }
@@ -26,8 +31,7 @@ export async function getTaskResult(
   taskId: string,
   executionId?: string
 ): Promise<TaskResult> {
-  const response = await apiClient.get(`/tasks/${taskId}/executions`)
-  const executions = response.data as TaskExecutionHistory[]
+  const executions = await listTaskExecutions(taskId)
   const selectedExecution = executionId
     ? executions.find((execution) => execution.id === executionId)
     : executions[executions.length - 1]
