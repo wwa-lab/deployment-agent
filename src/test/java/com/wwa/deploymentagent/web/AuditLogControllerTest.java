@@ -36,8 +36,9 @@ class AuditLogControllerTest {
     @Test
     @DisplayName("list_returnsAuditEntries_forAnyAuthenticatedUser - GET /audit-logs returns 200 with paginated records")
     void list_returnsAuditEntries_forAnyAuthenticatedUser() throws Exception {
+        String operatorId = "audit-test-user";
         AuditLogEntry entry = new AuditLogEntry();
-        entry.setOperatorId("emp-001");
+        entry.setOperatorId(operatorId);
         entry.setOperatorRole("DEVELOPER");
         entry.setActionType(AuditActionType.request_start);
         entry.setReleaseFlowId("rf-001");
@@ -47,11 +48,12 @@ class AuditLogControllerTest {
         auditLogRepository.save(entry);
 
         mockMvc.perform(get(BASE)
+                        .param("operatorId", operatorId)
                         .header("X-User-Id", "emp-001")
                         .header("X-User-Role", "DEVELOPER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data[0].operatorId").value("emp-001"))
+                .andExpect(jsonPath("$.data[0].operatorId").value(operatorId))
                 .andExpect(jsonPath("$.data[0].actionType").value("request_start"))
                 .andExpect(jsonPath("$.total").value(1));
     }
