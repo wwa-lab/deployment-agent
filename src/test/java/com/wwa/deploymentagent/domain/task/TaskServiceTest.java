@@ -55,7 +55,7 @@ class TaskServiceTest {
         Map<String, Object> input = Map.of("script", "deploy.sh", "parameters", "--env staging");
         CreateTaskInput createInput = new CreateTaskInput(
                 request, "TG-001", "Deploy App", 1, "deploy-app",
-                ExecutionType.AUTO, input, "Deployment successful", "alice",
+                ExecutionType.AUTO, true, input, "Deployment successful", "alice",
                 null, null, null);
 
         Task task = taskService.create(createInput);
@@ -66,6 +66,7 @@ class TaskServiceTest {
         assertThat(task.getStepSeq()).isEqualTo(1);
         assertThat(task.getTaskName()).isEqualTo("deploy-app");
         assertThat(task.getExecutionType()).isEqualTo(ExecutionType.AUTO);
+        assertThat(task.isCritical()).isTrue();
         assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.Pending);
         assertThat(task.getInputParameters()).containsEntry("script", "deploy.sh");
         assertThat(task.getExpectedOutput()).isEqualTo("Deployment successful");
@@ -79,11 +80,12 @@ class TaskServiceTest {
     void create_manualTask() {
         CreateTaskInput createInput = new CreateTaskInput(
                 request, "TG-002", "Manual Step", 1, "manual-step",
-                ExecutionType.MANUAL, null, null, null, null, null, null);
+                ExecutionType.MANUAL, false, null, null, null, null, null, null);
 
         Task task = taskService.create(createInput);
 
         assertThat(task.getExecutionType()).isEqualTo(ExecutionType.MANUAL);
+        assertThat(task.isCritical()).isFalse();
         assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.Pending);
     }
 

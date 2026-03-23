@@ -31,6 +31,7 @@ const templates = ref<TemplateRecord[]>([
         step: 1,
         stepName: 'verify build artifact',
         type: 'MANUAL',
+        critical: false,
         owner: 'alice',
         estDuration: '5m',
       },
@@ -41,6 +42,7 @@ const templates = ref<TemplateRecord[]>([
         step: 2,
         stepName: 'trigger deployment job',
         type: 'AUTO',
+        critical: true,
         owner: 'alice',
         estDuration: '10m',
         dependencies: 'Prepare Deployment Package',
@@ -52,6 +54,7 @@ const templates = ref<TemplateRecord[]>([
         step: 3,
         stepName: 'confirm service health',
         type: 'MANUAL',
+        critical: true,
         owner: 'alice',
         estDuration: '5m',
         dependencies: 'Deploy Application',
@@ -80,6 +83,7 @@ const templates = ref<TemplateRecord[]>([
         step: 1,
         stepName: 'collect sit release files',
         type: 'MANUAL',
+        critical: false,
         owner: 'alice',
         estDuration: '10m',
       },
@@ -90,6 +94,7 @@ const templates = ref<TemplateRecord[]>([
         step: 2,
         stepName: 'confirm sit environment readiness',
         type: 'MANUAL',
+        critical: true,
         owner: 'alice',
         estDuration: '10m',
         dependencies: 'Prepare Deployment Package',
@@ -101,6 +106,7 @@ const templates = ref<TemplateRecord[]>([
         step: 3,
         stepName: 'deploy sit package',
         type: 'AUTO',
+        critical: true,
         owner: 'alice',
         estDuration: '20m',
         dependencies: 'Pre-Deployment Checks',
@@ -112,6 +118,7 @@ const templates = ref<TemplateRecord[]>([
         step: 4,
         stepName: 'run sit verification checklist',
         type: 'MANUAL',
+        critical: false,
         owner: 'alice',
         estDuration: '20m',
         dependencies: 'Deploy Application',
@@ -140,6 +147,7 @@ const templates = ref<TemplateRecord[]>([
         step: 1,
         stepName: 'lock approved uat bundle',
         type: 'MANUAL',
+        critical: false,
         owner: 'bob',
         estDuration: '20m',
       },
@@ -150,6 +158,7 @@ const templates = ref<TemplateRecord[]>([
         step: 2,
         stepName: 'confirm deployment approval',
         type: 'MANUAL',
+        critical: true,
         owner: 'bob',
         estDuration: '15m',
         dependencies: 'Prepare Deployment Package',
@@ -161,6 +170,7 @@ const templates = ref<TemplateRecord[]>([
         step: 3,
         stepName: 'run uat deployment job',
         type: 'AUTO',
+        critical: true,
         owner: 'bob',
         estDuration: '45m',
         dependencies: 'Approval Gate',
@@ -172,6 +182,7 @@ const templates = ref<TemplateRecord[]>([
         step: 4,
         stepName: 'capture evidence and hand over',
         type: 'MANUAL',
+        critical: false,
         owner: 'bob',
         estDuration: '40m',
         dependencies: 'Deploy Application',
@@ -200,6 +211,7 @@ const templates = ref<TemplateRecord[]>([
         step: 1,
         stepName: 'confirm prd slot and stakeholders',
         type: 'MANUAL',
+        critical: false,
         owner: 'carol',
         estDuration: '30m',
       },
@@ -210,6 +222,7 @@ const templates = ref<TemplateRecord[]>([
         step: 2,
         stepName: 'complete production backup',
         type: 'AUTO',
+        critical: true,
         owner: 'carol',
         estDuration: '45m',
         dependencies: 'Prepare Change Window',
@@ -221,6 +234,7 @@ const templates = ref<TemplateRecord[]>([
         step: 3,
         stepName: 'run production deployment',
         type: 'AUTO',
+        critical: true,
         owner: 'carol',
         estDuration: '90m',
         dependencies: 'Backup and Safeguard',
@@ -232,6 +246,7 @@ const templates = ref<TemplateRecord[]>([
         step: 4,
         stepName: 'validate production health checks',
         type: 'MANUAL',
+        critical: true,
         owner: 'carol',
         estDuration: '45m',
         dependencies: 'Deploy Application',
@@ -243,6 +258,7 @@ const templates = ref<TemplateRecord[]>([
         step: 5,
         stepName: 'confirm rollback evidence pack',
         type: 'MANUAL',
+        critical: false,
         owner: 'carol',
         estDuration: '30m',
         dependencies: 'Post-Release Validation',
@@ -380,6 +396,10 @@ function resetFilters() {
 
 function executionTypeBadgeClass(type: 'MANUAL' | 'AUTO'): string {
   return type === 'MANUAL' ? 'badge-manual' : 'badge-auto'
+}
+
+function criticalBadgeClass(isCritical: boolean): string {
+  return isCritical ? 'badge-critical-yes' : 'badge-critical-no'
 }
 
 function formatDateTime(value: string): string {
@@ -591,6 +611,7 @@ function saveTask(draft: TemplateTaskDraft) {
     step: draft.step,
     stepName: draft.stepName,
     type: draft.type,
+    critical: draft.critical,
     owner: draft.owner,
     estDuration: formatDuration(draft.estDurationMinutes),
     dependencies: draft.dependencies,
@@ -945,6 +966,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
                     <th>Step</th>
                     <th>Step Name</th>
                     <th>Type</th>
+                    <th>Critical</th>
                     <th>Owner</th>
                     <th>Est. Duration</th>
                     <th>Dependencies</th>
@@ -959,6 +981,15 @@ function submitTemplate(draft: CreateTemplateDraft) {
                     <td>{{ task.stepName }}</td>
                     <td>
                       <span class="badge" :class="executionTypeBadgeClass(task.type)">{{ task.type }}</span>
+                    </td>
+                    <td>
+                      <span
+                        class="badge"
+                        :class="criticalBadgeClass(task.critical)"
+                        :title="task.critical ? 'This task is a review gate in the template' : 'This task does not block the next task'"
+                      >
+                        {{ task.critical ? 'Y' : 'N' }}
+                      </span>
                     </td>
                     <td>{{ task.owner }}</td>
                     <td>{{ task.estDuration }}</td>
@@ -1191,6 +1222,16 @@ function submitTemplate(draft: CreateTemplateDraft) {
 .site-pill {
   background: #eff6ff;
   color: #2563eb;
+}
+
+.badge-critical-yes {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.badge-critical-no {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .description-cell {

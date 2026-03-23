@@ -30,6 +30,7 @@ import java.util.UUID;
  *   <li>{@code stepSeq}         ← Excel "Step seq#"</li>
  *   <li>{@code taskName}        ← Excel "Step"</li>
  *   <li>{@code executionType}   ← Excel "Execution Type" (MANUAL | AUTO)</li>
+ *   <li>{@code critical}        ← Excel "Critical" (Y | N)</li>
  *   <li>{@code inputParameters} ← Excel "Script to be executed" + "Parameter (input)"</li>
  *   <li>{@code expectedOutput}  ← Excel "Parameter (Expected Output)"</li>
  *   <li>{@code owner}           ← Excel "Owner"</li>
@@ -90,6 +91,14 @@ public class Task {
     @Enumerated(EnumType.STRING)
     @Column(name = "task_status", length = 30, nullable = false)
     private TaskStatus taskStatus = TaskStatus.Pending;
+
+    /**
+     * From Excel "Critical" (Y/N).
+     * Critical tasks act as review gates: once execution is complete, the next task must not be
+     * released until this task is explicitly reviewed and approved/skipped.
+     */
+    @Column(name = "critical_flag", nullable = false)
+    private boolean critical;
 
     /**
      * Task input parameters as JSON: { "script": "...", "parameters": "..." }.

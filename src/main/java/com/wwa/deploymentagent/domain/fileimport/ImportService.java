@@ -135,6 +135,7 @@ public class ImportService {
         task.setStepSeq(row.stepSeq());
         task.setTaskName(row.taskName());
         task.setExecutionType(row.executionType());
+        task.setCritical(row.critical());
         task.setInputParameters(row.inputParameters());
         task.setExpectedOutput(row.expectedOutput());
         task.setOwner(row.owner());

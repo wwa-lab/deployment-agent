@@ -1,0 +1,2 @@
+ALTER TABLE DA_TASK
+    ADD (critical_flag NUMBER(1) DEFAULT 0 NOT NULL);

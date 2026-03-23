@@ -21,7 +21,7 @@ public class UploadTemplateService {
             "Script to be executed", "Parameter (input)",
             "Parameter (Expected Output)", "Owner",
             "Planned Start date/time", "Planned End date/time",
-            "Activity category", "Common", "Dependencies", "Validation",
+            "Activity category", "Common", "Dependencies", "Validation", "Critical",
             "Status", "Start date/time", "End date/time"
     };
 
@@ -53,6 +53,7 @@ public class UploadTemplateService {
             sample.createCell(14).setCellValue("N");
             sample.createCell(15).setCellValue("DB ready");
             sample.createCell(16).setCellValue("Smoke test passes");
+            sample.createCell(17).setCellValue("Y");
 
             for (int i = 0; i < HEADERS.length; i++) {
                 sheet.autoSizeColumn(i);

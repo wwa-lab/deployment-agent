@@ -34,6 +34,7 @@ const form = reactive({
   step: props.task?.step ?? props.nextStep,
   stepName: props.task?.stepName ?? '',
   type: props.task?.type ?? 'MANUAL',
+  critical: props.task?.critical ?? false,
   owner: props.task?.owner ?? props.defaultOwner,
   estDurationMinutes: parseDurationToMinutes(props.task?.estDuration),
   dependencies: props.task?.dependencies ?? '',
@@ -87,6 +88,7 @@ async function submit() {
       step: form.step,
       stepName: form.stepName.trim(),
       type: form.type,
+      critical: form.critical,
       owner: form.owner.trim(),
       estDurationMinutes: form.estDurationMinutes,
       dependencies: form.dependencies.trim() || undefined,
@@ -160,6 +162,17 @@ async function submit() {
               type="text"
               placeholder="Enter owner"
             />
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Critical</label>
+            <select v-model="form.critical" class="form-control">
+              <option :value="true">Yes (gate)</option>
+              <option :value="false">No</option>
+            </select>
+            <div class="field-hint">
+              Critical tasks must be reviewed before the next task can be released.
+            </div>
           </div>
 
           <div class="form-row">

@@ -55,6 +55,14 @@ function executionTypeBadgeClass(type: string): string {
   return type === 'MANUAL' ? 'badge-manual' : 'badge-auto'
 }
 
+function criticalBadgeClass(isCritical: boolean): string {
+  return isCritical ? 'badge-critical-yes' : 'badge-critical-no'
+}
+
+function criticalLabel(isCritical: boolean): string {
+  return isCritical ? 'Y' : 'N'
+}
+
 function normalizeIdentity(value: string | null | undefined): string {
   return (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
@@ -572,6 +580,7 @@ watch(() => store.detail, (val) => {
                 <th>Step</th>
                 <th>Step Name</th>
                 <th>Type</th>
+                <th>Critical</th>
                 <th>Status</th>
                 <th>Owner</th>
                 <th>Actions</th>
@@ -586,6 +595,15 @@ watch(() => store.detail, (val) => {
                 <td>
                   <span class="badge" :class="executionTypeBadgeClass(task.executionType)">
                     {{ task.executionType }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    class="badge"
+                    :class="criticalBadgeClass(task.critical)"
+                    :title="task.critical ? 'Must be reviewed before the next task can be released' : 'Does not block the next task from being released'"
+                  >
+                    {{ criticalLabel(task.critical) }}
                   </span>
                 </td>
                 <td>
@@ -941,6 +959,16 @@ watch(() => store.detail, (val) => {
 
 .mix-dot-auto {
   background: #0ea5e9;
+}
+
+.badge-critical-yes {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.badge-critical-no {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .rundown-progress-grid {

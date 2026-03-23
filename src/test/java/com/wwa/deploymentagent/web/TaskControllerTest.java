@@ -58,13 +58,14 @@ class TaskControllerTest {
     void getById_returnsTask() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
         Request req = helper.seedRequest(rf);
-        Task task = helper.seedTask(req);
+        Task task = helper.seedTask(req, TaskStatus.Pending, true);
 
         mockMvc.perform(get(BASE + "/" + task.getId())
                         .header("X-User-Id", "user1")
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(task.getId()));
+                .andExpect(jsonPath("$.id").value(task.getId()))
+                .andExpect(jsonPath("$.critical").value(true));
     }
 
     @Test

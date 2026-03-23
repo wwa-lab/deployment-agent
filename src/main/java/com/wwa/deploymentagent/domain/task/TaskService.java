@@ -56,6 +56,7 @@ public class TaskService {
         task.setStepSeq(input.stepSeq());
         task.setTaskName(input.taskName());
         task.setExecutionType(input.executionType());
+        task.setCritical(input.critical());
         task.setTaskStatus(TaskStatus.Pending);
         task.setInputParameters(input.inputParameters());
         task.setExpectedOutput(input.expectedOutput());

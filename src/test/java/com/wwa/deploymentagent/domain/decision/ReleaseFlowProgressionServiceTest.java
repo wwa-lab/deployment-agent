@@ -64,6 +64,18 @@ class ReleaseFlowProgressionServiceTest {
     }
 
     @Test
+    @DisplayName("does not advance the next task while a critical task is awaiting review")
+    void progressAfterDecision_criticalAwaitingReview_blocksNextTask() {
+        Task criticalReviewTask = helper.seedTask(request, TaskStatus.Awaiting_Review, true);
+        Task pending = helper.seedTask(request, TaskStatus.Pending);
+
+        progressionService.progressAfterDecision(criticalReviewTask.getId());
+
+        Task refreshedPending = taskRepository.findById(pending.getId()).orElseThrow();
+        assertThat(refreshedPending.getTaskStatus()).isEqualTo(TaskStatus.Pending);
+    }
+
+    @Test
     @DisplayName("advances Release Flow stage after SIT request is completed")
     void progressAfterDecision_sitCompleted_advancesToUat() {
         Task task = helper.seedTask(request, TaskStatus.Approved);
