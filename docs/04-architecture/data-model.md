@@ -1,7 +1,7 @@
 # Data Model: Deployment Agent
 
-**Date:** 2026-03-19
-**Status:** Implemented (MVP)
+**Date:** 2026-03-24
+**Status:** Implemented (current MVP + partial Phase 1 access governance)
 **Source:** spec.md (primary), JPA entity classes (validation)
 **ORM:** Spring Data JPA · Hibernate
 **Production DB:** Oracle · **Test DB:** H2 (create-drop)
@@ -10,7 +10,7 @@
 
 ## Overview
 
-The Deployment Agent persists six entity types in Oracle. The schema supports a hierarchical workflow model (Release Flow → Request → Task → Execution History), append-only audit logging, and runtime configuration management. All JSON columns use `@Convert(converter = JsonAttributeConverter.class)` with `CLOB` column definitions.
+The Deployment Agent currently persists seven implemented entity types in Oracle. The current workspace already includes a product-level `Access Grant` entity so the system can enforce deny-by-default product entry and admin-managed authorization, alongside the existing hierarchical workflow model (Release Flow → Request → Task → Execution History), append-only audit logging, and runtime configuration management. Existing structured attributes use converter-backed `CLOB` storage; `assigned_roles` on `DA_ACCESS_GRANT` is stored as a JSON array via `StringListJsonAttributeConverter`.
 
 ---
 
@@ -47,6 +47,13 @@ The Deployment Agent persists six entity types in Oracle. The schema supports a 
 │  (PK: config_key)   │                 │  (soft refs to RF/Req/Task)  │
 │  no version          │                 │  append-only                 │
 └─────────────────────┘                 └──────────────────────────────┘
+
+┌─────────────────────┐
+│  DA_ACCESS_GRANT    │
+│  (PK: employee_id)  │
+│  product access     │
+│  role assignment    │
+└─────────────────────┘
 ```
 
 ---
@@ -207,6 +214,34 @@ Immutable, append-only record of operator actions. Uses soft references (nullabl
 
 ---
 
+### DA_ACCESS_GRANT
+
+Product-level authorization record for one enterprise employee within Deployment Agent. This entity controls whether an authenticated employee may enter the product and what roles are assigned inside the product boundary.
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `employee_id` | VARCHAR(255) | No (PK) | Enterprise employee identifier |
+| `display_name_snapshot` | VARCHAR(255) | No | Last captured display name from identity source |
+| `grant_status` | VARCHAR(30) | No | Enum: `ACTIVE`, `SUSPENDED` |
+| `assigned_roles` | CLOB / JSON array | No | One or more Deployment Agent roles |
+| `note` | VARCHAR(1000) | Yes | Admin note / rationale |
+| `last_login_at` | TIMESTAMP | Yes | Last successful product entry time |
+| `created_by` | VARCHAR(255) | No | Admin who created the grant |
+| `created_at` | TIMESTAMP | No | Creation timestamp |
+| `updated_by` | VARCHAR(255) | No | Admin who last changed the grant |
+| `updated_at` | TIMESTAMP | No | Last update timestamp |
+| `version` | NUMBER(19) | No | Optimistic-lock version |
+
+**Indexes:**
+- Primary key on `employee_id`
+- Secondary index on `grant_status`
+
+**Lifecycle Notes:**
+- Access grants are suspended/reactivated, not physically deleted, so access history remains traceable
+- Multi-role assignment is stored as a JSON array in a `CLOB` column for parity with other structured attributes
+
+---
+
 ## State Models
 
 ### Task Status
@@ -224,15 +259,15 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | From | To | Trigger |
 |------|----|---------|
 | Pending | Ready_For_Execution | Import promotion or progression |
-| Pending | Skipped | TL skip decision |
-| Ready_For_Execution | Executing | Record Result (MANUAL) or Submit Auto (AUTO) |
-| Ready_For_Execution | Skipped | TL skip decision |
+| Pending | Skipped | Reviewer skip decision |
+| Ready_For_Execution | Executing | Run / record result (MANUAL) or Run (AUTO) |
+| Ready_For_Execution | Skipped | Reviewer skip decision |
 | Executing | Awaiting_Review | Result recorded |
 | Executing | Failed | Execution failure or submission failure |
-| Awaiting_Review | Approved | TL approve decision |
-| Awaiting_Review | Rejected | TL reject decision |
-| Rejected | Ready_For_Execution | TL rerun decision (creates new execution history) |
-| Failed | Ready_For_Execution | TL rerun decision (creates new execution history) |
+| Awaiting_Review | Approved | Reviewer approve decision |
+| Awaiting_Review | Rejected | Reviewer reject decision |
+| Rejected | Ready_For_Execution | Reviewer rerun decision (creates new execution history) |
+| Failed | Ready_For_Execution | Reviewer rerun decision (creates new execution history) |
 
 ### Flow Status
 
@@ -249,6 +284,15 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 ### Execution Status
 
 `Running` → `Completed` | `Failed` | `Timed_Out`
+
+### Access Grant Status
+
+`ACTIVE` ↔ `SUSPENDED`
+
+| From | To | Trigger |
+|------|----|---------|
+| ACTIVE | SUSPENDED | DevOps Admin suspends product access |
+| SUSPENDED | ACTIVE | DevOps Admin reactivates product access |
 
 ---
 
@@ -273,12 +317,16 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | `upload` | Excel file import | stage, taskCount |
 | `edit` | Task input edit | field changes |
 | `view_result` | Record manual result | task result |
-| `approve` | TL approve decision | decisionType, previousStatus, comment |
-| `reject` | TL reject decision | decisionType, previousStatus, comment |
-| `rerun` | TL rerun decision | decisionType, previousStatus, comment |
-| `skip` | TL skip decision | decisionType, previousStatus, comment |
+| `approve` | Reviewer approve decision | decisionType, previousStatus, comment |
+| `reject` | Reviewer reject decision | decisionType, previousStatus, comment |
+| `rerun` | Reviewer rerun decision | decisionType, previousStatus, comment |
+| `skip` | Reviewer skip decision | decisionType, previousStatus, comment |
 | `auto_submit` | AUTO task submission | systemType, attemptNumber, submissionStatus, externalJobUrl |
 | `config_update` | Config upsert | configKey, oldValue, newValue |
+| `access_grant_create` | Access grant creation | target employee, assigned roles, status |
+| `access_grant_update` | Access grant role or metadata update | target employee, before/after changes |
+| `access_grant_suspend` | Access suspension | target employee, previous status |
+| `access_grant_reactivate` | Access reactivation | target employee, previous status |
 
 ---
 
@@ -292,3 +340,4 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | Optimistic locking | `@Version Long` on RF/Request/Task | Concurrent update protection without pessimistic locks |
 | Audit FK strategy | Soft references (nullable, no constraints) | Audit entries survive entity deletion |
 | Timestamps | `@CreationTimestamp` / `@UpdateTimestamp` | Hibernate-managed; immutable created_at |
+| Access Grant delete model | Suspend / reactivate rather than physical delete | Preserves authorization history and supports deny-by-default governance |

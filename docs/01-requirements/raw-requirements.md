@@ -83,57 +83,99 @@ What do users actually need? / 用户真正需要什么？
 ## Initial Functional Ideas / 初步功能设想
 What capabilities are currently being considered? / 当前考虑中的能力有哪些？
 
-- Add WWA as a level-1 menu and Deployment Agent as a level-2 workspace entry.
-- 增加 WWA 一级菜单，并将 Deployment Agent 作为二级工作台入口。
+### Platform Navigation / 平台导航
 
-- Reserve shared menu entries under WWA for:
+- Build WWA as a two-level navigation structure: WWA as a first-level menu with a second-level flyout panel containing workspace entries.
+- 将 WWA 构建为两级导航结构：WWA 作为一级菜单，通过二级飞出面板展示工作台入口。
+
+- Include first-level placeholder applications alongside WWA so the sidebar reads like a broader platform shell.
+- 在 WWA 旁放置一级占位应用，使侧边栏看起来像一个更广泛的平台外壳。
+
+- Shared capability entries under WWA flyout:
+  - Deployment Agent
   - Template Management
   - Configuration Management
   - Audit Log
-- 在 WWA 下预留共享菜单入口：
+- WWA 飞出面板下的共享能力入口：
+  - Deployment Agent
   - 模板管理
   - 配置管理
   - 审计日志
 
+- Show shared-capability navigation for users without access, with page-level access guidance instead of hiding menu entries.
+- 对无权限用户仍显示共享能力导航项，在页面内提供访问引导而非隐藏菜单项。
+
+### Deployment Agent Main Page / Deployment Agent 主页面
+
 - Build the Deployment Agent main page with the following sections:
   - page introduction area
   - filter area
-  - Deployment Flow Summary
+  - Deployment Flow Summary with SIT / UAT / PROD stage status columns
   - Selected Release Flow Details
-  - Task Details
+  - Task Details with category column and execution mix (manual/auto counts and percentages)
   - Upload Excel entry and dialog
 - 构建 Deployment Agent 主页面，包含以下区域：
   - 页面介绍区
   - 筛选区
-  - Deployment Flow Summary
+  - 带 SIT / UAT / PROD 阶段状态列的 Deployment Flow Summary
   - Selected Release Flow Details
-  - Task Details
+  - 带类别列和执行组合（手动/自动任务数和百分比）的 Task Details
   - Upload Excel 入口及弹窗
+
+### Excel Upload / Excel 上传
 
 - Support Excel-based request onboarding, including:
   - Upload Excel
-  - Download Template
+  - Download Template (working Excel template download)
   - View Sample
   - upload success message
   - View Import Log entry
 - 支持基于 Excel 的请求接入，包括：
   - 上传 Excel
-  - 下载模板
+  - 下载模板（可用的 Excel 模板下载）
   - 查看示例
   - 上传成功提示
   - 查看导入日志入口
 
+### Release Flow / 发布流程
+
 - Represent the main business object as a Release Flow that groups multiple stage requests under the same journey.
 - 以 Release Flow 作为核心业务对象，用于把同一发布链路下的多个阶段请求归组管理。
 
-- Show task-level actions:
-  - Edit
-  - View Result
-  - Decision dropdown with Approve / Reject / Rerun / Skip
-- 展示任务级操作：
-  - Edit
-  - View Result
-  - Decision 下拉操作：Approve / Reject / Rerun / Skip
+- Show stage-level Rundown Information panel per stage tab, including editable fields for SNOW group, application, site, and estimated remaining time.
+- 在每个阶段标签页展示阶段级 Rundown 信息面板，包含可编辑的 SNOW group、application、site 和预计剩余时间字段。
+
+- Provide request-level actions: Refresh, Start Deployment, and Mark as Failed.
+- 提供请求级操作：Refresh、Start Deployment 和 Mark as Failed。
+
+### Task Actions and Permissions / 任务操作和权限
+
+- Show task-level actions: Edit, View Result, and Decision dropdown (Approve / Reject / Rerun / Skip), with state-based disabling and tooltips for disabled actions.
+- 展示任务级操作：Edit、View Result 和 Decision 下拉（Approve / Reject / Rerun / Skip），带基于状态的禁用和禁用动作提示。
+
+- Restrict task actions (edit input, record results, submit auto execution, apply decisions) to the task owner or DEVOPS_ADMIN only.
+- 将任务操作（编辑输入、记录结果、提交自动执行、应用决策）限制为仅任务所有者或 DEVOPS_ADMIN。
+
+- Move MANUAL task result submission into the Edit dialog.
+- 将手动任务结果提交移入编辑对话框。
+
+- Wire View Result to execution history so external job links and stored output can be viewed from the task result modal.
+- 将 View Result 关联到执行历史，使外部作业链接和存储输出可从任务结果模态框中查看。
+
+### Critical Task Gate / 关键任务门控
+
+- Add a first-class Critical (Y/N) task field, surfaced in the release detail table, included in Excel import and template flow.
+- 添加一个一等 Critical (Y/N) 任务字段，在发布详情表中展示，包含在 Excel 导入和模板流程中。
+
+- Use the Critical flag as a workflow gate: tasks marked critical must be reviewed before the next pending task is released.
+- 将 Critical 标志用作工作流门控：标记为 critical 的任务必须在下一个待处理任务释放前完成审查。
+
+### Task Activity / 任务活动
+
+- Provide a task-level Activity dialog on the release-flow detail page to trace who did what, when it happened, and related input/output from audit and execution records.
+- 在发布流程详情页提供任务级 Activity 对话框，用于追溯谁做了什么、何时发生、以及来自审计和执行记录的相关输入/输出。
+
+### Decision Effects / 决策效果
 
 - Define the decision effects in MVP:
   - Approve: continue the release flow normally
@@ -146,11 +188,50 @@ What capabilities are currently being considered? / 当前考虑中的能力有�
   - Rerun：重新执行当前 step
   - Skip：跳过当前 step 并继续
 
-- Maintain key integration configuration values in UI, such as Jenkins URL and Ansible URL. :contentReference[oaicite:8]{index=8}
-- 在 UI 中维护关键集成配置，例如 Jenkins URL 和 Ansible URL。:contentReference[oaicite:9]{index=9}
+### Template Management / 模板管理
 
-- Record a basic audit log for key actions such as upload_excel, create_request, edit_task_input, view_result, approve_task, reject_task, rerun_task, and skip_task. :contentReference[oaicite:10]{index=10}
-- 为关键动作记录基础审计日志，例如 upload_excel、create_request、edit_task_input、view_result、approve_task、reject_task、rerun_task、skip_task。:contentReference[oaicite:11]{index=11}
+- Build a full Template Management workspace for deployment templates with CRUD lifecycle (create, view, edit, clone, delete).
+- 构建完整的模板管理工作台，支持部署模板的 CRUD 生命周期（创建、查看、编辑、克隆、删除）。
+
+- Treat each template as a multi-task deployment blueprint, with task tables aligned to the current deployment task structure.
+- 将每个模板视为多任务部署蓝图，任务表与当前部署任务结构对齐。
+
+- Support local task authoring within templates: Add Task, Edit, Delete, dependency maintenance, and Critical (Y/N) flag.
+- 支持模板内的本地任务编写：添加任务、编辑、删除、依赖关系维护和 Critical (Y/N) 标志。
+
+- Support template creation via Manual Entry and Upload Excel tabs.
+- 支持通过手动录入和上传 Excel 标签页创建模板。
+
+- Provide a More menu per template row with Clone, Edit, and Delete actions.
+- 为每个模板行提供 More 菜单，包含 Clone、Edit 和 Delete 操作。
+
+- Template row selection directly switches the Template Details workspace (no separate View Details button).
+- 模板行选择直接切换模板详情工作台（无单独的查看详情按钮）。
+
+### Configuration Management / 配置管理
+
+- Redesign Configuration Management into a component workspace for Jenkins, Ansible, and callback integrations, while preserving a Raw Configuration tab for key-level admin edits.
+- 将配置管理重新设计为 Jenkins、Ansible 和回调集成的组件工作台，同时保留 Raw Configuration 标签页供键级管理编辑。
+
+- Open Configuration Management for read-only access to all signed-in users, with edit actions restricted to DEVOPS_ADMIN.
+- 向所有已登录用户开放配置管理的只读访问，编辑操作限制为 DEVOPS_ADMIN。
+
+- Rework the Configuration tab into a filterable admin table with application, owning-group, config-item, and value columns.
+- 将配置标签页重构为可筛选的管理表格，包含 application、owning-group、config-item 和 value 列。
+
+### Audit Log / 审计日志
+
+- Record a basic audit log for key actions such as upload_excel, create_request, edit_task_input, view_result, approve_task, reject_task, rerun_task, and skip_task.
+- 为关键动作记录基础审计日志。
+
+- Open Audit Log for read-only access to all signed-in users.
+- 向所有已登录用户开放审计日志的只读访问。
+
+- Present audit log as an action-record view with User, Time, Type, and Detail columns, plus Staff Id search for faster tracing.
+- 将审计日志呈现为操作记录视图，包含 User、Time、Type 和 Detail 列，以及 Staff Id 搜索以加速追踪。
+
+- Redact sensitive config-update values from audit responses.
+- 从审计响应中脱敏配置更新值。
 
 ## Initial Non-Functional Expectations / 初步非功能期望
 What are the expectations around performance, maintainability, reliability, security, etc.? / 对性能、可维护性、可靠性、安全性等有哪些预期？

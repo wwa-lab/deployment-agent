@@ -1,16 +1,16 @@
 # System Architecture: Deployment Agent
 
-**Date:** 2026-03-19
-**Status:** Implemented (MVP)
+**Date:** 2026-03-24
+**Status:** Implemented (current MVP + partial Phase 1 access governance)
 **Source:** spec.md (primary), repository code (validation)
 
 ---
 
 ## Overview
 
-Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and Tech Leads make explicit decisions (Approve / Reject / Rerun / Skip) at every task before the flow can advance.
+Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task reviewers make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants and an Access Management MVP; remaining Phase 1 work is centered on broader permission hardening, verification, and production rollout details.
 
-**Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, and Oracle persistence.
+**Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a product-scoped authorization layer for access governance.
 
 ---
 
@@ -39,41 +39,43 @@ Deployment Agent is a controlled, human-in-the-loop deployment workflow system e
 │  Web App                                                             │
 │  Vue 3 · Pinia · Vue Router · Axios                                  │
 │                                                                      │
-│  Summary View · Detail View · Upload · Config · Audit · Login        │
+│  Summary · Detail · Upload · Config · Audit · Access Mgmt · Login    │
 └──────────────────────┬───────────────────────────────────────────────┘
                        │ REST / JSON + Session Cookie
                        ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  API Service                                     ┌─────────────────┐ │
 │  Spring Boot 3 · Spring MVC                      │  Auth           │ │
-│  7 REST Controllers · 16 Endpoints               │  Session Filter │ │
-│  Jakarta Validation · RBAC                       │  Spring Security│ │
+│  Workflow controllers + Access Mgmt MVP          │  Session Filter │ │
+│  Jakarta Validation · RBAC / Access Grants       │  Spring Security│ │
 │                                                  └────────┬────────┘ │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌──────────────────┐  ┌─────────────────────┐  ┌────────────────┐  │
-│  │  Import &         │  │  Execution &         │  │  Config &      │  │
-│  │  Workflow Engine  │  │  Decision Engine     │  │  Audit         │  │
+│  │  Import &         │  │  Execution &         │  │  Config, Audit │  │
+│  │  Workflow Engine  │  │  Decision Engine     │  │  & Access Ctrl │  │
 │  │                   │  │                      │  │                │  │
 │  │  Excel Parser     │  │  Task State Machine  │  │  Config CRUD   │  │
 │  │  Import Service   │  │  Decision Engine     │  │  Audit Logger  │  │
-│  │  Release Flow Svc │  │  Progression Service │  │  (REQUIRES_NEW)│  │
-│  │  Task Service     │  │  Auto Execution Svc  │  │                │  │
+│  │  Release Flow Svc │  │  Progression Service │  │  Access Grants │  │
+│  │  Task Service     │  │  Auto Execution Svc  │  │  Permission Map│  │
 │  └──────────────────┘  └──────────┬────────────┘  └────────────────┘  │
 │                                   │                                   │
 ├──────────────────────────────────────────────────────────────────────┤
 │  Persistence                                                         │
-│  Spring Data JPA · 6 Repositories · Optimistic Locking               │
+│  Spring Data JPA · Workflow + Audit + Config + Access Grant stores   │
 └──────────────┬──────────────────────┬────────────────────────────────┘
                │                      │ REST (fire-and-forget)
                ▼                      ▼
 ┌──────────────────────┐  ┌───────────────────────┐  ┌────────────────┐
 │  Oracle DB           │  │  Jenkins              │  │  Team Book     │
-│                      │  │  Basic Auth · 10s/30s │  │  Auth Provider │
-│  6 Tables            │  ├───────────────────────┤  │  (stub for MVP)│
-│  CLOB for JSON cols  │  │  Ansible Tower        │  │                │
-│  Append-only audit   │  │  Bearer · 10s/30s     │  └────────────────┘
-└──────────────────────┘  └───────────────────────┘
+│                      │  │  + Ansible Tower      │  │  Auth Provider │
+│  7 implemented       │  │                       │  │  (stub for MVP)│
+│  entities including  │  │  Jenkins: Basic Auth │  │                │
+│  access grants       │  │  Ansible: Bearer     │  │                │
+│  CLOB for JSON cols  │  │  10s connect / 30s   │  │                │
+│  Append-only audit   │  │  read timeout        │  │                │
+└──────────────────────┘  └───────────────────────┘  └────────────────┘
 ```
 
 ---
@@ -89,16 +91,20 @@ Deployment Agent is a controlled, human-in-the-loop deployment workflow system e
 | C5 | No auto-progression after execution without explicit human decision | Spec FR-53 |
 | C6 | Single review owner per Release Flow | Spec §9.1 |
 | C7 | Task reruns preserve same `task_id`; new execution history per attempt | Spec §9.4 |
+| C8 | Deployment Agent product entry is deny-by-default in Phase 1 | Spec FR-70 |
+| C9 | Product access is managed through local Access Grants rather than a separate user account system | Spec US-21 / US-22 |
+| C10 | Access enforcement must be consistent across menus, routes, and APIs | Spec FR-75 / FR-76 |
 
 ### Resolved Design Decisions
 
 | Decision | Resolution |
 |----------|-----------|
-| Auto-execution trigger | User-triggered: TL clicks "Submit Auto" or "Record Result" |
+| Auto-execution trigger | User-triggered: reviewer starts Run / records MANUAL result |
 | Secret store | Jenkins/Ansible credentials stored in config table; no external vault for MVP |
 | Execution callbacks | Deferred — MVP uses fire-and-forget; task stays in `Executing` after submission |
 | Result log storage | Full logs stay in Jenkins/Ansible; DA stores external job URL for click-through |
 | Authentication | Session-based Team Book login; stub provider for dev/test |
+| Product entry authorization | Phase 1 uses local Access Grants with deny-by-default semantics |
 
 ---
 
@@ -114,6 +120,7 @@ Deployment Agent is a controlled, human-in-the-loop deployment workflow system e
 | Task Execution History | Per-attempt execution record | attempt_number, execution_status, result_summary, external job fields (6) |
 | Configuration Item | Runtime config (Jenkins/Ansible URLs, credentials) | config_key (enum PK), config_value |
 | Audit Log Entry | Immutable operator action record | operator_id, action_type, context_payload (JSON) |
+| Access Grant | Product-level authorization record for one employee | employee_id, grant_status, assigned_roles, last_login_at, updated_by |
 
 ### Entity Relationships
 
@@ -122,6 +129,7 @@ Release Flow ──1:N──► Request ──1:N──► Task ──1:N──�
 
 Configuration Item  (independent)
 Audit Log Entry     (independent, soft references to Release Flow / Request / Task)
+Access Grant        (independent, product-scope authorization record)
 ```
 
 ### Excel Template Field Mapping
@@ -194,7 +202,15 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 
 - **Pattern:** Interface-based provider
 - **MVP:** StubTeamBookAuthenticationProvider — 5 hardcoded users, any password
-- **Production:** Pending Team Book API contract (endpoint URL, request/response format, role mapping)
+- **Production:** Pending Team Book API contract (endpoint URL, request/response format, enterprise identity mapping)
+- **Responsibility boundary:** Team Book authenticates enterprise identity; Deployment Agent resolves product access through its own Access Grant store
+
+### Access Grant Resolution (Phase 1)
+
+- **Pattern:** Internal authorization lookup after successful authentication
+- **Source of truth:** Deployment Agent persistence store
+- **Purpose:** Determine whether an authenticated employee may enter the product and what effective roles/permissions apply
+- **Current contract:** `auth/login` and `auth/me` return a compatibility `role` plus `roles[]` and effective `permissions[]`
 
 ---
 
@@ -205,19 +221,24 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | POST | /auth/login | Session login | Public |
 | GET | /auth/me | Current user | Session |
 | POST | /auth/logout | End session | Session |
-| POST | /upload | Excel import | DEVELOPER, TL |
+| GET | /access-grants | List access grants | DEVOPS_ADMIN |
+| POST | /access-grants | Create access grant | DEVOPS_ADMIN |
+| PATCH | /access-grants/{employeeId} | Update roles / metadata | DEVOPS_ADMIN |
+| POST | /access-grants/{employeeId}/suspend | Suspend product access | DEVOPS_ADMIN |
+| POST | /access-grants/{employeeId}/reactivate | Reactivate product access | DEVOPS_ADMIN |
+| POST | /upload | Excel import | DEVELOPER, TL, DEVOPS_ADMIN |
 | GET | /release-flows | List flows (paginated) | Any |
 | GET | /release-flows/{id} | Flow detail with tasks | Any |
 | GET | /tasks | List tasks by request | Any |
 | GET | /tasks/{id} | Task detail | Any |
-| PUT | /tasks/{id}/input | Edit task input | TL |
+| PUT | /tasks/{id}/input | Edit task input | Task owner or DEVOPS_ADMIN |
 | GET | /tasks/{id}/executions | Execution history | Any |
-| POST | /tasks/{id}/record-result | Record MANUAL result | TL |
-| POST | /tasks/{id}/submit-auto | Submit AUTO task | TL, DEVOPS_ADMIN |
-| POST | /tasks/{id}/decision | Apply decision | TL |
+| POST | /tasks/{id}/record-result | Record MANUAL result | Task owner or DEVOPS_ADMIN |
+| POST | /tasks/{id}/submit-auto | Submit AUTO task | Task owner or DEVOPS_ADMIN |
+| POST | /tasks/{id}/decision | Apply decision | Task owner or DEVOPS_ADMIN |
 | GET | /config | List config items | Any |
 | POST | /config | Upsert config item | DEVOPS_ADMIN |
-| GET | /audit-logs | List audit entries | AUDIT, MANAGEMENT, DEVOPS_ADMIN |
+| GET | /audit-logs | List audit entries | Any authenticated |
 
 All endpoints prefixed with `/api/deployment-agent`.
 
@@ -227,14 +248,17 @@ All endpoints prefixed with `/api/deployment-agent`.
 
 - **Session management:** `IF_REQUIRED` — session created on login, read by SessionAuthFilter
 - **Filter chain:** SessionAuthFilter → HeaderAuthFilter (test fallback) → Spring Security
-- **RBAC:** Enforced server-side in controllers and domain services; frontend hides UI elements
+- **Authentication / authorization split:** Team Book provides enterprise identity; local Access Grants provide product entry authorization and effective roles for Phase 1
+- **RBAC / permissions:** Enforced server-side in controllers and domain services; frontend route guards and UI visibility must align with the same effective permissions
 - **CSRF:** Disabled (REST API with session cookies)
 - **Audit isolation:** AuditLoggerService uses `REQUIRES_NEW` propagation — audit writes persist even if the business transaction rolls back
 - **Optimistic locking:** `@Version` on ReleaseFlow, Request, Task — concurrent updates return 409
+- **Deny-by-default:** Users without an active Access Grant are blocked from Deployment Agent even if enterprise authentication succeeds
 
 ---
 
 ## Pending External Dependencies
 
-1. **Team Book API contract** — endpoint URL, request/response format, role mapping rules
+1. **Team Book API contract** — endpoint URL, request/response format, enterprise identity lookup rules
 2. **Jenkins/Ansible credentials** — entered at runtime via Config admin page
+3. **Enterprise directory expansion** — confirm whether a later phase should extend Access Management beyond the current existing-grants-only search scope

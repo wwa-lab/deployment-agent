@@ -9,6 +9,22 @@
 - Added request-level Refresh, Start Deployment, and Mark as Failed actions to the release-flow detail rundown panel.
 - Expanded Execution Mix to show both task counts and manual/auto percentages.
 - Exposed task-level category from imported Activity category and displayed it in the release detail table.
+- Reworked deployment task actions so Run and Rerun are always visible with state-based disabling, while rerun is no longer mixed into the regular review decision dropdown.
+- Surfaced task dependency relationships in both template management and release detail views, including Blocked By / Blocks visibility and multi-select dependency maintenance when editing template tasks.
+- Extended release upload access to DEVOPS_ADMIN and aligned the frontend upload entry state with the backend permission model.
+- Replaced rundown hard-delete with Archive/Restore flow support, hiding archived release data from default views while letting DEVOPS_ADMIN inspect and recover archived rundowns.
+- Added a DEVOPS_ADMIN-only `Delete Permanently` action for already archived rundowns, so admins can irreversibly purge archived task history without turning normal rundown cleanup back into hard delete.
+- Added Phase 1 Access Management user stories to the product requirements doc, covering access grants, deny-by-default product entry, the admin console, permission enforcement, and access-governance auditability.
+- Expanded `docs/03-spec/spec.md` with Phase 1 Access Management requirements, including Access Grant data, deny-by-default entry rules, Access Management functional scope, permission enforcement, and related risks/open questions.
+- Updated the `docs/04-architecture` document set to reflect the same Phase 1 Access Management direction, including access-grant architecture, authorization data flows, and the planned data-model extension.
+- Updated the `docs/05-design` document set so the detailed design and API guide now align with the current MVP plus Phase 1 Access Management, replacing outdated callback-era assumptions with local access-grant, archive lifecycle, and fire-and-forget execution design.
+- Rewrote `docs/06-tasks/tasks.md` into a remaining-work implementation plan for Phase 1 Access Management, replacing the old Node/TypeORM/callback-era task list with backend, frontend, audit, rollout, and verification workstreams aligned to the current design baseline.
+- Updated `docs/IMPLEMENTATION_PLAN.md` from an outdated MVP-complete report into a current baseline + Phase 1 execution plan, centered on Access Grants, deny-by-default entry, admin bootstrap, rollout sequencing, and verification gates.
+- Realigned the spec, architecture, design, tasks, and implementation-plan docs with the current workspace state, including implemented Access Grants, the `role` + `roles[]` + `permissions[]` auth contract, current audit visibility, existing-grants-only Access Management search, and the lighter dependency summary near the task table.
+- Started Phase 1 Access Management coding by adding Access Grant persistence, role-to-permission resolution, deny-by-default auth/session enforcement, bootstrap grants for local/dev users, and a `roles[] + permissions[]` auth contract across backend and frontend session state.
+- Added backend Access Management APIs for listing, creating, updating, suspending, and reactivating Access Grants, with audit events for each grant lifecycle action.
+- Added an Access Management workspace in the frontend with admin grant lifecycle controls, locked navigation for non-admin users, and audit-log labels for access-governance actions.
+- Moved dependency summary metrics out of the top Rundown Information block and into a lighter Task Dependencies panel above the task table, so stage metadata stays focused on execution status while dependency troubleshooting stays near Blocked By / Blocks details.
 - Realigned task-row actions with the prototype by always showing Edit, View Result, and a Decision dropdown, with state-based disabling.
 - Added tooltips to disabled task actions so users can see whether an action is blocked by role or task status.
 - Simplified task action permissions so only the task owner or a DEVOPS_ADMIN can edit input, record results, submit auto execution, or apply decisions.
