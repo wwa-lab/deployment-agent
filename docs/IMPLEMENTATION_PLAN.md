@@ -16,9 +16,9 @@ This implementation plan reflects the **current baseline plus next-phase deliver
 
 The immediate objective is to:
 - preserve the current deployment workflow baseline
-- introduce **deny-by-default** product access using **Access Grants**
-- add **Access Management** for `DEVOPS_ADMIN`
-- align backend API authorization, frontend route/menu behavior, and auditability with the new permission model
+- introduce **deny-by-default** product access plus scoped visibility using **Access Grants**
+- add **Access Management** for `DEVOPS_ADMIN`, including scope grants and scoped administration
+- align backend API authorization, frontend route/menu behavior, runtime scope handling, and auditability with the new permission-and-scope model
 
 This plan supersedes the earlier “all phases complete” interpretation that no longer matches the updated product, spec, architecture, design, and task documents.
 
@@ -29,21 +29,23 @@ This plan supersedes the earlier “all phases complete” interpretation that n
 The following capability areas are treated as the implemented baseline for planning:
 
 - session-based Team Book login with local/dev stub support
-- deny-by-default Access Grant resolution with compatibility `role` plus `roles[]` / `permissions[]` auth payloads
+- deny-by-default Access Grant resolution with compatibility `role` plus `roles[]` / `permissions[]` / `scopes[]` auth payloads
 - non-production bootstrap grants for known stub users and configured admin IDs
 - Excel upload and Release Flow / Request / Task import
-- Release Flow summary/detail views
+- Release Flow summary/detail views with `Application / SNOW Group / Agent` scope context and rundown owner visibility
 - stage-level rundown editing plus archive / restore / purge lifecycle
+- request-level rundown control actions limited to rundown owner or `DEVOPS_ADMIN`
 - MANUAL result recording and AUTO fire-and-forget submission
 - task review decisions (`Approve`, `Reject`, `Rerun`, `Skip`)
 - dependency visibility (`Blocked By` / `Blocks`) in relevant views
 - configuration management
-- audit log viewing
+- audit log viewing with scope-aware filtering and visibility
 - state-driven task action UX
-- Access Management backend APIs and admin UI
+- Access Management backend APIs and admin UI with scope grants
 
 **Not treated as complete for planning**
 - unified effective-permission enforcement across frontend and backend
+- full backend-enforced scope isolation for every remaining surface, especially configuration and template management
 - production Team Book adapter and rollout-safe admin bootstrap
 - full contract/integration/E2E verification
 
@@ -54,13 +56,13 @@ The following capability areas are treated as the implemented baseline for plann
 The following rules are already fixed by the current design baseline and should not be reopened unless upstream docs change:
 
 1. Team Book authenticates enterprise identity; Deployment Agent authorizes product access.
-2. Product authorization in Phase 1 is based on local **Access Grants**.
+2. Product authorization in Phase 1 is based on local **Access Grants** plus `Application + SNOW Group` scope grants.
 3. Product entry becomes **deny-by-default** once Access Management is introduced.
 4. Archive / restore / purge is a rundown lifecycle capability, not part of Access Management.
 5. AUTO execution remains **fire-and-forget** in the current baseline; callback-based completion is deferred.
 6. Existing workflow state transitions, rerun behavior, and execution-history preservation remain intact.
 7. Dependency visibility remains informational in MVP and does not yet become an authoritative DAG execution engine.
-8. Frontend menus/routes and backend APIs must converge on the same effective-permission model.
+8. Frontend menus/routes and backend APIs must converge on the same effective-permission-and-scope model.
 
 ---
 
@@ -69,10 +71,10 @@ The following rules are already fixed by the current design baseline and should 
 | Phase | Name | Status | Notes |
 |-------|------|--------|-------|
 | Baseline | Existing workflow baseline | Implemented | Current upload, workflow, archive lifecycle, config, and audit capabilities are the planning baseline |
-| Phase 1A | Authorization foundation | Implemented | Access Grant persistence, permission mapping, login/session resolution are in the workspace; production bootstrap rules still need confirmation |
-| Phase 1B | Access Management backend | Implemented | Access Grant APIs and audit events are in place; deeper legacy authorization cleanup is still partial |
-| Phase 1C | Frontend authorization alignment | Partial | user store and major menu/action alignment exist; hard route guards and broader denied-state UX are not finished |
-| Phase 1D | Access Management UI | Implemented | admin list/search, create/edit, suspend/reactivate are available in the workspace |
+| Phase 1A | Authorization foundation | Implemented | Access Grant persistence, permission mapping, login/session resolution, and scoped auth context are in the workspace; production bootstrap rules still need confirmation |
+| Phase 1B | Access Management backend | Implemented | Access Grant APIs, scope grants, scoped visibility, and audit events are in place; deeper legacy authorization cleanup is still partial |
+| Phase 1C | Frontend authorization alignment | Partial | user store, major menu/action alignment, and multi-scope runtime UX exist; hard route guards and broader denied-state UX are not finished |
+| Phase 1D | Access Management UI | Implemented | admin list/search, create/edit, suspend/reactivate, and scope-grant editing are available in the workspace |
 | Phase 1E | Verification and rollout | Partial | focused backend auth/access tests and frontend build pass; broader contract/E2E coverage and rollout readiness remain |
 | Follow-up | Deferred / optional next work | Deferred | enterprise directory search scope, AUTO completion ingestion design |
 
@@ -83,7 +85,7 @@ The following rules are already fixed by the current design baseline and should 
 ### Phase 1A — Authorization Foundation
 
 **Goal**
-- Establish the data and contract layer required for product-scoped authorization.
+- Establish the data and contract layer required for deny-by-default product entry and scoped visibility authorization.
 
 **Primary tasks**
 - `TASK-001` Add Access Grant persistence model
@@ -94,13 +96,13 @@ The following rules are already fixed by the current design baseline and should 
 **Exit criteria**
 - Access Grant entity/model and migration exist
 - backend can distinguish `authorized`, `not granted`, and `suspended`
-- auth/session payload contract is agreed and implemented
+- auth/session payload contract is agreed and implemented, including `scopes[]`
 - first-admin bootstrap path is defined and testable
 
 ### Phase 1B — Access Management Backend
 
 **Goal**
-- Expose admin-safe APIs and auditability for grant lifecycle operations.
+- Expose admin-safe APIs and auditability for grant lifecycle operations and scoped visibility enforcement.
 
 **Primary tasks**
 - `TASK-005` Build Access Management APIs
@@ -109,15 +111,15 @@ The following rules are already fixed by the current design baseline and should 
 - `TASK-008` Implement production Team Book adapter (`Should`, external dependency)
 
 **Exit criteria**
-- Access Management endpoints exist and are role-gated
+- Access Management endpoints exist, are role-gated, and can manage scope grants
 - grant lifecycle writes produce audit records
-- existing APIs no longer rely on fragmented legacy role assumptions
+- release and audit visibility enforce scope boundaries, and existing APIs no longer rely on fragmented legacy role assumptions
 - production Team Book path is either implemented or explicitly blocked by external contract
 
 ### Phase 1C — Frontend Authorization Alignment
 
 **Goal**
-- Make frontend behavior consistent with the new product authorization contract.
+- Make frontend behavior consistent with the new product authorization and scoped-visibility contract.
 
 **Primary tasks**
 - `TASK-009` Upgrade frontend user store contract
@@ -125,10 +127,10 @@ The following rules are already fixed by the current design baseline and should 
 - `TASK-012` Align existing frontend actions with effective permissions
 
 **Exit criteria**
-- frontend can consume access-aware auth context
+- frontend can consume access-aware auth context, including `scopes[]`
 - route access is blocked consistently
 - denied-state messaging distinguishes auth failure vs missing/suspended access
-- existing menus and pages reflect effective permissions without regressing current archive/admin flows
+- existing menus and pages reflect effective permissions and scope visibility without regressing current archive/admin flows
 
 ### Phase 1D — Access Management UI
 
@@ -146,6 +148,7 @@ The following rules are already fixed by the current design baseline and should 
   - display name
   - status
   - roles
+  - scope grants
   - last login
   - updated by / updated at
 
@@ -207,7 +210,7 @@ TASK-001
 ### Internal Dependencies
 
 - `docs/06-tasks/tasks.md` remains the detailed task-level planning source
-- auth/session contract is fixed; remaining frontend alignment depends on using it consistently
+- auth/session contract is fixed; remaining frontend alignment depends on using `role`, `roles[]`, `permissions[]`, and `scopes[]` consistently
 - bootstrap approach must be finalized before deny-by-default can be safely enabled
 
 ### External Dependencies
@@ -222,6 +225,7 @@ TASK-001
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Legacy workflow surfaces still mix role checks with permission checks | Backend and frontend authorization can drift | Continue centralizing permission evaluation and recheck older endpoints |
+| Some surfaces still expose multi-scope UX without equally strong backend isolation | Users may infer stronger scope guarantees than the backend currently enforces | Prioritize backend convergence for template/config scope rules before broad rollout |
 | No safe first-admin bootstrap path | Product lockout on rollout | Treat bootstrap as a blocking deliverable, not a nice-to-have |
 | Team Book production contract is delayed | Production auth path blocked | Keep stub/local path intact; isolate adapter work |
 | Access Management search scope expands after the MVP | API/UI scope grows unexpectedly | Treat enterprise directory lookup as a separately scoped follow-up |
@@ -246,6 +250,8 @@ The implementation should not be considered ready for rollout until the followin
   - suspend
   - reactivate
 - existing sensitive APIs rechecked under effective permissions
+- release and audit scope filtering validated for scoped vs global admins
+- rundown control actions validated for rundown owner vs admin vs non-owner
 
 ### Frontend Gates
 
@@ -272,10 +278,11 @@ The implementation should not be considered ready for rollout until the followin
 | Area | Status | Notes |
 |------|--------|-------|
 | Existing workflow baseline | Ready | Serves as the current implementation baseline |
-| Phase 1 authorization foundation | Implemented | Access Grant model, permission mapping, login/session resolution, and non-prod bootstrap are in place |
-| Access Management APIs | Implemented | Admin grant lifecycle APIs and audit events are available |
-| Frontend permission alignment | Partial | Auth payload and major UI surfaces are aligned; route hardening remains |
-| Access Management UI | Implemented | Admin grant management workspace is available |
+| Phase 1 authorization foundation | Implemented | Access Grant model, permission mapping, login/session resolution, scoped auth context, and non-prod bootstrap are in place |
+| Access Management APIs | Implemented | Admin grant lifecycle APIs, scope grants, and audit events are available |
+| Frontend permission alignment | Partial | Auth payload and major UI surfaces are aligned; route hardening and full scope convergence remain |
+| Access Management UI | Implemented | Admin grant management workspace with scope-grant editing is available |
+| Scoped runtime / audit visibility | Partial | Release and audit surfaces enforce scoped visibility; template/config remain lighter-weight for now |
 | Production Team Book adapter | Partially blocked | Requires external API contract |
 | Rollout readiness | Not ready | Requires bootstrap, verification, and support plan |
 
@@ -284,9 +291,10 @@ The implementation should not be considered ready for rollout until the followin
 ## 11. Immediate Next Actions
 
 1. Finish route-level permission hardening and access-denied UX (`TASK-010`, `TASK-012`).
-2. Continue aligning legacy controller/service authorization with effective permissions (`TASK-007`).
+2. Continue aligning legacy controller/service authorization with effective permissions and scope rules (`TASK-007`).
 3. Expand verification beyond focused auth/access coverage (`TASK-013`, `TASK-015`).
 4. Finalize production bootstrap and Team Book adapter rollout details (`TASK-004`, `TASK-008`).
+5. Decide whether the next iteration should deepen backend scope isolation for Template / Configuration and introduce an execution-target catalog.
 
 ---
 

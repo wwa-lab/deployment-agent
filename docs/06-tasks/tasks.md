@@ -2,16 +2,17 @@
 
 ## Overview
 
-This document breaks the updated Deployment Agent design into implementation-ready tasks for the next delivery phase. The focus is no longer “build the MVP from zero”; it is to align the current MVP with the documented Phase 1 Access Management direction, capture what is already implemented in the workspace, and make the remaining gaps explicit.
+This document breaks the updated Deployment Agent design into implementation-ready tasks for the next delivery phase. The focus is no longer “build the MVP from zero”; it is to align the current MVP with the implemented Access Management, scoped-visibility, multi-scope runtime, and rundown-owner direction already present in the workspace, and make the remaining gaps explicit.
 
 **Delivery objective**
-- Introduce deny-by-default product access with Access Grants
-- Add DevOps-admin-managed Access Management
-- Align session contracts, route/API authorization, audit coverage, and operational rollout with the updated design
+- Preserve the current deployment workflow baseline
+- Maintain deny-by-default product entry plus scoped visibility through Access Grants
+- Support DevOps-admin-managed Access Management, including scope grants and scoped administration
+- Align session contracts, route/API authorization, multi-scope runtime behavior, audit coverage, and operational rollout with the updated design
 
 **Planning assumptions**
 - Current workflow capabilities such as upload/import, Release Flow monitoring, rundown archive lifecycle, task actions, configuration management, and audit viewing already exist as the implementation baseline.
-- Remaining work is now primarily permission hardening, frontend route enforcement, broader verification, and rollout safety around the already-implemented Access Management MVP.
+- Remaining work is now primarily permission hardening, frontend route enforcement, broader verification, and rollout safety around the already-implemented Access Management, release/audit scoped visibility, and rundown-owner controls.
 - Callback-based AUTO completion ingestion is not part of the critical path for this phase.
 
 ### Current Workspace Alignment
@@ -22,13 +23,16 @@ This document breaks the updated Deployment Agent design into implementation-rea
   - `TASK-003` deny-by-default login and session resolution
   - `TASK-005` Access Management APIs
   - `TASK-006` access-governance audit events
+  - scoped visibility enforcement for Release Flow and Audit surfaces
+  - multi-scope runtime capture and presentation across upload, release summary/detail, and audit (`Application / SNOW Group / Agent`)
+  - rundown owner persistence plus owner/admin-only request-level controls
   - `TASK-009` frontend user store contract upgrade
   - `TASK-011` Access Management page
 - **Partially implemented**
   - `TASK-004` bootstrap strategy: local/dev/test bootstrap exists; production rollout rules still need confirmation
   - `TASK-007` API authorization alignment: some existing endpoints still rely on legacy role checks
   - `TASK-010` route guards and denied-state UX: current UI uses menu visibility and page-level guidance more than hard route blocking
-  - `TASK-012` existing frontend permission alignment: major surfaces are updated, but full convergence is not finished
+  - `TASK-012` existing frontend permission alignment: major surfaces are updated, but full convergence is not finished, especially for template/config scope isolation and hard route enforcement
   - `TASK-014` backend verification: focused auth/access tests exist, but full coverage is not complete
 - **Still remaining**
   - `TASK-008`, `TASK-013`, `TASK-015`, `TASK-016`, `TASK-017`, `TASK-018`, `TASK-019`
@@ -40,8 +44,8 @@ This document breaks the updated Deployment Agent design into implementation-rea
 **System name:** Deployment Agent
 
 **Design scope summary**
-- The updated design keeps Team Book as the enterprise identity source, adds local Access Grants for product authorization, and preserves the current workflow model for uploads, task execution, review decisions, and rundown lifecycle.
-- Phase 1 introduces Access Management, deny-by-default entry, effective-permission-based UI/API enforcement, and access-governance auditability.
+- The updated design keeps Team Book as the enterprise identity source, adds local Access Grants for product entry plus `Application + SNOW Group` scoped visibility, and preserves the current workflow model for uploads, task execution, review decisions, and rundown lifecycle.
+- Phase 1 introduces Access Management, deny-by-default entry, effective-permission-based UI/API enforcement, access-governance auditability, multi-scope runtime context, and rundown-owner controls.
 - Existing archive / restore / purge behavior remains separate from Access Management and must continue to work under the new authorization model.
 
 ---
@@ -115,7 +119,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 - **Dependencies**: None
 - **Owner type**: backend
 - **Priority**: Must
-- **Notes**: Include `employee_id`, `display_name_snapshot`, `grant_status`, `assigned_roles`, `note`, `last_login_at`, and audit-friendly timestamps.
+- **Notes**: Include `employee_id`, `display_name_snapshot`, `grant_status`, `assigned_roles`, `scope_grants`, `note`, `last_login_at`, and audit-friendly timestamps.
 
 ### TASK-002: Define Effective Permission Mapping
 - **Objective**: Convert assigned product roles into a stable effective-permission model that backend and frontend can both consume.
@@ -131,7 +135,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 - **Dependencies**: TASK-001, TASK-002
 - **Owner type**: backend
 - **Priority**: Must
-- **Notes**: Includes `POST /auth/login`, `GET /auth/me`, and session restore behavior. Current contract returns a compatibility `role` plus `roles[]` and `permissions[]`.
+- **Notes**: Includes `POST /auth/login`, `GET /auth/me`, and session restore behavior. Current contract returns a compatibility `role` plus `roles[]`, `permissions[]`, and `scopes[]`.
 
 ### TASK-004: Define Initial Admin Bootstrap Strategy
 - **Objective**: Ensure the system can be operated safely once deny-by-default is enabled.
@@ -143,7 +147,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 
 ### TASK-005: Build Access Management APIs
 - **Objective**: Expose admin-only CRUD-lite lifecycle APIs for Access Grants.
-- **Scope**: Implement list, create, update, suspend, and reactivate endpoints with validation, pagination/search, and lifecycle conflict handling.
+- **Scope**: Implement list, create, update, suspend, and reactivate endpoints with validation, pagination/search, lifecycle conflict handling, scope-grant maintenance, and scoped-admin restrictions.
 - **Dependencies**: TASK-001, TASK-002, TASK-003
 - **Owner type**: backend
 - **Priority**: Must
@@ -155,15 +159,15 @@ This document breaks the updated Deployment Agent design into implementation-rea
 - **Dependencies**: TASK-005
 - **Owner type**: backend
 - **Priority**: Must
-- **Notes**: Cover create, update, suspend, reactivate, and related operator/context details.
+- **Notes**: Cover create, update, suspend, reactivate, scope-grant changes, and related operator/context details.
 
 ### TASK-007: Align Existing API Authorization with Effective Permissions
 - **Objective**: Remove fragmented role checks and align existing APIs with the new authorization model.
-- **Scope**: Review upload, config, audit, task-action, rundown-lifecycle, and related endpoints; centralize authorization evaluation so menu/route/API behavior can converge on the same rules.
+- **Scope**: Review upload, config, audit, task-action, rundown-lifecycle, release visibility, and related endpoints; centralize authorization evaluation so menu/route/API behavior can converge on the same permission-and-scope rules.
 - **Dependencies**: TASK-002, TASK-003
 - **Owner type**: backend
 - **Priority**: Must
-- **Notes**: Preserve current archive/restore/purge separation from Access Management; do not add hidden superuser bypass behavior.
+- **Notes**: Preserve current archive/restore/purge separation from Access Management; keep request-level rundown controls limited to rundown owner or `DEVOPS_ADMIN`; do not add hidden superuser bypass behavior.
 
 ### TASK-008: Implement Production Team Book Adapter
 - **Objective**: Replace the current stub-only assumption with a production-ready Team Book integration path.
@@ -175,7 +179,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 
 ### TASK-009: Upgrade Frontend User Store Contract
 - **Objective**: Move frontend session handling from single-role assumptions to effective authorization context.
-- **Scope**: Update user store/types so the frontend can consume access status, `roles[]`, and optionally `permissions[]`, while remaining compatible with the agreed backend auth contract.
+- **Scope**: Update user store/types so the frontend can consume access status, `roles[]`, `permissions[]`, and `scopes[]`, while remaining compatible with the agreed backend auth contract.
 - **Dependencies**: TASK-003
 - **Owner type**: frontend
 - **Priority**: Must
@@ -195,11 +199,11 @@ This document breaks the updated Deployment Agent design into implementation-rea
 - **Dependencies**: TASK-005, TASK-009, TASK-010
 - **Owner type**: frontend
 - **Priority**: Must
-- **Notes**: Include fields for employee ID, display name, status, roles, last login, updated by, and updated at.
+- **Notes**: Include fields for employee ID, display name, status, roles, scope grants, last login, updated by, and updated at.
 
 ### TASK-012: Align Existing Frontend Actions with Effective Permissions
 - **Objective**: Ensure existing workflow/config/audit/admin surfaces honor the same authorization contract as the backend.
-- **Scope**: Recheck upload entry, configuration management, audit visibility, rundown lifecycle actions, task action clusters, and archived-view controls under the new effective-permission model.
+- **Scope**: Recheck upload entry, configuration management, audit visibility, release visibility, rundown lifecycle actions, task action clusters, archived-view controls, and scope-driven filters under the new effective-permission-and-scope model.
 - **Dependencies**: TASK-007, TASK-009, TASK-010
 - **Owner type**: frontend
 - **Priority**: Must
@@ -291,7 +295,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 
 ## Risks / Blockers
 
-- The auth/session contract is now fixed to compatibility `role` plus `roles[]` and `permissions[]`; the remaining risk is incomplete enforcement across older workflow surfaces.
+- The auth/session contract is now fixed to compatibility `role` plus `roles[]`, `permissions[]`, and `scopes[]`; the remaining risk is incomplete enforcement across older workflow surfaces.
 - Deny-by-default requires a safe first-admin bootstrap path; without it, rollout can lock everyone out of the product.
 - Team Book production contract details may block completion of the real provider adapter.
 - Access Management currently searches existing grants only; expanding into enterprise directory search would materially change the backend/API/UI scope.
@@ -304,4 +308,4 @@ This document breaks the updated Deployment Agent design into implementation-rea
 1. What is the approved production bootstrap mechanism for the first `DEVOPS_ADMIN` under deny-by-default rules?
 2. Should a later phase expand Access Management beyond existing-grants-only search into enterprise user lookup?
 3. Are grant updates required to capture a mandatory admin note for governance purposes?
-4. Is Access Management strictly product-global in Phase 1, or should project/environment scoping be prepared immediately afterward?
+4. Should a later phase extend Access Management beyond the current product-entry grant plus `Application + SNOW Group` scope model into agent- or environment-scoped authorization?
