@@ -22,6 +22,7 @@ public class TaskExecutionHistoryService {
 
     private final TaskExecutionHistoryRepository executionHistoryRepository;
     private final TaskRepository taskRepository;
+    private final TaskService taskService;
 
     /**
      * Create a new execution history record for a task.
@@ -36,6 +37,7 @@ public class TaskExecutionHistoryService {
     public TaskExecutionHistory createExecution(String taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NotFoundAppException("Task", taskId));
+        taskService.assertTaskRequestActive(task);
 
         int maxAttempt = executionHistoryRepository.findMaxAttemptNumberByTaskId(taskId);
         int nextAttempt = maxAttempt + 1;

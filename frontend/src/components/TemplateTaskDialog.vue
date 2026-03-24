@@ -28,6 +28,19 @@ function parseDurationToMinutes(value?: string): number {
   return total > 0 ? total : 15
 }
 
+function parseDependencyList(value?: string): string[] {
+  if (!value) return []
+
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  )
+}
+
 const form = reactive({
   category: props.task?.category ?? props.activityCategories[0] ?? 'release preparation',
   taskName: props.task?.taskName ?? '',
@@ -37,7 +50,7 @@ const form = reactive({
   critical: props.task?.critical ?? false,
   owner: props.task?.owner ?? props.defaultOwner,
   estDurationMinutes: parseDurationToMinutes(props.task?.estDuration),
-  dependencies: props.task?.dependencies ?? '',
+  dependencies: parseDependencyList(props.task?.dependencies),
 })
 
 const saving = ref(false)
@@ -59,6 +72,12 @@ const dependencyOptions = computed(() =>
   props.existingTaskNames.filter((name) => name !== props.task?.taskName),
 )
 
+const selectedDependencyLabel = computed(() => {
+  if (form.dependencies.length === 0) return 'No dependency selected.'
+  if (form.dependencies.length === 1) return `Depends on 1 task: ${form.dependencies[0]}.`
+  return `Depends on ${form.dependencies.length} tasks.`
+})
+
 const canSave = computed(
   () =>
     form.category.trim().length > 0 &&
@@ -71,6 +90,15 @@ const canSave = computed(
 
 function changeDuration(delta: number) {
   form.estDurationMinutes = Math.max(5, form.estDurationMinutes + delta)
+}
+
+function toggleDependency(name: string, checked: boolean) {
+  if (checked) {
+    form.dependencies = [...form.dependencies, name]
+    return
+  }
+
+  form.dependencies = form.dependencies.filter((dependency) => dependency !== name)
 }
 
 async function submit() {
@@ -91,7 +119,7 @@ async function submit() {
       critical: form.critical,
       owner: form.owner.trim(),
       estDurationMinutes: form.estDurationMinutes,
-      dependencies: form.dependencies.trim() || undefined,
+      dependencies: form.dependencies.length > 0 ? form.dependencies.join(', ') : undefined,
     })
   } finally {
     saving.value = false
@@ -191,14 +219,31 @@ async function submit() {
             <div class="field-hint">minutes ({{ durationLabel }})</div>
           </div>
 
-          <div class="form-row">
+          <div class="form-row form-row-wide">
             <label class="form-label">Dependencies</label>
-            <select v-model="form.dependencies" class="form-control">
-              <option value="">No dependency</option>
-              <option v-for="name in dependencyOptions" :key="name" :value="name">
-                {{ name }}
-              </option>
-            </select>
+            <div class="field-hint">
+              Select the tasks that must finish before this task can start.
+            </div>
+            <div v-if="dependencyOptions.length === 0" class="dependency-empty-state">
+              No other tasks are available yet. Save this task first, then come back to wire dependencies.
+            </div>
+            <div v-else class="dependency-option-grid">
+              <label
+                v-for="name in dependencyOptions"
+                :key="name"
+                class="dependency-option"
+                :class="{ selected: form.dependencies.includes(name) }"
+              >
+                <input
+                  class="dependency-checkbox"
+                  type="checkbox"
+                  :checked="form.dependencies.includes(name)"
+                  @change="toggleDependency(name, ($event.target as HTMLInputElement).checked)"
+                />
+                <span>{{ name }}</span>
+              </label>
+            </div>
+            <div class="field-hint">{{ selectedDependencyLabel }}</div>
           </div>
         </div>
       </div>
@@ -228,6 +273,10 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.form-row-wide {
+  grid-column: 1 / -1;
 }
 
 .required {
@@ -261,12 +310,52 @@ async function submit() {
   color: #64748b;
 }
 
+.dependency-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dependency-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.dependency-option.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.dependency-checkbox {
+  width: 14px;
+  height: 14px;
+}
+
+.dependency-empty-state {
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #64748b;
+}
+
 @media (max-width: 760px) {
   .modal-wide {
     width: calc(100vw - 24px);
   }
 
   .task-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dependency-option-grid {
     grid-template-columns: 1fr;
   }
 }

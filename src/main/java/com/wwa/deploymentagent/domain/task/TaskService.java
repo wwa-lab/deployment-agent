@@ -80,6 +80,7 @@ public class TaskService {
     @Transactional
     public Task updateStatus(String taskId, TaskStatus newStatus, UserContext user, String comment) {
         Task task = getById(taskId);
+        assertTaskRequestActive(task);
 
         if (!TaskStateMachine.isValid(task.getTaskStatus(), newStatus)) {
             throw new InvalidStateTransitionException(
@@ -109,6 +110,7 @@ public class TaskService {
     @Transactional
     public Task editInput(String taskId, Map<String, Object> newInput, UserContext user) {
         Task task = getById(taskId);
+        assertTaskRequestActive(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:editInput");
 
         if (task.getTaskStatus() != TaskStatus.Pending
@@ -145,9 +147,17 @@ public class TaskService {
                                      Map<String, Object> resultSummary,
                                      String executionId) {
         Task task = getById(taskId);
+        assertTaskRequestActive(task);
         task.setCurrentResultSummary(resultSummary);
         task.setLatestExecutionId(executionId);
         return save(task);
+    }
+
+    public void assertTaskRequestActive(Task task) {
+        if (task.getRequest().getArchivedAt() != null
+                || task.getRequest().getReleaseFlow().getArchivedAt() != null) {
+            throw new ValidationAppException("Archived rundowns are read-only until restored.");
+        }
     }
 
     private Task save(Task task) {

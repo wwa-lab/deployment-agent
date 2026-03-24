@@ -1,43 +1,57 @@
 # Deployment Agent — API Implementation Guide
 
-**Date:** 2026-03-19
-**Version:** 1.0 (MVP)
+**Date:** 2026-03-24
+**Version:** 1.2 (current MVP + partial Phase 1 Access Management implementation)
 **Base Path:** `/api/deployment-agent`
 **Backend:** Java 21 / Spring Boot 3.2.4 / Spring MVC
-**Auth:** Session-based (Team Book login) with header fallback for tests
+**Auth:** Session-based Team Book login with local Access Grant resolution and effective permissions
 
 ---
 
 ## Overview
 
-Deployment Agent exposes a REST/JSON API that supports the full deployment workflow lifecycle: Excel upload and import, Release Flow monitoring, task management, human decision gates, AUTO execution submission, configuration administration, and audit logging. All endpoints except `/auth/login` require an authenticated session.
+This guide describes the backend API surface for Deployment Agent. It covers the current MVP workflow APIs plus the currently implemented auth/access-management surface used for deny-by-default product entry and scoped visibility.
+
+**Interpretation rule**
+- Implemented auth/access-management endpoints are described as current behavior.
+- Follow-up items that are not yet implemented are called out inline where relevant.
 
 ---
 
-## Authentication
+## Authentication and Authorization
 
 ### Session Lifecycle
 
 | Operation | Endpoint | Notes |
 |-----------|----------|-------|
-| Login | `POST /auth/login` | Creates HTTP session; stores UserContext |
-| Check session | `GET /auth/me` | Returns current user or 401 |
+| Login | `POST /auth/login` | Authenticates enterprise identity; Phase 1 also resolves product access |
+| Check session | `GET /auth/me` | Returns current authenticated context |
 | Logout | `POST /auth/logout` | Invalidates session |
 
 ### Authentication Chain
 
-1. **SessionAuthFilter** — reads `UserContext` from HttpSession attribute `USER_CONTEXT`
-2. **HeaderAuthFilter** — fallback; reads `X-User-Id` / `X-User-Role` headers (enabled via `app.auth.header-fallback-enabled=true`; defaults to `false` in production, `true` in test)
+1. `AuthController` receives login request
+2. `AuthService` validates credentials via `TeamBookAuthenticationProvider`
+3. Access Grant resolution runs after identity authentication
+4. Session stores authenticated user context
+5. `SessionAuthFilter` reconstructs request security context
+6. `HeaderAuthFilter` remains a controlled fallback for tests/local validation
 
-### Roles
+### Roles and Effective Permissions
 
-| Role | Permissions |
-|------|------------|
-| `DEVELOPER` | Upload files, view Release Flows and tasks |
-| `TL` | All Developer permissions + edit task input, record results, make decisions, submit AUTO execution |
-| `DEVOPS_ADMIN` | All TL permissions + manage configuration, submit AUTO execution |
-| `AUDIT` | Read-only access to audit logs |
-| `MANAGEMENT` | Read-only access to audit logs |
+| Role | Current / Intended Capability |
+|------|-------------------------------|
+| `DEVELOPER` | Upload and monitor Release Flows |
+| `TL` | Reviewer-style workflow actions in the current model |
+| `DEVOPS_ADMIN` | Workflow management, configuration, archive/restore/purge, and Access Management |
+| `AUDIT` | Read-only audit visibility |
+| `MANAGEMENT` | Read-only audit / management visibility |
+
+**Phase 1 direction**
+- Product access is no longer “any authenticated user.”
+- Authorization is resolved from one or more assigned roles on the Access Grant.
+- Backend should prefer effective-permission evaluation over route-level role string assumptions.
+- Visibility and administrative reach are additionally constrained by `Application + SNOW Group` scope grants.
 
 ### Stub Users (dev/test)
 
@@ -55,7 +69,7 @@ Any non-blank password is accepted by the stub provider.
 
 ## Error Response Format
 
-All errors return a consistent JSON body:
+All errors should return a consistent JSON body:
 
 ```json
 {
@@ -68,16 +82,18 @@ All errors return a consistent JSON body:
 ### Error Codes
 
 | Code | HTTP Status | Trigger |
-|------|------------|---------|
-| `UNAUTHORIZED` | 401 | Missing or invalid session |
-| `FORBIDDEN` | 403 | Insufficient role for the requested action |
-| `NOT_FOUND` | 404 | Entity does not exist |
-| `VALIDATION_ERROR` | 400 | Request body fails validation |
-| `IMPORT_VALIDATION_ERROR` | 422 | Excel data fails schema/business rule validation |
-| `INVALID_STATE_TRANSITION` | 409 | Task is not in a valid state for the requested operation |
-| `OPTIMISTIC_LOCK_CONFLICT` | 409 | Concurrent update detected; reload and retry |
-| `CONFLICT` | 409 | Business rule conflict (e.g., wrong execution type) |
-| `INTERNAL_ERROR` | 500 | Unexpected server error |
+|------|-------------|---------|
+| `UNAUTHORIZED` | 401 | Missing or invalid credentials/session |
+| `FORBIDDEN` | 403 | Authenticated but not permitted for the action |
+| `ACCESS_NOT_GRANTED` | 403 | Enterprise-authenticated user has no Access Grant |
+| `ACCESS_SUSPENDED` | 403 | Enterprise-authenticated user has a suspended Access Grant |
+| `NOT_FOUND` | 404 | Requested entity does not exist |
+| `VALIDATION_ERROR` | 400 | Request payload or query fails validation |
+| `IMPORT_VALIDATION_ERROR` | 422 | Excel content fails import validation |
+| `INVALID_STATE_TRANSITION` | 409 | Requested action is invalid for current workflow state |
+| `OPTIMISTIC_LOCK_CONFLICT` | 409 | Concurrent update detected |
+| `CONFLICT` | 409 | Business rule conflict outside generic state transition handling |
+| `INTERNAL_ERROR` | 500 | Unexpected server-side failure |
 
 ---
 
@@ -91,18 +107,34 @@ All errors return a consistent JSON body:
 | Get current user | GET | `/auth/me` | Session |
 | Logout | POST | `/auth/logout` | Session |
 
-### Upload & Import
+### Access Management
 
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
-| Upload Excel file | POST | `/upload` | DEVELOPER, TL |
+| List Access Grants | GET | `/access-grants` | DEVOPS_ADMIN |
+| Create Access Grant | POST | `/access-grants` | DEVOPS_ADMIN |
+| Update Access Grant | PATCH | `/access-grants/{employeeId}` | DEVOPS_ADMIN |
+| Suspend Access Grant | POST | `/access-grants/{employeeId}/suspend` | DEVOPS_ADMIN |
+| Reactivate Access Grant | POST | `/access-grants/{employeeId}/reactivate` | DEVOPS_ADMIN |
+
+### Upload and Import
+
+| Operation | Method | Endpoint | Auth |
+|-----------|--------|----------|------|
+| Upload Excel file | POST | `/upload` | DEVELOPER, TL, DEVOPS_ADMIN |
 
 ### Release Flow
 
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
-| List Release Flows | GET | `/release-flows` | Any authenticated |
-| Get Release Flow detail | GET | `/release-flows/{id}` | Any authenticated |
+| List Release Flows | GET | `/release-flows` | Any authenticated within scoped visibility |
+| Get Release Flow detail | GET | `/release-flows/{id}` | Any authenticated within scoped visibility |
+| Update stage rundown | PATCH | `/release-flows/{flowId}/requests/{requestId}/rundown` | DEVELOPER, TL, DEVOPS_ADMIN |
+| Archive stage rundown | POST | `/release-flows/{flowId}/requests/{requestId}/archive` | DEVELOPER, TL, DEVOPS_ADMIN |
+| Restore archived stage rundown | POST | `/release-flows/{flowId}/requests/{requestId}/restore` | DEVOPS_ADMIN |
+| Purge archived stage rundown | DELETE | `/release-flows/{flowId}/requests/{requestId}/purge` | DEVOPS_ADMIN |
+| Start stage deployment | POST | `/release-flows/{flowId}/requests/{requestId}/start` | Rundown owner or DEVOPS_ADMIN |
+| Mark stage as failed | POST | `/release-flows/{flowId}/requests/{requestId}/fail` | Rundown owner or DEVOPS_ADMIN |
 
 ### Task Management
 
@@ -110,173 +142,265 @@ All errors return a consistent JSON body:
 |-----------|--------|----------|------|
 | List tasks by request | GET | `/tasks?requestId={id}` | Any authenticated |
 | Get task detail | GET | `/tasks/{id}` | Any authenticated |
-| Edit task input | PUT | `/tasks/{id}/input` | TL |
+| Edit task input | PUT | `/tasks/{id}/input` | Task owner or DEVOPS_ADMIN |
 | Get execution history | GET | `/tasks/{id}/executions` | Any authenticated |
-| Record manual result | POST | `/tasks/{id}/record-result` | TL |
-| Submit AUTO execution | POST | `/tasks/{id}/submit-auto` | TL, DEVOPS_ADMIN |
+| Record MANUAL result | POST | `/tasks/{id}/record-result` | Task owner or DEVOPS_ADMIN |
+| Submit AUTO execution | POST | `/tasks/{id}/submit-auto` | Task owner or DEVOPS_ADMIN |
 
 ### Decision
 
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
-| Apply decision | POST | `/tasks/{id}/decision` | TL |
+| Apply decision | POST | `/tasks/{id}/decision` | Task owner or DEVOPS_ADMIN |
 
 ### Configuration
 
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
-| List all config items | GET | `/config` | Any authenticated |
+| List config items | GET | `/config` | Any authenticated |
 | Upsert config item | POST | `/config` | DEVOPS_ADMIN |
 
 ### Audit
 
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
-| List audit log entries | GET | `/audit-logs` | AUDIT, MANAGEMENT, DEVOPS_ADMIN |
+| List audit log entries | GET | `/audit-logs` | Any authenticated within scoped visibility |
 
 ---
 
 ## Endpoint Reference
 
----
+## Authentication
 
-### Authentication
+### POST /auth/login
 
-#### POST /auth/login
+Authenticates enterprise identity and creates an HTTP session.
 
-Authenticates against Team Book and creates an HTTP session.
-
-**Request Body:**
+**Request Body**
 
 ```json
 {
-  "employeeId": "emp-002",
+  "employeeId": "emp-003",
   "password": "any-non-blank-value"
 }
 ```
 
-**Response** `200 OK`:
+**Current Response** `200 OK`
 
 ```json
 {
-  "userId": "emp-002",
-  "role": "TL",
-  "displayName": "Bob Kim"
+  "userId": "emp-003",
+  "role": "DEVOPS_ADMIN",
+  "roles": ["DEVOPS_ADMIN"],
+  "permissions": ["release.view", "release.upload", "release.rundown.edit", "release.rundown.archive", "release.rundown.start", "release.rundown.fail", "task.edit", "task.run", "task.review", "config.manage", "audit.view", "access.manage", "release.view_archived", "release.rundown.restore", "release.rundown.purge"],
+  "displayName": "Carol Lee",
+  "scopes": []
 }
 ```
 
-**Errors:**
+**Errors**
 
-| Status | When |
-|--------|------|
-| 401 | Invalid credentials |
+| Status | Code | When |
+|--------|------|------|
+| 401 | `UNAUTHORIZED` | Invalid enterprise credentials |
+| 403 | `ACCESS_NOT_GRANTED` | Valid identity but no Access Grant |
+| 403 | `ACCESS_SUSPENDED` | Valid identity but suspended Access Grant |
 
-**Side effects:** Creates HTTP session with `USER_CONTEXT` attribute.
+**Side effects**
+- Creates HTTP session
+- Updates `last_login_at` for active Access Grants
 
----
+### GET /auth/me
 
-#### GET /auth/me
+Returns the currently authenticated user context.
 
-Returns the currently authenticated user from the session.
-
-**Response** `200 OK`:
+**Current Response**
 
 ```json
 {
-  "userId": "emp-002",
-  "role": "TL",
-  "displayName": "Bob Kim"
+  "userId": "emp-003",
+  "role": "DEVOPS_ADMIN",
+  "roles": ["DEVOPS_ADMIN"],
+  "permissions": ["release.view", "release.upload", "release.rundown.edit", "release.rundown.archive", "release.rundown.start", "release.rundown.fail", "task.edit", "task.run", "task.review", "config.manage", "audit.view", "access.manage", "release.view_archived", "release.rundown.restore", "release.rundown.purge"],
+  "displayName": "Carol Lee",
+  "scopes": []
 }
 ```
 
-**Errors:**
+**Errors**
 
-| Status | When |
-|--------|------|
-| 401 | No active session |
+| Status | Code | When |
+|--------|------|------|
+| 401 | `UNAUTHORIZED` | No active session |
 
----
-
-#### POST /auth/logout
+### POST /auth/logout
 
 Invalidates the current session.
 
-**Response:** `200 OK` (empty body)
-
-**Side effects:** Session invalidated, SecurityContext cleared.
+**Response:** `200 OK`
 
 ---
 
-### Upload & Import
+## Access Management
 
-#### POST /upload
+### GET /access-grants
 
-Parses an Excel file (AMH_HCC_task sheet) and creates or updates a Release Flow with its Request and Tasks.
+Lists product Access Grants for Deployment Agent administration.
+
+**Query Parameters**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | String | No | Employee ID or display name search term |
+| `status` | String | No | `ACTIVE` or `SUSPENDED` |
+| `page` | int | No | Zero-based page index |
+| `size` | int | No | Page size |
+
+**Response** `200 OK`
+
+```json
+{
+  "data": [
+    {
+      "employeeId": "emp-003",
+      "displayName": "Carol Lee",
+      "grantStatus": "ACTIVE",
+      "assignedRoles": ["DEVOPS_ADMIN"],
+      "scopeGrants": [],
+      "lastLoginAt": "2026-03-24T09:30:00Z",
+      "updatedBy": "emp-003",
+      "updatedAt": "2026-03-24T09:00:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 0,
+  "size": 20
+}
+```
+
+### POST /access-grants
+
+Creates a new Access Grant.
+
+**Request Body**
+
+```json
+{
+  "employeeId": "emp-006",
+  "assignedRoles": ["DEVELOPER"],
+  "scopeGrants": [
+    { "application": "AMH HCC", "snowGroup": "HTSA-CSI-HCC-AMH-PRJ" }
+  ],
+  "grantStatus": "ACTIVE",
+  "note": "Initial product onboarding"
+}
+```
+
+**Validation**
+- `employeeId` required
+- `grantStatus` required
+- `assignedRoles` required when `grantStatus = ACTIVE`
+- `scopeGrants` must contain valid `application` and `snowGroup` values when provided
+
+**Side effects**
+- Audit log entry for access-grant creation
+
+### PATCH /access-grants/{employeeId}
+
+Updates mutable grant fields such as roles, display-name snapshot, or note.
+
+### POST /access-grants/{employeeId}/suspend
+
+Suspends product entry for an existing Access Grant without deleting the record.
+
+### POST /access-grants/{employeeId}/reactivate
+
+Reactivates a suspended Access Grant.
+
+**Errors for Access Management endpoints**
+
+| Status | Code | When |
+|--------|------|------|
+| 403 | `FORBIDDEN` | Caller is not DEVOPS_ADMIN |
+| 404 | `NOT_FOUND` | Grant does not exist |
+| 409 | `CONFLICT` | Invalid lifecycle operation for current grant state |
+
+---
+
+## Upload and Import
+
+### POST /upload
+
+Parses an Excel file (`AMH_HCC_task`) and creates or updates a Release Flow for the selected stage.
 
 **Content-Type:** `multipart/form-data`
 
-**Form Fields:**
+**Form Fields**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `file` | File | Yes | `.xlsx` file conforming to AMH_HCC_task template |
+| `file` | File | Yes | `.xlsx` file conforming to the template |
 | `stage` | String | Yes | `SIT`, `UAT`, or `PROD` |
+| `snowGroup` | String | No | Runtime support-group scope for the uploaded rundown |
+| `application` | String | No | Runtime application scope for the uploaded rundown |
+| `agent` | String | No | Runtime agent label for the uploaded rundown |
 
-**Response** `200 OK`:
+**Response** `200 OK`
 
 ```json
 {
   "releaseFlowId": "uuid-string",
-  "releaseId": "SIT-my-project-001",
+  "releaseId": "sit-my-project-001",
   "stage": "SIT",
-  "taskCount": 12
+  "taskCount": 12,
+  "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+  "application": "AMH HCC",
+  "agent": "Deployment Agent"
 }
 ```
 
-**Validation:**
-- Stage is required and must be a valid enum value
-- File is required and must be `.xlsx` format
-- Excel must contain sheet named `AMH_HCC_task`
-- Required columns: Project ID, Project Name, Task ID, Task Name, Step, Execution Type, Step seq#
-- `execution_type` must be `MANUAL` or `AUTO` (case-insensitive)
-- `step_seq` must be a positive integer, unique within each `task_group_id`
-- AUTO tasks require non-blank `Script to be executed`
+**Validation**
+- Stage required and valid
+- File required and `.xlsx`
+- Fixed worksheet name and required columns must exist
+- AUTO rows require executable script value
 
-**Errors:**
+**Errors**
 
 | Status | Code | When |
 |--------|------|------|
 | 400 | `VALIDATION_ERROR` | Missing file or invalid stage |
-| 403 | `FORBIDDEN` | Role is not DEVELOPER or TL |
-| 422 | `IMPORT_VALIDATION_ERROR` | Excel data fails validation (details includes row/field errors) |
+| 403 | `FORBIDDEN` | Caller lacks upload permission |
+| 422 | `IMPORT_VALIDATION_ERROR` | Spreadsheet content fails validation |
 
-**Side effects:**
-- Creates or updates one Release Flow (grouped by `Project ID`)
-- Creates one Request for the selected stage
-- Creates one Task per data row (all start in `Pending`)
-- First task promoted to `Ready_For_Execution`
-- Audit log entry (`upload`)
-- Import is atomic: validation failure creates no records
+**Side effects**
+- Creates or updates Release Flow / Request / Task records
+- Promotes first eligible task
+- Records upload audit entry
 
 ---
 
-### Release Flow
+## Release Flow
 
-#### GET /release-flows
+### GET /release-flows
 
 Returns a paginated list of Release Flows.
 
-**Query Parameters:**
+**Query Parameters**
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `project` | String | — | Filter by project ID (partial match) |
-| `status` | FlowStatus | — | `Pending`, `Running`, `Completed`, `Failed`, `Rejected` |
-| `stage` | Stage | — | `SIT`, `UAT`, `PROD` |
+| `project` | String | — | Filter by project ID or name |
+| `status` | String | — | Flow status filter |
+| `stage` | String | — | Current stage filter |
+| `application` | String | — | Scope filter by application |
+| `snowGroup` | String | — | Scope filter by SNOW group |
+| `agent` | String | — | Scope filter by agent |
+| `includeArchived` | Boolean | `false` | Admin-only archived visibility |
 | `page` | int | `0` | Zero-based page index |
-| `size` | int | `10` | Page size (max 100) |
+| `size` | int | `10` | Page size |
 
-**Response** `200 OK`:
+**Response** `200 OK`
 
 ```json
 {
@@ -285,11 +409,14 @@ Returns a paginated list of Release Flows.
       "id": "uuid",
       "projectId": "PRJ-001",
       "projectName": "My Project",
-      "releaseId": "SIT-my-project-001",
-      "normalizedReleaseId": "sit-my-project-001",
+      "releaseId": "sit-my-project-001",
       "currentStage": "SIT",
       "flowStatus": "Running",
-      "reviewStatus": "Pending_Review"
+      "reviewStatus": "Pending_Review",
+      "application": "AMH HCC",
+      "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+      "agent": "Deployment Agent",
+      "owner": "alice"
     }
   ],
   "total": 42,
@@ -298,232 +425,173 @@ Returns a paginated list of Release Flows.
 }
 ```
 
----
+### GET /release-flows/{id}
 
-#### GET /release-flows/{id}
+Returns Release Flow detail, nested stage requests, and tasks.
 
-Returns full Release Flow detail including nested Requests and Tasks.
+**Query Parameters**
 
-**Path Parameters:**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `includeArchived` | Boolean | `false` | Admin-only archived visibility |
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | String | Release Flow UUID |
+### PATCH /release-flows/{flowId}/requests/{requestId}/rundown
 
-**Response** `200 OK`:
+Updates stage-level rundown fields such as application, SNOW group, agent, site, estimated remaining time, and rundown owner.
+
+**Validation**
+- Runtime scope changes require rundown edit permission and scoped visibility
+- `owner` updates are restricted to `DEVOPS_ADMIN`
+
+### POST /release-flows/{flowId}/requests/{requestId}/archive
+
+Archives the selected stage rundown and hides it from default workflow views.
+
+**Response** `200 OK`
 
 ```json
 {
-  "id": "uuid",
-  "projectId": "PRJ-001",
-  "projectName": "My Project",
-  "releaseId": "SIT-my-project-001",
-  "normalizedReleaseId": "sit-my-project-001",
-  "currentStage": "SIT",
-  "flowStatus": "Running",
-  "reviewStatus": "Pending_Review",
-  "requests": [
-    {
-      "id": "uuid",
-      "releaseFlowId": "uuid",
-      "stage": "SIT",
-      "requestStatus": "Running",
-      "tasks": [
-        {
-          "id": "uuid",
-          "requestId": "uuid",
-          "taskGroupId": "T1",
-          "taskGroupName": "Deploy DB",
-          "stepSeq": 1,
-          "taskName": "Run migration",
-          "executionType": "AUTO",
-          "taskStatus": "Awaiting_Review",
-          "inputParameters": { "script": "migrate.sh", "parameters": "--env sit" },
-          "expectedOutput": "Migration complete",
-          "owner": "ops-team",
-          "plannedStartTime": null,
-          "plannedEndTime": null,
-          "currentResultSummary": { "output": "3 tables migrated" },
-          "latestExecutionId": "uuid",
-          "version": 2
-        }
-      ]
-    }
-  ]
+  "releaseFlowId": "uuid",
+  "requestId": "uuid",
+  "stage": "SIT",
+  "requestArchived": true,
+  "releaseFlowArchived": false,
+  "activeRequestCount": 1
 }
 ```
 
-**Errors:** `404` if Release Flow not found.
+### POST /release-flows/{flowId}/requests/{requestId}/restore
+
+Restores an archived stage rundown. If no other active requests existed, restoring also reactivates the parent Release Flow.
+
+### DELETE /release-flows/{flowId}/requests/{requestId}/purge
+
+Permanently deletes an already archived stage rundown.
+
+**Validation**
+- Target request must already be archived
+- Caller must be DEVOPS_ADMIN
+
+### POST /release-flows/{flowId}/requests/{requestId}/start
+
+Promotes the first pending task in the stage into an executable state.
+
+**Validation**
+- Caller must have scoped visibility to the request
+- Caller must be the rundown owner or `DEVOPS_ADMIN`
+
+### POST /release-flows/{flowId}/requests/{requestId}/fail
+
+Marks the stage request as failed and recomputes parent aggregate status.
+
+**Validation**
+- Caller must have scoped visibility to the request
+- Caller must be the rundown owner or `DEVOPS_ADMIN`
 
 ---
 
-### Task Management
+## Task Management
 
-#### GET /tasks
+### GET /tasks
 
-Returns tasks belonging to a specific Request.
+Returns tasks for a specific request.
 
-**Query Parameters:**
+**Query Parameters**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `requestId` | String | Yes | Request UUID |
 
-**Response** `200 OK`: `TaskDto[]`
+### GET /tasks/{id}
 
----
+Returns the current task record, including execution, owner, and display metadata.
 
-#### GET /tasks/{id}
+### PUT /tasks/{id}/input
 
-Returns a single task.
+Updates task input parameters while the task is still editable.
 
-**Response** `200 OK`: `TaskDto`
+**Auth:** Task owner or `DEVOPS_ADMIN`
 
-**Errors:** `404` if task not found.
+**Validation**
+- Task must be in an editable state
+- Parent rundown must not be archived
 
----
+**Side effects**
+- Audit log entry for task edit
 
-#### PUT /tasks/{id}/input
+### GET /tasks/{id}/executions
 
-Updates a task's input parameters. Only allowed when the task is in `Pending` or `Ready_For_Execution` status.
+Returns execution history in attempt order.
 
-**Auth:** TL only
+**AUTO execution history fields**
+- `externalSystemType`
+- `externalExecutionId`
+- `externalJobUrl`
+- `submittedAt`
+- `submissionStatus`
+- `submissionMessage`
 
-**Request Body:**
+These fields are `null` for MANUAL attempts.
 
-```json
-{
-  "script": "deploy.sh",
-  "parameters": "--env sit --version 1.2.3"
-}
-```
+### POST /tasks/{id}/record-result
 
-The body is a `Map<String, Object>` representing the new `inputParameters`.
+Records a MANUAL task result and transitions the task into `Awaiting_Review`.
 
-**Response** `200 OK`: Updated `TaskDto`
+**Auth:** Task owner or `DEVOPS_ADMIN`
 
-**Errors:**
-
-| Status | Code | When |
-|--------|------|------|
-| 400 | `VALIDATION_ERROR` | Null input or task not in editable state |
-| 403 | `FORBIDDEN` | Role is not TL |
-| 404 | `NOT_FOUND` | Task not found |
-| 409 | `OPTIMISTIC_LOCK_CONFLICT` | Concurrent update detected |
-
-**Side effects:** Audit log entry (`edit`).
-
----
-
-#### GET /tasks/{id}/executions
-
-Returns execution history for a task, ordered by attempt number.
-
-**Response** `200 OK`:
-
-```json
-[
-  {
-    "id": "uuid",
-    "taskId": "uuid",
-    "attemptNumber": 1,
-    "executionStatus": "Completed",
-    "inputSnapshot": { "script": "deploy.sh", "parameters": "--env sit" },
-    "resultSummary": { "output": "Deployed successfully" },
-    "resultLogs": "full log output...",
-    "startTime": "2026-03-19T10:00:00Z",
-    "endTime": "2026-03-19T10:05:00Z",
-    "externalSystemType": "JENKINS",
-    "externalExecutionId": "42",
-    "externalJobUrl": "https://jenkins.example.com/job/deploy/42/console",
-    "submittedAt": "2026-03-19T10:00:00Z",
-    "submissionStatus": "SUBMITTED",
-    "submissionMessage": "Build queued successfully"
-  }
-]
-```
-
-The six `external*` / `submission*` fields are populated only for AUTO tasks submitted via `/submit-auto`. They are `null` for MANUAL tasks.
-
----
-
-#### POST /tasks/{id}/record-result
-
-Records the result of a MANUAL task. Transitions the task from `Ready_For_Execution` → `Executing` → `Awaiting_Review`.
-
-**Auth:** TL only
-
-**Request Body:**
+**Request Body**
 
 ```json
 {
-  "resultSummary": { "output": "Migration completed, 3 tables updated" },
-  "resultLogs": "optional raw log text"
+  "resultSummary": { "output": "Migration completed" },
+  "resultLogs": "optional free-text log"
 }
 ```
 
-**Response** `200 OK`: Updated `TaskDto`
+**Validation**
+- Task must be `MANUAL`
+- Task must be runnable / editable according to workflow rules
 
-**Errors:**
+**Side effects**
+- Creates execution history
+- Moves task through execution bookkeeping into review state
+- Records audit entry
 
-| Status | Code | When |
-|--------|------|------|
-| 403 | `FORBIDDEN` | Role is not TL |
-| 404 | `NOT_FOUND` | Task not found |
-| 409 | `CONFLICT` | Task is not MANUAL or not in `Ready_For_Execution` |
+### POST /tasks/{id}/submit-auto
 
-**Side effects:**
-- Creates `TaskExecutionHistory` record
-- Transitions task through `Executing` to `Awaiting_Review`
-- Audit log entry (`view_result`)
+Submits an AUTO task to Jenkins or Ansible.
 
----
-
-#### POST /tasks/{id}/submit-auto
-
-Submits an AUTO task to Jenkins or Ansible. Fire-and-forget — the system stores the external job URL but does not wait for callbacks.
-
-**Auth:** TL or DEVOPS_ADMIN
+**Auth:** Task owner or `DEVOPS_ADMIN`
 
 **Request Body:** None
 
-**Response** `200 OK`: Updated `TaskDto`
+**Behavior**
+- Creates a new execution history attempt
+- Reads integration config
+- Submits to external system
+- Stores submission outcome and job URL
+- Leaves successful submission in `Executing`
+- Marks failed submission as `Failed`
 
-**Errors:**
+**Errors**
 
 | Status | Code | When |
 |--------|------|------|
-| 403 | `FORBIDDEN` | Role is not TL or DEVOPS_ADMIN |
+| 403 | `FORBIDDEN` | Caller lacks permission |
 | 404 | `NOT_FOUND` | Task not found |
-| 409 | `CONFLICT` | Task is not AUTO or not in `Ready_For_Execution` |
-
-**Side effects:**
-- Creates `TaskExecutionHistory` record
-- Transitions task to `Executing`
-- Reads credentials from configuration items
-- POSTs to Jenkins or Ansible (selected by `inputParameters.system`; defaults to `JENKINS`)
-- Stores `externalExecutionId`, `externalJobUrl`, `submissionStatus`
-- On external call failure: marks task `Failed`, records error in `submissionMessage`
-- Audit log entry (`auto_submit`)
-
-**External call details:**
-
-| System | Auth | Timeout | URL |
-|--------|------|---------|-----|
-| Jenkins | Basic Auth | 10s / 30s | `{jenkins_url}/job/{script}/buildWithParameters` |
-| Ansible | Bearer token | 10s / 30s | `{ansible_url}/api/v2/job_templates/{script}/launch/` |
+| 409 | `CONFLICT` | Task is not AUTO or not executable |
 
 ---
 
-### Decision
+## Decision
 
-#### POST /tasks/{id}/decision
+### POST /tasks/{id}/decision
 
-Applies a human decision to a task. Triggers Release Flow progression.
+Applies a human decision to a task and triggers progression logic.
 
-**Auth:** TL only (enforced in DecisionEngine)
+**Auth:** Task owner or `DEVOPS_ADMIN`
 
-**Request Body:**
+**Request Body**
 
 ```json
 {
@@ -532,67 +600,39 @@ Applies a human decision to a task. Triggers Release Flow progression.
 }
 ```
 
-| Field | Type | Required | Values |
-|-------|------|----------|--------|
-| `decision` | DecisionType | Yes (`@NotNull`) | `approve`, `reject`, `rerun`, `skip` |
-| `comment` | String | No | Free text |
+**Supported decisions**
 
-**Response** `200 OK`: Updated `TaskDto`
+| Decision | Valid Starting State | Effect |
+|----------|----------------------|--------|
+| `approve` | `Awaiting_Review` | Marks task approved and promotes next eligible task |
+| `reject` | `Awaiting_Review` | Marks task rejected and propagates rejected state |
+| `rerun` | `Rejected` or `Failed` | Returns task to `Ready_For_Execution` and creates new attempt context |
+| `skip` | `Pending`, `Ready_For_Execution`, or reviewable state per implementation rules | Skips task and promotes next eligible task |
 
-**Decision Effects:**
-
-| Decision | Required Task Status | Task Transition | Flow Effect |
-|----------|---------------------|----------------|-------------|
-| `approve` | `Awaiting_Review` | → `Approved` | Next task promoted; if last → Request/Flow completed |
-| `reject` | `Awaiting_Review` | → `Rejected` | Request → Rejected, Flow → Rejected |
-| `rerun` | `Rejected` or `Failed` | → `Ready_For_Execution` | New execution history created |
-| `skip` | `Pending` or `Ready_For_Execution` | → `Skipped` | Next task promoted; if last → completed |
-
-**Errors:**
+**Errors**
 
 | Status | Code | When |
 |--------|------|------|
-| 400 | `VALIDATION_ERROR` | Missing `decision` field |
-| 403 | `FORBIDDEN` | Role is not TL |
+| 400 | `VALIDATION_ERROR` | Missing or malformed decision |
+| 403 | `FORBIDDEN` | Caller lacks permission |
 | 404 | `NOT_FOUND` | Task not found |
-| 409 | `INVALID_STATE_TRANSITION` | Task not in valid state for decision |
-
-**Side effects:**
-- Updates task, request, and release flow statuses
-- May promote next task to `Ready_For_Execution`
-- Audit log entry (action type matches decision)
+| 409 | `INVALID_STATE_TRANSITION` | Task not in a valid state for the requested decision |
 
 ---
 
-### Configuration
+## Configuration
 
-#### GET /config
+### GET /config
 
-Returns all configuration items.
+Returns configuration items for Deployment Agent integrations.
 
-**Response** `200 OK`:
-
-```json
-[
-  {
-    "configKey": "jenkins_url",
-    "configValue": "https://jenkins.example.com",
-    "description": "Jenkins server base URL",
-    "updatedBy": "emp-003",
-    "updatedAt": "2026-03-19T10:00:00Z"
-  }
-]
-```
-
----
-
-#### POST /config
+### POST /config
 
 Creates or updates a configuration item.
 
-**Auth:** DEVOPS_ADMIN only
+**Auth:** `DEVOPS_ADMIN`
 
-**Request Body:**
+**Request Body**
 
 ```json
 {
@@ -602,76 +642,49 @@ Creates or updates a configuration item.
 }
 ```
 
-| Field | Type | Required | Validation |
-|-------|------|----------|-----------|
-| `key` | ConfigKey | Yes (`@NotNull`) | Must be a valid ConfigKey enum value |
-| `value` | String | Yes (`@NotBlank`) | Per-key validation (see below) |
-| `description` | String | No | — |
+**Supported keys**
 
-**Per-key validation:**
+| Key | Validation |
+|-----|------------|
+| `jenkins_url` | Must match `^https?://.+` |
+| `jenkins_user` | Must not be blank |
+| `jenkins_api_token` | Must not be blank |
+| `ansible_url` | Must match `^https?://.+` |
+| `ansible_user` | Must not be blank |
+| `ansible_api_token` | Must not be blank |
 
-| Key | Rule |
-|-----|------|
-| `jenkins_url`, `ansible_url` | Must match `^https?://.+` |
-| `jenkins_user`, `jenkins_api_token`, `ansible_user`, `ansible_api_token` | Must not be blank |
-| `execution_callback_endpoint` | Must match `^https://.+` (HTTPS required) |
-
-**Response** `200 OK`: `ConfigurationItemDto`
-
-**Errors:**
-
-| Status | Code | When |
-|--------|------|------|
-| 400 | `VALIDATION_ERROR` | Unknown key, blank value, or per-key validation failure |
-| 403 | `FORBIDDEN` | Role is not DEVOPS_ADMIN |
-
-**Side effects:** Audit log entry (`config_update`) with `oldValue` and `newValue`.
+**Design note**
+- `execution_callback_endpoint` is not part of the current design baseline
 
 ---
 
-### Audit
+## Audit
 
-#### GET /audit-logs
+### GET /audit-logs
 
-Returns a paginated list of audit log entries.
+Returns audit log entries for signed-in users.
 
-**Auth:** AUDIT, MANAGEMENT, or DEVOPS_ADMIN
+**Auth:** Any authenticated session, filtered by scoped visibility unless the user is a global `DEVOPS_ADMIN`
 
-**Query Parameters:**
+**Query Parameters**
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `operatorId` | String | — | Filter by operator |
-| `actionType` | AuditActionType | — | See Audit Action Types in data model |
-| `releaseFlowId` | String | — | Filter by Release Flow |
-| `taskId` | String | — | Filter by Task |
+| `actionType` | String | — | Filter by audit action |
+| `releaseFlowId` | String | — | Filter by flow |
+| `taskId` | String | — | Filter by task |
+| `application` | String | — | Filter by application scope |
+| `snowGroup` | String | — | Filter by SNOW group scope |
+| `agent` | String | — | Filter by agent |
 | `page` | int | `0` | Zero-based page index |
 | `size` | int | `20` | Page size |
 
-**Response** `200 OK`:
-
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "timestamp": "2026-03-19T10:00:00Z",
-      "operatorId": "emp-002",
-      "operatorRole": "TL",
-      "actionType": "approve",
-      "releaseFlowId": "uuid",
-      "requestId": "uuid",
-      "taskId": "uuid",
-      "contextPayload": { "decisionType": "approve", "previousStatus": "Awaiting_Review", "comment": "Looks good" }
-    }
-  ],
-  "total": 156,
-  "page": 0,
-  "size": 20
-}
-```
-
-**Errors:** `403` if role is not AUDIT, MANAGEMENT, or DEVOPS_ADMIN.
+**Audit action coverage**
+- workflow actions such as upload, edit, manual result, auto submit, approve/reject/rerun/skip
+- rundown lifecycle actions such as archive, restore, purge
+- config updates
+- access-grant actions
 
 ---
 
@@ -679,36 +692,56 @@ Returns a paginated list of audit log entries.
 
 ### Task Status
 
+```text
+Pending -> Ready_For_Execution -> Executing -> Awaiting_Review -> Approved
+Pending -> Skipped
+Ready_For_Execution -> Skipped
+Executing -> Failed
+Awaiting_Review -> Rejected
+Rejected -> Ready_For_Execution
+Failed -> Ready_For_Execution
 ```
-Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Review ──► Approved
-  │                │                    │                │
-  └──► Skipped     └──► Skipped         └──► Failed      └──► Rejected
-                                                │                │
-                                                └► Ready_For_    └► Ready_For_
-                                                   Execution        Execution
-                                                   (rerun)          (rerun)
+
+### Request Status
+
+```text
+Pending -> Running -> Completed | Failed | Skipped | Rejected
 ```
 
 ### Flow Status
 
-`Pending` → `Running` → `Completed` | `Failed` | `Rejected`
+```text
+Pending -> Running -> Completed | Failed | Rejected
+```
 
-### Request Status
+### Access Grant Status
 
-`Pending` → `Running` → `Completed` | `Failed` | `Skipped` | `Rejected`
+```text
+ACTIVE <-> SUSPENDED
+```
 
 ---
 
 ## Concurrency
 
-Task, Request, and Release Flow entities use optimistic locking via a `version` field. If a concurrent modification has occurred, the server returns `409 OPTIMISTIC_LOCK_CONFLICT`. The client should reload and retry.
+Task, Request, and Release Flow entities use optimistic locking. Concurrent mutation should return `409 OPTIMISTIC_LOCK_CONFLICT`, and the client should reload before retrying.
+
+Access Grant mutation follows the same optimistic-update discipline through its `version` column.
 
 ---
 
 ## Integration Dependencies
 
 | Dependency | Required Config Keys | Protocol | Timeout |
-|------------|---------------------|----------|---------|
+|------------|----------------------|----------|---------|
 | Jenkins | `jenkins_url`, `jenkins_user`, `jenkins_api_token` | REST + Basic Auth | 10s connect / 30s read |
 | Ansible Tower | `ansible_url`, `ansible_user`, `ansible_api_token` | REST + Bearer Token | 10s connect / 30s read |
-| Team Book | — (stubbed for MVP) | Interface-based | — |
+| Team Book | — (stubbed in MVP) | Provider interface | — |
+
+---
+
+## Design Notes for Implementation Planning
+
+- Access Management APIs should be implemented together with session contract changes, route guards, and audit action expansion.
+- Existing workflow APIs should not be widened to “superuser bypass” semantics without an explicit admin-override design.
+- Archive/restore/purge behavior should remain separate from Access Management; they solve different product problems.

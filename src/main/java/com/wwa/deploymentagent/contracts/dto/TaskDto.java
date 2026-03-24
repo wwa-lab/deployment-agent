@@ -11,6 +11,7 @@ public record TaskDto(
         String id,
         String requestId,
         String category,
+        String dependencies,
         String taskGroupId,
         String taskGroupName,
         int stepSeq,
@@ -33,6 +34,9 @@ public record TaskDto(
                 task.getRequest().getId(),
                 task.getImportMetadata() != null
                         ? (String) task.getImportMetadata().get("activity_category")
+                        : null,
+                task.getImportMetadata() != null
+                        ? (String) task.getImportMetadata().get("dependencies")
                         : null,
                 task.getTaskGroupId(),
                 task.getTaskGroupName(),

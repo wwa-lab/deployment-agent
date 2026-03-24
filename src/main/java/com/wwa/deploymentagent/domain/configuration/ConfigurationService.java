@@ -96,7 +96,10 @@ public class ConfigurationService {
         auditLogger.log(user, AuditActionType.config_update,
                 Map.of("configKey", key.name(),
                        "oldValue", oldValue != null ? oldValue : "",
-                       "newValue", value));
+                       "newValue", value,
+                       "application", "Deployment Agent",
+                       "snowGroup", "WWA Platform",
+                       "agent", "Deployment Agent"));
 
         return saved;
     }

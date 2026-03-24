@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
 import { getTaskResult, submitAutoExecution } from '../api/tasks'
-import { markRequestFailed, startRequestDeployment } from '../api/releaseFlows'
+import {
+  archiveRequestRundown,
+  markRequestFailed,
+  purgeRequestRundown,
+  restoreRequestRundown,
+  startRequestDeployment,
+} from '../api/releaseFlows'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
 import DecisionDialog from '../components/DecisionDialog.vue'
 import RundownEditDialog from '../components/RundownEditDialog.vue'
@@ -12,6 +18,7 @@ import TaskActivityDialog from '../components/TaskActivityDialog.vue'
 import type { Task, TaskResult, Request } from '../types'
 
 type DecisionOption = 'Approve' | 'Reject' | 'Rerun' | 'Skip'
+type TaskDialogMode = 'edit' | 'run'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,20 +26,27 @@ const store = useReleaseFlowStore()
 const userStore = useUserStore()
 
 const flowId = computed(() => route.params.id as string)
+const includeArchivedView = computed(() => userStore.isDevOpsAdmin && route.query.archived === '1')
 
 const editingTask = ref<Task | null>(null)
+const taskDialogMode = ref<TaskDialogMode>('edit')
 const decidingTask = ref<Task | null>(null)
 const viewingActivityTask = ref<Task | null>(null)
 const initialDecision = ref<DecisionOption | null>(null)
+const allowedDecisionOptions = ref<DecisionOption[]>(['Approve', 'Reject', 'Skip'])
 const editingRundown = ref<Request | null>(null)
 const requestActionLoadingId = ref<string | null>(null)
 const refreshingDetail = ref(false)
 
 const viewingResult = ref<{ task: Task; result: TaskResult | null; loading: boolean } | null>(null)
 
-onMounted(async () => {
-  await store.selectFlow(flowId.value)
-})
+watch(
+  [flowId, includeArchivedView],
+  async ([id, includeArchived]) => {
+    await store.selectFlowWithArchived(id, includeArchived)
+  },
+  { immediate: true },
+)
 
 function statusBadgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -67,25 +81,27 @@ function normalizeIdentity(value: string | null | undefined): string {
   return (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
+function currentUserIdentityCandidates(): string[] {
+  const displayName = userStore.displayName.replace(/\s*\(.*\)$/, '').trim()
+  const firstName = displayName.split(/\s+/)[0] ?? ''
+
+  return [userStore.userId, displayName, firstName]
+    .map((value) => normalizeIdentity(value))
+    .filter(Boolean)
+}
+
+function matchesCurrentUserIdentity(value: string | null | undefined): boolean {
+  const normalizedValue = normalizeIdentity(value)
+  if (!normalizedValue) return false
+  return currentUserIdentityCandidates().includes(normalizedValue)
+}
+
 function isTaskAdmin(): boolean {
   return userStore.isDevOpsAdmin
 }
 
 function isTaskOwner(task: Task): boolean {
-  const owner = normalizeIdentity(task.owner)
-  if (!owner) return false
-
-  const displayName = userStore.displayName.replace(/\s*\(.*\)$/, '').trim()
-  const firstName = displayName.split(/\s+/)[0] ?? ''
-  const candidates = [
-    userStore.userId,
-    displayName,
-    firstName,
-  ]
-    .map((value) => normalizeIdentity(value))
-    .filter(Boolean)
-
-  return candidates.includes(owner)
+  return matchesCurrentUserIdentity(task.owner)
 }
 
 function canModifyTask(task: Task): boolean {
@@ -115,31 +131,111 @@ function decisionDisabledReason(task: Task): string | null {
   return 'Available only when task status is Awaiting_Review'
 }
 
-function canSubmitAuto(task: Task): boolean {
-  return (
-    canModifyTask(task) &&
-    task.executionType === 'AUTO' &&
-    task.taskStatus === 'Ready_For_Execution'
-  )
+function canRun(task: Task): boolean {
+  return canModifyTask(task) && task.taskStatus === 'Ready_For_Execution'
+}
+
+function runDisabledReason(task: Task): string | null {
+  if (canRun(task)) return null
+  if (!canModifyTask(task)) return 'Task owner or admin only'
+  return 'Available only when task status is Ready_For_Execution'
+}
+
+function runButtonLabel(task: Task): string {
+  if (task.executionType === 'AUTO' && submittingAuto.value === task.id) {
+    return 'Running...'
+  }
+  if (task.taskStatus === 'Executing') {
+    return 'Running...'
+  }
+  return 'Run'
+}
+
+function canRerun(task: Task): boolean {
+  return canModifyTask(task) && (task.taskStatus === 'Failed' || task.taskStatus === 'Rejected')
+}
+
+function rerunDisabledReason(task: Task): string | null {
+  if (canRerun(task)) return null
+  if (!canModifyTask(task)) return 'Task owner or admin only'
+  return 'Available only when task status is Failed or Rejected'
 }
 
 function canEditRundown(): boolean {
   return userStore.isDeveloper || userStore.isTL || userStore.isDevOpsAdmin
 }
 
+function canRestoreRundown(): boolean {
+  return userStore.isDevOpsAdmin
+}
+
+function canPurgeRundown(request: Request): boolean {
+  return userStore.isDevOpsAdmin && isArchivedRequest(request)
+}
+
+function isArchivedRequest(request: Request): boolean {
+  return !!request.archivedAt
+}
+
+function archivedRequestReason(request: Request): string | null {
+  if (!isArchivedRequest(request)) return null
+  return 'Archived rundowns are read-only until restored.'
+}
+
+function taskActionReason(request: Request, reason: string | null): string | null {
+  return archivedRequestReason(request) ?? reason
+}
+
+function isRundownOperator(request: Request): boolean {
+  if (userStore.isDevOpsAdmin) return true
+  if (!userStore.isDeveloper && !userStore.isTL) return false
+  return matchesCurrentUserIdentity(request.owner)
+}
+
+function hasPendingTasks(request: Request): boolean {
+  return request.tasks.some((task) => task.taskStatus === 'Pending')
+}
+
+function hasFailEligibleTasks(request: Request): boolean {
+  return request.tasks.some(
+    (task) => !['Approved', 'Skipped', 'Rejected', 'Failed'].includes(task.taskStatus),
+  )
+}
+
 function canStartDeployment(request: Request): boolean {
   return (
-    canEditRundown() &&
+    isRundownOperator(request) &&
+    !isArchivedRequest(request) &&
     request.requestStatus === 'Pending' &&
-    request.tasks.some((task) => task.taskStatus === 'Pending')
+    hasPendingTasks(request)
   )
 }
 
 function canMarkRequestFailed(request: Request): boolean {
   return (
-    canEditRundown() &&
-    !['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus)
+    isRundownOperator(request) &&
+    !isArchivedRequest(request) &&
+    !['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus) &&
+    hasFailEligibleTasks(request)
   )
+}
+
+function startDeploymentDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (request.requestStatus !== 'Pending') return 'Available only when rundown status is Pending'
+  if (!hasPendingTasks(request)) return 'No pending tasks remain to start'
+  return null
+}
+
+function markRequestFailedDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus)) {
+    return 'Available only while the rundown is still active'
+  }
+  if (!hasFailEligibleTasks(request)) return 'No active tasks remain to fail'
+  return null
 }
 
 const submittingAuto = ref<string | null>(null)
@@ -154,6 +250,24 @@ async function handleSubmitAuto(task: Task) {
   } finally {
     submittingAuto.value = null
   }
+}
+
+async function handleRun(task: Task) {
+  if (!canRun(task)) return
+
+  if (task.executionType === 'AUTO') {
+    await handleSubmitAuto(task)
+    return
+  }
+
+  taskDialogMode.value = 'run'
+  editingTask.value = task
+}
+
+function openEditTask(task: Task) {
+  if (!canEdit(task)) return
+  taskDialogMode.value = 'edit'
+  editingTask.value = task
 }
 
 function canViewResult(task: Task): boolean {
@@ -177,18 +291,21 @@ async function openViewResult(task: Task) {
 
 async function onTaskSaved() {
   editingTask.value = null
+  taskDialogMode.value = 'edit'
   await store.refreshDetail()
 }
 
 async function onDecisionMade() {
   decidingTask.value = null
   initialDecision.value = null
+  allowedDecisionOptions.value = ['Approve', 'Reject', 'Skip']
   await store.refreshDetail()
 }
 
 function closeDecisionDialog() {
   decidingTask.value = null
   initialDecision.value = null
+  allowedDecisionOptions.value = ['Approve', 'Reject', 'Skip']
 }
 
 async function onRundownSaved() {
@@ -206,6 +323,7 @@ async function handleRefreshDetail() {
 }
 
 async function handleStartDeployment(request: Request) {
+  if (!canStartDeployment(request)) return
   requestActionLoadingId.value = `${request.id}:start`
   try {
     await startRequestDeployment(request.releaseFlowId, request.id)
@@ -218,6 +336,7 @@ async function handleStartDeployment(request: Request) {
 }
 
 async function handleMarkRequestFailed(request: Request) {
+  if (!canMarkRequestFailed(request)) return
   requestActionLoadingId.value = `${request.id}:fail`
   try {
     await markRequestFailed(request.releaseFlowId, request.id)
@@ -229,24 +348,136 @@ async function handleMarkRequestFailed(request: Request) {
   }
 }
 
-function openDecision(task: Task, decision?: DecisionOption) {
+function archiveRundownConfirmationMessage(request: Request): string {
+  const activeRequestCount = store.detail?.requests.filter((item) => !item.archivedAt).length ?? 0
+  if (activeRequestCount <= 1) {
+    return `Archive the ${request.stage} rundown? This is the last active stage, so the entire release flow will move into Archived and disappear from the default list.`
+  }
+  return `Archive the ${request.stage} rundown and hide it from the default workflow view?`
+}
+
+async function handleArchiveRundown(request: Request) {
+  if (!canEditRundown()) return
+  if (!window.confirm(archiveRundownConfirmationMessage(request))) return
+
+  requestActionLoadingId.value = `${request.id}:archive`
+  try {
+    const result = await archiveRequestRundown(request.releaseFlowId, request.id)
+    if (result.releaseFlowArchived && !includeArchivedView.value) {
+      await store.fetchList()
+      await router.push('/wwa/deployment-agent')
+      return
+    }
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handleRestoreRundown(request: Request) {
+  if (!canRestoreRundown()) return
+  if (!window.confirm(`Restore the ${request.stage} rundown back into the active workflow?`)) return
+
+  requestActionLoadingId.value = `${request.id}:restore`
+  try {
+    await restoreRequestRundown(request.releaseFlowId, request.id)
+    await store.fetchList()
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+function purgeRundownConfirmationMessage(request: Request): string {
+  const totalRequestCount = store.detail?.requests.length ?? 0
+  if (totalRequestCount <= 1) {
+    return `Delete the ${request.stage} rundown permanently? This is irreversible and will permanently remove the entire release flow because no other rundowns remain.`
+  }
+  return `Delete the ${request.stage} rundown permanently? This is irreversible and removes its archived task history from the system.`
+}
+
+async function handlePurgeRundown(request: Request) {
+  if (!canPurgeRundown(request)) return
+  if (!window.confirm(purgeRundownConfirmationMessage(request))) return
+
+  requestActionLoadingId.value = `${request.id}:purge`
+  try {
+    const result = await purgeRequestRundown(request.releaseFlowId, request.id)
+    await store.fetchList()
+    if (result.releaseFlowDeleted) {
+      await router.push('/wwa/deployment-agent')
+      return
+    }
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function toggleArchivedVisibility() {
+  const nextQuery = { ...route.query }
+  if (includeArchivedView.value) {
+    delete nextQuery.archived
+  } else {
+    nextQuery.archived = '1'
+  }
+  await router.replace({ query: nextQuery })
+}
+
+function openDecision(
+  task: Task,
+  options?: { decision?: DecisionOption; allowedDecisions?: DecisionOption[] },
+) {
   decidingTask.value = task
-  initialDecision.value = decision ?? null
+  initialDecision.value = options?.decision ?? null
+  allowedDecisionOptions.value = options?.allowedDecisions ?? ['Approve', 'Reject', 'Skip']
+}
+
+function openRerun(task: Task) {
+  openDecision(task, {
+    decision: 'Rerun',
+    allowedDecisions: ['Rerun'],
+  })
 }
 
 function handleDecisionSelect(task: Task, event: Event) {
   const select = event.target as HTMLSelectElement
   const decision = select.value as DecisionOption | ''
   if (!decision) return
-  openDecision(task, decision)
+  openDecision(task, {
+    decision,
+    allowedDecisions: ['Approve', 'Reject', 'Skip'],
+  })
   select.value = ''
 }
 
 function activeStageIndex(requests: Request[]): number {
   const detail = store.detail
   if (!detail) return 0
-  const idx = requests.findIndex((r) => r.stage === detail.currentStage)
-  return idx >= 0 ? idx : 0
+  const idx = requests.findIndex((r) => r.stage === detail.currentStage && !r.archivedAt)
+  if (idx >= 0) return idx
+  const archivedIdx = requests.findIndex((r) => r.stage === detail.currentStage)
+  if (archivedIdx >= 0) return archivedIdx
+  return 0
+}
+
+function requestTabLabel(request: Request): string {
+  return request.archivedAt ? `${request.stage} (Archived)` : request.stage
+}
+
+function canEditRundownFields(request: Request): boolean {
+  return canEditRundown() && !isArchivedRequest(request)
+}
+
+function flowArchiveLabel(): string | null {
+  if (!store.detail?.archivedAt) return null
+  return `Archived on ${formatDateTime(store.detail.archivedAt)}`
 }
 
 const activeTab = ref(0)
@@ -262,15 +493,26 @@ const activeRequestSummary = computed(() => {
   if (!request) return null
 
   const uniqueTaskGroups = new Set(request.tasks.map((task) => task.taskGroupId))
-  const uniqueOwners = Array.from(
-    new Set(request.tasks.map((task) => task.owner).filter((owner): owner is string => !!owner)),
-  )
+  const taskNames = new Set(request.tasks.map((task) => task.taskName))
   const manualCount = request.tasks.filter((task) => task.executionType === 'MANUAL').length
   const autoCount = request.tasks.filter((task) => task.executionType === 'AUTO').length
   const pendingReviewCount = request.tasks.filter((task) => task.taskStatus === 'Awaiting_Review').length
   const completedTaskCount = request.tasks.filter((task) =>
     ['Approved', 'Rejected', 'Skipped', 'Completed', 'Failed'].includes(task.taskStatus),
   ).length
+  const dependencyEdges = request.tasks.reduce(
+    (sum, task) => sum + parseDependencyList(task.dependencies).length,
+    0,
+  )
+  const tasksWithDependencies = request.tasks.filter(
+    (task) => parseDependencyList(task.dependencies).length > 0,
+  ).length
+  const unresolvedDependencyCount = request.tasks.reduce((sum, task) => {
+    const unresolved = parseDependencyList(task.dependencies).filter(
+      (dependency) => !taskNames.has(dependency),
+    )
+    return sum + unresolved.length
+  }, 0)
 
   const plannedStarts = request.tasks
     .map((task) => task.plannedStartTime)
@@ -304,7 +546,6 @@ const activeRequestSummary = computed(() => {
 
   return {
     taskGroupCount: uniqueTaskGroups.size,
-    owners: uniqueOwners,
     manualCount,
     autoCount,
     manualPercent,
@@ -312,6 +553,9 @@ const activeRequestSummary = computed(() => {
     pendingReviewCount,
     completedTaskCount,
     progressPercent,
+    dependencyEdges,
+    tasksWithDependencies,
+    unresolvedDependencyCount,
     plannedStart,
     plannedEnd,
     lastUpdated,
@@ -332,6 +576,30 @@ function formatDateTime(value: string | Date | null | undefined): string {
 
 function hasValue(value: string | null | undefined): boolean {
   return !!value && value.trim().length > 0
+}
+
+function parseDependencyList(value?: string): string[] {
+  if (!value) return []
+
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  )
+}
+
+function getBlockingTaskNames(task: Task, tasks: Task[]): string[] {
+  return tasks
+    .filter((candidate) => parseDependencyList(candidate.dependencies).includes(task.taskName))
+    .map((candidate) => candidate.taskName)
+}
+
+function getMissingDependencyNames(task: Task, tasks: Task[]): string[] {
+  const taskNames = new Set(tasks.map((candidate) => candidate.taskName))
+  return parseDependencyList(task.dependencies).filter((dependency) => !taskNames.has(dependency))
 }
 
 function plannedWindowLabel(start: Date | null, end: Date | null): string {
@@ -392,6 +660,19 @@ watch(() => store.detail, (val) => {
             </span>
           </div>
         </div>
+        <div class="detail-header-actions">
+          <span v-if="store.detail.archivedAt" class="badge badge-rejected">
+            {{ flowArchiveLabel() }}
+          </span>
+          <button
+            v-if="userStore.isDevOpsAdmin"
+            type="button"
+            class="btn btn-secondary btn-sm"
+            @click="toggleArchivedVisibility"
+          >
+            {{ includeArchivedView ? 'Hide Archived Rundowns' : 'Show Archived Rundowns' }}
+          </button>
+        </div>
       </div>
 
       <!-- Stage tabs -->
@@ -404,9 +685,12 @@ watch(() => store.detail, (val) => {
             :class="{ active: activeTab === idx }"
             @click="activeTab = idx"
           >
-            {{ req.stage }}
+            {{ requestTabLabel(req) }}
             <span class="badge" :class="statusBadgeClass(req.requestStatus)" style="margin-left:6px;font-size:11px">
               {{ req.requestStatus }}
+            </span>
+            <span v-if="req.archivedAt" class="badge badge-rejected" style="margin-left:6px;font-size:11px">
+              Archived
             </span>
           </button>
         </div>
@@ -430,14 +714,49 @@ watch(() => store.detail, (val) => {
                   {{ refreshingDetail ? 'Refreshing...' : 'Refresh' }}
                 </button>
                 <button
-                  v-if="canEditRundown()"
+                  v-if="canEditRundownFields(req)"
                   type="button"
                   class="btn btn-secondary btn-sm"
                   @click="editingRundown = req"
                 >
                   Edit Rundown
                 </button>
+                <button
+                  v-if="canEditRundownFields(req)"
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:archive`"
+                  @click="handleArchiveRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:archive` ? 'Archiving...' : 'Archive Rundown' }}
+                </button>
+                <button
+                  v-if="req.archivedAt && canRestoreRundown()"
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:restore`"
+                  @click="handleRestoreRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:restore` ? 'Restoring...' : 'Restore Rundown' }}
+                </button>
+                <button
+                  v-if="canPurgeRundown(req)"
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:purge`"
+                  @click="handlePurgeRundown(req)"
+                >
+                  {{
+                    requestActionLoadingId === `${req.id}:purge`
+                      ? 'Deleting...'
+                      : 'Delete Permanently'
+                  }}
+                </button>
               </div>
+            </div>
+
+            <div v-if="req.archivedAt" class="rundown-section archived-rundown-note">
+              This rundown is archived. Task history remains visible, but workflow actions stay disabled until it is restored. DEVOPS_ADMIN can also delete it permanently after review.
             </div>
 
             <div class="rundown-section">
@@ -460,15 +779,17 @@ watch(() => store.detail, (val) => {
                   <span class="rundown-field-label">Application:</span>
                   <span class="rundown-field-value">{{ req.application ?? store.detail.projectName }}</span>
                 </div>
+                <div v-if="hasValue(req.agent)" class="rundown-field">
+                  <span class="rundown-field-label">Agent:</span>
+                  <span class="rundown-field-value">{{ req.agent }}</span>
+                </div>
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Rundown Owner:</span>
+                  <span class="rundown-field-value">{{ req.owner ?? '—' }}</span>
+                </div>
                 <div v-if="hasValue(req.site)" class="rundown-field">
                   <span class="rundown-field-label">Site:</span>
                   <span class="rundown-field-value">{{ req.site }}</span>
-                </div>
-                <div class="rundown-field">
-                  <span class="rundown-field-label">Owners:</span>
-                  <span class="rundown-field-value">
-                    {{ activeRequestSummary.owners.length > 0 ? activeRequestSummary.owners.join(', ') : '—' }}
-                  </span>
                 </div>
                 <div class="rundown-field">
                   <span class="rundown-field-label">Execution Mix:</span>
@@ -550,19 +871,19 @@ watch(() => store.detail, (val) => {
             <div class="rundown-section">
               <div class="rundown-request-actions">
                 <button
-                  v-if="canStartDeployment(req)"
                   type="button"
                   class="btn btn-primary btn-start"
-                  :disabled="requestActionLoadingId === `${req.id}:start`"
+                  :disabled="!!startDeploymentDisabledReason(req) || requestActionLoadingId === `${req.id}:start`"
+                  :title="startDeploymentDisabledReason(req) ?? undefined"
                   @click="handleStartDeployment(req)"
                 >
                   {{ requestActionLoadingId === `${req.id}:start` ? 'Starting...' : 'Start Deployment' }}
                 </button>
                 <button
-                  v-if="canMarkRequestFailed(req)"
                   type="button"
                   class="btn btn-danger"
-                  :disabled="requestActionLoadingId === `${req.id}:fail`"
+                  :disabled="!!markRequestFailedDisabledReason(req) || requestActionLoadingId === `${req.id}:fail`"
+                  :title="markRequestFailedDisabledReason(req) ?? undefined"
                   @click="handleMarkRequestFailed(req)"
                 >
                   {{ requestActionLoadingId === `${req.id}:fail` ? 'Marking...' : 'Mark as Failed' }}
@@ -572,7 +893,45 @@ watch(() => store.detail, (val) => {
           </div>
 
           <div v-if="req.tasks.length === 0" class="empty-state">No tasks in this request.</div>
-          <table v-else class="data-table">
+          <template v-else>
+            <div class="task-dependency-panel">
+              <div class="task-dependency-head">
+                <div>
+                  <div class="task-dependency-title">Task Dependencies</div>
+                  <div class="task-dependency-copy">
+                    Dependency details now live with the task table, where blocked relationships are easiest to act on.
+                  </div>
+                </div>
+              </div>
+
+              <div class="task-dependency-grid">
+                <div class="task-dependency-block">
+                  <div class="task-dependency-label">Dependency Links</div>
+                  <div class="task-dependency-value">{{ activeRequestSummary?.dependencyEdges ?? 0 }}</div>
+                </div>
+                <div class="task-dependency-block">
+                  <div class="task-dependency-label">Tasks With Prerequisites</div>
+                  <div class="task-dependency-value">{{ activeRequestSummary?.tasksWithDependencies ?? 0 }}</div>
+                </div>
+                <div class="task-dependency-block">
+                  <div class="task-dependency-label">Missing Links</div>
+                  <div class="task-dependency-value">{{ activeRequestSummary?.unresolvedDependencyCount ?? 0 }}</div>
+                </div>
+              </div>
+
+              <div
+                v-if="(activeRequestSummary?.unresolvedDependencyCount ?? 0) > 0"
+                class="task-dependency-warning"
+              >
+                {{
+                  activeRequestSummary?.unresolvedDependencyCount
+                }}
+                dependency link{{ (activeRequestSummary?.unresolvedDependencyCount ?? 0) > 1 ? 's are' : ' is' }}
+                missing in this rundown. Check the `Blocked By` column below for affected tasks.
+              </div>
+            </div>
+
+            <table class="data-table">
             <thead>
               <tr>
                 <th>Activity Category</th>
@@ -583,6 +942,8 @@ watch(() => store.detail, (val) => {
                 <th>Critical</th>
                 <th>Status</th>
                 <th>Owner</th>
+                <th>Blocked By</th>
+                <th>Blocks</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -613,13 +974,41 @@ watch(() => store.detail, (val) => {
                 </td>
                 <td>{{ task.owner ?? '—' }}</td>
                 <td>
+                  <div v-if="parseDependencyList(task.dependencies).length > 0" class="dependency-chip-list">
+                    <span
+                      v-for="dependency in parseDependencyList(task.dependencies)"
+                      :key="`${task.id}-blocked-by-${dependency}`"
+                      class="dependency-chip"
+                    >
+                      {{ dependency }}
+                    </span>
+                  </div>
+                  <span v-else class="dependency-empty-chip">—</span>
+                  <div v-if="getMissingDependencyNames(task, req.tasks).length > 0" class="dependency-warning-text">
+                    Missing:
+                    {{ getMissingDependencyNames(task, req.tasks).join(', ') }}
+                  </div>
+                </td>
+                <td>
+                  <div v-if="getBlockingTaskNames(task, req.tasks).length > 0" class="dependency-chip-list">
+                    <span
+                      v-for="dependency in getBlockingTaskNames(task, req.tasks)"
+                      :key="`${task.id}-blocks-${dependency}`"
+                      class="dependency-chip dependency-chip-outbound"
+                    >
+                      {{ dependency }}
+                    </span>
+                  </div>
+                  <span v-else class="dependency-empty-chip">—</span>
+                </td>
+                <td>
                   <div class="task-action-panel">
                     <div class="action-btns">
-                      <span class="action-tooltip" :title="editDisabledReason(task) ?? ''">
+                      <span class="action-tooltip" :title="taskActionReason(req, editDisabledReason(task)) ?? ''">
                         <button
                           class="btn btn-secondary btn-sm"
-                          :disabled="!canEdit(task)"
-                          @click.stop="canEdit(task) && (editingTask = task)"
+                          :disabled="isArchivedRequest(req) || !canEdit(task)"
+                          @click.stop="openEditTask(task)"
                         >
                           Edit
                         </button>
@@ -639,25 +1028,34 @@ watch(() => store.detail, (val) => {
                           View Result
                         </button>
                       </span>
-                      <button
-                        v-if="canSubmitAuto(task)"
-                        class="btn btn-primary btn-sm"
-                        :disabled="submittingAuto === task.id"
-                        @click.stop="handleSubmitAuto(task)"
-                      >
-                        {{ submittingAuto === task.id ? 'Submitting...' : 'Submit Auto' }}
-                      </button>
+                      <span class="action-tooltip" :title="taskActionReason(req, runDisabledReason(task)) ?? ''">
+                        <button
+                          class="btn btn-primary btn-sm"
+                          :disabled="isArchivedRequest(req) || !canRun(task) || submittingAuto === task.id"
+                          @click.stop="handleRun(task)"
+                        >
+                          {{ runButtonLabel(task) }}
+                        </button>
+                      </span>
+                      <span class="action-tooltip" :title="taskActionReason(req, rerunDisabledReason(task)) ?? ''">
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          :disabled="isArchivedRequest(req) || !canRerun(task)"
+                          @click.stop="canRerun(task) && openRerun(task)"
+                        >
+                          Rerun
+                        </button>
+                      </span>
                     </div>
-                    <span class="action-tooltip" :title="decisionDisabledReason(task) ?? ''">
+                    <span class="action-tooltip" :title="taskActionReason(req, decisionDisabledReason(task)) ?? ''">
                       <select
                         class="decision-select"
-                        :disabled="!canDecide(task)"
+                        :disabled="isArchivedRequest(req) || !canDecide(task)"
                         @change="handleDecisionSelect(task, $event)"
                       >
-                        <option value="">Decision</option>
+                        <option value="">Review Decision</option>
                         <option value="Approve">Approve</option>
                         <option value="Reject">Reject</option>
-                        <option value="Rerun">Rerun</option>
                         <option value="Skip">Skip</option>
                       </select>
                     </span>
@@ -665,7 +1063,8 @@ watch(() => store.detail, (val) => {
                 </td>
               </tr>
             </tbody>
-          </table>
+            </table>
+          </template>
         </div>
       </div>
 
@@ -728,8 +1127,9 @@ watch(() => store.detail, (val) => {
     <TaskEditDialog
       v-if="editingTask"
       :task="editingTask"
+      :mode="taskDialogMode"
       @saved="onTaskSaved"
-      @close="editingTask = null"
+      @close="editingTask = null; taskDialogMode = 'edit'"
     />
 
     <!-- Decision Dialog -->
@@ -737,6 +1137,7 @@ watch(() => store.detail, (val) => {
       v-if="decidingTask"
       :task="decidingTask"
       :initial-decision="initialDecision"
+      :allowed-decisions="allowedDecisionOptions"
       @decided="onDecisionMade"
       @close="closeDecisionDialog"
     />
@@ -778,6 +1179,15 @@ watch(() => store.detail, (val) => {
   flex-wrap: wrap;
   gap: 24px;
   align-items: center;
+}
+
+.detail-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
 .header-field {
@@ -872,6 +1282,13 @@ watch(() => store.detail, (val) => {
 
 .rundown-section:last-of-type {
   border-bottom: none;
+}
+
+.archived-rundown-note {
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .rundown-section-title {
@@ -1000,6 +1417,109 @@ watch(() => store.detail, (val) => {
   flex-wrap: wrap;
 }
 
+.task-dependency-panel {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.task-dependency-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.task-dependency-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.task-dependency-copy {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.task-dependency-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 18px;
+}
+
+.task-dependency-block {
+  min-width: 0;
+}
+
+.task-dependency-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.task-dependency-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.task-dependency-warning {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dependency-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dependency-chip,
+.dependency-empty-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dependency-chip {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dependency-chip-outbound {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.dependency-empty-chip {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.dependency-warning-text {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #c2410c;
+}
+
 .btn-start {
   background: #16a34a;
   border-color: #16a34a;
@@ -1015,11 +1535,19 @@ watch(() => store.detail, (val) => {
   .rundown-progress-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .task-dependency-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
   .rundown-info-grid,
   .rundown-progress-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-dependency-grid {
     grid-template-columns: 1fr;
   }
 }

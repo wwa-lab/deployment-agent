@@ -42,6 +42,7 @@ public class RecordResultService {
     private final ReleaseFlowProgressionService progressionService;
     private final AuditLoggerService auditLogger;
     private final TaskPermissionService taskPermissionService;
+    private final TaskService taskService;
 
     @Transactional
     public Task recordResult(String taskId,
@@ -51,6 +52,7 @@ public class RecordResultService {
 
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NotFoundAppException("Task", taskId));
+        taskService.assertTaskRequestActive(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:recordResult");
 
         if (task.getExecutionType() != ExecutionType.MANUAL) {

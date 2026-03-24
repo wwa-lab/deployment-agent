@@ -1,6 +1,8 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.RequestArchiveResultDto;
+import com.wwa.deploymentagent.contracts.dto.RequestPurgeResultDto;
 import com.wwa.deploymentagent.contracts.dto.RequestRundownUpdateDto;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
@@ -16,10 +18,13 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,24 +48,30 @@ public class ReleaseFlowService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    /** Retrieve a Release Flow by ID. Throws {@link NotFoundAppException} if absent. */
+    /** Retrieve an active Release Flow by ID. Throws {@link NotFoundAppException} if absent. */
     @Transactional(readOnly = true)
     public ReleaseFlow getById(String id) {
-        return releaseFlowRepository.findById(id)
+        return releaseFlowRepository.findByIdAndArchivedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundAppException("ReleaseFlow", id));
     }
 
+    /** Retrieve a Release Flow by ID, optionally including archived data for admin recovery flows. */
+    @Transactional(readOnly = true)
+    public ReleaseFlow getById(String id, boolean includeArchived) {
+        if (includeArchived) {
+            return releaseFlowRepository.findById(id)
+                    .orElseThrow(() -> new NotFoundAppException("ReleaseFlow", id));
+        }
+        return getById(id);
+    }
+
     /**
-     * Load a Release Flow with its full request+task hierarchy in a single query.
-     * Prefer this over {@link #getById} when requests and tasks will be accessed,
-     * to avoid N+1 queries.
+     * Load a Release Flow with its full request+task hierarchy in a single transaction.
+     * Prefer this over {@link #getById} when requests and tasks will be accessed in service tests.
      */
     @Transactional
     public ReleaseFlow getByIdWithFullHierarchy(String id) {
-        ReleaseFlow rf = releaseFlowRepository.findById(id)
-                .orElseThrow(() -> new NotFoundAppException("ReleaseFlow", id));
-        // Flush and refresh to ensure all in-session changes are visible in the returned hierarchy.
-        // Collections initialized as empty during persist() would otherwise miss newly added children.
+        ReleaseFlow rf = getById(id);
         entityManager.flush();
         entityManager.refresh(rf);
         rf.getRequests().forEach(req -> {
@@ -70,47 +81,102 @@ public class ReleaseFlowService {
         return rf;
     }
 
-    /** Paginated list with optional filters. Callers build the Pageable from query params. */
+    /** Paginated list with optional filters. Archived flows are hidden unless explicitly requested. */
     @Transactional(readOnly = true)
-    public Page<ReleaseFlow> list(String projectId, FlowStatus flowStatus, Stage stage, Pageable pageable) {
-        boolean hasProject = projectId != null;
-        boolean hasStatus  = flowStatus != null;
-        boolean hasStage   = stage != null;
+    public Page<ReleaseFlow> list(
+            String projectId,
+            FlowStatus flowStatus,
+            Stage stage,
+            String application,
+            String snowGroup,
+            String agent,
+            UserContext user,
+            Pageable pageable,
+            boolean includeArchived) {
+        String normalizedApplication = normalizeBlank(application);
+        String normalizedSnowGroup = normalizeBlank(snowGroup);
+        String normalizedAgent = normalizeBlank(agent);
+        boolean scopeRestricted = user != null && !user.isGlobalDevOpsAdmin();
 
-        if (hasProject && hasStatus && hasStage)
-            return releaseFlowRepository.findByProjectIdAndFlowStatusAndCurrentStage(projectId, flowStatus, stage, pageable);
-        if (hasProject && hasStatus)
-            return releaseFlowRepository.findByProjectIdAndFlowStatus(projectId, flowStatus, pageable);
-        if (hasProject && hasStage)
-            return releaseFlowRepository.findByProjectIdAndCurrentStage(projectId, stage, pageable);
-        if (hasStatus && hasStage)
-            return releaseFlowRepository.findByFlowStatusAndCurrentStage(flowStatus, stage, pageable);
-        if (hasProject)
-            return releaseFlowRepository.findByProjectId(projectId, pageable);
-        if (hasStatus)
-            return releaseFlowRepository.findByFlowStatus(flowStatus, pageable);
-        if (hasStage)
-            return releaseFlowRepository.findByCurrentStage(stage, pageable);
-        return releaseFlowRepository.findAll(pageable);
+        if (!scopeRestricted
+                && normalizedApplication == null
+                && normalizedSnowGroup == null
+                && normalizedAgent == null) {
+            return releaseFlowRepository.search(projectId, flowStatus, stage, includeArchived, pageable);
+        }
+
+        Page<ReleaseFlow> basePage = releaseFlowRepository.search(
+                projectId,
+                flowStatus,
+                stage,
+                includeArchived,
+                Pageable.unpaged());
+        List<ReleaseFlow> baseFlows = basePage.getContent();
+        Map<String, List<Request>> requestsByReleaseFlowId = findRequestsByReleaseFlowIds(
+                baseFlows.stream().map(ReleaseFlow::getId).toList(),
+                includeArchived);
+
+        List<ReleaseFlow> filtered = baseFlows.stream()
+                .filter(releaseFlow -> matchesScope(
+                        releaseFlow,
+                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of()),
+                        normalizedApplication,
+                        normalizedSnowGroup,
+                        normalizedAgent))
+                .filter(releaseFlow -> matchesUserScope(
+                        user,
+                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of())))
+                .toList();
+
+        int fromIndex = Math.min((int) pageable.getOffset(), filtered.size());
+        int toIndex = Math.min(fromIndex + pageable.getPageSize(), filtered.size());
+        List<ReleaseFlow> pageContent = filtered.subList(fromIndex, toIndex);
+
+        return new PageImpl<>(pageContent, pageable, filtered.size());
     }
 
     @Transactional(readOnly = true)
-    public Map<String, List<Request>> findRequestsByReleaseFlowIds(List<String> releaseFlowIds) {
+    public Page<ReleaseFlow> list(String projectId, FlowStatus flowStatus, Stage stage, Pageable pageable) {
+        return list(projectId, flowStatus, stage, null, null, null, null, pageable, false);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReleaseFlow> list(String projectId,
+                                  FlowStatus flowStatus,
+                                  Stage stage,
+                                  String application,
+                                  String snowGroup,
+                                  String agent,
+                                  Pageable pageable,
+                                  boolean includeArchived) {
+        return list(projectId, flowStatus, stage, application, snowGroup, agent, null, pageable, includeArchived);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<Request>> findRequestsByReleaseFlowIds(List<String> releaseFlowIds, boolean includeArchived) {
         if (releaseFlowIds == null || releaseFlowIds.isEmpty()) {
             return Map.of();
         }
 
-        return requestRepository.findByReleaseFlowIds(releaseFlowIds).stream()
-                .collect(Collectors.groupingBy(request -> request.getReleaseFlow().getId()));
+        return requestRepository.findByReleaseFlowIds(releaseFlowIds, includeArchived).stream()
+                .collect(Collectors.groupingBy(
+                        request -> request.getReleaseFlow().getId(),
+                        Collectors.collectingAndThen(Collectors.toList(), this::sortRequests)));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Request> findRequestsForFlow(String releaseFlowId, boolean includeArchived) {
+        return sortRequests(requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, includeArchived));
     }
 
     /**
-     * Find existing Release Flow by grouping key (projectId, normalizedReleaseId).
+     * Find existing active Release Flow by grouping key (projectId, normalizedReleaseId).
      * Returns empty if not found.
      */
     @Transactional(readOnly = true)
     public Optional<ReleaseFlow> findByGroupKey(String projectId, String normalizedReleaseId) {
-        return releaseFlowRepository.findByProjectIdAndNormalizedReleaseId(projectId, normalizedReleaseId);
+        return releaseFlowRepository.findByProjectIdAndNormalizedReleaseIdAndArchivedAtIsNull(
+                projectId, normalizedReleaseId);
     }
 
     /**
@@ -129,23 +195,23 @@ public class ReleaseFlowService {
         rf.setFlowStatus(FlowStatus.Pending);
         rf.setReviewStatus(ReviewStatus.Pending_Review);
         rf.setReviewOwner(null);
+        rf.setArchivedAt(null);
+        rf.setArchivedBy(null);
         return releaseFlowRepository.save(rf);
     }
 
     /**
-     * Recompute and persist the Release Flow status from current child states.
-     * Reads all Requests and their Tasks, aggregates bottom-up, then updates the flow.
-     * Called after any state-changing operation (callback, decision, progression).
+     * Recompute and persist the Release Flow status from current visible child states.
+     * Called after any state-changing operation.
      */
     @Transactional
     public void recomputeAndPersistStatus(String releaseFlowId) {
         ReleaseFlow rf = getById(releaseFlowId);
-        List<Request> requests = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId);
+        List<Request> requests = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, false);
 
-        // Aggregate task → request status for each request
         for (Request req : requests) {
             List<TaskStatus> taskStatuses = req.getTasks().stream()
-                    .map(t -> t.getTaskStatus())
+                    .map(task -> task.getTaskStatus())
                     .toList();
             RequestStatus newStatus = ReleaseFlowAggregation.aggregateTasksToRequestStatus(taskStatuses);
             if (req.getRequestStatus() != newStatus) {
@@ -154,25 +220,9 @@ public class ReleaseFlowService {
             }
         }
 
-        // Aggregate request → stage → flow status.
-        // Only include stages that have at least one Request.
-        List<RequestStatus> stageStatuses = java.util.Arrays.stream(Stage.values())
-                .flatMap(stage -> {
-                    List<RequestStatus> stageReqs = requests.stream()
-                            .filter(r -> r.getStage() == stage)
-                            .map(Request::getRequestStatus)
-                            .toList();
-                    if (stageReqs.isEmpty()) return java.util.stream.Stream.empty();
-                    return java.util.stream.Stream.of(
-                            ReleaseFlowAggregation.aggregateRequestsToStageStatus(stageReqs));
-                })
-                .toList();
-
-        FlowStatus newFlowStatus = ReleaseFlowAggregation.aggregateStagesToFlowStatus(stageStatuses);
-        if (rf.getFlowStatus() != newFlowStatus) {
-            rf.setFlowStatus(newFlowStatus);
-            releaseFlowRepository.save(rf);
-        }
+        rf.setFlowStatus(aggregateFlowStatus(requests));
+        rf.setReviewStatus(determineReviewStatus(requests));
+        releaseFlowRepository.save(rf);
     }
 
     /** Advance the Release Flow's active stage to the next one in SIT→UAT→PROD order. */
@@ -189,7 +239,7 @@ public class ReleaseFlowService {
 
     @Transactional
     public Request updateRequestRundown(String releaseFlowId, String requestId, RequestRundownUpdateDto update) {
-        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+        Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
 
         if (update.estimatedRemainingMinutes() != null && update.estimatedRemainingMinutes() < 0) {
@@ -198,6 +248,8 @@ public class ReleaseFlowService {
 
         request.setSnowGroup(normalizeBlank(update.snowGroup()));
         request.setApplication(normalizeBlank(update.application()));
+        request.setAgent(normalizeBlank(update.agent()));
+        request.setOwner(normalizeBlank(update.owner()));
         request.setSite(normalizeBlank(update.site()));
         request.setEstimatedRemainingMinutes(update.estimatedRemainingMinutes());
         Request saved = requestRepository.save(request);
@@ -207,7 +259,7 @@ public class ReleaseFlowService {
 
     @Transactional
     public Request startRequestDeployment(String releaseFlowId, String requestId, UserContext user) {
-        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+        Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
 
         if (request.getRequestStatus() != RequestStatus.Pending) {
@@ -225,16 +277,16 @@ public class ReleaseFlowService {
                 });
 
         recomputeAndPersistStatus(releaseFlowId);
-        Request refreshed = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+        Request refreshed = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         auditLogger.log(user, AuditActionType.request_start, releaseFlowId, requestId, null,
-                java.util.Map.of("stage", refreshed.getStage().name()));
+                Map.of("stage", refreshed.getStage().name()));
         return refreshed;
     }
 
     @Transactional
     public Request markRequestFailed(String releaseFlowId, String requestId, UserContext user) {
-        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+        Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
 
         if (request.getRequestStatus() == RequestStatus.Completed
@@ -261,14 +313,265 @@ public class ReleaseFlowService {
         }
 
         recomputeAndPersistStatus(releaseFlowId);
-        Request refreshed = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+        Request refreshed = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         auditLogger.log(user, AuditActionType.request_fail, releaseFlowId, requestId, null,
-                java.util.Map.of("stage", refreshed.getStage().name()));
+                Map.of("stage", refreshed.getStage().name()));
         return refreshed;
+    }
+
+    @Transactional
+    public RequestArchiveResultDto archiveRequestRundown(String releaseFlowId, String requestId, UserContext user) {
+        Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        ReleaseFlow releaseFlow = getById(releaseFlowId);
+
+        Instant archivedAt = Instant.now();
+        request.setArchivedAt(archivedAt);
+        request.setArchivedBy(user.userId());
+        requestRepository.save(request);
+        entityManager.flush();
+
+        List<Request> activeRequests = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, false);
+        boolean releaseFlowArchived = activeRequests.isEmpty();
+
+        if (releaseFlowArchived) {
+            archiveReleaseFlow(releaseFlow, archivedAt, user.userId());
+        } else {
+            clearReleaseFlowArchive(releaseFlow);
+            syncReleaseFlowAfterVisibleRequestChange(releaseFlow, activeRequests);
+        }
+        releaseFlowRepository.save(releaseFlow);
+
+        auditLogger.log(user, AuditActionType.request_archive, releaseFlowId, requestId, null,
+                Map.of(
+                        "stage", request.getStage().name(),
+                        "releaseFlowArchived", releaseFlowArchived,
+                        "activeRequestCount", activeRequests.size()));
+
+        return new RequestArchiveResultDto(
+                releaseFlowId,
+                requestId,
+                request.getStage(),
+                true,
+                releaseFlowArchived,
+                activeRequests.size());
+    }
+
+    @Transactional
+    public RequestArchiveResultDto restoreRequestRundown(String releaseFlowId, String requestId, UserContext user) {
+        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        if (request.getArchivedAt() == null) {
+            throw new ValidationAppException("Only archived rundowns can be restored.");
+        }
+
+        ReleaseFlow releaseFlow = getById(releaseFlowId, true);
+        request.setArchivedAt(null);
+        request.setArchivedBy(null);
+        requestRepository.save(request);
+        entityManager.flush();
+
+        clearReleaseFlowArchive(releaseFlow);
+        List<Request> activeRequests = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, false);
+        syncReleaseFlowAfterVisibleRequestChange(releaseFlow, activeRequests);
+        releaseFlowRepository.save(releaseFlow);
+
+        auditLogger.log(user, AuditActionType.request_restore, releaseFlowId, requestId, null,
+                Map.of(
+                        "stage", request.getStage().name(),
+                        "activeRequestCount", activeRequests.size()));
+
+        return new RequestArchiveResultDto(
+                releaseFlowId,
+                requestId,
+                request.getStage(),
+                false,
+                false,
+                activeRequests.size());
+    }
+
+    @Transactional
+    public RequestPurgeResultDto purgeArchivedRequestRundown(String releaseFlowId, String requestId, UserContext user) {
+        Request request = requestRepository.findByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        if (request.getArchivedAt() == null) {
+            throw new ValidationAppException("Only archived rundowns can be permanently deleted.");
+        }
+
+        Stage stage = request.getStage();
+        int requestCountBeforeDelete = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, true).size();
+        boolean releaseFlowDeleted = requestCountBeforeDelete <= 1;
+        requestRepository.delete(request);
+        entityManager.flush();
+        entityManager.clear();
+
+        if (releaseFlowDeleted) {
+            releaseFlowRepository.deleteById(releaseFlowId);
+        } else {
+            List<Request> remainingRequests = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, true);
+            List<Request> activeRequests = remainingRequests.stream()
+                    .filter(remaining -> remaining.getArchivedAt() == null)
+                    .toList();
+            ReleaseFlow releaseFlow = getById(releaseFlowId, true);
+            if (activeRequests.isEmpty()) {
+                Instant archivedAt = releaseFlow.getArchivedAt() != null ? releaseFlow.getArchivedAt() : Instant.now();
+                String archivedBy = releaseFlow.getArchivedBy() != null ? releaseFlow.getArchivedBy() : user.userId();
+                archiveReleaseFlow(releaseFlow, archivedAt, archivedBy);
+            } else {
+                clearReleaseFlowArchive(releaseFlow);
+                syncReleaseFlowAfterVisibleRequestChange(releaseFlow, activeRequests);
+            }
+            releaseFlowRepository.save(releaseFlow);
+
+            auditLogger.log(user, AuditActionType.request_purge, releaseFlowId, requestId, null,
+                    Map.of(
+                            "stage", stage.name(),
+                            "releaseFlowDeleted", false,
+                            "remainingRequestCount", remainingRequests.size(),
+                            "activeRequestCount", activeRequests.size()));
+
+            return new RequestPurgeResultDto(
+                    releaseFlowId,
+                    requestId,
+                    stage,
+                    false,
+                    remainingRequests.size(),
+                    activeRequests.size());
+        }
+
+        auditLogger.log(user, AuditActionType.request_purge, releaseFlowId, requestId, null,
+                Map.of(
+                        "stage", stage.name(),
+                        "releaseFlowDeleted", true,
+                        "remainingRequestCount", 0,
+                        "activeRequestCount", 0));
+
+        return new RequestPurgeResultDto(
+                releaseFlowId,
+                requestId,
+                stage,
+                true,
+                0,
+                0);
+    }
+
+    private void syncReleaseFlowAfterVisibleRequestChange(ReleaseFlow releaseFlow, List<Request> visibleRequests) {
+        if (visibleRequests.isEmpty()) {
+            return;
+        }
+
+        releaseFlow.setCurrentStage(determineCurrentStage(visibleRequests, releaseFlow.getCurrentStage()));
+        releaseFlow.setFlowStatus(aggregateFlowStatus(visibleRequests));
+        releaseFlow.setReviewStatus(determineReviewStatus(visibleRequests));
+        releaseFlow.setReviewOwner(null);
+    }
+
+    private void archiveReleaseFlow(ReleaseFlow releaseFlow, Instant archivedAt, String archivedBy) {
+        releaseFlow.setArchivedAt(archivedAt);
+        releaseFlow.setArchivedBy(archivedBy);
+        releaseFlow.setReviewOwner(null);
+    }
+
+    private void clearReleaseFlowArchive(ReleaseFlow releaseFlow) {
+        releaseFlow.setArchivedAt(null);
+        releaseFlow.setArchivedBy(null);
+    }
+
+    private FlowStatus aggregateFlowStatus(List<Request> requests) {
+        List<RequestStatus> stageStatuses = java.util.Arrays.stream(Stage.values())
+                .flatMap(stage -> {
+                    List<RequestStatus> stageReqs = requests.stream()
+                            .filter(request -> request.getStage() == stage)
+                            .map(Request::getRequestStatus)
+                            .toList();
+                    if (stageReqs.isEmpty()) {
+                        return java.util.stream.Stream.empty();
+                    }
+                    return java.util.stream.Stream.of(
+                            ReleaseFlowAggregation.aggregateRequestsToStageStatus(stageReqs));
+                })
+                .toList();
+        return ReleaseFlowAggregation.aggregateStagesToFlowStatus(stageStatuses);
+    }
+
+    private Stage determineCurrentStage(List<Request> requests, Stage currentStage) {
+        if (requests.stream().anyMatch(request -> request.getStage() == currentStage)) {
+            return currentStage;
+        }
+
+        List<Request> sortedRequests = sortRequests(requests);
+        return sortedRequests.stream()
+                .filter(request -> request.getRequestStatus() != RequestStatus.Completed
+                        && request.getRequestStatus() != RequestStatus.Skipped)
+                .map(Request::getStage)
+                .findFirst()
+                .orElse(sortedRequests.get(sortedRequests.size() - 1).getStage());
+    }
+
+    private ReviewStatus determineReviewStatus(List<Request> requests) {
+        if (requests.stream().anyMatch(request -> request.getRequestStatus() == RequestStatus.Rejected)) {
+            return ReviewStatus.Rejected;
+        }
+
+        if (!requests.isEmpty() && requests.stream().allMatch(request ->
+                request.getRequestStatus() == RequestStatus.Completed
+                        || request.getRequestStatus() == RequestStatus.Skipped)) {
+            return ReviewStatus.Approved;
+        }
+
+        return ReviewStatus.Pending_Review;
+    }
+
+    private List<Request> sortRequests(List<Request> requests) {
+        return requests.stream()
+                .sorted(Comparator
+                        .comparing(Request::getStage)
+                        .thenComparing(request -> request.getArchivedAt() != null)
+                        .thenComparing(Request::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
     }
 
     private String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean matchesScope(
+            ReleaseFlow releaseFlow,
+            List<Request> requests,
+            String application,
+            String snowGroup,
+            String agent) {
+        if (requests == null || requests.isEmpty()) {
+            return matchesContains(releaseFlow.getProjectName(), application)
+                    && snowGroup == null
+                    && agent == null;
+        }
+
+        return requests.stream().anyMatch(request ->
+                matchesContains(request.getApplication() != null ? request.getApplication() : releaseFlow.getProjectName(), application)
+                        && matchesContains(request.getSnowGroup(), snowGroup)
+                        && matchesContains(request.getAgent(), agent));
+    }
+
+    private boolean matchesContains(String actualValue, String expectedFragment) {
+        if (expectedFragment == null) {
+            return true;
+        }
+        if (actualValue == null) {
+            return false;
+        }
+        return actualValue.toLowerCase().contains(expectedFragment.toLowerCase());
+    }
+
+    private boolean matchesUserScope(UserContext user, List<Request> requests) {
+        if (user == null || user.isGlobalDevOpsAdmin()) {
+            return true;
+        }
+        if (requests == null || requests.isEmpty()) {
+            return false;
+        }
+        return requests.stream()
+                .anyMatch(request -> user.hasScopedAccess(request.getApplication(), request.getSnowGroup()));
     }
 }

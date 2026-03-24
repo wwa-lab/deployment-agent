@@ -1,13 +1,13 @@
 # Data Flow: Deployment Agent
 
 > **Source**: architecture.md, spec.md, design.md
-> **Last updated**: 2026-03-19
+> **Last updated**: 2026-03-24
 
 ---
 
 ## Overview
 
-This document describes how data flows through the Deployment Agent system, from external inputs (Excel upload, user actions) through processing layers to persistence and external systems.
+This document describes how data flows through the Deployment Agent system, from external inputs (authentication, access-management actions, Excel upload, task actions) through processing layers to persistence and external systems.
 
 ---
 
@@ -18,6 +18,7 @@ flowchart LR
     subgraph Input
         Excel[Excel File<br/>AMH_HCC_task sheet]
         Stage[Stage selector<br/>SIT / UAT / PROD]
+        Scope[Upload scope<br/>Application / SNOW Group / Agent]
     end
 
     subgraph Parse["Parse Layer"]
@@ -39,6 +40,7 @@ flowchart LR
 
     Excel --> Parser
     Stage --> Import
+    Scope --> Import
     Parser --> Validate
     Validate -->|Valid| Import
     Validate -->|Invalid| Error[422 Validation Error]
@@ -68,6 +70,10 @@ flowchart LR
 | Activity category, Common, Dependencies, Validation | Task | import_metadata (JSON) | Metadata blob |
 | Status, Start/End date/time | -- | Not stored | Dropped |
 | *(from UI)* Stage | Request | stage | Core |
+| *(from UI)* Application | Request | application | Runtime scope |
+| *(from UI)* SNOW Group | Request | snow_group | Runtime scope |
+| *(from UI)* Agent | Request | agent | Runtime scope |
+| *(system-derived)* Rundown owner | Request | owner | Derived from a single imported task owner, otherwise uploader |
 | *(system-generated)* Release ID | ReleaseFlow | release_id | Core |
 
 ---
@@ -78,7 +84,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    TL[TL User] -->|Records result| API[POST /tasks/:id/record-result]
+    Reviewer[Task Owner / DevOps Admin] -->|Records result| API[POST /tasks/:id/record-result]
     API --> RRS[RecordResultService]
     RRS --> SM[TaskStateMachine<br/>validates transition]
     RRS --> TEH[(TaskExecutionHistory<br/>result_summary + result_logs)]
@@ -90,7 +96,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    User[TL / DevOps Admin] -->|Submit Auto| API[POST /tasks/:id/submit-auto]
+    User[Task Owner / DevOps Admin] -->|Run| API[POST /tasks/:id/submit-auto]
     API --> AES[AutoExecutionService]
     AES --> SM[TaskStateMachine<br/>validates transition]
     AES --> TEH1[(TaskExecutionHistory<br/>created with attempt_number)]
@@ -127,7 +133,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    TL[TL User] -->|Approve / Reject / Rerun / Skip| API[POST /tasks/:id/decision]
+    Reviewer[Task Owner / DevOps Admin] -->|Approve / Reject / Rerun / Skip| API[POST /tasks/:id/decision]
     API --> DE[DecisionEngine]
 
     DE --> SM[TaskStateMachine<br/>validate transition]
@@ -160,7 +166,7 @@ Statuses bubble up from Task → Request → ReleaseFlow using pure functions in
 
 ---
 
-## 4. Authentication Data Flow
+## 4. Authentication and Authorization Data Flow
 
 ```mermaid
 flowchart LR
@@ -168,11 +174,14 @@ flowchart LR
     Auth --> AS[AuthService]
     AS --> TB[TeamBookAuthProvider]
     TB -->|Stub: hardcoded 5 users<br/>Prod: Team Book API| Validate{Valid?}
-    Validate -->|Yes| Session[HttpSession<br/>stores UserContext<br/>employeeId, name, role]
+    Validate -->|Yes| AG[AccessGrant Resolution<br/>deny-by-default]
     Validate -->|No| Err[401 Unauthorized]
 
+    AG -->|No active grant| Forbidden[403 Access not granted / suspended]
+    AG -->|Active grant| Session[HttpSession<br/>stores user identity<br/>and authorization profile]
+
     Session --> SF[SessionAuthFilter<br/>reads UserContext from session<br/>populates SecurityContext]
-    SF --> API[All /api/* requests<br/>authenticated with role]
+    SF --> API[All /api/* requests<br/>authenticated with effective access]
 ```
 
 ### Auth Data Objects
@@ -180,8 +189,27 @@ flowchart LR
 | Object | Content | Lifecycle |
 |---|---|---|
 | LoginRequestDto | employeeId, password | Request-scoped |
-| UserContext | employeeId, displayName, role | Stored in HttpSession |
+| UserContext | employeeId, displayName, identity context | Stored in HttpSession |
+| Authorization Profile `[Phase 1]` | access status, assigned roles, effective permissions, applicable scopes | Resolved during login / session restore |
 | SecurityContext | Authentication with UserContext | Per-request from session |
+
+### 4.1 Access Management Admin Flow
+
+```mermaid
+flowchart LR
+    Admin[DevOps Admin] -->|GET/POST/PATCH /access-grants| AMC[Access Management API]
+    AMC --> AGS[Access Grant Service]
+    AGS --> Validate[Grant validation<br/>roles, scopes, status, note]
+    AGS --> DB[(DA_ACCESS_GRANT)]
+    AGS --> AL[(AuditLogEntry<br/>access governance action)]
+```
+
+### 4.2 Authorization Resolution Notes
+
+- Authentication confirms enterprise identity through Team Book
+- Authorization then resolves local product access and `Application + SNOW Group` visibility through Access Grants
+- Users without an active Access Grant are blocked before entering the Deployment Agent workspace
+- Frontend route visibility and backend endpoint access are expected to use the same effective permission set and scope evaluation in Phase 1
 
 ---
 
@@ -223,16 +251,17 @@ flowchart TD
     subgraph Sources["Audit Event Sources"]
         Upload[Upload/Import]
         Edit[Task Edit]
-        Result[Record Result]
+        Result[Run / Record Result]
         Decision[Decision]
         AutoSub[Auto Submit]
         Config[Config Update]
+        Access[Access Grant Create / Update / Suspend / Reactivate]
     end
 
     Sources -->|AuditLoggerService.log()| ALS[AuditLoggerService<br/>REQUIRES_NEW propagation]
     ALS --> DB[(DA_AUDIT_LOG_ENTRY)]
 
-    DB --> AuditAPI[GET /audit-logs<br/>role-gated: AUDIT, MANAGEMENT]
+    DB --> AuditAPI[GET /audit-logs<br/>signed-in users, filtered by scope]
     AuditAPI --> AuditView[Audit Log View<br/>read-only list]
 ```
 
@@ -243,11 +272,14 @@ flowchart TD
 | audit_log_id | System-generated UUID |
 | operator_id | From authenticated UserContext |
 | operator_role | From authenticated UserContext |
-| action_type | upload, edit, view_result, approve, reject, rerun, skip, auto_submit, config_update |
+| action_type | upload, edit, view_result, approve, reject, rerun, skip, auto_submit, config_update, access-governance actions |
 | timestamp | System clock at event time |
 | release_flow_id | Nullable context reference |
 | request_id | Nullable context reference |
 | task_id | Nullable context reference |
+| application | Nullable scope field for filtering and traceability |
+| snow_group | Nullable scope field for filtering and traceability |
+| agent | Nullable scope field for filtering and traceability |
 | context_payload | JSON with action-specific details |
 
 ### Audit Isolation
@@ -260,20 +292,24 @@ flowchart TD
 
 ```mermaid
 flowchart TB
-    Excel[Excel Upload] --> Import[Import Pipeline]
+    Login[Enterprise Login] --> Authz[Access Grant Resolution]
+    Authz -->|Authorized| Excel[Excel Upload]
+    Authz -->|Denied| Blocked[Access Denied]
+    Excel --> Import[Import Pipeline]
     Import --> RF[ReleaseFlow + Request + Tasks]
     RF --> Execution{Execution Path}
-    Execution -->|MANUAL| Manual[TL records result]
+    Execution -->|MANUAL| Manual[Reviewer records result]
     Execution -->|AUTO| Auto[Submit to Jenkins/Ansible]
     Manual --> Review[Awaiting Review]
     Auto --> Review
-    Review --> Decision[TL Decision]
+    Review --> Decision[Reviewer Decision]
     Decision -->|Approve/Skip| Progress[Progression Engine]
     Decision -->|Reject| Terminal[Flow Terminated]
     Decision -->|Rerun| Execution
     Progress --> Complete[Flow Completed]
 
-    Import -.-> Audit[(Audit Log)]
+    Authz -.-> Audit[(Audit Log)]
+    Import -.-> Audit
     Manual -.-> Audit
     Auto -.-> Audit
     Decision -.-> Audit

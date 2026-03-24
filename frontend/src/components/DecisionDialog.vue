@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { submitDecision } from '../api/tasks'
 import type { Task } from '../types'
 
-const props = defineProps<{ task: Task; initialDecision?: Decision | null }>()
+const props = withDefaults(defineProps<{
+  task: Task
+  initialDecision?: Decision | null
+  allowedDecisions?: Decision[]
+}>(), {
+  initialDecision: null,
+  allowedDecisions: () => ['Approve', 'Reject', 'Rerun', 'Skip'],
+})
 const emit = defineEmits<{ decided: []; close: [] }>()
 
 type Decision = 'Approve' | 'Reject' | 'Rerun' | 'Skip'
 
-const decisions: { value: Decision; label: string; description: string }[] = [
+const decisionCatalog: { value: Decision; label: string; description: string }[] = [
   { value: 'Approve', label: 'Approve', description: 'Approve this task and advance the flow.' },
   { value: 'Reject', label: 'Reject', description: 'Reject this task and halt the flow.' },
   { value: 'Rerun', label: 'Rerun', description: 'Queue this task for re-execution.' },
@@ -19,6 +26,28 @@ const selected = ref<Decision | null>(props.initialDecision ?? null)
 const submitting = ref(false)
 const error = ref('')
 const successMsg = ref('')
+
+const decisions = computed(() =>
+  decisionCatalog.filter((decision) => props.allowedDecisions.includes(decision.value)),
+)
+
+const isSingleAction = computed(() => decisions.value.length === 1)
+
+const dialogTitle = computed(() => {
+  const actionLabel = decisions.value[0]?.label ?? 'Decision'
+  return isSingleAction.value
+    ? `${actionLabel} Task — ${props.task.taskName}`
+    : `Decision — ${props.task.taskName}`
+})
+
+const confirmLabel = computed(() => {
+  if (submitting.value) {
+    return isSingleAction.value ? 'Submitting...' : 'Confirming...'
+  }
+  return isSingleAction.value
+    ? `${decisions.value[0]?.label ?? 'Submit'}`
+    : 'Confirm Decision'
+})
 
 async function submit() {
   if (!selected.value) return
@@ -47,13 +76,30 @@ function decisionBtnClass(d: Decision): string {
   }
   return map[d]
 }
+
+function statusBadgeClass(status: string): string {
+  const map: Record<string, string> = {
+    Pending: 'badge-pending',
+    Running: 'badge-running',
+    Executing: 'badge-executing',
+    Completed: 'badge-completed',
+    Failed: 'badge-failed',
+    Rejected: 'badge-rejected',
+    Approved: 'badge-approved',
+    Awaiting_Review: 'badge-awaiting-review',
+    Skipped: 'badge-skipped',
+    Ready_For_Execution: 'badge-ready-for-execution',
+    Pending_Review: 'badge-pending-review',
+  }
+  return map[status] ?? 'badge-pending'
+}
 </script>
 
 <template>
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">Decision — {{ task.taskName }}</span>
+        <span class="modal-title">{{ dialogTitle }}</span>
         <button class="modal-close" @click="emit('close')">✕</button>
       </div>
 
@@ -65,7 +111,7 @@ function decisionBtnClass(d: Decision): string {
           <span class="info-label">Task Group:</span> {{ task.taskGroupName }}
           &nbsp;|&nbsp;
           <span class="info-label">Status:</span>
-          <span class="badge badge-awaiting-review">{{ task.taskStatus }}</span>
+          <span class="badge" :class="statusBadgeClass(task.taskStatus)">{{ task.taskStatus }}</span>
         </div>
 
         <div class="decision-list">
@@ -97,7 +143,7 @@ function decisionBtnClass(d: Decision): string {
           @click="submit"
         >
           <span v-if="submitting" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
-          {{ submitting ? 'Submitting...' : 'Confirm Decision' }}
+          {{ confirmLabel }}
         </button>
       </div>
     </div>

@@ -1,525 +1,435 @@
 # Detailed Design: Deployment Agent
 
+**Date:** 2026-03-24
+**Status:** Implemented (current MVP + partial Phase 1 access governance)
+**Source:** `docs/04-architecture/architecture.md`, `docs/03-spec/spec.md`, repository validation
+
+---
+
 ## Overview
 
-This document provides a detailed, implementation-friendly design for the Deployment Agent system, transforming the high-level architecture into concrete module and interface specifications suitable for Java 21 / Spring Boot 3 / Spring Data JPA backend, Vue 3 frontend, and Oracle persistence. The design covers all MVP workflows and integration points necessary for controlled, human-in-the-loop deployment request processing.
+This document translates the current Deployment Agent architecture into implementation-facing design guidance for backend services, frontend behavior, data structures, integrations, and operational rules. It covers the current MVP workflow plus the now-implemented Phase 1 access-governance foundation through Access Grants, scoped visibility, and Access Management.
+
+```mermaid
+flowchart LR
+    User[Enterprise User] --> Login[Team Book Login]
+    Login --> Authz[Access Grant Resolution]
+    Authz -->|Authorized| UI[Vue Workspace]
+    Authz -->|Denied| Denied[Access Denied State]
+
+    UI --> WorkflowAPI[Workflow API]
+    UI --> AccessUI[Access Management UI]
+
+    WorkflowAPI --> Import[Import / Release Flow Services]
+    WorkflowAPI --> Tasking[Task / Decision / Execution Services]
+    WorkflowAPI --> Config[Configuration Service]
+    WorkflowAPI --> Audit[Audit Logger]
+
+    AccessUI --> AccessAPI[Access Grant Service]
+    AccessAPI --> Audit
+
+    Import --> Oracle[(Oracle)]
+    Tasking --> Oracle
+    Config --> Oracle
+    Audit --> Oracle
+    AccessAPI --> Oracle
+
+    Tasking --> Jenkins[Jenkins]
+    Tasking --> Ansible[Ansible Tower]
+```
+
+### Design Objective
+
+- Preserve the current controlled deployment workflow model: upload, execute, review, and progress.
+- Make state handling, validation, and audit behavior explicit enough for implementation and test planning.
+- Extend the design to cover deny-by-default product access and DevOps-admin-managed authorization without turning Deployment Agent into a separate account system.
+
+### Relationship to Source Architecture
+
+- The architecture defines major modules, data entities, integrations, and security boundaries.
+- This design adds implementation-level behavior for module responsibilities, state handling, UI behavior, validation, and interface contracts.
+- Where the design goes beyond explicit architecture statements, the detail is marked as `[Assumption]`.
 
 ---
 
 ## Source Architecture
 
-**System**: Deployment Agent (WWA Platform embedded workspace)
+**System name:** Deployment Agent (WWA embedded workspace)
 
-**Architecture Summary**:
-- Embedded UI and backend within WWA platform
-- User-initiated file upload→process→verification→decision workflow
-- Multi-stage release tracking (SIT/UAT/PROD)
-- Human-in-the-loop task decision control
-- Audit logging and configuration management
-- External integration with Jenkins and Ansible via callback webhook
+**Architecture summary carried forward:**
+- Vue 3 SPA frontend inside the WWA workspace shell
+- Spring Boot REST backend with session-based authentication
+- Oracle persistence for workflow, configuration, audit, and implemented Access Grant data
+- Human-gated task progression with explicit review decisions
+- Fire-and-forget AUTO submission to Jenkins / Ansible
+- Product entry authorization and `Application + SNOW Group` scoped visibility through local Access Grants in Phase 1
 
-**Key Assumptions Carried Forward**:
-- Vue 3 UI + **Java 21 / Spring Boot 3 / Spring Data JPA** API + Oracle persistence
-- Fixed Excel template for MVP (dynamic schema out of scope)
-- Task reruns create new execution history records (same task_id, incremented attempt_number)
-- Atomic file-level import (no partial import)
-- Single review owner per Release Flow
-- Initial task execution may auto-trigger upon `Ready_For_Execution` status
+**Key architectural constraints carried forward:**
+- Fixed Excel import schema for MVP
+- Import remains atomic at file level
+- Task reruns reuse the same `task_id` and create new execution history attempts
+- Product entry becomes deny-by-default in Phase 1
+- Access enforcement must align across menus, routes, and APIs
 
 ---
 
 ## Design Assumptions
 
-- [Resolved] ~~HTTP callbacks from remote execution engines (Jenkins/Ansible) carry execution_id for correlation~~ → MVP uses fire-and-forget submission; no callbacks. External job URL is stored for user click-through.
-- [Assumption] Oracle is the primary transactional store for all workflow state and immutable audit records
-- [Resolved] ~~Result payloads (execution logs) are stored in Oracle CLOB columns~~ → Full logs stay in Jenkins/Ansible. DA stores external job URL (VARCHAR2(2000)) for click-through. MANUAL task result summaries stored in CLOB as before.
-- [Implemented] Vue 3 frontend uses Pinia for state management (user, releaseFlow, task, config, audit stores)
-- [Implemented] Spring Boot 3.2.4 uses Spring Data JPA with repository patterns for Oracle/H2 persistence
-- [Resolved] ~~WWA authentication and authorization infrastructure is reused~~ → Replaced with session-based Team Book login. SessionAuthFilter reads UserContext from HttpSession. StubTeamBookAuthenticationProvider for dev/test; real provider pending Team Book API contract.
-- [Resolved] ~~Secrets stored in managed secret store external to Oracle~~ → Jenkins/Ansible credentials (user, API token) stored in DA_CONFIGURATION_ITEM table via Config admin page. No external secret store for MVP.
-- [Implemented] Configuration values stored in DA_CONFIGURATION_ITEM table; read at execution time by adapters
-- [Assumption] Task state transitions follow a linear, human-gated progression; no parallel branches in MVP
+- [Resolved] AUTO execution in MVP is submission-only. The system records submission outcome and external job links but does not rely on a callback pipeline in the current design baseline.
+- [Resolved] Jenkins and Ansible credentials are stored in Deployment Agent configuration records for MVP.
+- Access Grant multi-role assignment is stored as a JSON array in Oracle for parity with existing structured attributes.
+- `auth/login` and `auth/me` return a compatibility `role` plus `roles[]`, effective `permissions[]`, and applicable `scopes[]`.
+- [Assumption] Task dependency data remains informational in MVP and does not gate execution order beyond current progression rules.
+- [Resolved] Access Management currently operates on product-entry grants plus optional `Application + SNOW Group` scope grants; `Agent` is not the primary authorization boundary.
 
 ---
 
 ## Design Scope
 
-**In-Scope Modules**:
-1. Upload & Import Service – Excel parsing, validation, Release Flow creation/update *(implemented)*
-2. Release Flow Service – state aggregation, stage progression *(implemented)*
-3. Task Management Service – task CRUD, input editing, status transitions *(implemented)*
-4. Decision Engine – decision processing (Approve/Reject/Rerun/Skip) and Release Flow progression *(implemented)*
-5. Auto Execution Service – fire-and-forget submission to Jenkins/Ansible; external job URL storage *(implemented, replaces callback handler)*
-6. Configuration Service – configuration CRUD and retrieval *(implemented)*
-7. Audit Logger – event-based audit trail recording *(implemented)*
-8. Auth Service – session-based Team Book login, role-based access control *(implemented with stub provider)*
-9. Vue 3 UI Modules – login, workspace navigation, summary, details, task views, dialogs, auto submit, external job link *(implemented)*
-10. Spring REST Controllers – 7 HTTP endpoint controllers *(implemented)*
+### In Scope
 
-**Deferred from MVP**:
-- Execution Callback Handler – no callbacks in MVP; tasks stay in Executing after submission
-- Result log ingestion – full logs stay in Jenkins/Ansible
+1. Session-based authentication and local product authorization
+2. Access Grant resolution and Access Management administration
+3. Excel upload and Release Flow / Request / Task import
+4. Release Flow monitoring, stage-level rundown management, and archive lifecycle
+5. Task input editing, execution history, manual result recording, AUTO submission, and review decisions
+6. Configuration management for Jenkins / Ansible integration
+7. Audit logging for workflow and access-governance actions
+8. Frontend workspace views for summary, detail, task actions, config, audit, and Access Management
 
-**Out-of-Scope Details**:
-- Performance tuning and caching policies
-- Advanced filtering, export, and reporting UI
-- Parallel task execution or branching workflows
-- Real Team Book API integration (pending external contract)
+### Out of Scope
 
-**Design Boundaries**:
-- Frontend → Backend: HTTP/REST API with JSON payloads, session cookies (withCredentials)
-- Backend → Oracle: Spring Data JPA with repository patterns
-- Backend → External Systems: Synchronous HTTP calls to Jenkins/Ansible (10s connect / 30s read timeout); fire-and-forget; no callbacks
-- Backend → Team Book: TeamBookAuthenticationProvider interface; stubbed for dev/test, real implementation pending
-- Audit Logger: Event capture occurs at domain layer; persistence in Oracle; uses authenticated session identity
+- Agent-scoped authorization and finer-grained environment-scoped authorization
+- Self-service access requests or approval workflows
+- Real Team Book directory-backed search, unless confirmed later
+- Callback-based AUTO completion ingestion
+- Dynamic import schemas or template customization
+- Parallel or DAG-based execution control from dependencies
+
+### Design Boundaries
+
+- Frontend communicates with backend via REST/JSON and session cookies
+- Backend owns workflow state, authorization resolution, and audit persistence
+- Team Book authenticates enterprise identity only; Deployment Agent owns product authorization
+- Jenkins and Ansible are synchronous submission integrations with externally hosted execution detail
 
 ---
 
 ## Module Design
 
-### 1. Upload & Import Service
+### 1. Identity and Session Module
 
-**Responsibilities**:
-- Receive `(file, stage)` from the upload request — Stage is a required request parameter provided by the user at upload time; it is never read from Excel rows
-- Parse the **AMH_HCC_task** sheet using the fixed column schema
-- Validate all rows and cells against the known field list
-- Extract `Project ID` and `Project Name` for Release Flow grouping
-- Look up active Release Flow by `project_id`:
-  - If none exists: create new Release Flow; generate `release_id` as `{stage}-{normalized_project_name}-{seq}`
-  - If one exists: attach new Request to it for the selected Stage
-- Create Request for the selected Stage within the Release Flow
-- Create one Task per data row under the Request
-- Create audit log entry for the upload action
-- Return structured import result with summary (created/updated count, errors)
+**Responsibilities**
+- Authenticate users through `TeamBookAuthenticationProvider`
+- Create and restore authenticated session state
+- Populate request-scoped security context from session data
+- Distinguish enterprise identity from product authorization
 
-**Key Interactions**:
-- Receives HTTP multipart upload with `file` and `stage` parameters
-- Calls Release Flow Service to create/lookup/update Release Flow
-- Calls Task Management Service to create Tasks (one per row)
-- Calls Audit Logger to record upload event
+**Key Interactions**
+- `AuthController` accepts login / logout / current-user requests
+- `AuthService` validates credentials via Team Book provider
+- `SessionAuthFilter` reconstructs authenticated user context on each request
+- `HeaderAuthFilter` remains a controlled fallback for tests
 
-**Internal Design Concerns**:
-- **Stage source**: Stage is always from the HTTP upload parameter; never derived from file content
-- **Release ID generation**: `{stage}-{normalized_project_name}-{seq}` where `{seq}` is padded-sequential per project; generated once on new Release Flow creation
-- **Atomicity**: Import is atomic at file level; all rows succeed or fail together
-- **Idempotency**: Rerun of same Excel file with same Stage updates existing records, matched by `(project_id, stage, task_group_id, step_seq)`
-- **Validation**: Required fields, date formats, `execution_type` must be `MANUAL` or `AUTO`
-- **Error Reporting**: Accumulated errors returned to user with row number and field name
-- **Transactionality**: Use `DataSource.transaction()` to ensure atomicity
+**Internal Design Concerns**
+- Authentication success does not automatically imply product access
+- Session state must be stable enough to support page refresh, navigation, and repeated API calls
+- Session payload carries a compatibility `role` plus `roles[]`, effective `permissions[]`, and `scopes[]`
 
-**MANUAL vs AUTO task treatment on import**:
-- Both `MANUAL` and `AUTO` tasks are created in the same `Pending` state on import
-- `execution_type` is stored on the Task entity and determines the execution path at runtime
-- No state-machine difference during import; difference manifests at the execution phase
+### 2. Access Grant Resolution Module
 
-#### Excel Template Field Parsing Specification
+**Responsibilities**
+- Resolve whether an authenticated employee may enter Deployment Agent
+- Load the employee's Access Grant record
+- Reject entry when no grant exists or when the grant is suspended
+- Compute effective roles and permissions from assigned product roles
+- Resolve which `Application + SNOW Group` records are visible/manageable for the authenticated user
 
-| Template Column | Action | Parsed Into | Required | Validation Rule |
-|---|---|---|---|---|
-| `Project ID` | Map | `release_flow.project_id` | Yes | Non-blank string |
-| `Project Name` | Map | `release_flow.project_name` | Yes | Non-blank string |
-| `Task ID` | Map | `task.task_group_id` | Yes | Non-blank string; groups rows for display |
-| `Task Name` | Map | `task.task_group_name` | Yes | Non-blank string |
-| `Step seq#` | Map | `task.step_seq` | Yes | Positive integer; unique within `task_group_id` |
-| `Step` | Map | `task.task_name` | Yes | Non-blank string |
-| `Execution Type` | Map | `task.execution_type` | Yes | Must be `MANUAL` or `AUTO` (case-insensitive); reject otherwise |
-| `Script to be executed` | Map | `task.input_parameters.script` | Conditional | Required when execution is automated |
-| `Parameter (input)` | Map | `task.input_parameters.parameters` | No | String or parseable JSON |
-| `Parameter (Expected Output)` | Map | `task.expected_output` | No | String; shown during result review |
-| `Owner` | Map | `task.owner` | No | String |
-| `Planned Start date/time` | Map | `task.planned_start_time` | No | ISO 8601 or Excel date format |
-| `Planned End date/time` | Map | `task.planned_end_time` | No | ISO 8601 or Excel date format |
-| `Activity category` | Store in metadata | `task.import_metadata.activity_category` | No | No validation |
-| `Common` | Store in metadata | `task.import_metadata.common` | No | No validation |
-| `Dependencies` | Store in metadata | `task.import_metadata.dependencies` | No | No validation |
-| `Validation` | Store in metadata | `task.import_metadata.validation` | No | No validation |
-| `Status` | **Ignore** | not stored | — | Template tracking artefact; system sets Task to `Pending`; this column is never read |
-| `Start date/time` | **Drop** | not stored | — | Runtime value; system generates `start_time` at execution start |
-| `End date/time` | **Drop** | not stored | — | Runtime value; system generates `end_time` from callback |
-| `Release ID` | **System-generated** — not parsed from template | `release_flow.release_id` | N/A | Generated as `{stage}-{normalized_project_name}-{seq}` when Release Flow is first created |
-| `Stage` | **From HTTP upload `stage` parameter** — not from template rows | `request.stage` | Yes (from request param) | SIT \| UAT \| PROD; validated from the upload request, not from Excel |
+**Key Interactions**
+- Runs immediately after Team Book authentication succeeds
+- Reads Access Grant data from Oracle
+- Returns authorization profile to session creation and `auth/me`
 
----
+**Internal Design Concerns**
+- Deny-by-default behavior is mandatory
+- One employee should map to one Access Grant record with optional scope grants
+- Response contract must remain explicit about access-denied reasons:
+  - `Access not granted`
+  - `Access suspended`
 
-### 2. Release Flow Service
+### 3. Access Management Module
 
-**Responsibilities**:
-- Create Release Flow with initial state
-- Retrieve Release Flow by ID or criteria
-- Aggregate Request statuses to determine Release Flow summary status (Done/Running/Pending)
-- Aggregate task statuses within a stage to determine Request/Stage summary status
-- Update Release Flow state upon task/decision transitions
-- Track Review Status and Review Owner
-- Provide Release Flow detail for display
+**Responsibilities**
+- Provide admin-only creation, update, suspension, and reactivation of Access Grants
+- Support search by employee ID or display name
+- Support assignment of scoped visibility through `Application + SNOW Group`
+- Record access-governance audit events
+- Expose a clean administrative view without introducing account/password management
 
-**Key Interactions**:
-- Receives calls from Import Service, Task Management Service, Decision Engine, and UI via controllers
-- Reads from Oracle Release Flow, Request, Task tables
-- Calls Audit Logger for significant state transitions
+**Key Interactions**
+- Access Management UI calls Access Grant endpoints
+- Access Grant Service validates role assignment and grant lifecycle
+- Audit Logger records create / update / suspend / reactivate actions
 
-**Internal Design Concerns**:
-- **State Aggregation**: Define clear rules for aggregating child statuses to parent:
-  - Request summary = aggregate of all task statuses in that Request
-  - Stage summary = aggregate of all Request summaries in that stage
-  - Release Flow summary = aggregate of stage summaries
-  - Mixed states: `Running` if any running task; `Done` if all done; `Pending` if any pending
-- **Hierarchical Navigation**: Maintain efficient parent-child relationships for querying
-- **Caching**: Consider caching Release Flow list for summary view (short TTL due to frequent updates)
+**Internal Design Concerns**
+- Grant records are suspended/reactivated, not physically deleted
+- Role assignment supports one or more product roles
+- Scope grants constrain visibility and admin delegation for non-global admins
+- Current implementation searches existing grants only
+- Enterprise directory lookup remains a follow-up expansion, not part of the current admin workflow
 
----
+### 4. Upload and Import Module
 
-### 3. Task Management Service
+**Responsibilities**
+- Accept Excel upload plus selected stage and optional runtime scope fields
+- Parse the fixed `AMH_HCC_task` worksheet
+- Validate required data and map rows into Release Flow, Request, and Task records
+- Preserve selected non-core columns as import metadata
+- Default rundown owner from a single imported task owner or the uploader
+- Produce a single audit event for the upload action
 
-**Responsibilities**:
-- CRUD operations on Task records
-- Maintain task input parameters and validation rules
-- Support task status transitions (Pending → Ready_For_Execution → Executing → Awaiting_Review → (Approved/Rejected/Skipped))
-- Edit task input parameters (only in editable states: Pending, Ready_For_Execution)
-- Track latest execution reference and current result summary
-- Coordinate with Task Execution History for reruns
+**Key Interactions**
+- `UploadController` accepts multipart input
+- Import logic creates or updates Release Flow and Request records
+- First eligible task is promoted into executable state after import
 
-**Key Interactions**:
-- Receives calls from Import Service, UI controllers, Decision Engine, Execution Callback Handler
-- Manages Task and Task Execution History records in Oracle
-- Calls Audit Logger for edit actions
+**Internal Design Concerns**
+- Stage and runtime scope come from the upload UI, not from spreadsheet rows
+- Import is atomic for the whole file
+- Release Flow grouping and release ID generation must remain deterministic
+- Dependency fields are imported and preserved but do not yet drive execution gating
 
-**Internal Design Concerns**:
-- **Input Schema**: Define which fields are editable per task type; reuse existing error types from `src/errors/`
-- **State Validation**: Enforce state transition rules; only allow edits in Pending/Ready_For_Execution states
-- **Execution History**: On rerun, create new Task Execution History record (same task_id, incremented attempt_number)
-- **Result Tracking**: Current_Result_Summary and Latest_Execution_Id fields updated by Execution Callback Handler
+### 5. Release Flow and Rundown Module
 
----
+**Responsibilities**
+- Aggregate child status into Request and Release Flow summaries
+- Expose summary and detail views for each Release Flow
+- Manage stage-level rundown fields and stage lifecycle operations
+- Surface runtime scope (`Application`, `SNOW Group`, `Agent`) and rundown owner
+- Handle archive / restore / purge of stage rundowns
 
-### 4. Decision Engine
+**Key Interactions**
+- Consumed by summary and detail views
+- Triggered by import, task transitions, decision processing, and admin rundown actions
+- Coordinates with audit logging for stage archive lifecycle changes
 
-**Responsibilities**:
-- Process task-level decisions: Approve, Reject, Rerun, Skip
-- Update task state based on decision
-- Trigger Release Flow progression
-- Determine next eligible task or stage advancement
-- Call Execution Service for reruns
-- Create audit log entries for all decisions
+**Internal Design Concerns**
+- Archived rundowns are hidden from default views
+- Archived rundowns become read-only
+- Restoring a previously archived last-active rundown must reactivate its parent Release Flow
+- Purge is irreversible and must remain admin-only
+- `Start Deployment` and `Mark as Failed` are rundown-control actions and are limited to the rundown owner or `DEVOPS_ADMIN`
 
-**Key Interactions**:
-- Receives decision request from UI via controller
-- Calls Task Management Service to update task state
-- Calls Execution Service to trigger rerun (for Rerun decision)
-- Calls Release Flow Service to advance Release Flow
-- Calls Audit Logger for decision tracking
+### 6. Task Management Module
 
-**Internal Design Concerns**:
-- **Decision Validation**: Enforce role-based access, task state constraints, and release flow context
-- **State Transitions**:
-  - Approve: Task → Approved; Release Flow advances to next task
-  - Reject: Release Flow → Rejected; all subsequent tasks in stage skipped
-  - Rerun: Task → Executing; new execution history entry created
-  - Skip: Task → Skipped; Release Flow continues to next task
-- **Release Flow Progression**: Define logic to determine next eligible task (linear for MVP)
-- **Idempotency**: Prevent duplicate decisions on same task; repeat calls return cached result
+**Responsibilities**
+- Store task inputs, display data, metadata, and status
+- Support task input editing in eligible states
+- Manage manual result capture and execution history
+- Surface dependency relationships (`Blocked By` / `Blocks`) as display-oriented context
 
----
+**Key Interactions**
+- Receives imported task data from Upload / Import
+- Works with Decision and Progression logic
+- Returns execution history and current result data to UI modals
 
-### 5. Execution Callback Handler
+**Internal Design Concerns**
+- Editable states remain constrained to pre-execution states
+- Execution history must preserve every rerun attempt
+- Dependency visualization should tolerate missing references without breaking task rendering
+- Archived parent rundown should block task mutation
 
-**Responsibilities**:
-- Receive webhook callback from Jenkins/Ansible upon job/playbook completion
-- Validate callback source and correlation (execution_id, task_id)
-- Ensure request authenticity and prevent replay attacks
-- Update Task status to reflect execution result
-- Store execution result in Result Storage
-- Update Task with result summary and latest execution reference
-- Trigger Decision Engine if task reaches Awaiting_Review status
-- Respond with 202 Accepted or 200 OK to callback source
+### 7. Decision and Progression Module
 
-**Key Interactions**:
-- Accepts HTTP POST callback from external execution engines
-- Calls Task Management to update current_result_summary and latest_execution_id
-- Calls Result Storage to persist result logs
-- Calls Task Management to transition task to Awaiting_Review
-- Calls Decision Engine if auto-progression is enabled
+**Responsibilities**
+- Apply human review decisions: `Approve`, `Reject`, `Rerun`, `Skip`
+- Update task, request, and flow state
+- Promote the next eligible task when progression rules allow
+- Preserve rerun history and review traceability
 
-**Internal Design Concerns**:
-- **Idempotency**: Same callback received twice should be handled gracefully; use execution_id as idempotency key
-- **Security**:
-  - HTTPS only (enforced at infrastructure level)
-  - Authenticate callback source (TBD: signed JWT, API key, mutual TLS)
-  - Validate correlation: execution_id must match an active Task Execution History record
-- **Error Handling**: Failed callbacks should be retried by caller; handler returns explicit error response
-- **Timeout**: Callback endpoint is synchronous; should complete within acceptable window (suggest 30s)
-- **Logging**: Log all callbacks (including failures) for debugging
+**Key Interactions**
+- Invoked by task decision endpoints
+- Uses task state validation and aggregation rules
+- Writes audit entries for every decision
 
----
+**Internal Design Concerns**
+- `Run` / `Rerun` are execution actions; `Approve` / `Reject` / `Skip` are review actions
+- Rerun only becomes valid after `Failed` or `Rejected`
+- Critical-path and dependency behavior must not silently bypass explicit review requirements
 
-### 6. Configuration Service
+### 8. Auto Execution Module
 
-**Responsibilities**:
-- CRUD Configuration Item records
-- Retrieve current configuration for use by execution
-- Validate configuration values against defined rules
-- Limit updates to DevOps Admin role
-- Support configuration schema (Jenkins URL, Ansible URL, Execution Callback Endpoint)
+**Responsibilities**
+- Submit eligible AUTO tasks to Jenkins or Ansible
+- Create execution history for each submission attempt
+- Capture external execution identifiers, submission outcome, and job URLs
 
-**Key Interactions**:
-- Receives configuration requests from UI (Admin view) and domain services (Execution context)
-- Reads/writes Configuration Item table in Oracle
-- Calls Audit Logger for configuration changes
+**Key Interactions**
+- Uses configuration values to determine integration targets and credentials
+- Writes execution metadata into task execution history
+- Writes audit events for submission actions
 
-**Internal Design Concerns**:
-- **Validation**: Each configuration item has format rules (URI format, HTTPS requirement, etc.)
-- **Caching**: Load-on-startup with periodic refresh (or on demand with per-item caching) to avoid repeated DB queries
-- **Immutability**: Store original values for audit; never overwrite in place
-- **Update Semantics**: Changes take effect immediately for new executions (future tasks)
-- **Authorization**: Enforce role check in controller; cannot rely on UI-side visibility
+**Internal Design Concerns**
+- Submission is synchronous; remote execution is not
+- No callback contract is relied upon in the current design baseline
+- AUTO tasks may remain in `Executing` until future completion-ingestion capability is introduced
+- Submission failures must transition tasks to `Failed`
 
----
+### 9. Configuration Module
 
-### 7. Audit Logger
+**Responsibilities**
+- Store and update runtime configuration used by AUTO integrations
+- Validate configuration values at write time
+- Expose configuration read APIs and admin-only update APIs
 
-**Responsibilities**:
-- Record immutable audit log entries for all key actions
-- Capture action metadata: operator, action type, timestamp, context
-- Support audit log retrieval for display
-- Ensure append-only persistence to Oracle
+**Key Interactions**
+- Used by AUTO execution adapters
+- Surfaced through Configuration Management UI
+- Audited on every update
 
-**Key Interactions**:
-- Called by all domain services to record actions
-- Receives log requests from UI via controller for display
-- Writes Audit Log Entry records (append-only) to Oracle
+**Internal Design Concerns**
+- Current config set covers Jenkins and Ansible connectivity
+- Changes apply to future executions, not retroactively to stored history
+- Sensitive values must be redacted in audit and UI contexts where appropriate
 
-**Internal Design Concerns**:
-- **Event Capture**: Define supported action types: upload, edit, view_result, approve, reject, rerun, skip, config_update
-- **Context Payload**: Store nested context (release_flow_id, request_id, task_id, additional metadata as JSON)
-- **Immutability**: No updates or deletes; only appends
-- **Indexing**: Index on timestamp and operator_id for efficient query
-- **Role-Based Retrieval**: Audit/Management users can view all logs; other users see only their own actions or relevant context
+### 10. Audit Module
 
----
+**Responsibilities**
+- Record immutable audit entries for workflow and access-governance actions
+- Support read-only retrieval for authorized viewers
+- Preserve traceability across archive / restore / purge lifecycle changes
 
-### 8. Result Storage
+**Key Interactions**
+- Called from workflow, configuration, and access services
+- Exposed to Audit Log UI
 
-**Responsibilities**:
-- Persist task execution results (logs, summary, status)
-- Retrieve full result for Result Viewer
-- Associate result with Task Execution History record
+**Internal Design Concerns**
+- Audit writes should not be lost when surrounding business operations fail after the audit call boundary
+- Access-governance actions need their own action types
+- Audit records must survive physical purge of business entities where possible through soft references
+- Audit entries should persist request scope fields so multi-scope filtering remains possible after later lifecycle changes
 
-**Key Interactions**:
-- Receives result payload from Execution Callback Handler
-- Reads result for UI result viewer
-- Supports switching between execution attempts (handled at UI layer for MVP)
+### 11. Vue UI Modules
 
-**Internal Design Concerns**:
-- **Storage Strategy**: [Assumption] Store in Oracle using dedicated result table or CLOB within Task Execution History
-  - If Oracle: use CLOB for large logs, index on task_id for efficient retrieval
-  - If externalized (future): persist reference URL in Oracle and actual content in S3/file system
-- **Format**: Store execution_status, result_summary, result_logs (raw output); schema to be finalized in implementation
-- **Retrieval**: Default to latest execution attempt; Result Viewer explicitly specifies attempt_number if switching
+**Responsibilities**
+- Present workflow state clearly across summary, detail, task, config, audit, and access-management experiences
+- Keep action discoverability high through visible-but-disabled controls where appropriate
+- Explain blocked states instead of hiding system capability
 
----
+**Primary Views**
+- Login / access-denied states
+- Release Flow Summary
+- Release Flow Detail with stage tabs and rundown panel
+- Task table with action controls and execution history
+- Template and dependency maintenance views `[existing related capability]`
+- Configuration Management
+- Audit Log
+- Access Management
 
-### 9. Vue 3 UI Modules
-
-**Main UI Views / Components**:
-
-#### 9.1 Workspace Layout
-- **Purpose**: Top-level container for all Deployment Agent features
-- **Structure**:
-  - Left sidebar: navigation menu (Summary, Task Management sections)
-  - Top bar: workspace title, user profile, actions
-  - Main content area: dynamic based on selected view
-
-#### 9.2 Release Flow Summary View
-- **Purpose**: Monitor all Release Flows with stage-level status
-- **Components**:
-  - Release Flow table with columns: Release ID, Project, Current Stage, SIT status, UAT status, PROD status
-  - Filter controls (by project, stage, status)
-  - Upload button to initiate new import
-  - On row click: select Release Flow and update Details view
-
-#### 9.3 Selected Release Flow Details View
-- **Purpose**: Show context for selected Release Flow
-- **Components**:
-  - Detail cards: Project, Release ID, Current Stage, Current Request ID, Review Status, Review Owner
-  - Breadcrumb or context indicator showing hierarchy
-
-#### 9.4 Task Details and Results View
-- **Purpose**: Display tasks for selected Request with actions
-- **Components**:
-  - Task table with columns: Task Name, Execution Type, Status, Result Summary, Start Time, End Time
-  - Action controls per row (shown based on task state and user role):
-    - **Edit** — for Pending / Ready_For_Execution tasks (TL only)
-    - **View Result** — for tasks with available result output
-    - **Record Result** — for MANUAL tasks in `Ready_For_Execution` state; opens inline form to enter actual result/output; on submit the system creates execution history and transitions task to `Awaiting_Review`
-    - **Decision** dropdown — for tasks in `Awaiting_Review` state: Approve / Reject / Rerun / Skip (TL only)
-  - Result modal: displays result summary, `expected_output` for comparison, and option to view raw logs
-- **MANUAL task visual indicator**: rows with `execution_type = MANUAL` should display a clear visual label so the TL knows no automated execution will occur
-
-#### 9.5 Upload Dialog
-- **Purpose**: Initiate Excel file import with stage selection
-- **Components**:
-  - **Stage selector** (required dropdown: SIT / UAT / PROD) — must be selected before upload is enabled
-  - File input control
-  - Download Template button
-  - View Sample button
-  - Upload button (disabled until both Stage is selected and file is chosen)
-  - Import status message (success/error detail)
-- **Behavior**:
-  - Stage selection is a prerequisite; upload is blocked without it
-  - Stage is submitted as a request parameter alongside the file; it is not read from the Excel content
-  - On success, display release_id of the created/updated Release Flow
-
-#### 9.6 Task Edit Dialog
-- **Purpose**: Edit task input parameters
-- **Components**:
-  - Form fields for editable input parameters (per task type)
-  - Validation feedback (real-time or on submit)
-  - Save and Cancel buttons
-
-#### 9.6b Record Result Dialog (MANUAL tasks only)
-- **Purpose**: Allow operator to record the outcome of a manually-executed step
-- **Triggered by**: "Record Result" button on a MANUAL task row in `Ready_For_Execution` state
-- **Components**:
-  - Read-only display of `input_parameters.script`, `input_parameters.parameters`, and `expected_output` as reference context
-  - Text area or form field for operator to enter the actual result/output
-  - Save and Cancel buttons
-- **Behavior on Save**:
-  - System creates a `TaskExecutionHistory` record with `execution_type = MANUAL`, `attempt_number` incremented, and the entered result as `result_summary`
-  - System transitions task from `Ready_For_Execution` to `Awaiting_Review`
-  - Task row refreshes; Decision actions become available
-- **Authorization**: TL (same role as decision-making)
-
-#### 9.7 Decision Dialog
-- **Purpose**: Confirm and submit task-level decision
-- **Components**:
-  - Radio or button selection: Approve / Reject / Rerun / Skip
-  - Optional comment or rejection reason field (future scope)
-  - Confirm and Cancel buttons
-
-#### 9.8 Configuration Management View
-- **Purpose**: Manage system configuration (DevOps Admin only)
-- **Components**:
-  - Configuration table with columns: Config Key, Current Value
-  - Edit button per row to open inline or modal editor
-  - Save/Cancel buttons for each edit
-  - Validation feedback and error messages
-
-#### 9.9 Audit Log View
-- **Purpose**: Display audit records (read-only for Audit/Management users)
-- **Components**:
-  - Audit log table with columns: Timestamp, Operator, Action Type, Context (Release ID / Task Name)
-  - Optional: pagination or lazy-load for large datasets
-  - No edit/delete capabilities
-
-**State Management**:
-- [Assumption] Use Pinia or provide/inject to manage:
-  - Currently selected Release Flow ID
-  - Currently selected Request ID (context)
-  - Release Flow list and detail
-  - Task list for selected Request
-  - Configuration items
-  - Current user context (role, identity)
-
-**API Integration**:
-- Use REST client (axios or fetch) to call backend endpoints
-- Handle HTTP errors and display user-friendly messages
-- Poll or subscribe for Release Flow status updates (polling for MVP; consider WebSocket or SSE for real-time in future)
+**Internal Design Concerns**
+- Current task actions are state-driven and intentionally visible even when disabled
+- Admin-facing views must expose archived content safely
+- Access-denied states must clearly distinguish authentication failure from missing / suspended product access
 
 ---
 
 ## API / Interface Design
 
-### HTTP Endpoints
+This section describes logical API behavior. Endpoint-level payload examples live in the companion API guide.
 
-All endpoints use Fastify patterns: resource-oriented route handlers, explicit TypeScript DTOs, validation through Zod schemas, centralized Fastify error handler, server-side RBAC via `requireRole()`.
+### Authentication Interfaces
 
-#### Upload Endpoint
-- **Path**: `POST /api/deployment-agent/upload`
-- **Purpose**: Submit Excel file for import at a specified stage
-- **Input**: Multipart form with `file` field and required `stage` field (`SIT` | `UAT` | `PROD`)
-- **Output**:
-  - 200 OK: `{ success: true, message: "...", importLog: {...}, releaseFlowId: "...", releaseId: "...", stage: "..." }`
-  - 400 Bad Request: `{ success: false, errors: [...], details: "..." }`
-- **Validation**: Stage required and valid; file required; file format (XLSX); schema compliance; `execution_type` must be `MANUAL` or `AUTO`
-- **Authorization**: Developer, TL (any authenticated user with upload permission)
+**Purpose**
+- Authenticate enterprise identity
+- Resolve local product access
+- Return current authenticated context
 
-#### Release Flow List Endpoint
-- **Path**: `GET /api/deployment-agent/release-flows`
-- **Purpose**: Retrieve Release Flow list with optional filters
-- **Query Parameters**: `?project=X&stage=Y&status=Z&page=0&size=20`
-- **Output**: `{ data: [{ id, project, releaseId, currentStage, sitStatus, uatStatus, prodStatus, flowStatus, reviewStatus }], total, page, size }`
-- **Authorization**: Any authenticated user
+**Main Interfaces**
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/logout`
 
-#### Release Flow Detail Endpoint
-- **Path**: `GET /api/deployment-agent/release-flows/{id}`
-- **Purpose**: Retrieve full Release Flow details
-- **Output**: `{ id, project, releaseId, currentStage, currentRequestId, flowStatus, reviewStatus, reviewOwner, createdAt, updatedAt }`
-- **Authorization**: Any authenticated user
+**Validation Expectations**
+- `employeeId` and password required on login
+- Invalid enterprise credentials return `401`
+- Valid enterprise credentials without active product access return `403`
 
-#### Task List Endpoint
-- **Path**: `GET /api/deployment-agent/release-flows/{id}/requests/{requestId}/tasks`
-- **Purpose**: Retrieve task list for selected Request
-- **Output**: `{ data: [{ id, name, type, status, inputParameters, currentResultSummary, latestExecutionId, startTime, endTime, lastUpdatedAt }] }`
-- **Authorization**: Any authenticated user
+**Error Behavior**
+- `401 Unauthorized` for invalid credentials
+- `403 Forbidden` with explicit access-state messaging for missing or suspended Access Grant
 
-#### Edit Task Input Endpoint
-- **Path**: `POST /api/deployment-agent/tasks/{id}/edit`
-- **Purpose**: Update task input parameters
-- **Input**: `{ inputParameters: {...} }`
-- **Output**: 200 OK or 400 Bad Request with validation errors
-- **Validation**: Schema matching, type checking, required field checking
-- **Authorization**: TL, DevOps Admin (RoleBasedAccess)
+### Access Management Interfaces
 
-#### Decision Endpoint
-- **Path**: `POST /api/deployment-agent/tasks/{id}/decision`
-- **Purpose**: Submit task-level decision
-- **Input**: `{ decision: "Approve" | "Reject" | "Rerun" | "Skip", context: {...} }`
-- **Output**: 200 OK with updated Release Flow state or error
-- **Validation**: Decision validity for task state, authorization
-- **Authorization**: TL, DevOps Admin (RoleBasedAccess)
+**Purpose**
+- List and manage Access Grants for Deployment Agent
 
-#### Get Task Result Endpoint
-- **Path**: `GET /api/deployment-agent/tasks/{id}/result`
-- **Purpose**: Retrieve execution result for display
-- **Query Parameters**: `?executionId=X` (optional; defaults to latest)
-- **Output**: `{ taskId, executionId, attemptNumber, status, resultSummary, resultLogs }`
-- **Authorization**: Any authenticated user (may be gated by result sensitivity in future)
+**Main Interfaces**
+- `GET /access-grants`
+- `POST /access-grants`
+- `PATCH /access-grants/{employeeId}`
+- `POST /access-grants/{employeeId}/suspend`
+- `POST /access-grants/{employeeId}/reactivate`
 
-#### Configuration List Endpoint
-- **Path**: `GET /api/deployment-agent/config`
-- **Purpose**: Retrieve current configuration items
-- **Output**: `{ data: [{ key, value, description, updatedBy, updatedAt }] }`
-- **Authorization**: Any authenticated user (read-only via API)
+**Validation Expectations**
+- Only DevOps Admin users may access these interfaces
+- Active grants require at least one assigned role
+- Scope grants are optional but must be valid `Application + SNOW Group` pairs when supplied
+- Scoped admins may manage only grants within their visible scopes; empty scopes on a `DEVOPS_ADMIN` grant represent global-admin access
+- Employee identity fields must be present and stable enough for display and audit
 
-#### Update Configuration Endpoint
-- **Path**: `POST /api/deployment-agent/config`
-- **Purpose**: Create or update configuration item
-- **Input**: `{ key, value, description }`
-- **Output**: 200 OK or 400 Bad Request
-- **Validation**: Format rules per configuration key, required/optional constraints
-- **Authorization**: DevOps Admin only
+**Error Behavior**
+- `403` for unauthorized role
+- `404` when target grant does not exist
+- `409` when lifecycle operation is invalid for current grant status
 
-#### Audit Log List Endpoint
-- **Path**: `GET /api/deployment-agent/audit-logs`
-- **Purpose**: Retrieve audit log entries
-- **Query Parameters**: `?releaseFlowId=X&page=0&size=50`
-- **Output**: `{ data: [{ id, operatorId, operatorRole, actionType, timestamp, releaseFlowId, requestId, taskId, contextPayload }], total }`
-- **Authorization**: Audit/Management users (role-gated), or own actions for operators
+### Workflow Interfaces
 
-#### Execution Callback Endpoint
-- **Path**: `POST /api/deployment-agent/callback/execution`
-- **Purpose**: Receive task execution result from Jenkins/Ansible
-- **Input**: `{ executionId, taskId, status, resultSummary, resultLogs, timestamp }`
-- **Output**: 200 OK or 202 Accepted
-- **Validation**:
-  - Execution ID must correlate with active Task Execution History
-  - Status must be valid (Completed, Failed, Timed Out, etc.)
-  - Request signature/token validation
-- **Authorization**: Callback source authentication (API key or signed token)
-- **Side Effects**:
-  - Update Task Execution History with result
-  - Store result in Result Storage
-  - Update Task status to Awaiting_Review
-  - Trigger Decision Engine (if auto-progression enabled)
+**Purpose**
+- Import requests, view release state, mutate eligible tasks, and apply review decisions
+
+**Main Interfaces**
+- Upload: `POST /upload`
+- Release Flow list/detail and stage actions
+- Task detail, input update, execution history, manual result capture, AUTO submit
+- Decision endpoint
+
+**Validation Expectations**
+- Import validates stage and fixed worksheet schema
+- Upload and list/detail views validate runtime scope where applicable
+- Task mutations validate ownership/permission, current task state, and parent rundown lifecycle
+- Rundown-control actions validate scope plus rundown owner/admin rules
+- Decision submission validates allowed decision for the current status
+
+**Error Behavior**
+- `400` for bad request shape
+- `409` for invalid state transitions or optimistic locking conflicts
+- `404` for missing flow, request, or task
+
+### Configuration Interfaces
+
+**Purpose**
+- Read and update Jenkins / Ansible runtime configuration
+
+**Main Interfaces**
+- `GET /config`
+- `POST /config`
+
+**Validation Expectations**
+- Keys must be from the supported configuration catalog
+- URL values must match expected URI rules
+- Sensitive values must never be echoed back in unsafe contexts
+
+### Audit Interfaces
+
+**Purpose**
+- Provide read-only audit search and inspection
+
+**Main Interface**
+- `GET /audit-logs`
+
+**Validation Expectations**
+- Any signed-in user may read audit history in the current MVP implementation, but returned rows are limited by scoped visibility unless the user is a global admin
+- Filtering inputs must be validated to avoid malformed queries
 
 ---
 
@@ -527,472 +437,351 @@ All endpoints use Fastify patterns: resource-oriented route handlers, explicit T
 
 ### Logical Entities
 
-#### Release Flow
-- **Attributes**:
-  - release_flow_id (PK)
-  - project_id (from template `Project ID`; primary grouping key)
-  - project_name (from template `Project Name`; display)
-  - release_id (from workbook structure per OQ-25; nullable; fallback applied if absent)
-  - current_stage (SIT | UAT | PROD; from workbook structure per OQ-25)
-  - flow_status (Pending | Running | Completed | Failed | Rejected)
-  - review_status (Pending_Review | Approved | Rejected)
-  - review_owner (user_id)
-  - created_at
-  - updated_at
-- **State Transitions**:
-  - New Release Flows start in `Pending` status
-  - Move to `Running` on task execution
-  - Move to `Completed` when all stages done
-  - Can be `Rejected` by reviewer
-  - Can be `Failed` if any stage fails unrecoverably
+| Entity | Purpose | Key Attributes |
+|--------|---------|----------------|
+| Release Flow | Top-level deployment journey | `project_id`, `project_name`, `release_id`, `current_stage`, `flow_status`, `review_status` |
+| Request | Stage-level rundown inside a Release Flow | `stage`, `request_status`, `snow_group`, `application`, `agent`, `owner`, archive markers |
+| Task | Atomic execution step | `task_group_id`, `step_seq`, `task_name`, `execution_type`, `task_status`, `input_parameters`, `expected_output`, `import_metadata` |
+| Task Execution History | Per-attempt execution record | `attempt_number`, `execution_status`, `result_summary`, `result_logs`, external job fields |
+| Configuration Item | Runtime integration config | `config_key`, `config_value`, `updated_by`, `updated_at` |
+| Audit Log Entry | Immutable operator audit record | `operator_id`, `action_type`, `timestamp`, `application`, `snow_group`, `agent`, `context_payload` |
+| Access Grant | Product authorization record | `employee_id`, `display_name_snapshot`, `grant_status`, `assigned_roles`, `scope_grants`, `note`, `last_login_at` |
 
-#### Request
-- **Attributes**:
-  - request_id (PK)
-  - release_flow_id (FK)
-  - stage (SIT | UAT | PROD)
-  - request_status (Pending | Running | Completed | Failed | Skipped | Rejected)
-  - created_at
-  - updated_at
-- **State Transitions**:
-  - New Requests start in `Pending`
-  - Move to `Running` on first task execution
-  - Move to `Completed` when all tasks done (Approved/Skipped)
-  - Can be `Rejected` en masse
-  - Can be `Failed` if critical task fails
+### Relationships
 
-#### Task
-Represents one atomic execution step from the AMH_HCC_task template. One row = one Task.
+```text
+Release Flow 1:N Request
+Request 1:N Task
+Task 1:N Task Execution History
 
-- **Core workflow attributes**:
-  - task_id (PK, system-generated)
-  - request_id (FK)
-  - task_group_id (VARCHAR; from template `Task ID`; groups related steps for display ordering)
-  - task_group_name (VARCHAR; from template `Task Name`; display label)
-  - step_seq (INTEGER; from template `Step seq#`; execution ordering within task_group_id)
-  - task_name (VARCHAR; from template `Step`; name of this atomic step)
-  - execution_type (VARCHAR; enum: `MANUAL` | `AUTO`; determines execution path at runtime — MANUAL = human-executed externally; AUTO = system-submitted to pipeline)
-  - input_parameters (CLOB/JSON: `{ "script": "...", "parameters": "..." }` from template fields)
-  - expected_output (VARCHAR; nullable; from template `Parameter (Expected Output)`; shown during result review)
-  - task_status (Pending | Ready_For_Execution | Executing | Awaiting_Review | Approved | Rejected | Skipped | Failed)
-  - current_result_summary (CLOB, nullable)
-  - latest_execution_id (FK to Task Execution History, nullable)
-  - start_time (TIMESTAMP, nullable; populated by execution service — NOT from template)
-  - end_time (TIMESTAMP, nullable; populated from execution callback — NOT from template)
-  - last_updated_at
-  - editable_statuses: [Pending, Ready_For_Execution] (enforced in service layer)
-
-- **Display-only attributes** (explicit columns; no workflow role):
-  - owner (VARCHAR; nullable; from template `Owner`)
-  - planned_start_time (TIMESTAMP; nullable; from template `Planned Start date/time`; shown in task list)
-  - planned_end_time (TIMESTAMP; nullable; from template `Planned End date/time`; shown in task list)
-
-- **Raw import metadata** (single JSON blob; no business logic reads this in MVP):
-  - import_metadata (VARCHAR2/CLOB; JSON object containing `activity_category`, `common`, `dependencies`, `validation` from the template; preserved for reference only)
-
-- **Fields NOT stored** (explicitly excluded):
-  - template `Status` — ignored; system always creates Tasks in `Pending`
-  - template `Start date/time` — not imported; system generates actual start
-  - template `End date/time` — not imported; system generates actual end from callback
-
-- **State Transitions**:
-  - Pending → Ready_For_Execution (on import or progression rule)
-  - Pending → Skipped (TL skip decision)
-  - Ready_For_Execution → Executing (auto-triggered or manual record-result)
-  - Ready_For_Execution → Skipped (TL skip decision)
-  - Executing → Awaiting_Review (callback from engine or manual result recording)
-  - Executing → Failed (execution failure)
-  - Awaiting_Review → Approved | Rejected (TL decision)
-  - Rejected → Ready_For_Execution (TL rerun decision; creates new execution history)
-  - Failed → Ready_For_Execution (TL rerun decision; creates new execution history)
-
-#### Task Execution History
-- **Attributes**:
-  - execution_id (PK)
-  - task_id (FK)
-  - attempt_number
-  - execution_status (Running | Completed | Failed | Timed_Out)
-  - input_snapshot (JSON, copy of inputs at execution time)
-  - result_summary (JSON, nullable)
-  - result_logs (CLOB, nullable)
-  - start_time
-  - end_time (nullable)
-- **Keys**:
-  - Composite unique key: (task_id, attempt_number)
-  - Latest execution identified by max(attempt_number) for given task_id
-
-#### Configuration Item
-- **Attributes**:
-  - config_key (PK, e.g., "jenkins_url", "ansible_url", "callback_endpoint")
-  - config_value
-  - description
-  - updated_by (user_id)
-  - updated_at
-- **Validation**:
-  - jenkins_url: URI format, HTTPS recommended
-  - ansible_url: URI format, HTTPS recommended
-  - callback_endpoint: URI format, HTTPS required
-
-#### Audit Log Entry
-- **Attributes**:
-  - audit_log_id (PK)
-  - operator_id
-  - operator_role
-  - action_type (enum: upload, edit, view_result, approve, reject, rerun, skip, config_update)
-  - timestamp
-  - release_flow_id (FK, nullable)
-  - request_id (FK, nullable)
-  - task_id (FK, nullable)
-  - context_payload (JSON, arbitrary context for the action)
-- **Immutability**: Append-only; no updates or deletes after creation
-- **Indexing**: timestamp, operator_id, action_type for efficient query
-
-### Entity Relationships (ER)
-```
-Release Flow
-  ├── 1:N → Request (by stage)
-       ├── 1:N → Task
-            ├── 1:N → Task Execution History
-            └── Result Storage (CLOB or reference)
-
-Configuration Item (independent)
-Audit Log Entry (independent, soft references to Release Flow / Request / Task)
+Configuration Item - independent
+Audit Log Entry - independent, soft-referenced with scope fields
+Access Grant - independent, product entry + scoped visibility
 ```
 
-### Execution Payload Mapping
+### Release Flow and Request Design Notes
 
-`execution_type` has two values and determines completely different execution paths:
+- A Release Flow groups related stage requests for the same deployment journey.
+- A Request represents a single stage rundown and owns its tasks.
+- Requests and Release Flows may be archived from default views.
+- Archive metadata is operational lifecycle state, not a separate business entity.
 
-#### AUTO tasks (execution_type = `AUTO`)
-The Execution Service submits the task to the configured execution pipeline:
+### Task Design Notes
 
-| Task Field | Execution Payload Role |
-|---|---|
-| `input_parameters.script` | The script or job name to invoke |
-| `input_parameters.parameters` | Runtime parameters passed to the script |
-| `task_id` | Correlation reference for callback matching |
-| `execution_id` | System-generated per attempt; included in callback for result correlation |
-| `task_group_id` + `step_seq` | Contextual metadata for observability |
+**Core fields**
+- `execution_type`: `MANUAL` or `AUTO`
+- `task_status`: workflow state
+- `input_parameters`: structured task input
+- `expected_output`: human comparison reference
+- `import_metadata`: imported metadata such as activity category, dependency hints, and validation notes
 
-The Execution Service reads `jenkins_url` / `ansible_url` from Configuration Items and submits to the appropriate endpoint. A callback is expected to mark the task result and transition to `Awaiting_Review`.
+**Imported dependency semantics**
+- `Dependencies` are preserved from import/template maintenance
+- Runtime UI derives:
+  - `Blocked By`
+  - `Blocks`
+- MVP progression remains rule-driven and does not yet use dependency links as authoritative gating logic
 
-#### MANUAL tasks (execution_type = `MANUAL`)
-No automated submission. The Execution Service treats MANUAL tasks differently:
+### Access Grant Design
 
-- Task transitions to a "manual execution required" state (or stays at `Ready_For_Execution` with a MANUAL indicator)
-- The system displays `input_parameters.script`, `input_parameters.parameters`, and `expected_output` as reference instructions to the operator
-- The operator performs execution externally
-- The TL or operator records the result through an inline "Record Result" action in the UI
-- The system then transitions the task to `Awaiting_Review` for the normal decision gate
-- No callback endpoint is triggered for MANUAL tasks
+**Fields**
+- `employee_id`
+- `display_name_snapshot`
+- `grant_status` = `ACTIVE | SUSPENDED`
+- `assigned_roles`
+- `scope_grants`
+- `note`
+- `last_login_at`
+- `created_by`, `created_at`, `updated_by`, `updated_at`
 
-> **R-07 resolved**: MANUAL task result recording uses an inline "Record Result" button in the Task Details row. Clicking it opens a form where the operator enters the actual result/output. On form submission, the system creates a `TaskExecutionHistory` record and transitions the task to `Awaiting_Review`.
+**Rules**
+- one Access Grant per employee
+- no physical delete in Phase 1
+- active grant requires at least one assigned role
+- scope grants are optional
+- empty scope grants on a `DEVOPS_ADMIN` record represent global-admin visibility
+- suspend/reactivate retains history
 
----
+### Configuration Keys
 
-### Expected Output and Verification Handling
+- `jenkins_url`
+- `jenkins_user`
+- `jenkins_api_token`
+- `ansible_url`
+- `ansible_user`
+- `ansible_api_token`
 
-`expected_output` (from template `Parameter (Expected Output)`) is a first-class field in the result review step.
+`execution_callback_endpoint` is not part of the current design baseline because callback ingestion is deferred.
 
-**Design decision**:
-- `expected_output` is stored on the Task entity and displayed side-by-side with the actual execution result in the Result Viewer
-- The TL manually compares actual vs. expected output during the verification step of the core workflow
-- The system does **not** auto-pass or auto-fail based on expected_output; the human decision gate is the authoritative verification mechanism in MVP
+### State Models
 
----
+#### Task Status
 
-### Dependency, Validation, and Common Handling
+```text
+Pending -> Ready_For_Execution -> Executing -> Awaiting_Review -> Approved
+Pending -> Skipped
+Ready_For_Execution -> Skipped
+Executing -> Failed
+Awaiting_Review -> Rejected
+Rejected -> Ready_For_Execution
+Failed -> Ready_For_Execution
+```
 
-`Dependencies`, `Validation`, and `Common` from the template are **raw metadata fields with no workflow behavior in MVP**.
+#### Request Status
 
-**Design decision for all three**:
-- Stored in the `import_metadata` JSON blob on the Task entity
-- No gating logic, no automated processing, no state-transition control
-- These fields are preserved for future reference or post-MVP enhancement only
-- No open questions remain for these fields — the decision is final for MVP scope
+```text
+Pending -> Running -> Completed
+Pending/Running -> Failed
+Pending/Running -> Rejected
+Pending/Running -> Skipped
+```
 
-Execution sequencing in MVP is controlled solely by `step_seq` within `task_group_id`. No additional dependency resolution engine is needed.
+#### Flow Status
 
----
+```text
+Pending -> Running -> Completed
+Pending/Running -> Failed
+Pending/Running -> Rejected
+```
 
-### Scheduling Field Usage
+#### Access Grant Status
 
-`planned_start_time` and `planned_end_time` (from template `Planned Start date/time` / `Planned End date/time`) are display-only fields.
+```text
+ACTIVE <-> SUSPENDED
+```
 
-**Design decision**:
-- Stored as explicit timestamp columns on the Task entity for UI display in the task list
-- The system does **not** auto-start, delay, or gate execution based on planned dates in MVP
-- `start_time` (actual) is populated by the Execution Service when execution begins
-- `end_time` (actual) is populated from the execution callback when execution completes
-- Template `Start date/time` and `End date/time` columns are **not imported** — they are runtime values that the system generates, not planning inputs from the spreadsheet
+### Aggregation Rules
 
----
+- Request status is derived from child task statuses
+- Release Flow status is derived from child request statuses
+- Archive lifecycle overlays visibility and mutability, not the base workflow status
 
-### State Aggregation Rules
-
-**Request Summary Status** (from Task statuses within Request):
-- If any Task is `Executing` or in running state → `Running`
-- If all Tasks are `Approved` or `Skipped` → `Completed`
-- If any Task is `Failed` → `Failed`
-- If any Task is `Rejected` → `Rejected`
-- Otherwise → `Pending`
-
-**Stage Summary Status** (from Request summaries within Stage):
-- If any Request is `Running` → `Running`
-- If all Requests are `Completed` → `Done`
-- If any Request is `Failed` → `Failed`
-- If any Request is `Rejected` → `Rejected`
-- Otherwise → `Pending`
-
-**Release Flow Summary** (from Stage statuses):
-- Aggregate all three stages (SIT, UAT, PROD) similarly to stage aggregation
+Priority guidance:
+1. `Running` if any active execution exists
+2. `Failed` if any child has failed and no higher-priority running state applies
+3. `Rejected` if any child is rejected and no running / failed state applies
+4. `Completed` when all children are terminal-success or skipped
+5. `Pending` otherwise
 
 ---
 
 ## UI / User Flow Design
 
-### User Journey: Request → Process → Verification → Decision
+### 1. Product Entry
 
-#### 1. Access Workspace
-- User logs into WWA platform
-- Selects Deployment Agent from level-2 menu
-- Workspace loads with Release Flow Summary view visible
+- User authenticates with enterprise credentials
+- System resolves Access Grant
+- Entry states:
+  - authenticated + active grant -> workspace
+  - authenticated + no grant -> access denied (`Access not granted`)
+  - authenticated + suspended grant -> access denied (`Access suspended`)
 
-#### 2. Upload Deployment Request
-- User clicks "Upload" or "Upload Excel" button
-- Upload dialog opens
-- User can: Download Template, View Sample, or select Excel file
-- User selects valid Excel file and clicks Upload
-- System processes import and displays success message with import log link
-- New or updated Release Flows appear in Summary list
+### 2. Release Flow Summary
 
-#### 3. View Release Flow Progress
-- User sees Release Flow list with SIT/UAT/PROD stage statuses
-- Can apply filters (by project, stage, status)
-- Clicks on Release Flow row to select it
-- Details section updates with Release Flow context
+- Displays Release Flows with stage-level SIT / UAT / PROD visibility
+- Shows active runtime scope and `Rundown Owner` in the summary table
+- Default list excludes archived flows
+- `[Implemented]` admin can enable archived visibility in management contexts
+- Upload entry remains visible according to permission model
 
-#### 4. View and Edit Task Input
-- Selected Release Flow Details shows Current Request
-- Task Details section shows tasks in that Request
-- User clicks "Edit" on a task in Pending or Ready_For_Execution state
-- Edit dialog opens with input parameters
-- User modifies parameters, sees validation feedback, saves
-- Task input updated; audit log entry created
+### 3. Release Flow Detail and Rundown Panel
 
-#### 5. Monitor Task Execution
-- Task status shows Executing
-- External engine (Jenkins/Ansible) runs job
-- Upon completion, external engine sends callback to Execution Callback Endpoint
-- System updates task status to Awaiting_Review with result summary
-- UI reflects updated status (polling or SSE-based refresh)
+- Stage tabs provide per-request context
+- Rundown Information panel shows current stage summary, runtime scope, rundown owner, and stage-level actions
+- Dependency summary is intentionally lighter and sits with the task area so `Blocked By` / `Blocks` troubleshooting stays near the actionable task table
+- Lifecycle actions:
+  - `Archive Rundown`
+  - `Restore Rundown` (admin)
+  - `Delete Permanently` (admin, archived only)
+- Rundown-control actions:
+  - `Start Deployment` (rundown owner or admin)
+  - `Mark as Failed` (rundown owner or admin)
+- Archived rundowns should display a clear read-only state
 
-#### 6. Review Result and Make Decision
-- User clicks "View Result" on completed task
-- Result modal shows result summary and raw logs
-- User makes decision: Approve | Reject | Rerun | Skip
-- Decision dialog opens; user confirms choice
-- System processes decision:
-  - **Approve**: Task marked Approved; Release Flow continues to next task
-  - **Reject**: Release Flow marked Rejected; all remaining tasks skipped
-  - **Rerun**: Task re-executes (new execution history entry)
-  - **Skip**: Task marked Skipped; Release Flow continues to next task
-- Audit log entry created
-- UI updates to reflect new state
+### 4. Task Table and Action Model
 
-#### 7. Review Audit Trail
-- User navigates to Audit Log view
-- Sees chronological list of actions: uploads, edits, decisions, config updates
-- Each entry shows operator, action type, timestamp, and context
+Expected columns include:
+- category / task identity
+- step information
+- execution type
+- critical flag
+- status
+- owner
+- `Blocked By`
+- `Blocks`
+- action cluster
 
-### State Visibility Rules (UI-Side)
+**Action behavior**
+- `Run` is always visible; enabled when execution is allowed
+- `Rerun` is always visible; enabled only for `Failed` / `Rejected`
+- `Review Decision` remains visible; enabled only when review actions are valid
+- Disabled actions should communicate the reason through tooltip or adjacent helper text
 
-**Available Actions by Task Status**:
-- Pending / Ready_For_Execution: Edit, View Result (if available), Decision (if applicable)
-- Executing: View Result (if streaming available; otherwise disabled)
-- Awaiting_Review: View Result, Decision (Approve/Reject/Rerun/Skip)
-- Approved / Rejected / Skipped: View Result (read-only); no actions
+**Manual vs AUTO behavior**
+- MANUAL run opens a run-oriented input/result dialog
+- AUTO run submits directly to external execution
 
-**Release Flow Details Visibility**:
-- Always visible: Project, Release ID, Current Stage, Review Status, Review Owner
-- Dynamic: Current Request ID updates as Release Flow progresses
+### 5. Execution History and Result Viewing
 
-**Decision Options Visibility**:
-- Approve / Reject / Rerun / Skip enabled only for tasks in Awaiting_Review state
-- Role check (TL/Admin) enforced server-side; UI hides actions for other roles
+- Task result UI should show latest execution summary and allow history review
+- AUTO attempts should surface external job URL
+- MANUAL attempts should display operator-entered result summary and logs
+
+### 6. Access Management View
+
+- Admin-only page
+- List fields:
+  - employee ID
+  - display name
+  - status
+  - assigned roles
+  - scope grants
+  - last login
+  - updated by / updated at
+- Actions:
+  - grant access
+  - edit roles
+  - suspend
+  - reactivate
+  - inspect audit context
+
+### 7. Configuration and Audit Views
+
+- Configuration is operational data with read-only or admin-edit behavior depending on permission
+- Audit is a read-only trace surface for authorized users
+- Access-governance actions should appear naturally in the same audit experience
 
 ---
 
 ## Workflow / Execution Design
 
-### Import Processing Workflow
+### 1. Product Entry Authorization
 
-**Trigger**: User uploads Excel file
+1. User submits login credentials
+2. Team Book authenticates enterprise identity
+3. Deployment Agent resolves local Access Grant
+4. System either:
+   - denies entry with access-state message, or
+   - creates session with authorization profile
+5. Session context includes effective permissions and applicable scope grants
+6. Frontend menus, routes, and API access use effective permissions from that profile
 
-**Steps**:
-1. Receive multipart file upload in Upload Controller
-2. Validate file format (XLSX)
-3. Parse Excel using fixed schema:
-   - Extract columns: Project, Release ID, Stage, Task Name, Task Type, Input Parameters
-   - Rows represent tasks
-4. Validate data:
-   - Required fields present
-   - Release ID present or apply fallback rule
-5. Group rows into Release Flows using grouping rule:
-   - [TBD] Grouping logic: by (Project, Release_ID) or another key
-6. For each Release Flow group:
-   - Lookup existing Release Flow by (Project, Release_ID)
-   - If not found: create new with initial state Pending
-   - If found and status allows: update with new/modified Requests and Tasks
-7. For each Request in Release Flow:
-   - Create new Request record with stage from Excel
-8. For each Task in Request:
-   - Create new Task record with status Pending and input_parameters
-9. Create single Audit Log entry summarizing the import
-10. Return success response with created/updated IDs and import summary
+### 2. Upload and Import Flow
 
-**Atomicity**: All-or-nothing at file level; validation failures abort entire import
+1. User selects stage and optional `Application / SNOW Group / Agent` scope, then uploads Excel file
+2. System validates worksheet, schema, and row data
+3. Import service groups rows into Release Flow / Request / Task structures
+4. Import service derives rundown owner from the imported task owner set or uploader
+5. System persists data atomically
+6. First eligible task is promoted to `Ready_For_Execution`
+7. Audit event is recorded
 
-**Error Handling**:
-- Schema validation errors: return 400 with detailed error list (row, column, error message)
-- Business rule violations: accumulate and return as part of validation response
+### 3. MANUAL Task Execution Flow
 
----
+1. User opens a runnable MANUAL task
+2. System shows task input and expected output context
+3. User performs the manual activity externally
+4. User records result in the UI
+5. System creates execution history
+6. Task moves to `Awaiting_Review`
+7. Reviewer applies decision
 
-### Task Execution Workflow (High-Level)
+### 4. AUTO Task Execution Flow
 
-**Trigger**: Task transitions to Ready_For_Execution (manual or auto)
+1. User triggers `Run` on an AUTO task
+2. System validates task state and execution type
+3. System creates execution history attempt
+4. System reads configuration and submits to Jenkins or Ansible
+5. System stores:
+   - submission outcome
+   - external execution identifier
+   - external job URL
+6. On submission failure, task becomes `Failed`
+7. On successful submission, task remains `Executing`
 
-**Steps**:
-1. Execution Service (external, or within Backend Orchestration) receives task execution request
-2. Read task from Task Management Service
-3. Read configuration values from Configuration Service
-4. Prepare execution payload: task_id, execution_id, input_parameters, config
-5. Call external engine (Jenkins/Ansible):
-   - POST job/playbook with payload
-   - Provide callback URL (Execution Callback Endpoint)
-   - External engine runs asynchronously
-6. Return 202 Accepted to caller (if called from API)
-7. [Async] External engine completes job
-8. [Async] External engine POSTs result to Execution Callback Endpoint with execution_id, status, result_summary, result_logs
-9. Execution Callback Handler validates and processes:
-   - Verify execution_id matches active Task Execution History
-   - Store result in Result Storage
-   - Update Task status → Awaiting_Review
-   - Update Task current_result_summary and latest_execution_id
-   - [If auto-progression] Trigger Decision Engine to auto-approve/continue
-10. Task state now reflects execution result; UI updates on poll/refresh
+**Current design note**
+- External completion ingestion is deferred; the system does not rely on callback handling in the current design baseline.
 
-**Failure Handling**:
-- Callback timeout: external engine implements retry; callback endpoint is idempotent
-- Invalid callback: return 400 Bad Request; external system should not retry invalid requests
-- Missing task/execution: return 404; external system should investigate correlation
+### 5. Review and Progression Flow
 
----
+1. Reviewer opens task in a reviewable state
+2. Reviewer chooses `Approve`, `Reject`, `Rerun`, or `Skip`
+3. System validates transition rules
+4. Decision engine updates task state
+5. Aggregation recomputes Request and Release Flow status
+6. Next eligible task is promoted when progression rules allow
+7. Audit event is recorded
 
-### Decision Processing Workflow
+### 6. Archive / Restore / Purge Flow
 
-**Trigger**: User submits Decision action (Approve/Reject/Rerun/Skip)
+1. User archives a stage rundown
+2. Archived request disappears from default views and becomes read-only
+3. If no active requests remain, the parent Release Flow is effectively archived from default views
+4. Admin may restore the archived request
+5. Admin may permanently purge an already archived request
 
-**Steps**:
-1. UI collects decision choice and submits to Decision Endpoint
-2. Decision Controller validates:
-   - User role (TL only)
-   - Task exists and current state is valid for the decision (Awaiting_Review for approve/reject; Rejected/Failed for rerun; Pending/Ready_For_Execution for skip)
-3. Decision Engine processes:
-   - **Approve**:
-     - Update Task status → Approved
-     - Determine next task in Request
-     - If next task exists: update it to Ready_For_Execution or trigger execution
-     - If no next task: update Request status → Completed
-     - Determine if all Requests in stage completed; if yes, advance Release Flow stage
-   - **Reject**:
-     - Update Task status → Rejected
-     - Update Release Flow status → Rejected
-     - Skip all remaining tasks in Release Flow
-   - **Rerun** (only from `Rejected` or `Failed` state):
-     - Create new Task Execution History record (attempt_number + 1)
-     - Update Task status → Ready_For_Execution
-     - Execution pipeline picks up the task again (auto-trigger or manual record-result)
-   - **Skip**:
-     - Update Task status → Skipped
-     - Determine next task; update similarly to Approve
-4. Create Audit Log entry for decision
-5. Return updated Release Flow state to UI
-6. UI refreshes to display new state
+### 7. Dependency Handling
 
-**Idempotency**: Same decision submitted twice should result in idempotent operation; leverage execution_id as idempotency key for reruns
+- Template maintenance and imported metadata may define predecessor relationships
+- Release detail derives `Blocked By` and `Blocks` for visibility
+- Missing references should be shown as informational gaps, not fatal runtime errors
+- Execution order is still primarily governed by workflow progression rules in MVP
 
 ---
 
 ## Integration Design
 
-### Jenkins/Ansible Execution Integration
+### Team Book
 
-**Purpose**: Orchestrate external job execution and receive results
+**Purpose**
+- Authenticate enterprise identity
 
-**Interaction Pattern**:
-- Synchronous request initiation (Job Submission API)
-- Asynchronous result delivery (Execution Callback Webhook)
+**Pattern**
+- Interface-based provider with stub implementation for dev/test
 
-**Request Initiation** (Backend → Jenkins/Ansible):
-- Endpoint: `POST https://jenkins.example.com/api/job` or equivalent
-- Payload:
-  ```json
-  {
-    "jobName": "deploy-app",
-    "parameters": { "app": "myapp", "version": "1.2.3" },
-    "callbackUrl": "https://deployment-agent.wwa.com/api/deployment-agent/callback/execution",
-    "executionId": "exec-12345"
-  }
-  ```
-- Auth: [TBD] API key or OAuth token (stored in secret store)
-- Success: Returns job ID and 202 Accepted
+**Failure Behavior**
+- Invalid credentials return `401`
+- Provider-level failures should surface as authentication failure with server-side diagnostics
 
-**Result Callback** (Jenkins/Ansible → Backend):
-- Endpoint: `POST /api/deployment-agent/callback/execution`
-- Payload:
-  ```json
-  {
-    "executionId": "exec-12345",
-    "taskId": "task-789",
-    "status": "Completed | Failed | Timed_Out",
-    "resultSummary": { "output": "Deployment succeeded", "returnCode": 0 },
-    "resultLogs": "full console output as string"
-  }
-  ```
-- Auth: Request validation (TBD: signed token, API key, mutual TLS)
-- Idempotency: Use executionId; repeated callbacks result in 200 OK (no duplicate processing)
-- Response: `{ status: "accepted", message: "Result recorded" }` (200 OK)
+### Jenkins
 
-### Secret / Credential Handling
+**Purpose**
+- Execute AUTO tasks
 
-**Current Scope**: Open; implementation to finalize
+**Pattern**
+- Synchronous POST submission, fire-and-forget
 
-**Assumptions**:
-- Jenkins credentials (API key) stored in external secret store (Vault, platform secrets, env vars)
-- Ansible credentials similarly managed
-- Backend loads credentials at startup or on-demand via envelope pattern
-- Credentials never logged or exposed in audits
+**Credentials**
+- Basic Auth values loaded from configuration
 
-**Design Note**: Detailed secret access pattern deferred to implementation phase; likely via Spring Cloud Config or a secrets management adapter
+**Failure / Retry Behavior**
+- Submission failures are handled inside Deployment Agent and mark task submission failed
+- Downstream remote-job retries are out of scope for Deployment Agent
 
-### Configuration Management Integration
+### Ansible Tower
 
-**Purpose**: Centralize system configuration for operational flexibility
+**Purpose**
+- Execute AUTO tasks
 
-**Interaction Pattern**: Synchronous read/write via Configuration Service
+**Pattern**
+- Synchronous POST submission, fire-and-forget
 
-**Configuration Retrieval** (Domain Service → Config Service):
-- When Execution Service prepares a job submission, it reads Jenkins URL, Ansible URL from Configuration Service
-- Config Service returns current value; caching layer (optional) reduces repeated DB queries
-- If config missing or invalid: default behavior or error (TBD)
+**Credentials**
+- Bearer token loaded from configuration
 
-**Configuration Update** (Admin UI → Config Service):
-- Admin submits updated config value via Configuration Endpoint
-- Config Service validates format (URI, HTTPS requirement, etc.)
-- Persists to Configuration Item table
-- Applies immediately to future executions
+**Failure / Retry Behavior**
+- Same as Jenkins
+
+### Access-Management Directory Search `[Open]`
+
+**Purpose**
+- Optionally allow admins to search enterprise users who do not yet have a grant
+
+**Pattern**
+- Not finalized
+
+**Design Note**
+- If introduced, this remains an identity lookup integration, not a second authorization source of truth
 
 ---
 
@@ -1000,70 +789,37 @@ Execution sequencing in MVP is controlled solely by `step_seq` within `task_grou
 
 ### Access Control
 
-**Role-Based Access Control (RBAC)**:
-- **Developer**: Can upload files, edit own tasks, view Release Flows/results
-- **TL** (Team Lead): Can view all Release Flows, edit all tasks, make decisions (Approve/Reject/Rerun/Skip)
-- **DevOps Admin**: Full access including configuration management
-- **Audit/Management**: Read-only access to audit logs and Release Flow summaries
-
-**Enforcement**:
-- Frontend (Vue 3) enforces visibility via conditional rendering (usability only)
-- Backend (Fastify) enforces authorization in every handler via `requireRole()` middleware
-- Authorization rule examples:
-  - Edit Task: `requireRole(req, "task_edit", "TL")`
-  - Update Config: `requireRole(req, "config_update", "DEVOPS_ADMIN")`
-  - View Audit: `requireRole(req, "audit_log_view", "AUDIT", "MANAGEMENT", "DEVOPS_ADMIN")`
-
-**Assumption**: User identity and roles available from WWA authentication context (automatically injected by platform)
+- Team Book authenticates identity
+- Access Grants authorize product entry
+- Effective permissions drive menus, routes, and API access
+- Admin management actions are explicit and auditable
+- Archive and purge operations require stronger permission than standard workflow navigation
 
 ### Secrets Handling
 
-**Approach**: [Assumption] Envelope pattern with external secret store
+- Current MVP stores Jenkins / Ansible credentials in configuration records
+- Sensitive values must be masked in UI and excluded from audit payloads where necessary
+- This is an MVP tradeoff rather than a long-term secrets strategy
 
-**Details**:
-- Credentials (Jenkins API key, Ansible token) never stored in Oracle
-- At runtime, Backend retrieves credentials from secret store when preparing job submission
-- Callback payloads do not contain credentials; caller adds credentials to request headers
-- Audit logs may reference secret names (e.g., "jenkins_api_key") but never values
+### Audit Design
 
-**Implementation TBD**: Spring Cloud Config, HashiCorp Vault, platform-managed secrets, or environment variables
+Audit should record at least:
+- upload / import
+- task edit
+- manual result record
+- AUTO submit
+- approve / reject / rerun / skip
+- rundown archive / restore / purge
+- config update
+- access grant create / update / suspend / reactivate
 
-### Audit Logging
+### Reliability and Observability
 
-**What is Logged**:
-- upload action: File name, line count, created/updated counts, operator
-- edit action: Task ID, changed fields, old/new values, operator
-- view_result action: Task ID, timestamp, operator
-- Approve/Reject/Rerun/Skip actions: Task ID, decision, operator, timestamp
-- config_update action: Config key, old/new value, operator
-
-**Where**: Oracle Audit Log Entry table (append-only)
-
-**When**: Immediately after action completes successfully
-
-**Immutability**: No updates or deletes; audit log is append-only
-
-**Retrieval**: Audit Log controller provides role-gated access (Audit/Management users see all; others see own actions or context-relevant)
-
-### Resilience & Reliability
-
-**Retries**:
-- Callback-driven: External engine responsible for retries on network failure
-- Idempotency key (executionId): Repeated callbacks with same ID result in same state (no duplicates)
-
-**Timeouts**:
-- Callback endpoint: 30 seconds (configurable)
-- Job submission to Jenkins/Ansible: 30 seconds (configurable)
-- Task result retrieval: 5 seconds (can fail if result not ready; client retries)
-
-**Circuit Breakers** [Optional, future]:
-- If Jenkins/Ansible callback endpoint unreachable: log error, optionally alert; do not block task
-
-**Observability**:
-- Log all callback attempts (success, failure, correlation info)
-- Log all decision outcomes
-- Structured logging for stacktraces and domain context
-- Audit logs serve as compliance/traceability trail
+- Optimistic locking protects concurrent task / request / flow mutation
+- Import remains all-or-nothing
+- Submission adapters use bounded network timeouts
+- Structured logs should capture submission target, execution identifiers, and failure context
+- Audit trail is part of operational observability, not just compliance history
 
 ---
 
@@ -1071,60 +827,31 @@ Execution sequencing in MVP is controlled solely by `step_seq` within `task_grou
 
 ### Input Validation
 
-**File Upload**:
-- File must be XLSX (MIME type check + file extension check)
-- File size < 10MB (example; to be finalized)
-- Sheet must contain expected columns
+- Login requires non-blank enterprise credentials
+- Upload requires stage and valid Excel file
+- Access Grant writes require valid role assignment and legal status transitions
+- Task mutation requires valid current state and permitted actor
+- Configuration writes require per-key validation
 
-**Excel Data**:
-- Required fields present in each row
-- Data types match schema (e.g., Stage must be SIT/UAT/PROD)
-- Release ID present or fallback rule applied
+### Workflow-Level Validation
 
-**Task Input Edit**:
-- Input parameters match declared schema for task type
-- Required fields present
-- Type validation (e.g., numeric fields are numeric)
-- Custom business rule validation (e.g., version format)
+- No task edits on archived rundowns
+- No rerun unless task is `Failed` or `Rejected`
+- No review decision unless task is in a reviewable state
+- No purge unless the target rundown is already archived
 
-**Configuration Update**:
-- Configuration value matches format rule (e.g., valid URI for URLs)
-- HTTPS enforced if required
-- No null values for required config items
+### Integration Failure Handling
 
-**Decision Submission**:
-- Decision value is one of: Approve, Reject, Rerun, Skip
-- Task is in Awaiting_Review state
-- User role allows decision
+- Jenkins / Ansible submission failure marks the attempt and task as failed
+- Missing required configuration blocks AUTO submission with a clear validation / configuration error
+- Team Book provider failures block login
 
-### Error Handling & User Feedback
+### User-Facing Error Messaging Expectations
 
-**Validation Errors**:
-- Return 400 Bad Request with structured error response
-- Example: `{ success: false, errors: [{ field: "stage", message: "Invalid stage; must be SIT/UAT/PROD" }] }`
-- User sees clear, actionable error messages in UI
-
-**Authorization Errors**:
-- Return 403 Forbidden if user lacks required role
-- User sees "You do not have permission to perform this action"
-
-**Not Found Errors**:
-- Return 404 if Release Flow / Task / Config not found
-- User sees "The requested item does not exist" or navigated away before requesting
-
-**Conflict Errors**:
-- Return 409 if state conflict (e.g., task already completed, cannot decide again)
-- Design: Idempotency key ensures repeated decisions are safe
-
-**Server Errors**:
-- Return 500 with structured error; log full stacktrace server-side
-- User sees "An unexpected error occurred; please try again or contact support"
-
-**Callback Errors**:
-- 400 Bad Request: Invalid payload structure or missing correlation
-- 404 Not Found: Execution ID does not match any active task
-- 409 Conflict: Task already completed or in inconsistent state
-- 500 Server Error: Unexpected issue; callback source should retry
+- Separate authentication failure from authorization failure
+- Explain disabled actions where possible
+- Return actionable validation feedback for upload, configuration, and admin grant edits
+- Avoid generic error messages when the system knows the exact blocked condition
 
 ---
 
@@ -1132,56 +859,34 @@ Execution sequencing in MVP is controlled solely by `step_seq` within `task_grou
 
 ### Key Test Areas
 
-1. **Import Service**:
-   - Valid Excel parsing and Release Flow creation
-   - Invalid/malformed Excel rejection with appropriate errors
-   - Duplicate import (same file uploaded twice) updates existing records
-   - Atomic failure on validation error (no partial import)
-
-2. **Release Flow State Aggregation**:
-   - Task state changes propagate to Request and Release Flow summaries
-   - Mixed task states aggregate correctly (Running > Completed > Pending)
-   - Stage status reflects Request statuses correctly
-
-3. **Task Management**:
-   - Task input edit allowed only in Pending/Ready_For_Execution states
-   - Task status transitions follow allowed paths
-   - New execution history records created on rerun
-
-4. **Execution Callback**:
-   - Callback with valid correlation updates task and result
-   - Callback with invalid execution_id returns 404
-   - Duplicate callback (same execution_id) handled idempotently
-   - Task status transitions to Awaiting_Review after callback
-
-5. **Decision Processing**:
-   - Approve advances Release Flow to next task
-   - Reject marks Release Flow as rejected and skips remaining tasks
-   - Rerun creates new execution history and re-executes task
-   - Skip skips current task without executing
-
-6. **Audit Logging**:
-   - All supported actions create audit log entries
-   - Audit log is append-only (immutability)
-   - Operator identity captured correctly
-
-7. **Authorization**:
-   - Roles enforce access to sensitive endpoints (configuration update, decisions)
-   - Cross-tenant isolation (one Release Flow cannot access another's data)
+1. Enterprise login and session restore
+2. Access Grant create / update / suspend / reactivate
+3. Deny-by-default entry behavior
+4. Upload validation and atomic import
+5. Release Flow aggregation and archive lifecycle
+6. Task edit, run, manual result recording, and execution history behavior
+7. Decision transitions and progression
+8. AUTO submission integration error handling
+9. Configuration validation and masking
+10. Audit record creation and retrieval
 
 ### Critical Test Scenarios
 
-- **End-to-End Workflow**: Upload → Release Flow creation → Task execution → Callback → Decision → Progression
-- **Rerun After Failure**: Task fails, decision Rerun, new execution created, succeeds
-- **Reject Cascade**: Task rejected, all subsequent tasks in Release Flow marked skipped
-- **Concurrent Decisions**: Two users attempt to decide on same task simultaneously (only one wins; second gets conflict)
-- **Long-Running Callback**: Callback delayed >30 seconds; retry mechanism handles gracefully
+- Login succeeds but product access is denied because no grant exists
+- Suspended user cannot enter Deployment Agent
+- Access grant is created and takes effect on next login
+- Upload creates a new Release Flow and first executable task
+- MANUAL task run -> result record -> review decision -> progression
+- AUTO task submission succeeds and stores external job link
+- Failed task rerun creates a new execution history attempt
+- Archived rundown is hidden by default, restorable by admin, and purgeable only after archive
 
 ### State Transition Coverage
 
-- All valid transitions (Pending → Ready → Executing → Awaiting_Review → Approved/Rejected/Skipped verified)
-- Invalid transitions rejected with error (e.g., cannot transition directly from Pending to Rejected)
-- Rerun loop test: Can task be rerun multiple times? (Yes, new execution history records created)
+- All allowed task transitions
+- All invalid decision / rerun combinations
+- Access Grant lifecycle transitions
+- Archive -> restore -> purge restrictions
 
 ---
 
@@ -1189,83 +894,43 @@ Execution sequencing in MVP is controlled solely by `step_seq` within `task_grou
 
 ### Design Risks
 
-1. **Callback Reliability**: Depends on external engine retry logic. If Jenkins/Ansible does not retry failed callbacks, tasks may hang.
-   - **Mitigation**: Document callback retry requirements; monitor for hanging tasks; implement polling fallback if needed (future).
+1. **Auth contract drift**
+   - Phase 1 needs a stable contract for `roles` vs `permissions`
+   - Without it, frontend and backend authorization logic can diverge
 
-2. **State Consistency Under Concurrent Writes**: Multiple users making decisions on same Release Flow simultaneously.
-   - **Mitigation**: Optimistic locking (version field) or database locks on Update operations; decision endpoints validate state before update.
+2. **Directory search scope ambiguity**
+   - Access Management UX changes significantly depending on whether admins can search only grants or also enterprise users without grants
 
-3. **audit Log Growth**: Append-only audit logs may grow unbounded over time.
-   - **Mitigation**: Implement archival/retention policy; index on timestamp for efficient purge; consider partitioning.
+3. **MVP secret storage tradeoff**
+   - Storing integration credentials in configuration records is operationally simple but not ideal for long-term secret hygiene
 
-4. **Excel Schema Flexibility**: Fixed Excel schema limits user flexibility; changes require code updates.
-   - **Mitigation**: Document schema clearly; plan for dynamic schema in future version.
+4. **AUTO completion gap**
+   - Without callback/polling, AUTO tasks may remain in `Executing` after successful submission
 
-5. **Secrets Storage**: Currently unresolved; default behavior may be insecure.
-   - **Mitigation**: Confirm secret store technology during implementation; do not use environment variables in production without encryption.
+5. **Dependency semantics**
+   - Showing dependency links without making them authoritative may confuse users who expect hard gating
 
 ### Notable Tradeoffs
 
 | Tradeoff | Choice | Rationale |
-|---|---|---|
-| **File-level vs. Row-level Import Atomicity** | File-level atomic | Simpler to reason about; prevents partial imports causing confusion |
-| **Manual vs. Auto Task Execution** | [Assumption] Auto on Ready_For_Execution | Reduces clicks; design assumes auto but can be switched to manual via toggle |
-| **Task Input Edi Permission** | TL / DevOps Admin | Prevents developers from re-importing if data incorrect; allows controlled editing by leads |
-| **Callback Sync vs. Async** | Synchronous POST | Simpler integration; allows immediate response to caller; acceptable load for MVP |
-| **Single Review Owner** | Assumption for MVP | Simpler authorization; group-based review deferred to future |
-| **Oracle vs. Externalized Result Storage** | Oracle (via CLOB or dedicated table) | Simpler deployment; no external dependencies; acceptable for MVP volumes |
+|----------|--------|-----------|
+| Product access model | External identity + local authorization | Avoids building a new account system while preserving product control |
+| Access Grant lifecycle | Suspend/reactivate, not delete | Preserves authorization history and supports restore |
+| AUTO execution | Fire-and-forget submission | Keeps MVP integration simple and auditable |
+| Dependency handling | Informational first | Improves visibility now without forcing DAG execution redesign |
+| Action visibility | Visible-but-disabled controls | Improves discoverability and reduces hidden-state confusion |
 
 ---
 
 ## Open Questions
 
-1. **Excel Template Schema**: What are the exact mandatory fields, optional fields, and data types?
-   - Impact: Import Service validation implementation
-   - **Stakeholder**: Product / Requirements team
-   - **Deliverable**: JSON Schema or spreadsheet with field definitions
-
-2. **Release Flow Grouping Rule**: What criteria determine when to create a new Release Flow vs. update existing?
-   - Example: By (Project, Release_ID) or by (Project, Release_ID, Stage)?
-   - **Stakeholder**: Product / Domain expert
-   - **Deliverable**: Formal rule specification
-
-3. **Release ID Fallback Rule**: If Release ID is missing in Excel, how should it be handled?
-   - Options: Generate UUID, use Row Number, require manual input, use Project + Date
-   - **Stakeholder**: Product
-   - **Deliverable**: Explicit fallback rule
-
-4. **Auto-Execution Confirmation**: Should tasks auto-transition from Ready_For_Execution → Executing, or require manual trigger?
-   - If manual: Need UI button and endpoint for "Execute Task"
-   - **Stakeholder**: Product / UX
-   - **Deliverable**: Boolean flag + UI/backend implementation if manual
-
-5. **Secret Store Technology**: Vault, environment variables, or platform-managed secrets?
-   - **Stakeholder**: DevOps / Infrastructure team
-   - **Deliverable**: Secret store integration design (out of scope for initial design)
-
-6. **Configuration Update Semantics**: Do configuration changes apply immediately, or at task boundary?
-   - **Stakeholder**: Product / DevOps
-   - **Deliverable**: Policy clarification
-
-7. **Result Payload Format**: Are result_summary and result_logs fixed JSON structures, or flexible?
-   - **Stakeholder**: Integration team (Jenkins/Ansible)
-   - **Deliverable**: Result schema specification and callback contract
-
-8. **Stage Tie-Breaking**: If stage has mixed state (some tasks Done, some Failed, some Rejected), what priority applies?
-   - Current assumption: Running > Failed > Rejected > Done > Pending
-   - **Stakeholder**: Product
-   - **Deliverable**: Confirmation or revised tie-breaking rule
-
-9. **User Role Reuse from WWA**: Can we assume user roles (Developer, TL, Admin) and identity are available from WWA authentication context?
-   - **Stakeholder**: Platform team
-   - **Deliverable**: Confirmation of available user context fields
-
-10. **Oracle Schema Finalization**: Should we use a separate result table or CLOB within Task Execution History?
-    - **Stakeholder**: Database / DBA team
-    - **Deliverable**: Oracle DDL and indexing strategy
+1. Should a later phase expand Access Management beyond the current existing-grants-only search model to include enterprise users without grants?
+2. Should Access Grant role edits require a mandatory admin note?
+3. Should a later phase extend authorization beyond the current product-entry grant plus `Application + SNOW Group` scopes into agent- or environment-scoped control?
+4. Should AUTO completion ingestion be addressed by callback, polling, or explicit manual completion in the next phase?
 
 ---
 
 ## Summary
 
-This design document translates the architecture into actionable module designs, API contracts, data models, and workflows. It establishes clear boundaries between frontend, backend, and persistence layers, and defines state transitions and validation rules necessary for implementation. Key areas requiring confirmation before development (Excel schema, grouping rules, secret store, auto-execution behavior) are surfaced as open questions and pre-design deliverables. The design is structured to support the core MVP workflow, with clear extension points for future enhancements (dynamic templates, advanced audit filtering, real-time notifications, etc.).
+The current Deployment Agent design centers on controlled workflow execution, explicit human review, strong auditability, and operational clarity. Phase 1 extends that foundation by introducing local Access Grants, deny-by-default product entry, and an admin-managed Access Management capability, while preserving the existing separation between enterprise identity and product authorization. The design is intentionally explicit about current MVP tradeoffs, especially around AUTO execution completion and dependency handling, so follow-on implementation work can proceed with fewer hidden assumptions.

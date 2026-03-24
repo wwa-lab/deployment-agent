@@ -25,7 +25,10 @@ import java.util.UUID;
         @Index(name = "IDX_ALE_TIMESTAMP", columnList = "timestamp"),
         @Index(name = "IDX_ALE_OPERATOR", columnList = "operator_id"),
         @Index(name = "IDX_ALE_ACTION_TYPE", columnList = "action_type"),
-        @Index(name = "IDX_ALE_RELEASE_FLOW", columnList = "release_flow_id")
+        @Index(name = "IDX_ALE_RELEASE_FLOW", columnList = "release_flow_id"),
+        @Index(name = "IDX_ALE_APPLICATION", columnList = "application"),
+        @Index(name = "IDX_ALE_SNOW_GROUP", columnList = "snow_group"),
+        @Index(name = "IDX_ALE_AGENT", columnList = "agent")
     }
 )
 @Getter
@@ -61,6 +64,16 @@ public class AuditLogEntry {
     /** Soft reference to Task (nullable – no FK constraint). */
     @Column(name = "task_id", length = 36)
     private String taskId;
+
+    /** Optional scope fields for multi-tenant-ish filtering and traceability. */
+    @Column(name = "application", length = 255)
+    private String application;
+
+    @Column(name = "snow_group", length = 255)
+    private String snowGroup;
+
+    @Column(name = "agent", length = 255)
+    private String agent;
 
     /**
      * Arbitrary JSON context for the action.

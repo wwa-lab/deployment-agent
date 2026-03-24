@@ -16,21 +16,51 @@ public interface RequestRepository extends JpaRepository<Request, String> {
      * Fetch all Requests for a Release Flow, eagerly loading their Tasks.
      * Used by aggregation and detail view.
      */
-    @Query("SELECT r FROM Request r LEFT JOIN FETCH r.tasks WHERE r.releaseFlow.id = :releaseFlowId")
-    List<Request> findByReleaseFlowIdWithTasks(@Param("releaseFlowId") String releaseFlowId);
+    @Query("""
+            SELECT DISTINCT r FROM Request r
+            LEFT JOIN FETCH r.tasks
+            WHERE r.releaseFlow.id = :releaseFlowId
+              AND (:includeArchived = TRUE OR r.archivedAt IS NULL)
+            """)
+    List<Request> findByReleaseFlowIdWithTasks(@Param("releaseFlowId") String releaseFlowId,
+                                               @Param("includeArchived") boolean includeArchived);
 
     /** Fetch all Requests for a Release Flow (no task loading). */
-    List<Request> findByReleaseFlowId(String releaseFlowId);
+    List<Request> findByReleaseFlowIdAndArchivedAtIsNull(String releaseFlowId);
 
-    @Query("SELECT r FROM Request r WHERE r.releaseFlow.id IN :releaseFlowIds")
-    List<Request> findByReleaseFlowIds(@Param("releaseFlowIds") List<String> releaseFlowIds);
+    default List<Request> findByReleaseFlowId(String releaseFlowId) {
+        return findByReleaseFlowIdAndArchivedAtIsNull(releaseFlowId);
+    }
+
+    @Query("""
+            SELECT r FROM Request r
+            WHERE r.releaseFlow.id IN :releaseFlowIds
+              AND (:includeArchived = TRUE OR r.archivedAt IS NULL)
+            """)
+    List<Request> findByReleaseFlowIds(@Param("releaseFlowIds") List<String> releaseFlowIds,
+                                       @Param("includeArchived") boolean includeArchived);
 
     /** Find existing Request for a specific release flow and stage – used during import upsert. */
-    Optional<Request> findByReleaseFlowIdAndStage(String releaseFlowId, Stage stage);
+    Optional<Request> findByReleaseFlowIdAndStageAndArchivedAtIsNull(String releaseFlowId, Stage stage);
 
     Optional<Request> findByIdAndReleaseFlowId(String id, String releaseFlowId);
 
-    @Query("SELECT r FROM Request r LEFT JOIN FETCH r.tasks WHERE r.id = :requestId AND r.releaseFlow.id = :releaseFlowId")
+    @Query("""
+            SELECT DISTINCT r FROM Request r
+            LEFT JOIN FETCH r.tasks
+            WHERE r.id = :requestId
+              AND r.releaseFlow.id = :releaseFlowId
+              AND r.archivedAt IS NULL
+            """)
+    Optional<Request> findActiveByIdAndReleaseFlowIdWithTasks(@Param("requestId") String requestId,
+                                                              @Param("releaseFlowId") String releaseFlowId);
+
+    @Query("""
+            SELECT DISTINCT r FROM Request r
+            LEFT JOIN FETCH r.tasks
+            WHERE r.id = :requestId
+              AND r.releaseFlow.id = :releaseFlowId
+            """)
     Optional<Request> findByIdAndReleaseFlowIdWithTasks(@Param("requestId") String requestId,
                                                         @Param("releaseFlowId") String releaseFlowId);
 }

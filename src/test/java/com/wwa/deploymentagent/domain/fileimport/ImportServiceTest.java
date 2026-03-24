@@ -119,11 +119,29 @@ class ImportServiceTest {
                 });
     }
 
+    @Test
+    @DisplayName("single task owner becomes the default rundown owner on import")
+    void importFile_singleTaskOwner_setsRequestOwner() throws IOException {
+        byte[] xlsx = buildXlsx("PROJ-C", "Project C", "TG-01", "Task C", 1, "step-1", "MANUAL", "alice");
+
+        ImportResult result = importService.importFile(xlsx, Stage.SIT, developer);
+
+        var requests = requestRepository.findByReleaseFlowId(result.releaseFlowId());
+        assertThat(requests).hasSize(1);
+        assertThat(requests.get(0).getOwner()).isEqualTo("alice");
+    }
+
     // ─── XLSX builder helpers ─────────────────────────────────────────────────
 
     private byte[] buildXlsx(String projectId, String projectName,
                               String taskGroupId, String taskGroupName,
                               int stepSeq, String step, String execType) throws IOException {
+        return buildXlsx(projectId, projectName, taskGroupId, taskGroupName, stepSeq, step, execType, null);
+    }
+
+    private byte[] buildXlsx(String projectId, String projectName,
+                              String taskGroupId, String taskGroupName,
+                              int stepSeq, String step, String execType, String owner) throws IOException {
         try (Workbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet(ExcelParserService.SHEET_NAME);
 
@@ -138,6 +156,9 @@ class ImportServiceTest {
             data.createCell(4).setCellValue(String.valueOf(stepSeq));
             data.createCell(5).setCellValue(step);
             data.createCell(6).setCellValue(execType);
+            if (owner != null) {
+                data.createCell(10).setCellValue(owner);
+            }
             // remaining columns left blank (optional)
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();

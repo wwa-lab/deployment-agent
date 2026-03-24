@@ -18,37 +18,35 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
      * Look up an existing Release Flow by grouping key: (projectId, normalizedReleaseId).
      * Used during import to determine whether to create a new RF or attach to existing one.
      */
-    Optional<ReleaseFlow> findByProjectIdAndNormalizedReleaseId(String projectId, String normalizedReleaseId);
+    Optional<ReleaseFlow> findByProjectIdAndNormalizedReleaseIdAndArchivedAtIsNull(
+            String projectId, String normalizedReleaseId);
 
-    // ─── Filtered paginated queries ──────────────────────────────────────────
-
-    Page<ReleaseFlow> findByProjectId(String projectId, Pageable pageable);
-
-    Page<ReleaseFlow> findByFlowStatus(FlowStatus flowStatus, Pageable pageable);
-
-    Page<ReleaseFlow> findByCurrentStage(Stage currentStage, Pageable pageable);
-
-    Page<ReleaseFlow> findByProjectIdAndFlowStatus(String projectId, FlowStatus flowStatus, Pageable pageable);
-
-    Page<ReleaseFlow> findByProjectIdAndCurrentStage(String projectId, Stage currentStage, Pageable pageable);
-
-    Page<ReleaseFlow> findByFlowStatusAndCurrentStage(FlowStatus flowStatus, Stage currentStage, Pageable pageable);
-
-    Page<ReleaseFlow> findByProjectIdAndFlowStatusAndCurrentStage(
-            String projectId, FlowStatus flowStatus, Stage currentStage, Pageable pageable);
+    @Query("""
+            SELECT rf FROM ReleaseFlow rf
+            WHERE (:projectId IS NULL OR rf.projectId = :projectId)
+              AND (:flowStatus IS NULL OR rf.flowStatus = :flowStatus)
+              AND (:stage IS NULL OR rf.currentStage = :stage)
+              AND (:includeArchived = TRUE OR rf.archivedAt IS NULL)
+            """)
+    Page<ReleaseFlow> search(@Param("projectId") String projectId,
+                             @Param("flowStatus") FlowStatus flowStatus,
+                             @Param("stage") Stage stage,
+                             @Param("includeArchived") boolean includeArchived,
+                             Pageable pageable);
 
     /** Look up the first (active) Release Flow for a given projectId – used during import. */
-    Optional<ReleaseFlow> findFirstByProjectId(String projectId);
+    Optional<ReleaseFlow> findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(String projectId);
+
+    default Optional<ReleaseFlow> findFirstByProjectId(String projectId) {
+        return findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId);
+    }
+
+    Optional<ReleaseFlow> findByIdAndArchivedAtIsNull(String id);
 
     /**
      * Load a Release Flow with its full request+task hierarchy in a single query.
      * Uses DISTINCT to avoid duplicates from multiple JOIN FETCH paths.
      */
-    @Query("SELECT DISTINCT rf FROM ReleaseFlow rf " +
-           "LEFT JOIN FETCH rf.requests " +
-           "WHERE rf.id = :id")
-    Optional<ReleaseFlow> findByIdWithFullHierarchy(@Param("id") String id);
-
     /** Count of existing Release Flows for a given projectId – used for seq generation. */
     @Query("SELECT COUNT(rf) FROM ReleaseFlow rf WHERE rf.projectId = :projectId")
     long countByProjectId(@Param("projectId") String projectId);

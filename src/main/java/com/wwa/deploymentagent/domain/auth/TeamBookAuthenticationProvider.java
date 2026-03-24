@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.auth;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -16,4 +17,12 @@ public interface TeamBookAuthenticationProvider {
      * @return employee details if authentication succeeds, empty otherwise
      */
     Optional<TeamBookEmployee> authenticate(String employeeId, String password);
+
+    default Optional<TeamBookEmployee> findByEmployeeId(String employeeId) {
+        return Optional.empty();
+    }
+
+    default List<TeamBookEmployee> listKnownEmployees() {
+        return List.of();
+    }
 }

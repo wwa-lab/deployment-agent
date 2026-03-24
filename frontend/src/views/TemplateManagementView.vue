@@ -309,6 +309,13 @@ const sites = computed(() =>
   Array.from(new Set(templates.value.map((template) => template.site))).sort(),
 )
 
+const activeScopeFilters = computed(() => ({
+  agent: selectedAgent.value === 'All' ? undefined : selectedAgent.value,
+  snowGroup: selectedSnowGroup.value === 'All' ? undefined : selectedSnowGroup.value,
+  application: selectedApplication.value === 'All' ? undefined : selectedApplication.value,
+  site: selectedSite.value === 'All' ? undefined : selectedSite.value,
+}))
+
 const filteredTemplates = computed(() => {
   const keyword = search.value.trim().toLowerCase()
 
@@ -342,6 +349,13 @@ const filteredTemplates = computed(() => {
     )
   })
 })
+
+const filteredScopeSummary = computed(() => ({
+  application: activeScopeFilters.value.application ?? 'All Applications',
+  snowGroup: activeScopeFilters.value.snowGroup ?? 'All SNOW Groups',
+  agent: activeScopeFilters.value.agent ?? 'All Agents',
+  site: activeScopeFilters.value.site ?? 'All Sites',
+}))
 
 const selectedTemplate = computed(() => {
   const explicitSelection = filteredTemplates.value.find(
@@ -377,6 +391,107 @@ const selectedTemplateActivityCategories = computed(() =>
 )
 
 const selectedTemplateNextStep = computed(() => (selectedTemplate.value?.tasks.length ?? 0) + 1)
+
+const createTemplateDefaults = computed<Partial<CreateTemplateDraft> | undefined>(() => {
+  if (editingTemplate.value) {
+    return {
+      name: editingTemplate.value.name,
+      version: editingTemplate.value.version,
+      agent: editingTemplate.value.agent,
+      category: editingTemplate.value.category,
+      snowGroup: editingTemplate.value.snowGroup,
+      application: editingTemplate.value.application,
+      site: editingTemplate.value.site,
+      estDurationMinutes: parseDurationToMinutes(editingTemplate.value.estDuration),
+      description: editingTemplate.value.description,
+      source: 'manual',
+    }
+  }
+
+  return {
+    agent: activeScopeFilters.value.agent ?? agents.value[0] ?? 'Deployment Agent',
+    snowGroup: activeScopeFilters.value.snowGroup ?? snowGroups.value[0] ?? '',
+    application: activeScopeFilters.value.application ?? applications.value[0] ?? '',
+    site: activeScopeFilters.value.site ?? sites.value[0] ?? '',
+    category: selectedCategory.value === 'All' ? categories.value[0] ?? 'development' : selectedCategory.value,
+    version: '1.0',
+    estDurationMinutes: 60,
+    source: 'manual',
+  }
+})
+
+function parseDependencyList(value?: string): string[] {
+  if (!value) return []
+
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  )
+}
+
+function serializeDependencyList(dependencies: string[]): string | undefined {
+  const normalized = Array.from(
+    new Set(
+      dependencies
+        .map((dependency) => dependency.trim())
+        .filter(Boolean),
+    ),
+  )
+
+  return normalized.length > 0 ? normalized.join(', ') : undefined
+}
+
+function replaceDependencyReference(
+  dependencies: string | undefined,
+  previousTaskName: string,
+  nextTaskName?: string,
+): string | undefined {
+  const nextDependencies = parseDependencyList(dependencies).flatMap((dependency) => {
+    if (dependency !== previousTaskName) return [dependency]
+    return nextTaskName ? [nextTaskName] : []
+  })
+
+  return serializeDependencyList(nextDependencies)
+}
+
+function getBlockingTaskNames(task: TemplateTask, tasks: TemplateTask[]): string[] {
+  return tasks
+    .filter((candidate) => parseDependencyList(candidate.dependencies).includes(task.taskName))
+    .map((candidate) => candidate.taskName)
+}
+
+const selectedTemplateTaskStates = computed(() => {
+  const tasks = selectedTemplate.value?.tasks ?? []
+  const taskNames = new Set(tasks.map((task) => task.taskName))
+
+  return tasks.map((task) => {
+    const blockedBy = parseDependencyList(task.dependencies)
+    const unresolvedDependencies = blockedBy.filter((dependency) => !taskNames.has(dependency))
+
+    return {
+      ...task,
+      blockedBy,
+      blocks: getBlockingTaskNames(task, tasks),
+      unresolvedDependencies,
+    }
+  })
+})
+
+const selectedTemplateDependencySummary = computed(() => {
+  const taskStates = selectedTemplateTaskStates.value
+
+  return {
+    edges: taskStates.reduce((sum, task) => sum + task.blockedBy.length, 0),
+    tasksWithDependencies: taskStates.filter((task) => task.blockedBy.length > 0).length,
+    rootTasks: taskStates.filter((task) => task.blockedBy.length === 0).length,
+    terminalTasks: taskStates.filter((task) => task.blocks.length === 0).length,
+    unresolvedTasks: taskStates.filter((task) => task.unresolvedDependencies.length > 0).length,
+  }
+})
 
 function selectTemplate(templateId: string) {
   selectedTemplateId.value = templateId
@@ -581,7 +696,7 @@ function removeTask(task: TemplateTask) {
       .filter((item) => item.id !== task.id)
       .map((item) => ({
         ...item,
-        dependencies: item.dependencies === task.taskName ? undefined : item.dependencies,
+        dependencies: replaceDependencyReference(item.dependencies, task.taskName),
       })),
   )
 
@@ -620,8 +735,11 @@ function saveTask(draft: TemplateTaskDraft) {
   const mergedTasks = editingTask.value
     ? selectedTemplate.value.tasks.map((task) => {
         if (task.id === taskId) return nextTask
-        if (previousTaskName && task.dependencies === previousTaskName) {
-          return { ...task, dependencies: draft.taskName }
+        if (previousTaskName) {
+          return {
+            ...task,
+            dependencies: replaceDependencyReference(task.dependencies, previousTaskName, draft.taskName),
+          }
         }
         return task
       })
@@ -717,9 +835,44 @@ function submitTemplate(draft: CreateTemplateDraft) {
       </div>
     </div>
 
+    <section class="card scope-summary-card">
+      <div class="scope-summary-header">
+        <div>
+          <h2 class="panel-title">Current Scope</h2>
+          <p class="scope-summary-copy">
+            Narrow templates by Application, SNOW Group, Agent, and Site before choosing the right rollout blueprint.
+          </p>
+        </div>
+        <div class="scope-template-count">
+          {{ filteredTemplates.length }} template{{ filteredTemplates.length === 1 ? '' : 's' }}
+        </div>
+      </div>
+      <div class="scope-summary-grid">
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">Application</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.application }}</div>
+        </div>
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">SNOW Group</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.snowGroup }}</div>
+        </div>
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">Agent</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.agent }}</div>
+        </div>
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">Site</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.site }}</div>
+        </div>
+      </div>
+    </section>
+
     <div class="template-layout">
       <aside class="card filters-panel">
         <h2 class="panel-title">Filters</h2>
+        <p class="filter-copy">
+          These filters drive both the list below and the default scope for any new template you create.
+        </p>
 
         <div class="filter-stack">
           <div class="filter-item">
@@ -807,6 +960,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
                 <th>Template Name</th>
                 <th>Version</th>
                 <th>Category</th>
+                <th>Agent</th>
                 <th>SNOW Group</th>
                 <th>Application</th>
                 <th>Site</th>
@@ -829,6 +983,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
                 <td>
                   <span class="category-pill">{{ template.category }}</span>
                 </td>
+                <td>{{ template.agent }}</td>
                 <td>{{ template.snowGroup }}</td>
                 <td>{{ template.application }}</td>
                 <td>
@@ -915,6 +1070,12 @@ function submitTemplate(draft: CreateTemplateDraft) {
                 <div class="detail-label">Estimated Duration</div>
                 <div class="detail-value">{{ selectedTemplate.estDuration }}</div>
               </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Scope Context</div>
+            <div class="details-grid">
               <div class="detail-item">
                 <div class="detail-label">Agent</div>
                 <div class="detail-value">{{ selectedTemplate.agent }}</div>
@@ -958,6 +1119,84 @@ function submitTemplate(draft: CreateTemplateDraft) {
             </div>
 
             <div v-else class="task-table-wrap">
+              <div class="dependency-overview-grid">
+                <div class="dependency-summary-card">
+                  <div class="dependency-summary-label">Dependency Links</div>
+                  <div class="dependency-summary-value">{{ selectedTemplateDependencySummary.edges }}</div>
+                </div>
+                <div class="dependency-summary-card">
+                  <div class="dependency-summary-label">Tasks With Prerequisites</div>
+                  <div class="dependency-summary-value">{{ selectedTemplateDependencySummary.tasksWithDependencies }}</div>
+                </div>
+                <div class="dependency-summary-card">
+                  <div class="dependency-summary-label">Entry Tasks</div>
+                  <div class="dependency-summary-value">{{ selectedTemplateDependencySummary.rootTasks }}</div>
+                </div>
+                <div class="dependency-summary-card">
+                  <div class="dependency-summary-label">Exit Tasks</div>
+                  <div class="dependency-summary-value">{{ selectedTemplateDependencySummary.terminalTasks }}</div>
+                </div>
+              </div>
+
+              <div class="dependency-map">
+                <article
+                  v-for="task in selectedTemplateTaskStates"
+                  :key="`${task.id}-dependency-map`"
+                  class="dependency-map-card"
+                >
+                  <div class="dependency-map-head">
+                    <span class="dependency-step-pill">Step {{ task.step }}</span>
+                    <span class="dependency-map-title">{{ task.taskName }}</span>
+                  </div>
+                  <div class="dependency-map-row">
+                    <span class="dependency-map-label">Blocked By</span>
+                    <div v-if="task.blockedBy.length > 0" class="dependency-chip-list">
+                      <span
+                        v-for="dependency in task.blockedBy"
+                        :key="`${task.id}-blocked-by-${dependency}`"
+                        class="dependency-chip"
+                      >
+                        {{ dependency }}
+                      </span>
+                    </div>
+                    <span v-else class="dependency-empty-chip">None</span>
+                  </div>
+                  <div class="dependency-map-row">
+                    <span class="dependency-map-label">Blocks</span>
+                    <div v-if="task.blocks.length > 0" class="dependency-chip-list">
+                      <span
+                        v-for="dependency in task.blocks"
+                        :key="`${task.id}-blocks-${dependency}`"
+                        class="dependency-chip dependency-chip-outbound"
+                      >
+                        {{ dependency }}
+                      </span>
+                    </div>
+                    <span v-else class="dependency-empty-chip">None</span>
+                  </div>
+                  <div v-if="task.unresolvedDependencies.length > 0" class="dependency-warning-row">
+                    <span class="dependency-map-label">Missing Links</span>
+                    <div class="dependency-chip-list">
+                      <span
+                        v-for="dependency in task.unresolvedDependencies"
+                        :key="`${task.id}-missing-${dependency}`"
+                        class="dependency-chip dependency-chip-warning"
+                      >
+                        {{ dependency }}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <div
+                v-if="selectedTemplateDependencySummary.unresolvedTasks > 0"
+                class="dependency-inline-warning"
+              >
+                {{ selectedTemplateDependencySummary.unresolvedTasks }} tasks reference dependencies
+                that are not currently present in this template.
+              </div>
+
               <table class="data-table">
                 <thead>
                   <tr>
@@ -969,12 +1208,13 @@ function submitTemplate(draft: CreateTemplateDraft) {
                     <th>Critical</th>
                     <th>Owner</th>
                     <th>Est. Duration</th>
-                    <th>Dependencies</th>
+                    <th>Blocked By</th>
+                    <th>Blocks</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="task in selectedTemplate.tasks" :key="task.id">
+                  <tr v-for="task in selectedTemplateTaskStates" :key="task.id">
                     <td>{{ task.category }}</td>
                     <td>{{ task.taskName }}</td>
                     <td>{{ task.step }}</td>
@@ -993,7 +1233,30 @@ function submitTemplate(draft: CreateTemplateDraft) {
                     </td>
                     <td>{{ task.owner }}</td>
                     <td>{{ task.estDuration }}</td>
-                    <td>{{ task.dependencies ?? '—' }}</td>
+                    <td>
+                      <div v-if="task.blockedBy.length > 0" class="dependency-chip-list">
+                        <span
+                          v-for="dependency in task.blockedBy"
+                          :key="`${task.id}-table-blocked-by-${dependency}`"
+                          class="dependency-chip"
+                        >
+                          {{ dependency }}
+                        </span>
+                      </div>
+                      <span v-else class="dependency-empty-chip">—</span>
+                    </td>
+                    <td>
+                      <div v-if="task.blocks.length > 0" class="dependency-chip-list">
+                        <span
+                          v-for="dependency in task.blocks"
+                          :key="`${task.id}-table-blocks-${dependency}`"
+                          class="dependency-chip dependency-chip-outbound"
+                        >
+                          {{ dependency }}
+                        </span>
+                      </div>
+                      <span v-else class="dependency-empty-chip">—</span>
+                    </td>
                     <td>
                       <div class="action-btns">
                         <button class="btn btn-secondary btn-sm" type="button" @click="openEditTaskDialog(task)">
@@ -1039,22 +1302,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
       :applications="applications"
       :sites="sites"
       :mode="editingTemplate ? 'edit' : 'create'"
-      :initial-draft="
-        editingTemplate
-          ? {
-              name: editingTemplate.name,
-              version: editingTemplate.version,
-              agent: editingTemplate.agent,
-              category: editingTemplate.category,
-              snowGroup: editingTemplate.snowGroup,
-              application: editingTemplate.application,
-              site: editingTemplate.site,
-              estDurationMinutes: parseDurationToMinutes(editingTemplate.estDuration),
-              description: editingTemplate.description,
-              source: 'manual',
-            }
-          : undefined
-      "
+      :initial-draft="createTemplateDefaults"
       @close="closeCreateTemplateDialog"
       @submit="submitTemplate"
     />
@@ -1117,6 +1365,63 @@ function submitTemplate(draft: CreateTemplateDraft) {
   line-height: 1.6;
 }
 
+.scope-summary-card {
+  padding: 18px;
+}
+
+.scope-summary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.scope-summary-copy {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.scope-template-count {
+  white-space: nowrap;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scope-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.scope-summary-item {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.scope-summary-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.scope-summary-value {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .template-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
@@ -1126,6 +1431,13 @@ function submitTemplate(draft: CreateTemplateDraft) {
 
 .filters-panel {
   padding: 18px;
+}
+
+.filter-copy {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #64748b;
 }
 
 .filter-stack {
@@ -1376,6 +1688,142 @@ function submitTemplate(draft: CreateTemplateDraft) {
   line-height: 1.6;
 }
 
+.dependency-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dependency-summary-card {
+  padding: 14px 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.dependency-summary-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.dependency-summary-value {
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dependency-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dependency-map-card {
+  padding: 14px 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.dependency-map-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.dependency-step-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dependency-map-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dependency-map-row,
+.dependency-warning-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.dependency-map-row + .dependency-map-row,
+.dependency-map-row + .dependency-warning-row {
+  margin-top: 10px;
+}
+
+.dependency-map-label {
+  min-width: 72px;
+  padding-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.dependency-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dependency-chip,
+.dependency-empty-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dependency-chip {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dependency-chip-outbound {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.dependency-chip-warning {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.dependency-empty-chip {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.dependency-inline-warning {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+}
+
 .task-table-wrap {
   overflow-x: auto;
 }
@@ -1399,12 +1847,21 @@ function submitTemplate(draft: CreateTemplateDraft) {
 }
 
 @media (max-width: 800px) {
+  .scope-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .details-grid {
     grid-template-columns: 1fr;
   }
 
   .toolbar-category {
     width: 100%;
+  }
+
+  .dependency-overview-grid,
+  .dependency-map {
+    grid-template-columns: 1fr;
   }
 }
 </style>

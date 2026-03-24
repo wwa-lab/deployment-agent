@@ -16,6 +16,8 @@ type ConfigCatalogRow = {
   label: string
   application: string
   owningGroup: string
+  agent: string
+  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
   integration: string
   value: string
   description?: string
@@ -27,6 +29,10 @@ const COMPONENT_DEFINITIONS: Array<{
   id: ConfigIntegrationId
   label: string
   category: string
+  application: string
+  owningGroup: string
+  agent: string
+  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
   endpointKey?: ConfigKey
   userKey?: ConfigKey
   secretKey?: ConfigKey
@@ -36,6 +42,10 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'jenkins',
     label: 'Jenkins Pipeline',
     category: 'CI/CD',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     endpointKey: 'jenkins_url',
     userKey: 'jenkins_user',
     secretKey: 'jenkins_api_token',
@@ -45,6 +55,10 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'ansible',
     label: 'Ansible Automation',
     category: 'Execution',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     endpointKey: 'ansible_url',
     userKey: 'ansible_user',
     secretKey: 'ansible_api_token',
@@ -54,6 +68,10 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'callback',
     label: 'Execution Callback',
     category: 'Integration',
+    application: 'Deployment Agent',
+    owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     endpointKey: 'execution_callback_endpoint',
     defaultDescription: 'HTTPS callback endpoint used by external tools to post execution updates.',
   },
@@ -64,6 +82,8 @@ const CONFIG_CATALOG: Array<{
   label: string
   application: string
   owningGroup: string
+  agent: string
+  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
   integration: string
 }> = [
   {
@@ -71,6 +91,8 @@ const CONFIG_CATALOG: Array<{
     label: 'JENKINS_URL',
     application: 'Deployment Agent',
     owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     integration: 'Jenkins Pipeline',
   },
   {
@@ -78,6 +100,8 @@ const CONFIG_CATALOG: Array<{
     label: 'JENKINS_USER',
     application: 'Deployment Agent',
     owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     integration: 'Jenkins Pipeline',
   },
   {
@@ -85,6 +109,8 @@ const CONFIG_CATALOG: Array<{
     label: 'JENKINS_API_TOKEN',
     application: 'Deployment Agent',
     owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     integration: 'Jenkins Pipeline',
   },
   {
@@ -92,6 +118,8 @@ const CONFIG_CATALOG: Array<{
     label: 'ANSIBLE_URL',
     application: 'Deployment Agent',
     owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     integration: 'Ansible Automation',
   },
   {
@@ -99,6 +127,8 @@ const CONFIG_CATALOG: Array<{
     label: 'ANSIBLE_USER',
     application: 'Deployment Agent',
     owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     integration: 'Ansible Automation',
   },
   {
@@ -106,6 +136,8 @@ const CONFIG_CATALOG: Array<{
     label: 'ANSIBLE_API_TOKEN',
     application: 'Deployment Agent',
     owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     integration: 'Ansible Automation',
   },
   {
@@ -113,6 +145,8 @@ const CONFIG_CATALOG: Array<{
     label: 'EXECUTION_CALLBACK_ENDPOINT',
     application: 'Deployment Agent',
     owningGroup: 'WWA Platform',
+    agent: 'Deployment Agent',
+    scopeSource: 'Platform Default',
     integration: 'Execution Callback',
   },
 ]
@@ -127,14 +161,21 @@ const canEdit = computed(() => userStore.isDevOpsAdmin)
 const activeView = ref<'component' | 'raw'>('raw')
 const searchTerm = ref('')
 const statusFilter = ref<'All' | ConfigComponentRow['status']>('All')
+const componentScopeFilters = reactive({
+  application: 'All',
+  owningGroup: 'All',
+  agent: 'All',
+})
 const filterForm = reactive({
   owningGroup: 'All',
   application: 'All',
+  agent: 'All',
   configItem: 'All',
 })
 const appliedFilters = reactive({
   owningGroup: 'All',
   application: 'All',
+  agent: 'All',
   configItem: 'All',
 })
 
@@ -193,6 +234,10 @@ const componentRows = computed<ConfigComponentRow[]>(() => {
       id: definition.id,
       label: definition.label,
       category: definition.category,
+      application: definition.application,
+      owningGroup: definition.owningGroup,
+      agent: definition.agent,
+      scopeSource: definition.scopeSource,
       endpointKey: definition.endpointKey,
       userKey: definition.userKey,
       secretKey: definition.secretKey,
@@ -212,6 +257,19 @@ const componentRows = computed<ConfigComponentRow[]>(() => {
   })
 })
 
+const componentOwningGroupOptions = computed(() => [
+  'All',
+  ...new Set(componentRows.value.map((row) => row.owningGroup ?? '')),
+].filter(Boolean))
+const componentApplicationOptions = computed(() => [
+  'All',
+  ...new Set(componentRows.value.map((row) => row.application ?? '')),
+].filter(Boolean))
+const componentAgentOptions = computed(() => [
+  'All',
+  ...new Set(componentRows.value.map((row) => row.agent ?? '')),
+].filter(Boolean))
+
 const filteredComponentRows = computed(() => {
   const query = searchTerm.value.trim().toLowerCase()
 
@@ -225,7 +283,12 @@ const filteredComponentRows = computed(() => {
       (row.description ?? '').toLowerCase().includes(query)
 
     const matchesStatus = statusFilter.value === 'All' || row.status === statusFilter.value
-    return matchesSearch && matchesStatus
+    const matchesApplication =
+      componentScopeFilters.application === 'All' || row.application === componentScopeFilters.application
+    const matchesOwningGroup =
+      componentScopeFilters.owningGroup === 'All' || row.owningGroup === componentScopeFilters.owningGroup
+    const matchesAgent = componentScopeFilters.agent === 'All' || row.agent === componentScopeFilters.agent
+    return matchesSearch && matchesStatus && matchesApplication && matchesOwningGroup && matchesAgent
   })
 })
 
@@ -244,6 +307,7 @@ const rawRows = computed<ConfigCatalogRow[]>(() => {
 
 const owningGroupOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.owningGroup))])
 const applicationOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.application))])
+const agentOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.agent))])
 const configItemOptions = computed(() => ['All', ...rawRows.value.map((row) => row.label)])
 
 const filteredRawRows = computed(() => {
@@ -252,10 +316,11 @@ const filteredRawRows = computed(() => {
       appliedFilters.owningGroup === 'All' || row.owningGroup === appliedFilters.owningGroup
     const matchesApplication =
       appliedFilters.application === 'All' || row.application === appliedFilters.application
+    const matchesAgent = appliedFilters.agent === 'All' || row.agent === appliedFilters.agent
     const matchesConfigItem =
       appliedFilters.configItem === 'All' || row.label === appliedFilters.configItem
 
-    return matchesOwningGroup && matchesApplication && matchesConfigItem
+    return matchesOwningGroup && matchesApplication && matchesAgent && matchesConfigItem
   })
 })
 
@@ -271,12 +336,14 @@ function refreshConfig() {
 function applyRawFilters() {
   appliedFilters.owningGroup = filterForm.owningGroup
   appliedFilters.application = filterForm.application
+  appliedFilters.agent = filterForm.agent
   appliedFilters.configItem = filterForm.configItem
 }
 
 function resetRawFilters() {
   filterForm.owningGroup = 'All'
   filterForm.application = 'All'
+  filterForm.agent = 'All'
   filterForm.configItem = 'All'
   applyRawFilters()
 }
@@ -448,7 +515,9 @@ function displayValue(value?: string) {
     <div v-if="activeView === 'component'" class="component-workspace">
         <div class="helper-banner">
           This view groups the current backend configuration keys into reusable integration
-          components. Use <strong>Configuration</strong> only when you need key-level edits.
+          components. Scope fields show who this shared default is meant to serve today; true
+          per-agent overrides are not wired yet. Use <strong>Configuration</strong> only when you
+          need key-level edits.
         </div>
 
         <div v-if="store.error" class="alert alert-error">
@@ -476,6 +545,33 @@ function displayValue(value?: string) {
                 <option value="Needs Setup">Needs Setup</option>
               </select>
             </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Application</label>
+              <select v-model="componentScopeFilters.application" class="form-control">
+                <option v-for="application in componentApplicationOptions" :key="application" :value="application">
+                  {{ application === 'All' ? 'All Applications' : application }}
+                </option>
+              </select>
+            </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">SNOW Group</label>
+              <select v-model="componentScopeFilters.owningGroup" class="form-control">
+                <option v-for="group in componentOwningGroupOptions" :key="group" :value="group">
+                  {{ group === 'All' ? 'All SNOW Groups' : group }}
+                </option>
+              </select>
+            </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Agent</label>
+              <select v-model="componentScopeFilters.agent" class="form-control">
+                <option v-for="agent in componentAgentOptions" :key="agent" :value="agent">
+                  {{ agent === 'All' ? 'All Agents' : agent }}
+                </option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -498,9 +594,13 @@ function displayValue(value?: string) {
               <thead>
                 <tr>
                   <th>Component</th>
+                  <th>Application</th>
+                  <th>SNOW Group</th>
+                  <th>Agent</th>
                   <th>Area</th>
                   <th>Endpoint</th>
                   <th>Service User</th>
+                  <th>Scope Source</th>
                   <th>Secret</th>
                   <th>Status</th>
                   <th>Updated By</th>
@@ -514,9 +614,17 @@ function displayValue(value?: string) {
                     <div class="component-name">{{ component.label }}</div>
                     <div class="component-description">{{ component.description }}</div>
                   </td>
+                  <td>{{ component.application ?? '—' }}</td>
+                  <td>{{ component.owningGroup ?? '—' }}</td>
+                  <td>{{ component.agent ?? '—' }}</td>
                   <td>{{ component.category }}</td>
                   <td class="endpoint-cell">{{ displayValue(component.endpoint) }}</td>
                   <td>{{ displayValue(component.serviceUser) }}</td>
+                  <td>
+                    <span class="scope-source-badge">
+                      {{ component.scopeSource ?? 'Platform Default' }}
+                    </span>
+                  </td>
                   <td>
                     <span class="secret-badge" :class="`secret-${component.secretState.toLowerCase().replace(/ /g, '-')}`">
                       {{ component.secretState }}
@@ -551,15 +659,16 @@ function displayValue(value?: string) {
         <div class="helper-banner helper-banner-muted">
           Configuration lists the fixed catalog of backend-managed settings. This view is closer to
           a traditional admin table: filter by context, review values, and edit only when needed.
+          Today these keys still act as shared defaults, even when scoped ownership fields are shown.
         </div>
 
         <div class="toolbar-card">
           <div class="toolbar-grid toolbar-grid-config">
             <div class="toolbar-field">
-              <label class="toolbar-label">Owning Group</label>
+              <label class="toolbar-label">SNOW Group</label>
               <select v-model="filterForm.owningGroup" class="form-control">
                 <option v-for="group in owningGroupOptions" :key="group" :value="group">
-                  {{ group === 'All' ? 'All Owning Groups' : group }}
+                  {{ group === 'All' ? 'All SNOW Groups' : group }}
                 </option>
               </select>
             </div>
@@ -569,6 +678,15 @@ function displayValue(value?: string) {
               <select v-model="filterForm.application" class="form-control">
                 <option v-for="application in applicationOptions" :key="application" :value="application">
                   {{ application === 'All' ? 'All Applications' : application }}
+                </option>
+              </select>
+            </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Agent</label>
+              <select v-model="filterForm.agent" class="form-control">
+                <option v-for="agent in agentOptions" :key="agent" :value="agent">
+                  {{ agent === 'All' ? 'All Agents' : agent }}
                 </option>
               </select>
             </div>
@@ -618,9 +736,11 @@ function displayValue(value?: string) {
             <thead>
               <tr>
                 <th>Application</th>
-                <th>Owning Group</th>
+                <th>SNOW Group</th>
+                <th>Agent</th>
                 <th>Config Item</th>
                 <th>Config Value</th>
+                <th>Scope Source</th>
                 <th>Updated By</th>
                 <th>Updated Time</th>
                 <th>Action</th>
@@ -631,6 +751,7 @@ function displayValue(value?: string) {
                 <tr>
                   <td>{{ row.application }}</td>
                   <td>{{ row.owningGroup }}</td>
+                  <td>{{ row.agent }}</td>
                   <td>
                     <div class="config-item-name mono">{{ row.label }}</div>
                     <div class="config-item-meta">{{ row.integration }}</div>
@@ -653,6 +774,9 @@ function displayValue(value?: string) {
                       <div class="config-value-text">{{ formatValue(row) }}</div>
                       <div class="config-item-meta">{{ row.description ?? 'No description' }}</div>
                     </template>
+                  </td>
+                  <td>
+                    <span class="scope-source-badge">{{ row.scopeSource }}</span>
                   </td>
                   <td>{{ row.updatedBy ?? '—' }}</td>
                   <td class="timestamp">{{ formatDate(row.updatedAt) }}</td>
@@ -687,7 +811,7 @@ function displayValue(value?: string) {
                   </td>
                 </tr>
                 <tr v-if="rowError[row.key] || rowSuccess[row.key]">
-                  <td colspan="7" class="feedback-row">
+                  <td colspan="9" class="feedback-row">
                     <span v-if="rowError[row.key]" class="feedback-error">{{ rowError[row.key] }}</span>
                     <span v-if="rowSuccess[row.key]" class="feedback-success">Saved successfully.</span>
                   </td>
@@ -817,6 +941,10 @@ function displayValue(value?: string) {
   align-items: end;
 }
 
+.toolbar-field-wide {
+  grid-column: span 2;
+}
+
 .toolbar-label {
   display: block;
   margin-bottom: 8px;
@@ -903,7 +1031,8 @@ function displayValue(value?: string) {
 }
 
 .status-badge,
-.secret-badge {
+.secret-badge,
+.scope-source-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -912,6 +1041,11 @@ function displayValue(value?: string) {
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.scope-source-badge {
+  color: #334155;
+  background: #e2e8f0;
 }
 
 .status-ready {
@@ -994,6 +1128,10 @@ function displayValue(value?: string) {
 
   .toolbar-grid-config {
     grid-template-columns: 1fr;
+  }
+
+  .toolbar-field-wide {
+    grid-column: span 1;
   }
 }
 

@@ -5,6 +5,9 @@ import type { AuditLogEntry } from '../types'
 
 const store = useAuditStore()
 const operatorQuery = ref(store.operatorId)
+const applicationQuery = ref(store.application)
+const snowGroupQuery = ref(store.snowGroup)
+const agentQuery = ref(store.agent)
 
 onMounted(() => {
   store.fetchLogs()
@@ -27,12 +30,25 @@ function onPageChange(newPage: number) {
 
 function applySearch() {
   store.setOperatorId(operatorQuery.value.trim())
+  store.setScopeFilters({
+    application: applicationQuery.value.trim(),
+    snowGroup: snowGroupQuery.value.trim(),
+    agent: agentQuery.value.trim(),
+  })
   store.fetchLogs()
 }
 
 function resetSearch() {
   operatorQuery.value = ''
+  applicationQuery.value = ''
+  snowGroupQuery.value = ''
+  agentQuery.value = ''
   store.setOperatorId('')
+  store.setScopeFilters({
+    application: '',
+    snowGroup: '',
+    agent: '',
+  })
   store.fetchLogs()
 }
 
@@ -53,6 +69,10 @@ function actionLabel(log: AuditLogEntry): string {
     auto_submit: 'Auto Submit',
     request_start: 'Start Deployment',
     request_fail: 'Mark as Failed',
+    access_grant_create: 'Access Granted',
+    access_grant_update: 'Access Updated',
+    access_grant_suspend: 'Access Suspended',
+    access_grant_reactivate: 'Access Reactivated',
   }
 
   return labels[log.actionType] ?? log.actionType
@@ -128,6 +148,15 @@ function detailText(log: AuditLogEntry): string {
     case 'request_start':
     case 'request_fail':
       return `Stage: ${String(payload.stage ?? '—')}`
+    case 'access_grant_create':
+    case 'access_grant_update':
+    case 'access_grant_suspend':
+    case 'access_grant_reactivate':
+      return `Employee: ${String(payload.employeeId ?? '—')}${
+        payload.newGrantStatus ? ` | Status: ${String(payload.newGrantStatus)}` : ''
+      }${
+        payload.newAssignedRoles ? ` | Roles: ${String(payload.newAssignedRoles)}` : ''
+      }`
     default:
       return compactJson(payload) || 'No additional detail'
   }
@@ -139,6 +168,10 @@ function detailMeta(log: AuditLogEntry): string {
   if (log.requestId) refs.push(`Request ${log.requestId}`)
   if (log.taskId) refs.push(`Task ${log.taskId}`)
   return refs.join(' | ')
+}
+
+function scopeValue(value?: string): string {
+  return value && value.trim().length > 0 ? value : '—'
 }
 </script>
 
@@ -161,22 +194,55 @@ function detailMeta(log: AuditLogEntry): string {
     </div>
 
     <div class="toolbar-card">
-      <div class="toolbar-grid">
-        <div class="toolbar-field">
-          <label class="toolbar-label">Operator / Staff ID</label>
-          <input
-            v-model="operatorQuery"
+        <div class="toolbar-grid">
+          <div class="toolbar-field">
+            <label class="toolbar-label">Operator / Staff ID</label>
+            <input
+              v-model="operatorQuery"
             class="form-control"
             type="text"
             placeholder="Search by operator id"
-            @keyup.enter="applySearch"
-          />
-        </div>
+              @keyup.enter="applySearch"
+            />
+          </div>
 
-        <div class="toolbar-actions">
-          <button class="btn btn-primary" type="button" @click="applySearch">Search</button>
-          <button class="btn btn-secondary" type="button" @click="resetSearch">Reset</button>
-        </div>
+          <div class="toolbar-field">
+            <label class="toolbar-label">Application</label>
+            <input
+              v-model="applicationQuery"
+              class="form-control"
+              type="text"
+              placeholder="Filter by application"
+              @keyup.enter="applySearch"
+            />
+          </div>
+
+          <div class="toolbar-field">
+            <label class="toolbar-label">SNOW Group</label>
+            <input
+              v-model="snowGroupQuery"
+              class="form-control"
+              type="text"
+              placeholder="Filter by SNOW Group"
+              @keyup.enter="applySearch"
+            />
+          </div>
+
+          <div class="toolbar-field">
+            <label class="toolbar-label">Agent</label>
+            <input
+              v-model="agentQuery"
+              class="form-control"
+              type="text"
+              placeholder="Filter by agent"
+              @keyup.enter="applySearch"
+            />
+          </div>
+
+          <div class="toolbar-actions">
+            <button class="btn btn-primary" type="button" @click="applySearch">Search</button>
+            <button class="btn btn-secondary" type="button" @click="resetSearch">Reset</button>
+          </div>
       </div>
     </div>
 
@@ -210,6 +276,7 @@ function detailMeta(log: AuditLogEntry): string {
               <th>User</th>
               <th>Time</th>
               <th>Type</th>
+              <th>Scope</th>
               <th>Detail</th>
             </tr>
           </thead>
@@ -228,6 +295,20 @@ function detailMeta(log: AuditLogEntry): string {
                   </span>
                 </div>
                 <div class="cell-meta mono">{{ log.actionType }}</div>
+              </td>
+              <td class="scope-cell">
+                <div class="scope-line">
+                  <span class="scope-label">App</span>
+                  <span>{{ scopeValue(log.application) }}</span>
+                </div>
+                <div class="scope-line">
+                  <span class="scope-label">Group</span>
+                  <span>{{ scopeValue(log.snowGroup) }}</span>
+                </div>
+                <div class="scope-line">
+                  <span class="scope-label">Agent</span>
+                  <span>{{ scopeValue(log.agent) }}</span>
+                </div>
               </td>
               <td class="detail-cell">
                 <div class="detail-text">{{ detailText(log) }}</div>
@@ -329,7 +410,7 @@ function detailMeta(log: AuditLogEntry): string {
 
 .toolbar-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 380px) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 16px;
   align-items: end;
 }
@@ -428,6 +509,30 @@ function detailMeta(log: AuditLogEntry): string {
 
 .detail-cell {
   max-width: 520px;
+}
+
+.scope-cell {
+  min-width: 220px;
+}
+
+.scope-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.scope-line + .scope-line {
+  margin-top: 4px;
+}
+
+.scope-label {
+  min-width: 44px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
 }
 
 .detail-text {

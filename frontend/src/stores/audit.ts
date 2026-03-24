@@ -11,6 +11,9 @@ export const useAuditStore = defineStore('audit', () => {
   const loading = ref(false)
   const error = ref('')
   const operatorId = ref('')
+  const application = ref('')
+  const snowGroup = ref('')
+  const agent = ref('')
 
   async function fetchLogs() {
     loading.value = true
@@ -20,6 +23,9 @@ export const useAuditStore = defineStore('audit', () => {
         page: page.value,
         size: size.value,
         operatorId: operatorId.value || undefined,
+        application: application.value || undefined,
+        snowGroup: snowGroup.value || undefined,
+        agent: agent.value || undefined,
       })
       logs.value = result.data
       total.value = result.total
@@ -39,6 +45,13 @@ export const useAuditStore = defineStore('audit', () => {
     page.value = 0
   }
 
+  function setScopeFilters(filters: { application: string; snowGroup: string; agent: string }) {
+    application.value = filters.application
+    snowGroup.value = filters.snowGroup
+    agent.value = filters.agent
+    page.value = 0
+  }
+
   return {
     logs,
     total,
@@ -47,8 +60,12 @@ export const useAuditStore = defineStore('audit', () => {
     loading,
     error,
     operatorId,
+    application,
+    snowGroup,
+    agent,
     fetchLogs,
     setPage,
     setOperatorId,
+    setScopeFilters,
   }
 })

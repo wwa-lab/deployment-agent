@@ -25,7 +25,7 @@ import java.io.IOException;
  *   POST /api/deployment-agent/upload   (multipart: file + stage)
  * </pre>
  *
- * <p>Authorization: DEVELOPER or TL role.
+ * <p>Authorization: DEVELOPER, TL, or DEVOPS_ADMIN role.
  */
 @RestController
 @RequestMapping("/api/deployment-agent/upload")
@@ -51,6 +51,9 @@ public class UploadController {
     public ResponseEntity<UploadResponseDto> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam("stage") String stageParam,
+            @RequestParam(value = "snowGroup", required = false) String snowGroup,
+            @RequestParam(value = "application", required = false) String application,
+            @RequestParam(value = "agent", required = false) String agent,
             @AuthenticationPrincipal UserContext user) throws IOException {
         validateUploadRole(user);
 
@@ -67,12 +70,14 @@ public class UploadController {
             throw new ValidationAppException("Uploaded file is empty");
         }
 
-        ImportResult result = importService.importFile(file.getBytes(), stage, user);
+        ImportResult result = importService.importFile(file.getBytes(), stage, user, snowGroup, application, agent);
         return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 
     private void validateUploadRole(UserContext user) {
-        if (user == null || (!"DEVELOPER".equals(user.role()) && !"TL".equals(user.role()))) {
+        if (user == null || (!user.hasRole("DEVELOPER")
+                && !user.hasRole("TL")
+                && !user.hasRole("DEVOPS_ADMIN"))) {
             throw new ForbiddenAppException("upload");
         }
     }
