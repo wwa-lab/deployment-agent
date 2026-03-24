@@ -40,17 +40,21 @@ public class ReleaseFlowController {
             @RequestParam(required = false) String project,
             @RequestParam(required = false) FlowStatus status,
             @RequestParam(required = false) Stage stage,
+            @RequestParam(defaultValue = "false") boolean includeArchived,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserContext user) {
 
         if (page < 0) throw new ValidationAppException("Invalid page parameter", page);
         if (size < 1) throw new ValidationAppException("Invalid size parameter", size);
         if (size > 100) throw new ValidationAppException("Page size cannot exceed 100", size);
+        validateArchivedViewer(includeArchived, user);
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
-        Page<ReleaseFlow> result = releaseFlowService.list(project, status, stage, pageable);
+        Page<ReleaseFlow> result = releaseFlowService.list(project, status, stage, pageable, includeArchived);
         Map<String, List<Request>> requestsByReleaseFlowId = releaseFlowService.findRequestsByReleaseFlowIds(
-                result.getContent().stream().map(ReleaseFlow::getId).toList());
+                result.getContent().stream().map(ReleaseFlow::getId).toList(),
+                includeArchived);
 
         List<ReleaseFlowListItemDto> dtos = result.getContent().stream()
                 .map(releaseFlow -> ReleaseFlowListItemDto.from(
@@ -63,11 +67,14 @@ public class ReleaseFlowController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ReleaseFlowDetailDto> getById(@PathVariable String id) {
-        // Single query: loads RF + requests + tasks via LEFT JOIN FETCH (T4.3)
-        ReleaseFlow rf = releaseFlowService.getByIdWithFullHierarchy(id);
+    public ResponseEntity<ReleaseFlowDetailDto> getById(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "false") boolean includeArchived,
+            @AuthenticationPrincipal UserContext user) {
+        validateArchivedViewer(includeArchived, user);
 
-        List<RequestDto> requestDtos = rf.getRequests().stream()
+        ReleaseFlow rf = releaseFlowService.getById(id, includeArchived);
+        List<RequestDto> requestDtos = releaseFlowService.findRequestsForFlow(id, includeArchived).stream()
                 .map(req -> {
                     List<TaskDto> taskDtos = req.getTasks().stream()
                             .map(TaskDto::from)
@@ -80,6 +87,7 @@ public class ReleaseFlowController {
                 rf.getId(), rf.getProjectId(), rf.getProjectName(),
                 rf.getReleaseId(), rf.getNormalizedReleaseId(),
                 rf.getCurrentStage(), rf.getFlowStatus(), rf.getReviewStatus(),
+                rf.getArchivedAt(), rf.getArchivedBy(),
                 requestDtos));
     }
 
@@ -96,6 +104,33 @@ public class ReleaseFlowController {
                 .map(TaskDto::from)
                 .toList();
         return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/archive")
+    public ResponseEntity<RequestArchiveResultDto> archiveRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        return ResponseEntity.ok(releaseFlowService.archiveRequestRundown(flowId, requestId, user));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/restore")
+    public ResponseEntity<RequestArchiveResultDto> restoreRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateAdmin(user, "restore_rundown");
+        return ResponseEntity.ok(releaseFlowService.restoreRequestRundown(flowId, requestId, user));
+    }
+
+    @DeleteMapping("/{flowId}/requests/{requestId}/purge")
+    public ResponseEntity<RequestPurgeResultDto> purgeArchivedRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateAdmin(user, "purge_rundown");
+        return ResponseEntity.ok(releaseFlowService.purgeArchivedRequestRundown(flowId, requestId, user));
     }
 
     @PostMapping("/{flowId}/requests/{requestId}/start")
@@ -130,9 +165,21 @@ public class ReleaseFlowController {
         if (user == null) {
             throw new ForbiddenAppException("update_rundown");
         }
-        String role = user.role();
-        if (!"DEVELOPER".equals(role) && !"TL".equals(role) && !"DEVOPS_ADMIN".equals(role)) {
+        if (!user.hasRole("DEVELOPER") && !user.hasRole("TL") && !user.hasRole("DEVOPS_ADMIN")) {
             throw new ForbiddenAppException("update_rundown");
+        }
+    }
+
+    private void validateArchivedViewer(boolean includeArchived, UserContext user) {
+        if (!includeArchived) {
+            return;
+        }
+        validateAdmin(user, "view_archived_rundown");
+    }
+
+    private void validateAdmin(UserContext user, String action) {
+        if (user == null || !user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException(action);
         }
     }
 }

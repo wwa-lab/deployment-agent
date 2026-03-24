@@ -1,11 +1,16 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
+import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.RequestArchiveResultDto;
+import com.wwa.deploymentagent.contracts.dto.RequestPurgeResultDto;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
+import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
+import com.wwa.deploymentagent.errors.ValidationAppException;
 import com.wwa.deploymentagent.helper.TestDataHelper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -242,5 +247,77 @@ class ReleaseFlowServiceTest {
         ReleaseFlow updated = releaseFlowRepository.findById(rf.getId()).orElseThrow();
         // No requests → stageStatuses list is empty → aggregation returns Pending
         assertThat(updated.getFlowStatus()).isEqualTo(FlowStatus.Pending);
+    }
+
+    @Test
+    @DisplayName("archiveRequestRundown archives the release flow when the final active request is archived")
+    void archiveRequestRundown_lastRequest_archivesFlow() {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        helper.seedTask(req);
+
+        RequestArchiveResultDto result = releaseFlowService.archiveRequestRundown(
+                rf.getId(), req.getId(), new UserContext("admin-001", "DEVOPS_ADMIN"));
+
+        ReleaseFlow archivedFlow = releaseFlowRepository.findById(rf.getId()).orElseThrow();
+        Request archivedRequest = requestRepository.findById(req.getId()).orElseThrow();
+
+        assertThat(result.requestArchived()).isTrue();
+        assertThat(result.releaseFlowArchived()).isTrue();
+        assertThat(result.activeRequestCount()).isZero();
+        assertThat(archivedFlow.getArchivedAt()).isNotNull();
+        assertThat(archivedRequest.getArchivedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("archiveRequestRundown realigns the remaining flow state when other active requests still exist")
+    void archiveRequestRundown_updatesCurrentStageAndStatuses() {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request sit = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
+        Request uat = helper.seedRequest(rf, Stage.UAT, RequestStatus.Pending);
+
+        RequestArchiveResultDto result = releaseFlowService.archiveRequestRundown(
+                rf.getId(), sit.getId(), new UserContext("admin-001", "DEVOPS_ADMIN"));
+
+        ReleaseFlow updated = releaseFlowRepository.findById(rf.getId()).orElseThrow();
+        assertThat(result.requestArchived()).isTrue();
+        assertThat(result.releaseFlowArchived()).isFalse();
+        assertThat(result.activeRequestCount()).isEqualTo(1);
+        assertThat(updated.getCurrentStage()).isEqualTo(Stage.UAT);
+        assertThat(updated.getFlowStatus()).isEqualTo(FlowStatus.Pending);
+        assertThat(updated.getReviewStatus()).isEqualTo(ReviewStatus.Pending_Review);
+        assertThat(requestRepository.findById(sit.getId())).get().extracting(Request::getArchivedAt).isNotNull();
+        assertThat(requestRepository.findById(uat.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("purgeArchivedRequestRundown permanently removes the final archived request and its flow")
+    void purgeArchivedRequestRundown_lastArchivedRequest_deletesFlow() {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        helper.seedTask(req);
+        UserContext admin = new UserContext("admin-001", "DEVOPS_ADMIN");
+
+        releaseFlowService.archiveRequestRundown(rf.getId(), req.getId(), admin);
+        RequestPurgeResultDto result = releaseFlowService.purgeArchivedRequestRundown(rf.getId(), req.getId(), admin);
+
+        assertThat(result.releaseFlowDeleted()).isTrue();
+        assertThat(result.remainingRequestCount()).isZero();
+        assertThat(result.activeRequestCount()).isZero();
+        assertThat(requestRepository.findById(req.getId())).isEmpty();
+        assertThat(releaseFlowRepository.findById(rf.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("purgeArchivedRequestRundown rejects active rundowns")
+    void purgeArchivedRequestRundown_activeRequest_rejected() {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        helper.seedTask(req);
+
+        assertThatThrownBy(() -> releaseFlowService.purgeArchivedRequestRundown(
+                rf.getId(), req.getId(), new UserContext("admin-001", "DEVOPS_ADMIN")))
+                .isInstanceOf(ValidationAppException.class)
+                .hasMessageContaining("Only archived rundowns can be permanently deleted.");
     }
 }

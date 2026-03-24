@@ -2,11 +2,13 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
+import { useUserStore } from '../stores/user'
 import UploadDialog from '../components/UploadDialog.vue'
 import type { FlowStatus, RequestStatus, Stage } from '../types'
 
 const router = useRouter()
 const store = useReleaseFlowStore()
+const userStore = useUserStore()
 
 const showUpload = ref(false)
 
@@ -14,6 +16,9 @@ const flowStatuses: FlowStatus[] = ['Pending', 'Running', 'Completed', 'Failed',
 const stages: Stage[] = ['SIT', 'UAT', 'PROD']
 
 onMounted(() => {
+  if (!userStore.isDevOpsAdmin && store.filters.includeArchived) {
+    store.setFilter('includeArchived', undefined)
+  }
   store.fetchList()
   store.startPolling()
 })
@@ -28,7 +33,10 @@ function onFilterChange(key: 'project' | 'status' | 'stage', value: string) {
 }
 
 function goToDetail(id: string) {
-  router.push(`/wwa/deployment-agent/release-flows/${id}`)
+  router.push({
+    path: `/wwa/deployment-agent/release-flows/${id}`,
+    query: showArchived.value ? { archived: '1' } : {},
+  })
 }
 
 function onPageChange(newPage: number) {
@@ -48,6 +56,10 @@ function statusBadgeClass(status: string) {
     Skipped: 'badge-skipped',
   }
   return map[status] ?? 'badge-pending'
+}
+
+function archiveBadgeClass(archivedAt?: string) {
+  return archivedAt ? 'badge-rejected' : 'badge-pending'
 }
 
 function statusLabel(status: string) {
@@ -70,6 +82,13 @@ function stageStatus(flow: { sitStatus: RequestStatus; uatStatus: RequestStatus;
 }
 
 const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size)))
+const showArchived = computed(() => store.filters.includeArchived === true)
+
+function toggleArchivedVisibility() {
+  if (!userStore.isDevOpsAdmin) return
+  store.setFilter('includeArchived', showArchived.value ? undefined : true)
+  store.fetchList()
+}
 </script>
 
 <template>
@@ -80,7 +99,24 @@ const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size
         <h1 class="view-title">Deployment Agent</h1>
         <p class="view-subtitle">Track release flows, upload deployment files, and monitor stage progress.</p>
       </div>
-      <button class="btn btn-primary" @click="showUpload = true">+ Upload</button>
+      <div class="header-actions">
+        <button
+          v-if="userStore.isDevOpsAdmin"
+          class="btn btn-secondary"
+          type="button"
+          @click="toggleArchivedVisibility"
+        >
+          {{ showArchived ? 'Hide Archived' : 'Show Archived' }}
+        </button>
+        <button
+          class="btn btn-primary"
+          :disabled="!userStore.canUploadRelease"
+          :title="userStore.canUploadRelease ? '' : 'Upload is available to DEVELOPER, TL, and DEVOPS_ADMIN.'"
+          @click="userStore.canUploadRelease && (showUpload = true)"
+        >
+          + Upload
+        </button>
+      </div>
     </div>
 
     <!-- Filter bar -->
@@ -147,10 +183,14 @@ const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size
             v-for="flow in store.list"
             :key="flow.id"
             class="clickable"
+            :class="{ 'row-archived': !!flow.archivedAt }"
             @click="goToDetail(flow.id)"
           >
             <td>{{ flow.projectName }}</td>
-            <td class="release-id">{{ flow.releaseId }}</td>
+            <td>
+              <div class="release-id">{{ flow.releaseId }}</div>
+              <span v-if="flow.archivedAt" class="badge badge-rejected archive-chip">Archived</span>
+            </td>
             <td v-for="stage in stages" :key="`${flow.id}-${stage}`" class="stage-column">
               <span class="badge" :class="statusBadgeClass(stageStatus(flow, stage))">
                 {{ statusLabel(stageStatus(flow, stage)) }}
@@ -159,6 +199,13 @@ const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size
             <td>
               <span class="badge" :class="statusBadgeClass(flow.flowStatus)">
                 {{ statusLabel(flow.flowStatus) }}
+              </span>
+              <span
+                v-if="flow.archivedAt"
+                class="badge archive-status-chip"
+                :class="archiveBadgeClass(flow.archivedAt)"
+              >
+                Archived
               </span>
             </td>
           </tr>
@@ -206,6 +253,13 @@ const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .view-title {
@@ -256,6 +310,15 @@ const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size
   font-family: monospace;
   font-size: 13px;
   color: #2563eb;
+}
+
+.archive-chip,
+.archive-status-chip {
+  margin-top: 6px;
+}
+
+.row-archived {
+  opacity: 0.72;
 }
 
 .stage-column {

@@ -3,7 +3,9 @@ import { computed, reactive, ref } from 'vue'
 import { editTask, recordResult } from '../api/tasks'
 import type { Task } from '../types'
 
-const props = defineProps<{ task: Task }>()
+const props = withDefaults(defineProps<{ task: Task; mode?: 'edit' | 'run' }>(), {
+  mode: 'edit',
+})
 const emit = defineEmits<{ saved: []; close: [] }>()
 
 const originalScript = props.task.inputParameters.script ?? ''
@@ -42,6 +44,16 @@ const submitLabel = computed(() =>
     : isSubmittingResult.value
       ? 'Save & Submit Result'
       : 'Save',
+)
+
+const dialogTitle = computed(() =>
+  props.mode === 'run' ? `Run Task — ${props.task.taskName}` : `Edit Task — ${props.task.taskName}`,
+)
+
+const manualResultHelp = computed(() =>
+  props.mode === 'run'
+    ? 'Capture the outcome here after you complete the manual step. Submitting a result will move the task to review.'
+    : 'Add the execution outcome here if this manual step has been completed. Saving with a result summary will move the task to review.',
 )
 
 function validate(): boolean {
@@ -97,7 +109,7 @@ async function submit() {
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">Edit Task — {{ task.taskName }}</span>
+        <span class="modal-title">{{ dialogTitle }}</span>
         <button class="modal-close" @click="emit('close')">✕</button>
       </div>
 
@@ -131,8 +143,7 @@ async function submit() {
         <div v-if="canSubmitManualResult" class="manual-result-panel">
           <div class="manual-result-title">Submit Manual Result</div>
           <p class="manual-result-help">
-            Add the execution outcome here if this manual step has been completed. Saving with a
-            result summary will move the task to review.
+            {{ manualResultHelp }}
           </p>
 
           <div class="form-group">

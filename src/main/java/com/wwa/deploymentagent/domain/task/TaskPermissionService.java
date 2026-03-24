@@ -34,7 +34,7 @@ public class TaskPermissionService {
         if (task == null || user == null) {
             return false;
         }
-        if ("DEVOPS_ADMIN".equals(user.role())) {
+        if (user.hasRole("DEVOPS_ADMIN")) {
             return true;
         }
         return isOwner(task, user);

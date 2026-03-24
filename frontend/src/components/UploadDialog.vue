@@ -2,11 +2,13 @@
 import { ref, computed } from 'vue'
 import { downloadTemplate, uploadFile } from '../api/upload'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
+import { useUserStore } from '../stores/user'
 import type { Stage, UploadResponse } from '../types'
 
 const emit = defineEmits<{ close: [] }>()
 
 const store = useReleaseFlowStore()
+const userStore = useUserStore()
 
 const stage = ref<Stage | ''>('')
 const file = ref<File | null>(null)
@@ -15,7 +17,10 @@ const downloadingTemplate = ref(false)
 const error = ref('')
 const successResult = ref<UploadResponse | null>(null)
 
-const canSubmit = computed(() => stage.value !== '' && file.value !== null && !uploading.value)
+const canUseUpload = computed(() => userStore.canUploadRelease)
+const canSubmit = computed(() =>
+  canUseUpload.value && stage.value !== '' && file.value !== null && !uploading.value,
+)
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -81,10 +86,13 @@ function close() {
 
         <template v-else>
           <div v-if="error" class="alert alert-error">{{ error }}</div>
+          <div v-if="!canUseUpload" class="alert alert-info">
+            Upload is available to `DEVELOPER`, `TL`, and `DEVOPS_ADMIN` users.
+          </div>
 
           <div class="form-group">
             <label class="form-label">Stage <span class="required">*</span></label>
-            <select v-model="stage" class="form-control">
+            <select v-model="stage" class="form-control" :disabled="!canUseUpload">
               <option value="">Select stage...</option>
               <option value="SIT">SIT</option>
               <option value="UAT">UAT</option>
@@ -98,6 +106,7 @@ function close() {
               type="file"
               accept=".xlsx,.xls"
               class="form-control"
+              :disabled="!canUseUpload"
               @change="onFileChange"
             />
             <span v-if="file" class="file-name">{{ file.name }}</span>
@@ -107,7 +116,7 @@ function close() {
             <button
               type="button"
               class="btn btn-secondary btn-sm"
-              :disabled="downloadingTemplate"
+              :disabled="downloadingTemplate || !canUseUpload"
               @click="handleTemplateDownload"
             >
               {{ downloadingTemplate ? 'Downloading...' : 'Download Template' }}

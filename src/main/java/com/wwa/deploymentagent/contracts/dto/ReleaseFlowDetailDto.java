@@ -15,5 +15,7 @@ public record ReleaseFlowDetailDto(
         Stage currentStage,
         FlowStatus flowStatus,
         ReviewStatus reviewStatus,
+        java.time.Instant archivedAt,
+        String archivedBy,
         List<RequestDto> requests
 ) {}

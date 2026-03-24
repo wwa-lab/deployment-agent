@@ -25,7 +25,7 @@ import java.io.IOException;
  *   POST /api/deployment-agent/upload   (multipart: file + stage)
  * </pre>
  *
- * <p>Authorization: DEVELOPER or TL role.
+ * <p>Authorization: DEVELOPER, TL, or DEVOPS_ADMIN role.
  */
 @RestController
 @RequestMapping("/api/deployment-agent/upload")
@@ -72,7 +72,9 @@ public class UploadController {
     }
 
     private void validateUploadRole(UserContext user) {
-        if (user == null || (!"DEVELOPER".equals(user.role()) && !"TL".equals(user.role()))) {
+        if (user == null || (!user.hasRole("DEVELOPER")
+                && !user.hasRole("TL")
+                && !user.hasRole("DEVOPS_ADMIN"))) {
             throw new ForbiddenAppException("upload");
         }
     }

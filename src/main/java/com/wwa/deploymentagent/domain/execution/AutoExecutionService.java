@@ -51,11 +51,13 @@ public class AutoExecutionService {
     private final List<AutoExecutionAdapter> adapters;
     private final AuditLoggerService auditLogger;
     private final ReleaseFlowProgressionService progressionService;
+    private final TaskService taskService;
 
     @Transactional
     public Task submitAutoExecution(String taskId, UserContext user) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NotFoundAppException("Task", taskId));
+        taskService.assertTaskRequestActive(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:submitAutoExecution");
 
         if (task.getExecutionType() != ExecutionType.AUTO) {

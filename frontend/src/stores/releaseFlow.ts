@@ -8,11 +8,12 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
   const total = ref(0)
   const page = ref(0)
   const size = ref(10)
-  const filters = ref<{ project?: string; status?: string; stage?: string }>({})
+  const filters = ref<{ project?: string; status?: string; stage?: string; includeArchived?: boolean }>({})
   const selectedId = ref<string | null>(null)
   const detail = ref<ReleaseFlowDetail | null>(null)
   const loading = ref(false)
   const pollingInterval = ref<number | null>(null)
+  const detailIncludeArchived = ref(false)
 
   async function fetchList() {
     loading.value = true
@@ -31,6 +32,7 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
 
   async function selectFlow(id: string) {
     selectedId.value = id
+    detailIncludeArchived.value = false
     loading.value = true
     try {
       detail.value = await getReleaseFlow(id)
@@ -39,9 +41,23 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
     }
   }
 
+  async function selectFlowWithArchived(id: string, includeArchived = false) {
+    selectedId.value = id
+    detailIncludeArchived.value = includeArchived
+    loading.value = true
+    try {
+      detail.value = await getReleaseFlow(id, includeArchived ? { includeArchived: true } : undefined)
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function refreshDetail() {
     if (selectedId.value) {
-      detail.value = await getReleaseFlow(selectedId.value)
+      detail.value = await getReleaseFlow(
+        selectedId.value,
+        detailIncludeArchived.value ? { includeArchived: true } : undefined,
+      )
     }
   }
 
@@ -59,7 +75,7 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
     }
   }
 
-  function setFilter(key: keyof typeof filters.value, value: string | undefined) {
+  function setFilter(key: keyof typeof filters.value, value: string | boolean | undefined) {
     filters.value = { ...filters.value, [key]: value }
     page.value = 0
   }
@@ -78,8 +94,10 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
     detail,
     loading,
     pollingInterval,
+    detailIncludeArchived,
     fetchList,
     selectFlow,
+    selectFlowWithArchived,
     refreshDetail,
     startPolling,
     stopPolling,

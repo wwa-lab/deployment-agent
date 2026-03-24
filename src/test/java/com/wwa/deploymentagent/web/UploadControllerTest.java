@@ -32,4 +32,17 @@ class UploadControllerTest {
                 .andExpect(header().string("Content-Type",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     }
+
+    @Test
+    @DisplayName("GET /upload/template with DevOps Admin auth returns downloadable xlsx")
+    void downloadTemplate_devOpsAdminCanDownloadTemplate() throws Exception {
+        mockMvc.perform(get("/api/deployment-agent/upload/template")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"deployment-request-template.xlsx\""))
+                .andExpect(header().string("Content-Type",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+    }
 }

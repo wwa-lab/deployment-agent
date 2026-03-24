@@ -60,6 +60,12 @@ public class Request {
     @Column(name = "estimated_remaining_minutes")
     private Integer estimatedRemainingMinutes;
 
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    @Column(name = "archived_by", length = 255)
+    private String archivedBy;
+
     @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("taskGroupId ASC, stepSeq ASC")
     private List<Task> tasks = new ArrayList<>();

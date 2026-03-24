@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.web;
 
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
+import com.wwa.deploymentagent.contracts.enums.Stage;
 import org.springframework.http.MediaType;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
@@ -15,6 +16,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -151,6 +154,98 @@ class ReleaseFlowControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requestStatus").value("Failed"))
                 .andExpect(jsonPath("$.tasks[0].taskStatus").value("Failed"));
+    }
+
+    @Test
+    @DisplayName("archiveRequestRundown_archivesWholeFlow_whenLastActiveStageArchived")
+    void archiveRequestRundown_archivesWholeFlow_whenLastActiveStageArchived() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        helper.seedTask(req);
+
+        mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/archive")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.releaseFlowId").value(rf.getId()))
+                .andExpect(jsonPath("$.requestId").value(req.getId()))
+                .andExpect(jsonPath("$.stage").value("SIT"))
+                .andExpect(jsonPath("$.requestArchived").value(true))
+                .andExpect(jsonPath("$.releaseFlowArchived").value(true))
+                .andExpect(jsonPath("$.activeRequestCount").value(0));
+
+        mockMvc.perform(get(BASE + "/" + rf.getId())
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get(BASE + "/" + rf.getId())
+                        .param("includeArchived", "true")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archivedAt", notNullValue()));
+    }
+
+    @Test
+    @DisplayName("archiveRequestRundown_keepsFlow_andMovesCurrentStage_whenOtherStagesRemain")
+    void archiveRequestRundown_keepsFlow_andMovesCurrentStage_whenOtherStagesRemain() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request sit = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
+        Request uat = helper.seedRequest(rf, Stage.UAT, RequestStatus.Pending);
+
+        mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + sit.getId() + "/archive")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requestArchived").value(true))
+                .andExpect(jsonPath("$.releaseFlowArchived").value(false))
+                .andExpect(jsonPath("$.activeRequestCount").value(1));
+
+        mockMvc.perform(get(BASE + "/" + rf.getId())
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStage").value("UAT"))
+                .andExpect(jsonPath("$.requests.length()").value(1))
+                .andExpect(jsonPath("$.requests[0].id").value(uat.getId()));
+
+        mockMvc.perform(get(BASE + "/" + rf.getId())
+                        .param("includeArchived", "true")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requests.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("purgeArchivedRequestRundown_deletesArchivedRundown_andRemovesFlowWhenLastRequest")
+    void purgeArchivedRequestRundown_deletesArchivedRundown_andRemovesFlowWhenLastRequest() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        helper.seedTask(req);
+
+        mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/archive")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/purge")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.releaseFlowId").value(rf.getId()))
+                .andExpect(jsonPath("$.requestId").value(req.getId()))
+                .andExpect(jsonPath("$.stage").value("SIT"))
+                .andExpect(jsonPath("$.releaseFlowDeleted").value(true))
+                .andExpect(jsonPath("$.remainingRequestCount").value(0))
+                .andExpect(jsonPath("$.activeRequestCount").value(0));
+
+        mockMvc.perform(get(BASE + "/" + rf.getId())
+                        .param("includeArchived", "true")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

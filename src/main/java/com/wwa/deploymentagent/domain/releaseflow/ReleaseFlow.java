@@ -76,6 +76,12 @@ public class ReleaseFlow {
     @Column(name = "review_owner", length = 255)
     private String reviewOwner;
 
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    @Column(name = "archived_by", length = 255)
+    private String archivedBy;
+
     @OneToMany(mappedBy = "releaseFlow", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Request> requests = new ArrayList<>();
 

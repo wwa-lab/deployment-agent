@@ -39,7 +39,7 @@ public class ConfigurationController {
     public ResponseEntity<ConfigurationItemDto> upsert(
             @Valid @RequestBody ConfigurationItemDto.UpsertRequest body,
             @AuthenticationPrincipal UserContext user) {
-        if (!"DEVOPS_ADMIN".equals(user.role())) {
+        if (!user.hasRole("DEVOPS_ADMIN")) {
             throw new ForbiddenAppException("config:update");
         }
 

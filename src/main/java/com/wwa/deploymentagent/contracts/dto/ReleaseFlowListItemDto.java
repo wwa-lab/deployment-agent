@@ -18,6 +18,8 @@ public record ReleaseFlowListItemDto(
         Stage currentStage,
         FlowStatus flowStatus,
         ReviewStatus reviewStatus,
+        java.time.Instant archivedAt,
+        String archivedBy,
         RequestStatus sitStatus,
         RequestStatus uatStatus,
         RequestStatus prodStatus
@@ -32,6 +34,8 @@ public record ReleaseFlowListItemDto(
                 rf.getCurrentStage(),
                 rf.getFlowStatus(),
                 rf.getReviewStatus(),
+                rf.getArchivedAt(),
+                rf.getArchivedBy(),
                 requestStatusFor(requests, Stage.SIT),
                 requestStatusFor(requests, Stage.UAT),
                 requestStatusFor(requests, Stage.PROD)
@@ -45,6 +49,11 @@ public record ReleaseFlowListItemDto(
 
         return requests.stream()
                 .filter(request -> request.getStage() == stage)
+                .sorted((left, right) -> {
+                    boolean leftArchived = left.getArchivedAt() != null;
+                    boolean rightArchived = right.getArchivedAt() != null;
+                    return Boolean.compare(leftArchived, rightArchived);
+                })
                 .map(Request::getRequestStatus)
                 .findFirst()
                 .orElse(RequestStatus.Pending);

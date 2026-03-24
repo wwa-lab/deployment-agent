@@ -95,7 +95,8 @@ public class ImportService {
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private ReleaseFlow findOrCreateReleaseFlow(String projectId, String projectName, Stage stage) {
-        Optional<ReleaseFlow> existing = releaseFlowRepository.findFirstByProjectId(projectId);
+        Optional<ReleaseFlow> existing =
+                releaseFlowRepository.findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId);
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -107,7 +108,7 @@ public class ImportService {
     }
 
     private Request findOrCreateRequest(ReleaseFlow rf, Stage stage, UserContext user) {
-        return requestRepository.findByReleaseFlowIdAndStage(rf.getId(), stage)
+        return requestRepository.findByReleaseFlowIdAndStageAndArchivedAtIsNull(rf.getId(), stage)
                 .orElseGet(() -> {
                     Request req = new Request();
                     req.setReleaseFlow(rf);
@@ -115,6 +116,8 @@ public class ImportService {
                     req.setRequestStatus(RequestStatus.Pending);
                     req.setApplication(rf.getProjectName());
                     req.setCreatedBy(user.userId());
+                    req.setArchivedAt(null);
+                    req.setArchivedBy(null);
                     return requestRepository.save(req);
                 });
     }
