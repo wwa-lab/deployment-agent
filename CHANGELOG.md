@@ -27,6 +27,7 @@
 - Realigned the user stories, spec, architecture, design, tasks, and implementation-plan docs again with the latest workspace code, including scoped access grants, `scopes[]` in auth/session, runtime `Application / SNOW Group / Agent` scope, audit scope fields, and rundown owner/admin-only control actions.
 - Added a dedicated UAT runbook covering Oracle/database prerequisites, backend and frontend bring-up order, integrated smoke checks, current authentication mode, and known pre-UAT blockers such as the missing baseline schema script.
 - Added a ready-to-run Oracle current-schema SQL script for fresh UAT environments, so tables can be created directly from IntelliJ IDEA before backend startup.
+- Standardized bilingual requirement and user-story documents to English-only wording so repository comments and docs align with the team's official documentation language.
 - Started Phase 1 Access Management coding by adding Access Grant persistence, role-to-permission resolution, deny-by-default auth/session enforcement, bootstrap grants for local/dev users, and a `roles[] + permissions[]` auth contract across backend and frontend session state.
 - Added backend Access Management APIs for listing, creating, updating, suspending, and reactivating Access Grants, with audit events for each grant lifecycle action.
 - Added an Access Management workspace in the frontend with admin grant lifecycle controls, locked navigation for non-admin users, and audit-log labels for access-governance actions.
