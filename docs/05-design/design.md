@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document translates the current Deployment Agent architecture into implementation-facing design guidance for backend services, frontend behavior, data structures, integrations, and operational rules. It covers the current MVP workflow plus the now-implemented foundation of Phase 1 product access governance through Access Grants and Access Management.
+This document translates the current Deployment Agent architecture into implementation-facing design guidance for backend services, frontend behavior, data structures, integrations, and operational rules. It covers the current MVP workflow plus the now-implemented Phase 1 access-governance foundation through Access Grants, scoped visibility, and Access Management.
 
 ```mermaid
 flowchart LR
@@ -59,10 +59,10 @@ flowchart LR
 **Architecture summary carried forward:**
 - Vue 3 SPA frontend inside the WWA workspace shell
 - Spring Boot REST backend with session-based authentication
-- Oracle persistence for workflow, configuration, audit, and planned Access Grant data
+- Oracle persistence for workflow, configuration, audit, and implemented Access Grant data
 - Human-gated task progression with explicit review decisions
 - Fire-and-forget AUTO submission to Jenkins / Ansible
-- Product-scoped authorization through local Access Grants in Phase 1
+- Product entry authorization and `Application + SNOW Group` scoped visibility through local Access Grants in Phase 1
 
 **Key architectural constraints carried forward:**
 - Fixed Excel import schema for MVP
@@ -78,9 +78,9 @@ flowchart LR
 - [Resolved] AUTO execution in MVP is submission-only. The system records submission outcome and external job links but does not rely on a callback pipeline in the current design baseline.
 - [Resolved] Jenkins and Ansible credentials are stored in Deployment Agent configuration records for MVP.
 - Access Grant multi-role assignment is stored as a JSON array in Oracle for parity with existing structured attributes.
-- `auth/login` and `auth/me` return a compatibility `role` plus `roles[]` and effective `permissions[]`.
+- `auth/login` and `auth/me` return a compatibility `role` plus `roles[]`, effective `permissions[]`, and applicable `scopes[]`.
 - [Assumption] Task dependency data remains informational in MVP and does not gate execution order beyond current progression rules.
-- [Assumption] Access Management initially operates on product-scope grants only, not project-level or environment-level authorization.
+- [Resolved] Access Management currently operates on product-entry grants plus optional `Application + SNOW Group` scope grants; `Agent` is not the primary authorization boundary.
 
 ---
 
@@ -99,7 +99,7 @@ flowchart LR
 
 ### Out of Scope
 
-- Project-scoped or environment-scoped authorization
+- Agent-scoped authorization and finer-grained environment-scoped authorization
 - Self-service access requests or approval workflows
 - Real Team Book directory-backed search, unless confirmed later
 - Callback-based AUTO completion ingestion
@@ -134,7 +134,7 @@ flowchart LR
 **Internal Design Concerns**
 - Authentication success does not automatically imply product access
 - Session state must be stable enough to support page refresh, navigation, and repeated API calls
-- Session payload carries a compatibility `role` plus `roles[]` and effective `permissions[]`
+- Session payload carries a compatibility `role` plus `roles[]`, effective `permissions[]`, and `scopes[]`
 
 ### 2. Access Grant Resolution Module
 
@@ -143,6 +143,7 @@ flowchart LR
 - Load the employee's Access Grant record
 - Reject entry when no grant exists or when the grant is suspended
 - Compute effective roles and permissions from assigned product roles
+- Resolve which `Application + SNOW Group` records are visible/manageable for the authenticated user
 
 **Key Interactions**
 - Runs immediately after Team Book authentication succeeds
@@ -151,7 +152,7 @@ flowchart LR
 
 **Internal Design Concerns**
 - Deny-by-default behavior is mandatory
-- One employee should map to one product-scope Access Grant record
+- One employee should map to one Access Grant record with optional scope grants
 - Response contract must remain explicit about access-denied reasons:
   - `Access not granted`
   - `Access suspended`
@@ -161,6 +162,7 @@ flowchart LR
 **Responsibilities**
 - Provide admin-only creation, update, suspension, and reactivation of Access Grants
 - Support search by employee ID or display name
+- Support assignment of scoped visibility through `Application + SNOW Group`
 - Record access-governance audit events
 - Expose a clean administrative view without introducing account/password management
 
@@ -172,16 +174,18 @@ flowchart LR
 **Internal Design Concerns**
 - Grant records are suspended/reactivated, not physically deleted
 - Role assignment supports one or more product roles
+- Scope grants constrain visibility and admin delegation for non-global admins
 - Current implementation searches existing grants only
 - Enterprise directory lookup remains a follow-up expansion, not part of the current admin workflow
 
 ### 4. Upload and Import Module
 
 **Responsibilities**
-- Accept Excel upload plus selected stage
+- Accept Excel upload plus selected stage and optional runtime scope fields
 - Parse the fixed `AMH_HCC_task` worksheet
 - Validate required data and map rows into Release Flow, Request, and Task records
 - Preserve selected non-core columns as import metadata
+- Default rundown owner from a single imported task owner or the uploader
 - Produce a single audit event for the upload action
 
 **Key Interactions**
@@ -190,7 +194,7 @@ flowchart LR
 - First eligible task is promoted into executable state after import
 
 **Internal Design Concerns**
-- Stage comes from the upload UI, not from spreadsheet rows
+- Stage and runtime scope come from the upload UI, not from spreadsheet rows
 - Import is atomic for the whole file
 - Release Flow grouping and release ID generation must remain deterministic
 - Dependency fields are imported and preserved but do not yet drive execution gating
@@ -201,6 +205,7 @@ flowchart LR
 - Aggregate child status into Request and Release Flow summaries
 - Expose summary and detail views for each Release Flow
 - Manage stage-level rundown fields and stage lifecycle operations
+- Surface runtime scope (`Application`, `SNOW Group`, `Agent`) and rundown owner
 - Handle archive / restore / purge of stage rundowns
 
 **Key Interactions**
@@ -213,6 +218,7 @@ flowchart LR
 - Archived rundowns become read-only
 - Restoring a previously archived last-active rundown must reactivate its parent Release Flow
 - Purge is irreversible and must remain admin-only
+- `Start Deployment` and `Mark as Failed` are rundown-control actions and are limited to the rundown owner or `DEVOPS_ADMIN`
 
 ### 6. Task Management Module
 
@@ -301,6 +307,7 @@ flowchart LR
 - Audit writes should not be lost when surrounding business operations fail after the audit call boundary
 - Access-governance actions need their own action types
 - Audit records must survive physical purge of business entities where possible through soft references
+- Audit entries should persist request scope fields so multi-scope filtering remains possible after later lifecycle changes
 
 ### 11. Vue UI Modules
 
@@ -351,7 +358,7 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 - `401 Unauthorized` for invalid credentials
 - `403 Forbidden` with explicit access-state messaging for missing or suspended Access Grant
 
-### Access Management Interfaces `[Phase 1 Planned]`
+### Access Management Interfaces
 
 **Purpose**
 - List and manage Access Grants for Deployment Agent
@@ -366,6 +373,8 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 **Validation Expectations**
 - Only DevOps Admin users may access these interfaces
 - Active grants require at least one assigned role
+- Scope grants are optional but must be valid `Application + SNOW Group` pairs when supplied
+- Scoped admins may manage only grants within their visible scopes; empty scopes on a `DEVOPS_ADMIN` grant represent global-admin access
 - Employee identity fields must be present and stable enough for display and audit
 
 **Error Behavior**
@@ -386,7 +395,9 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 
 **Validation Expectations**
 - Import validates stage and fixed worksheet schema
+- Upload and list/detail views validate runtime scope where applicable
 - Task mutations validate ownership/permission, current task state, and parent rundown lifecycle
+- Rundown-control actions validate scope plus rundown owner/admin rules
 - Decision submission validates allowed decision for the current status
 
 **Error Behavior**
@@ -417,7 +428,7 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 - `GET /audit-logs`
 
 **Validation Expectations**
-- Any signed-in user may read audit history in the current MVP implementation
+- Any signed-in user may read audit history in the current MVP implementation, but returned rows are limited by scoped visibility unless the user is a global admin
 - Filtering inputs must be validated to avoid malformed queries
 
 ---
@@ -429,12 +440,12 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 | Entity | Purpose | Key Attributes |
 |--------|---------|----------------|
 | Release Flow | Top-level deployment journey | `project_id`, `project_name`, `release_id`, `current_stage`, `flow_status`, `review_status` |
-| Request | Stage-level rundown inside a Release Flow | `stage`, `request_status`, rundown display fields, archive markers |
+| Request | Stage-level rundown inside a Release Flow | `stage`, `request_status`, `snow_group`, `application`, `agent`, `owner`, archive markers |
 | Task | Atomic execution step | `task_group_id`, `step_seq`, `task_name`, `execution_type`, `task_status`, `input_parameters`, `expected_output`, `import_metadata` |
 | Task Execution History | Per-attempt execution record | `attempt_number`, `execution_status`, `result_summary`, `result_logs`, external job fields |
 | Configuration Item | Runtime integration config | `config_key`, `config_value`, `updated_by`, `updated_at` |
-| Audit Log Entry | Immutable operator audit record | `operator_id`, `action_type`, `timestamp`, `context_payload` |
-| Access Grant | Product authorization record | `employee_id`, `display_name_snapshot`, `grant_status`, `assigned_roles`, `note`, `last_login_at` |
+| Audit Log Entry | Immutable operator audit record | `operator_id`, `action_type`, `timestamp`, `application`, `snow_group`, `agent`, `context_payload` |
+| Access Grant | Product authorization record | `employee_id`, `display_name_snapshot`, `grant_status`, `assigned_roles`, `scope_grants`, `note`, `last_login_at` |
 
 ### Relationships
 
@@ -444,8 +455,8 @@ Request 1:N Task
 Task 1:N Task Execution History
 
 Configuration Item - independent
-Audit Log Entry - independent, soft-referenced
-Access Grant - independent, product-scoped
+Audit Log Entry - independent, soft-referenced with scope fields
+Access Grant - independent, product entry + scoped visibility
 ```
 
 ### Release Flow and Request Design Notes
@@ -471,21 +482,24 @@ Access Grant - independent, product-scoped
   - `Blocks`
 - MVP progression remains rule-driven and does not yet use dependency links as authoritative gating logic
 
-### Access Grant Design `[Phase 1 Planned]`
+### Access Grant Design
 
 **Fields**
 - `employee_id`
 - `display_name_snapshot`
 - `grant_status` = `ACTIVE | SUSPENDED`
 - `assigned_roles`
+- `scope_grants`
 - `note`
 - `last_login_at`
 - `created_by`, `created_at`, `updated_by`, `updated_at`
 
 **Rules**
-- one product-scope grant per employee
+- one Access Grant per employee
 - no physical delete in Phase 1
 - active grant requires at least one assigned role
+- scope grants are optional
+- empty scope grants on a `DEVOPS_ADMIN` record represent global-admin visibility
 - suspend/reactivate retains history
 
 ### Configuration Keys
@@ -530,7 +544,7 @@ Pending/Running -> Failed
 Pending/Running -> Rejected
 ```
 
-#### Access Grant Status `[Phase 1 Planned]`
+#### Access Grant Status
 
 ```text
 ACTIVE <-> SUSPENDED
@@ -565,6 +579,7 @@ Priority guidance:
 ### 2. Release Flow Summary
 
 - Displays Release Flows with stage-level SIT / UAT / PROD visibility
+- Shows active runtime scope and `Rundown Owner` in the summary table
 - Default list excludes archived flows
 - `[Implemented]` admin can enable archived visibility in management contexts
 - Upload entry remains visible according to permission model
@@ -572,12 +587,15 @@ Priority guidance:
 ### 3. Release Flow Detail and Rundown Panel
 
 - Stage tabs provide per-request context
-- Rundown Information panel shows current stage summary and stage-level actions
+- Rundown Information panel shows current stage summary, runtime scope, rundown owner, and stage-level actions
 - Dependency summary is intentionally lighter and sits with the task area so `Blocked By` / `Blocks` troubleshooting stays near the actionable task table
 - Lifecycle actions:
   - `Archive Rundown`
   - `Restore Rundown` (admin)
   - `Delete Permanently` (admin, archived only)
+- Rundown-control actions:
+  - `Start Deployment` (rundown owner or admin)
+  - `Mark as Failed` (rundown owner or admin)
 - Archived rundowns should display a clear read-only state
 
 ### 4. Task Table and Action Model
@@ -617,6 +635,7 @@ Expected columns include:
   - display name
   - status
   - assigned roles
+  - scope grants
   - last login
   - updated by / updated at
 - Actions:
@@ -636,7 +655,7 @@ Expected columns include:
 
 ## Workflow / Execution Design
 
-### 1. Product Entry Authorization `[Phase 1 Planned]`
+### 1. Product Entry Authorization
 
 1. User submits login credentials
 2. Team Book authenticates enterprise identity
@@ -644,16 +663,18 @@ Expected columns include:
 4. System either:
    - denies entry with access-state message, or
    - creates session with authorization profile
-5. Frontend menus, routes, and API access use effective permissions from that profile
+5. Session context includes effective permissions and applicable scope grants
+6. Frontend menus, routes, and API access use effective permissions from that profile
 
 ### 2. Upload and Import Flow
 
-1. User selects stage and uploads Excel file
+1. User selects stage and optional `Application / SNOW Group / Agent` scope, then uploads Excel file
 2. System validates worksheet, schema, and row data
 3. Import service groups rows into Release Flow / Request / Task structures
-4. System persists data atomically
-5. First eligible task is promoted to `Ready_For_Execution`
-6. Audit event is recorded
+4. Import service derives rundown owner from the imported task owner set or uploader
+5. System persists data atomically
+6. First eligible task is promoted to `Ready_For_Execution`
+7. Audit event is recorded
 
 ### 3. MANUAL Task Execution Flow
 
@@ -905,7 +926,7 @@ Audit should record at least:
 
 1. Should a later phase expand Access Management beyond the current existing-grants-only search model to include enterprise users without grants?
 2. Should Access Grant role edits require a mandatory admin note?
-3. Should product authorization remain global in Phase 1, or should project/environment scoping be planned immediately after?
+3. Should a later phase extend authorization beyond the current product-entry grant plus `Application + SNOW Group` scopes into agent- or environment-scoped control?
 4. Should AUTO completion ingestion be addressed by callback, polling, or explicit manual completion in the next phase?
 
 ---

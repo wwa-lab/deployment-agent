@@ -10,7 +10,7 @@
 
 ## Overview
 
-The Deployment Agent currently persists seven implemented entity types in Oracle. The current workspace already includes a product-level `Access Grant` entity so the system can enforce deny-by-default product entry and admin-managed authorization, alongside the existing hierarchical workflow model (Release Flow → Request → Task → Execution History), append-only audit logging, and runtime configuration management. Existing structured attributes use converter-backed `CLOB` storage; `assigned_roles` on `DA_ACCESS_GRANT` is stored as a JSON array via `StringListJsonAttributeConverter`.
+The Deployment Agent currently persists seven implemented entity types in Oracle. The current workspace already includes an `Access Grant` entity with scope grants so the system can enforce deny-by-default product entry and scoped visibility, alongside the existing hierarchical workflow model (Release Flow → Request → Task → Execution History), append-only audit logging, and runtime configuration management. Existing structured attributes use converter-backed `CLOB` storage; `assigned_roles` and `scope_grants` on `DA_ACCESS_GRANT` are stored as JSON arrays via attribute converters.
 
 ---
 
@@ -29,7 +29,8 @@ The Deployment Agent currently persists seven implemented entity types in Oracle
 │  DA_REQUEST         │
 │  (PK: id)           │
 │  (FK: release_flow) │
-│  version             │
+│  scope + owner      │
+│  version            │
 └────────┬────────────┘
          │ 1:N
          ▼
@@ -45,14 +46,14 @@ The Deployment Agent currently persists seven implemented entity types in Oracle
 │  DA_CONFIGURATION   │                 │  DA_AUDIT_LOG_ENTRY          │
 │  _ITEM              │                 │  (PK: id)                    │
 │  (PK: config_key)   │                 │  (soft refs to RF/Req/Task)  │
-│  no version          │                 │  append-only                 │
+│  no version         │                 │  scope fields + append-only  │
 └─────────────────────┘                 └──────────────────────────────┘
 
 ┌─────────────────────┐
 │  DA_ACCESS_GRANT    │
 │  (PK: employee_id)  │
-│  product access     │
-│  role assignment    │
+│  product entry      │
+│  roles + scopes     │
 └─────────────────────┘
 ```
 
@@ -94,6 +95,15 @@ Stage-scoped unit within a Release Flow. One Request per (Release Flow, Stage) p
 | `release_flow_id` | VARCHAR(36) | No (FK) | References DA_RELEASE_FLOW |
 | `stage` | VARCHAR(10) | No | Enum: `SIT`, `UAT`, `PROD` |
 | `request_status` | VARCHAR(30) | No | Enum: `Pending`, `Running`, `Completed`, `Failed`, `Skipped`, `Rejected` |
+| `snow_group` | VARCHAR(255) | Yes | Runtime scope / owning support group |
+| `application` | VARCHAR(255) | Yes | Runtime application scope |
+| `agent` | VARCHAR(255) | Yes | Runtime agent label |
+| `owner` | VARCHAR(255) | Yes | Rundown owner for request-level control actions |
+| `site` | VARCHAR(100) | Yes | Display / operational context |
+| `created_by` | VARCHAR(255) | Yes | Uploading or creating user |
+| `estimated_remaining_minutes` | NUMBER(10) | Yes | Operator-maintained ETA |
+| `archived_at` | TIMESTAMP | Yes | Soft-archive marker |
+| `archived_by` | VARCHAR(255) | Yes | User who archived the request |
 | `created_at` | TIMESTAMP | No | Auto-populated, immutable |
 | `updated_at` | TIMESTAMP | No | Auto-updated |
 | `version` | BIGINT | No | Optimistic locking counter |
@@ -202,6 +212,9 @@ Immutable, append-only record of operator actions. Uses soft references (nullabl
 | `release_flow_id` | VARCHAR(36) | Yes | Soft reference |
 | `request_id` | VARCHAR(36) | Yes | Soft reference |
 | `task_id` | VARCHAR(36) | Yes | Soft reference |
+| `application` | VARCHAR(255) | Yes | Scope field for filtering / traceability |
+| `snow_group` | VARCHAR(255) | Yes | Scope field for filtering / traceability |
+| `agent` | VARCHAR(255) | Yes | Scope field for filtering / traceability |
 | `context_payload` | CLOB | Yes | JSON; action-specific detail |
 
 **Indexes:**
@@ -216,7 +229,7 @@ Immutable, append-only record of operator actions. Uses soft references (nullabl
 
 ### DA_ACCESS_GRANT
 
-Product-level authorization record for one enterprise employee within Deployment Agent. This entity controls whether an authenticated employee may enter the product and what roles are assigned inside the product boundary.
+Product-level authorization record for one enterprise employee within Deployment Agent. This entity controls whether an authenticated employee may enter the product, what roles are assigned, and which `Application + SNOW Group` records are visible/manageable.
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
@@ -224,6 +237,7 @@ Product-level authorization record for one enterprise employee within Deployment
 | `display_name_snapshot` | VARCHAR(255) | No | Last captured display name from identity source |
 | `grant_status` | VARCHAR(30) | No | Enum: `ACTIVE`, `SUSPENDED` |
 | `assigned_roles` | CLOB / JSON array | No | One or more Deployment Agent roles |
+| `scope_grants` | CLOB / JSON array | Yes | Zero or more `Application + SNOW Group` visibility grants |
 | `note` | VARCHAR(1000) | Yes | Admin note / rationale |
 | `last_login_at` | TIMESTAMP | Yes | Last successful product entry time |
 | `created_by` | VARCHAR(255) | No | Admin who created the grant |
@@ -239,6 +253,7 @@ Product-level authorization record for one enterprise employee within Deployment
 **Lifecycle Notes:**
 - Access grants are suspended/reactivated, not physically deleted, so access history remains traceable
 - Multi-role assignment is stored as a JSON array in a `CLOB` column for parity with other structured attributes
+- Empty `scope_grants` on a `DEVOPS_ADMIN` grant represent global-admin visibility
 
 ---
 

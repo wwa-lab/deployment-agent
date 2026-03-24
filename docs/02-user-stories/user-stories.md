@@ -1097,13 +1097,13 @@ so that the deployment context is captured per request for operational coordinat
 
 2. Given the Rundown Information panel is visible,
    When the user clicks Edit on the rundown,
-   Then a dialog opens with editable fields for SNOW group, application, site, and estimated remaining time.
+   Then a dialog opens with editable fields for SNOW group, application, agent, site, estimated remaining time, and rundown owner when the current user is a DevOps Admin.
 
 3. Given the user saves rundown changes,
    When the save completes,
    Then the updated values are persisted via the backend API.
 
-4. Given a request is in a runnable state,
+4. Given a request is in a runnable state and the current user is the rundown owner or a DevOps Admin,
    When the user clicks Start Deployment, Refresh, or Mark as Failed,
    Then the corresponding request-level action is executed and the detail refreshes.
 
@@ -1266,7 +1266,7 @@ so that product access can be managed without building a separate user account s
 
 1. Given an employee has a valid enterprise identity but does not yet have Deployment Agent access,
    When the DevOps Admin creates an access grant,
-   Then the system stores the employee ID, display name snapshot, status, assigned roles, and note.
+   Then the system stores the employee ID, display name snapshot, status, assigned roles, scope grants, and note.
 
 2. Given an employee already has an active access grant,
    When the DevOps Admin suspends the employee,
@@ -1279,7 +1279,8 @@ so that product access can be managed without building a separate user account s
 **Notes / Assumptions / 备注 / 假设**
 
 - Authentication continues to come from Team Book or enterprise SSO.
-- Phase 1 manages product-level access only and does not yet support project-level authorization.
+- Phase 1 manages product entry plus scoped visibility through `Application + SNOW Group` grants.
+- `Agent` remains a runtime dimension and is not the primary authorization boundary.
 
 **Dependencies / 依赖**
 
@@ -1320,7 +1321,7 @@ so that platform access is controlled and auditable.
 
 3. Given an employee has an active Deployment Agent access grant,
    When the employee logs in,
-   Then the system returns the employee's effective roles and permissions rather than relying on a single hardcoded role value.
+   Then the system returns the employee's effective roles, permissions, and applicable scope grants rather than relying on a single hardcoded role value.
 
 **Notes / Assumptions / 备注 / 假设**
 
@@ -1358,11 +1359,11 @@ so that I can operate authorization without changing code or stub data.
 
 1. Given the DevOps Admin opens the Access Management page,
    When the page finishes loading,
-   Then the system displays employee ID, name, status, roles, last login time, updated by, and updated at.
+   Then the system displays employee ID, name, status, roles, scope grants, last login time, updated by, and updated at.
 
 2. Given the DevOps Admin searches for an employee,
    When an employee ID or name keyword is entered,
-   Then matching employees are shown and the admin can grant access, edit roles, suspend access, or reactivate access.
+   Then matching employees are shown and the admin can grant access, edit roles, update scope grants, suspend access, or reactivate access.
 
 3. Given a non-admin user attempts to access the Access Management page,
    When the user navigates from the menu or enters the URL directly,
@@ -1413,6 +1414,10 @@ so that the product behaves predictably and securely.
 3. Given a user has multiple assigned roles,
    When the system resolves the user's effective permissions,
    Then page visibility and action availability are derived from the combined permission set.
+
+4. Given a user has active scope grants,
+   When the user loads scoped surfaces such as release flows or audit history,
+   Then the system limits visible records to the `Application + SNOW Group` scopes assigned to that user unless the user is a global DevOps Admin.
 
 **Notes / Assumptions / 备注 / 假设**
 

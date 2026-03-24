@@ -18,6 +18,7 @@ flowchart LR
     subgraph Input
         Excel[Excel File<br/>AMH_HCC_task sheet]
         Stage[Stage selector<br/>SIT / UAT / PROD]
+        Scope[Upload scope<br/>Application / SNOW Group / Agent]
     end
 
     subgraph Parse["Parse Layer"]
@@ -39,6 +40,7 @@ flowchart LR
 
     Excel --> Parser
     Stage --> Import
+    Scope --> Import
     Parser --> Validate
     Validate -->|Valid| Import
     Validate -->|Invalid| Error[422 Validation Error]
@@ -68,6 +70,10 @@ flowchart LR
 | Activity category, Common, Dependencies, Validation | Task | import_metadata (JSON) | Metadata blob |
 | Status, Start/End date/time | -- | Not stored | Dropped |
 | *(from UI)* Stage | Request | stage | Core |
+| *(from UI)* Application | Request | application | Runtime scope |
+| *(from UI)* SNOW Group | Request | snow_group | Runtime scope |
+| *(from UI)* Agent | Request | agent | Runtime scope |
+| *(system-derived)* Rundown owner | Request | owner | Derived from a single imported task owner, otherwise uploader |
 | *(system-generated)* Release ID | ReleaseFlow | release_id | Core |
 
 ---
@@ -184,7 +190,7 @@ flowchart LR
 |---|---|---|
 | LoginRequestDto | employeeId, password | Request-scoped |
 | UserContext | employeeId, displayName, identity context | Stored in HttpSession |
-| Authorization Profile `[Phase 1]` | access status, assigned roles, effective permissions | Resolved during login / session restore |
+| Authorization Profile `[Phase 1]` | access status, assigned roles, effective permissions, applicable scopes | Resolved during login / session restore |
 | SecurityContext | Authentication with UserContext | Per-request from session |
 
 ### 4.1 Access Management Admin Flow
@@ -193,7 +199,7 @@ flowchart LR
 flowchart LR
     Admin[DevOps Admin] -->|GET/POST/PATCH /access-grants| AMC[Access Management API]
     AMC --> AGS[Access Grant Service]
-    AGS --> Validate[Grant validation<br/>roles, status, note]
+    AGS --> Validate[Grant validation<br/>roles, scopes, status, note]
     AGS --> DB[(DA_ACCESS_GRANT)]
     AGS --> AL[(AuditLogEntry<br/>access governance action)]
 ```
@@ -201,9 +207,9 @@ flowchart LR
 ### 4.2 Authorization Resolution Notes
 
 - Authentication confirms enterprise identity through Team Book
-- Authorization then resolves local product access through Access Grants
+- Authorization then resolves local product access and `Application + SNOW Group` visibility through Access Grants
 - Users without an active Access Grant are blocked before entering the Deployment Agent workspace
-- Frontend route visibility and backend endpoint access are expected to use the same effective permission set in Phase 1
+- Frontend route visibility and backend endpoint access are expected to use the same effective permission set and scope evaluation in Phase 1
 
 ---
 
@@ -255,7 +261,7 @@ flowchart TD
     Sources -->|AuditLoggerService.log()| ALS[AuditLoggerService<br/>REQUIRES_NEW propagation]
     ALS --> DB[(DA_AUDIT_LOG_ENTRY)]
 
-    DB --> AuditAPI[GET /audit-logs<br/>role-gated: AUDIT, MANAGEMENT]
+    DB --> AuditAPI[GET /audit-logs<br/>signed-in users, filtered by scope]
     AuditAPI --> AuditView[Audit Log View<br/>read-only list]
 ```
 
@@ -271,6 +277,9 @@ flowchart TD
 | release_flow_id | Nullable context reference |
 | request_id | Nullable context reference |
 | task_id | Nullable context reference |
+| application | Nullable scope field for filtering and traceability |
+| snow_group | Nullable scope field for filtering and traceability |
+| agent | Nullable scope field for filtering and traceability |
 | context_payload | JSON with action-specific details |
 
 ### Audit Isolation

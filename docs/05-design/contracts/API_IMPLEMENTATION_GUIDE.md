@@ -10,7 +10,7 @@
 
 ## Overview
 
-This guide describes the backend API surface for Deployment Agent. It covers the current MVP workflow APIs plus the currently implemented auth/access-management surface used for deny-by-default product entry.
+This guide describes the backend API surface for Deployment Agent. It covers the current MVP workflow APIs plus the currently implemented auth/access-management surface used for deny-by-default product entry and scoped visibility.
 
 **Interpretation rule**
 - Implemented auth/access-management endpoints are described as current behavior.
@@ -51,6 +51,7 @@ This guide describes the backend API surface for Deployment Agent. It covers the
 - Product access is no longer “any authenticated user.”
 - Authorization is resolved from one or more assigned roles on the Access Grant.
 - Backend should prefer effective-permission evaluation over route-level role string assumptions.
+- Visibility and administrative reach are additionally constrained by `Application + SNOW Group` scope grants.
 
 ### Stub Users (dev/test)
 
@@ -126,14 +127,14 @@ All errors should return a consistent JSON body:
 
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
-| List Release Flows | GET | `/release-flows` | Any authenticated |
-| Get Release Flow detail | GET | `/release-flows/{id}` | Any authenticated |
+| List Release Flows | GET | `/release-flows` | Any authenticated within scoped visibility |
+| Get Release Flow detail | GET | `/release-flows/{id}` | Any authenticated within scoped visibility |
 | Update stage rundown | PATCH | `/release-flows/{flowId}/requests/{requestId}/rundown` | DEVELOPER, TL, DEVOPS_ADMIN |
 | Archive stage rundown | POST | `/release-flows/{flowId}/requests/{requestId}/archive` | DEVELOPER, TL, DEVOPS_ADMIN |
 | Restore archived stage rundown | POST | `/release-flows/{flowId}/requests/{requestId}/restore` | DEVOPS_ADMIN |
 | Purge archived stage rundown | DELETE | `/release-flows/{flowId}/requests/{requestId}/purge` | DEVOPS_ADMIN |
-| Start stage deployment | POST | `/release-flows/{flowId}/requests/{requestId}/start` | DEVELOPER, TL, DEVOPS_ADMIN |
-| Mark stage as failed | POST | `/release-flows/{flowId}/requests/{requestId}/fail` | DEVELOPER, TL, DEVOPS_ADMIN |
+| Start stage deployment | POST | `/release-flows/{flowId}/requests/{requestId}/start` | Rundown owner or DEVOPS_ADMIN |
+| Mark stage as failed | POST | `/release-flows/{flowId}/requests/{requestId}/fail` | Rundown owner or DEVOPS_ADMIN |
 
 ### Task Management
 
@@ -163,7 +164,7 @@ All errors should return a consistent JSON body:
 
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
-| List audit log entries | GET | `/audit-logs` | Any authenticated |
+| List audit log entries | GET | `/audit-logs` | Any authenticated within scoped visibility |
 
 ---
 
@@ -192,7 +193,8 @@ Authenticates enterprise identity and creates an HTTP session.
   "role": "DEVOPS_ADMIN",
   "roles": ["DEVOPS_ADMIN"],
   "permissions": ["release.view", "release.upload", "release.rundown.edit", "release.rundown.archive", "release.rundown.start", "release.rundown.fail", "task.edit", "task.run", "task.review", "config.manage", "audit.view", "access.manage", "release.view_archived", "release.rundown.restore", "release.rundown.purge"],
-  "displayName": "Carol Lee"
+  "displayName": "Carol Lee",
+  "scopes": []
 }
 ```
 
@@ -220,7 +222,8 @@ Returns the currently authenticated user context.
   "role": "DEVOPS_ADMIN",
   "roles": ["DEVOPS_ADMIN"],
   "permissions": ["release.view", "release.upload", "release.rundown.edit", "release.rundown.archive", "release.rundown.start", "release.rundown.fail", "task.edit", "task.run", "task.review", "config.manage", "audit.view", "access.manage", "release.view_archived", "release.rundown.restore", "release.rundown.purge"],
-  "displayName": "Carol Lee"
+  "displayName": "Carol Lee",
+  "scopes": []
 }
 ```
 
@@ -263,6 +266,7 @@ Lists product Access Grants for Deployment Agent administration.
       "displayName": "Carol Lee",
       "grantStatus": "ACTIVE",
       "assignedRoles": ["DEVOPS_ADMIN"],
+      "scopeGrants": [],
       "lastLoginAt": "2026-03-24T09:30:00Z",
       "updatedBy": "emp-003",
       "updatedAt": "2026-03-24T09:00:00Z"
@@ -284,6 +288,9 @@ Creates a new Access Grant.
 {
   "employeeId": "emp-006",
   "assignedRoles": ["DEVELOPER"],
+  "scopeGrants": [
+    { "application": "AMH HCC", "snowGroup": "HTSA-CSI-HCC-AMH-PRJ" }
+  ],
   "grantStatus": "ACTIVE",
   "note": "Initial product onboarding"
 }
@@ -293,6 +300,7 @@ Creates a new Access Grant.
 - `employeeId` required
 - `grantStatus` required
 - `assignedRoles` required when `grantStatus = ACTIVE`
+- `scopeGrants` must contain valid `application` and `snowGroup` values when provided
 
 **Side effects**
 - Audit log entry for access-grant creation
@@ -333,6 +341,9 @@ Parses an Excel file (`AMH_HCC_task`) and creates or updates a Release Flow for 
 |-------|------|----------|-------------|
 | `file` | File | Yes | `.xlsx` file conforming to the template |
 | `stage` | String | Yes | `SIT`, `UAT`, or `PROD` |
+| `snowGroup` | String | No | Runtime support-group scope for the uploaded rundown |
+| `application` | String | No | Runtime application scope for the uploaded rundown |
+| `agent` | String | No | Runtime agent label for the uploaded rundown |
 
 **Response** `200 OK`
 
@@ -341,7 +352,10 @@ Parses an Excel file (`AMH_HCC_task`) and creates or updates a Release Flow for 
   "releaseFlowId": "uuid-string",
   "releaseId": "sit-my-project-001",
   "stage": "SIT",
-  "taskCount": 12
+  "taskCount": 12,
+  "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+  "application": "AMH HCC",
+  "agent": "Deployment Agent"
 }
 ```
 
@@ -379,6 +393,9 @@ Returns a paginated list of Release Flows.
 | `project` | String | — | Filter by project ID or name |
 | `status` | String | — | Flow status filter |
 | `stage` | String | — | Current stage filter |
+| `application` | String | — | Scope filter by application |
+| `snowGroup` | String | — | Scope filter by SNOW group |
+| `agent` | String | — | Scope filter by agent |
 | `includeArchived` | Boolean | `false` | Admin-only archived visibility |
 | `page` | int | `0` | Zero-based page index |
 | `size` | int | `10` | Page size |
@@ -395,7 +412,11 @@ Returns a paginated list of Release Flows.
       "releaseId": "sit-my-project-001",
       "currentStage": "SIT",
       "flowStatus": "Running",
-      "reviewStatus": "Pending_Review"
+      "reviewStatus": "Pending_Review",
+      "application": "AMH HCC",
+      "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+      "agent": "Deployment Agent",
+      "owner": "alice"
     }
   ],
   "total": 42,
@@ -416,7 +437,11 @@ Returns Release Flow detail, nested stage requests, and tasks.
 
 ### PATCH /release-flows/{flowId}/requests/{requestId}/rundown
 
-Updates stage-level rundown fields such as application, site, SNOW group, and estimated remaining time.
+Updates stage-level rundown fields such as application, SNOW group, agent, site, estimated remaining time, and rundown owner.
+
+**Validation**
+- Runtime scope changes require rundown edit permission and scoped visibility
+- `owner` updates are restricted to `DEVOPS_ADMIN`
 
 ### POST /release-flows/{flowId}/requests/{requestId}/archive
 
@@ -451,9 +476,17 @@ Permanently deletes an already archived stage rundown.
 
 Promotes the first pending task in the stage into an executable state.
 
+**Validation**
+- Caller must have scoped visibility to the request
+- Caller must be the rundown owner or `DEVOPS_ADMIN`
+
 ### POST /release-flows/{flowId}/requests/{requestId}/fail
 
 Marks the stage request as failed and recomputes parent aggregate status.
+
+**Validation**
+- Caller must have scoped visibility to the request
+- Caller must be the rundown owner or `DEVOPS_ADMIN`
 
 ---
 
@@ -631,7 +664,7 @@ Creates or updates a configuration item.
 
 Returns audit log entries for signed-in users.
 
-**Auth:** Any authenticated session
+**Auth:** Any authenticated session, filtered by scoped visibility unless the user is a global `DEVOPS_ADMIN`
 
 **Query Parameters**
 
@@ -641,6 +674,9 @@ Returns audit log entries for signed-in users.
 | `actionType` | String | — | Filter by audit action |
 | `releaseFlowId` | String | — | Filter by flow |
 | `taskId` | String | — | Filter by task |
+| `application` | String | — | Filter by application scope |
+| `snowGroup` | String | — | Filter by SNOW group scope |
+| `agent` | String | — | Filter by agent |
 | `page` | int | `0` | Zero-based page index |
 | `size` | int | `20` | Page size |
 

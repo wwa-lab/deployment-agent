@@ -9,10 +9,10 @@
 ## 1. Overview
 
 ### 1.1 Feature Summary
-Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. It enables users to upload deployment requests via a fixed Excel template, create and monitor Release Flows across SIT / UAT / PROD stages, inspect task execution results, make explicit human decisions (Approve / Reject / Rerun / Skip), maintain key integration configuration, review audit records, and control product access through admin-managed access grants.
+Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. It enables users to upload deployment requests via a fixed Excel template, create and monitor Release Flows across SIT / UAT / PROD stages, inspect task execution results, make explicit human decisions (Approve / Reject / Rerun / Skip), maintain key integration configuration, review audit records, and control product access plus scoped visibility through admin-managed access grants.
 
 ### 1.2 Business Objective
-Provide a unified and traceable deployment workspace that makes deployment execution visible, reviewable, auditable, explicitly controlled by humans before progression, and protected by product-level access governance.
+Provide a unified and traceable deployment workspace that makes deployment execution visible, reviewable, auditable, explicitly controlled by humans before progression, and protected by product-entry and scoped-visibility governance.
 
 ### 1.3 MVP Objective
 Ensure the core workflow can successfully run through:
@@ -34,8 +34,9 @@ The MVP shall support the following end-to-end capabilities:
 10. Maintain core integration configuration in UI
 11. View minimal read-only audit log list in MVP
 12. Enforce deny-by-default product entry using Deployment Agent access grants
-13. Allow DevOps Admin to manage access grants, roles, and access status
+13. Allow DevOps Admin to manage access grants, roles, scope grants, and access status
 14. Record access-governance changes in audit logs
+15. Restrict rundown-level control actions to the rundown owner or DevOps Admin
 
 ---
 
@@ -100,9 +101,10 @@ The MVP shall support the following end-to-end capabilities:
 - **Task**: An executable unit within a Request
 - **Current Stage**: The current stage of a Release Flow, such as SIT, UAT, or PROD
 - **Review Gate**: The point after execution where TL must explicitly decide how to proceed
-- **Access Grant**: A product-level authorization record that determines whether an enterprise user may enter Deployment Agent
+- **Access Grant**: A product authorization record that determines whether an enterprise user may enter Deployment Agent and which `Application + SNOW Group` scopes are visible/manageable
 - **Effective Permissions**: The combined permissions derived from a user's assigned Deployment Agent roles
 - **Suspended Access**: An access state in which the employee identity still exists but product entry is blocked
+- **Rundown Owner**: The user designated to control request-level actions such as `Start Deployment` and `Mark as Failed`
 
 ---
 
@@ -124,7 +126,7 @@ Task operations such as View Result, Edit, Approve, Reject, Rerun, and Skip occu
 | Audit Log Entry | may reference Request | N:1 | Optional context |
 | Audit Log Entry | may reference Task | N:1 | Optional context |
 | Configuration Item | independent managed record | N/A | Shared platform capability |
-| Access Grant | independent managed record | 1:1 per employee in product scope | Controls product entry and effective roles |
+| Access Grant | independent managed record | 1:1 per employee | Controls product entry, effective roles, and scoped visibility |
 
 ### 5.2 Core Entities
 
@@ -151,6 +153,12 @@ Minimum attributes:
 - `release_flow_id`
 - `stage`
 - `request_status`
+- `snow_group`
+- `application`
+- `agent`
+- `owner` — rundown owner
+- `site`
+- `estimated_remaining_minutes`
 - `created_at`
 - `updated_at`
 
@@ -291,17 +299,19 @@ Minimum attributes:
 ### 7.4 Release Flow Summary
 
 - **FR-21**: The system shall display a Release Flow Summary list in the Deployment Agent dashboard.
-- **FR-22**: Each Release Flow row shall display the Release Flow identifier and stage summary status for SIT, UAT, and PROD.
+- **FR-22**: Each Release Flow row shall display the Release Flow identifier, active scope summary, rundown owner, and stage summary status for SIT, UAT, and PROD.
 - **FR-23**: Stage summary statuses shown in the summary list shall use only `Done`, `Running`, or `Pending`.
-- **FR-24**: The system shall support filtering of Release Flows by supported criteria.
+- **FR-24**: The system shall support filtering of Release Flows by project, status, stage, application, SNOW group, and agent.
 - **FR-25**: Applying filters shall update the summary list to show only matching records.
 - **FR-26**: The Release Flow Summary depends on Release Flow records already existing in the system.
 
 ### 7.5 Selected Release Flow Details
 
 - **FR-27**: When a user selects a Release Flow, the system shall update the Selected Release Flow Details section.
-- **FR-28**: The details section shall display `Project`, `Release ID`, `Current Stage`, `Current Request ID`, `Review Status`, and `Review Owner`.
+- **FR-28**: The details section shall display `Project`, `Release ID`, `Current Stage`, `Review Status`, `Review Owner`, active rundown scope (`Application`, `SNOW Group`, `Agent`), and `Rundown Owner`.
 - **FR-29**: When a different Release Flow is selected, the details section shall refresh accordingly.
+- **FR-29a**: The Rundown Information panel shall expose request-level actions such as `Refresh`, `Start Deployment`, and `Mark as Failed` when the request status permits them.
+- **FR-29b**: `Start Deployment` and `Mark as Failed` shall be executable only by the rundown owner or a DevOps Admin.
 
 ### 7.6 Task Details and Result Viewing
 
@@ -362,7 +372,7 @@ Minimum attributes:
 
 ### 7.11 Audit Log Viewing
 
-- **FR-66**: Signed-in users shall be able to access the Audit Log area in read-only mode.
+- **FR-66**: Signed-in users shall be able to access the Audit Log area in read-only mode for records visible to their assigned scopes.
 - **FR-67**: The system shall display a read-only list of recent audit log records in MVP.
 - **FR-68**: Each displayed audit record shall show operator identity, action type, timestamp, and related context.
 - **FR-69**: Users viewing audit logs in MVP shall be able to read but not edit or delete records.
@@ -372,7 +382,7 @@ Minimum attributes:
 - **FR-70**: The system shall enforce deny-by-default entry for Deployment Agent using a local Access Grant record. *(Source: US-22)*
 - **FR-71**: If an enterprise-authenticated employee has no Access Grant, the system shall deny product entry and display an `Access not granted` message. *(Source: US-22)*
 - **FR-72**: If an employee has a suspended Access Grant, the system shall deny product entry and display an `Access suspended` message. *(Source: US-21, US-22)*
-- **FR-73**: If an employee has an active Access Grant, the system shall resolve and return the employee's effective Deployment Agent roles and permissions. *(Source: US-22, US-24)*
+- **FR-73**: If an employee has an active Access Grant, the system shall resolve and return the employee's effective Deployment Agent roles, permissions, and applicable scope grants. *(Source: US-22, US-24)*
 - **FR-74**: The system shall support one or more assigned Deployment Agent roles per authorized employee. *(Source: US-24)*
 - **FR-75**: Menus, routes, page access, and API access shall be enforced consistently using effective permissions. *(Source: US-24)*
 - **FR-76**: If a user lacks permission for a route or API, the frontend shall block entry and the backend shall reject the operation. *(Source: US-23, US-24)*
@@ -380,10 +390,10 @@ Minimum attributes:
 ### 7.13 Access Management
 
 - **FR-77**: The system shall provide an `Access Management` capability that is accessible only to DevOps Admin users. *(Source: US-23)*
-- **FR-78**: The Access Management page shall display employee ID, display name, grant status, assigned roles, last login time, updated by, and updated at for each access grant. *(Source: US-23)*
+- **FR-78**: The Access Management page shall display employee ID, display name, grant status, assigned roles, scope grants, last login time, updated by, and updated at for each access grant. *(Source: US-23)*
 - **FR-79**: DevOps Admin users shall be able to search Access Grants by employee ID or employee name. *(Source: US-23)*
-- **FR-80**: DevOps Admin users shall be able to create an Access Grant that stores employee ID, display name snapshot, grant status, assigned roles, and note. *(Source: US-21, US-23)*
-- **FR-81**: DevOps Admin users shall be able to update the assigned roles on an existing Access Grant. *(Source: US-21, US-23)*
+- **FR-80**: DevOps Admin users shall be able to create an Access Grant that stores employee ID, display name snapshot, grant status, assigned roles, scope grants, and note. *(Source: US-21, US-23)*
+- **FR-81**: DevOps Admin users shall be able to update the assigned roles and scope grants on an existing Access Grant. *(Source: US-21, US-23)*
 - **FR-82**: DevOps Admin users shall be able to suspend an existing Access Grant without physically deleting the record. *(Source: US-21)*
 - **FR-83**: DevOps Admin users shall be able to reactivate a suspended Access Grant. *(Source: US-21)*
 - **FR-84**: The system shall record audit log entries for Access Grant creation, role update, suspension, and reactivation. *(Source: US-25)*
@@ -637,15 +647,18 @@ Each configuration item shall include:
 ### 10.4 Access Grant Requirements
 
 Access Grant data must support the following product rules:
-- one product-scope Access Grant record per employee `[INFERRED]`
+- one Access Grant record per employee `[INFERRED]`
 - `grant_status` valid values: `ACTIVE`, `SUSPENDED`
 - an active Access Grant must have at least one assigned role
+- an Access Grant may include zero or more `Application + SNOW Group` scope grants
+- an empty scope list on a `DEVOPS_ADMIN` grant represents global admin visibility
 - suspending access shall preserve the record rather than delete it
 - reactivating access shall reuse the existing Access Grant record
 
 Access Grant validation requirements:
 - `employee_id` is required
 - `assigned_roles` is required when `grant_status = ACTIVE`
+- `scope_grants` shall be validated when provided
 - only DevOps Admin users may create, update, suspend, or reactivate Access Grants
 - Access Grant changes must produce audit records
 
@@ -654,8 +667,9 @@ Access Grant validation requirements:
 ## 11. Non-Functional Requirements
 
 ### 11.1 Security
-- The system shall use authenticated identity and role context for access control.
+- The system shall use authenticated identity, effective permissions, and scope grants for access control.
 - Deployment Agent product entry shall use deny-by-default access control based on local Access Grants.
+- Release Flow and Audit visibility shall be constrained by `Application + SNOW Group` scope grants unless the user is a global DevOps Admin.
 - Audit logs shall not be editable or deletable by end users.
 - Configuration editing shall be limited to authorized DevOps Admin users.
 - Access Grant management shall be limited to authorized DevOps Admin users.
@@ -750,10 +764,10 @@ The architecture solution must ensure:
 | R-05 | Editable task statuses are currently based on working assumption | Assumption | Medium | Validate during architecture review |
 | R-06 | Result display detail beyond minimum output may expand later | Scope | Medium | Keep minimum guarantee in MVP |
 | R-07 | Review Owner cardinality (single user vs group) is not finalized | Unclear | Medium | Confirm in design |
-| R-08 | Audit log visibility scope beyond Audit / Management users is not fully defined | Security | Medium | Confirm access scope before implementation |
+| R-08 | ~~Audit log visibility scope beyond Audit / Management users is not fully defined~~ **Resolved**: any signed-in user may read audit history for records visible to their assigned scopes; global DevOps Admin may read all audit history | Closed | — | No action required |
 | R-09 | Rerun history presentation is only minimally defined | Unclear | Medium | Finalize UI/trace behavior during design |
 | R-10 | Default sorting and filtering behavior is not finalized | Unclear | Low | Confirm in product/design refinement |
-| R-11 | Product roles are expanding from a single role value toward a permission-based model | Architecture | Medium | Confirm whether backend contracts return roles only or roles plus effective permissions |
+| R-11 | ~~Product roles are expanding from a single role value toward a permission-based model~~ **Resolved**: auth/session returns compatibility `role` plus `roles[]`, effective `permissions[]`, and applicable `scopes[]` | Closed | — | No action required |
 | R-12 | A later phase may expand Access Management beyond the current existing-grants-only search model | Product | Medium | Treat enterprise directory lookup as a separately scoped follow-up |
 
 ---
@@ -762,7 +776,7 @@ The architecture solution must ensure:
 
 The following are explicitly out of scope for MVP:
 
-- Dynamic template management
+- Backend-persisted template management beyond the current workspace draft experience
 - Upload resume after network interruption
 - Manual Release Flow merge / split
 - Real-time streaming logs
@@ -771,15 +785,14 @@ The following are explicitly out of scope for MVP:
 - Reporting / export features
 - Advanced audit filtering and search
 - Audit analytics dashboards
-- Editing Release Flow metadata
+- Editing top-level Release Flow metadata beyond the current rundown fields
 - Free-form task input outside defined schema
 - Automatic decision-making based on result content
 - Parallel branch execution
 - Environment-specific configuration override matrices
 - Advanced configuration versioning and rollback
 - Self-service access request workflow
-- Project-level access control
-- Environment-level access control
+- Environment-level access control beyond current `Application + SNOW Group` scope grants
 - Enterprise group sync / SCIM-style provisioning
 
 ---
@@ -818,7 +831,7 @@ The following are explicitly out of scope for MVP:
 | OQ-30 | Should a later phase expand Access Management beyond the current existing-grants-only search model to include enterprise users without an Access Grant? | Product |
 | OQ-31 | Should Access Grant role changes require a mandatory admin note? | Product / Governance |
 | OQ-32 | Should Template Management be restricted to DevOps Admin only in Phase 1? | Product |
-| OQ-33 | ~~Should the frontend session model return roles only, or roles plus effective permissions?~~ **Resolved**: the session contract returns `role` for compatibility plus `roles[]` and effective `permissions[]`. | Closed |
+| OQ-33 | ~~Should the frontend session model return roles only, or roles plus effective permissions?~~ **Resolved**: the session contract returns `role` for compatibility plus `roles[]`, effective `permissions[]`, and applicable `scopes[]`. | Closed |
 
 > Template-related open questions around Excel import semantics are resolved. Remaining open questions from OQ-29 onward focus on access-governance expansion, UX, and authorization hardening; the auth/session payload contract is already resolved.
 
@@ -835,7 +848,7 @@ The following decisions should be confirmed before implementation design is fina
 5. Task input schema per `execution_type` (MANUAL vs AUTO may have different editable fields)
 6. Final confirmation of third configuration item
 7. Final confirmation of initial execution trigger behavior for AUTO tasks
-8. ~~Final confirmation of the Access Grant permission model and auth/session response contract~~ — **Resolved**: auth/session returns `role` for compatibility plus `roles[]` and effective `permissions[]`
+8. ~~Final confirmation of the Access Grant permission model and auth/session response contract~~ — **Resolved**: auth/session returns `role` for compatibility plus `roles[]`, effective `permissions[]`, and applicable `scopes[]`
 9. Confirm whether a later phase should expand Access Management search beyond the current existing-grants-only scope
 
 These items are tracked in `Open Questions` and `Risks / Ambiguities` and are not hidden assumptions.

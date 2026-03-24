@@ -1,16 +1,16 @@
 # System Architecture: Deployment Agent
 
 **Date:** 2026-03-24
-**Status:** Implemented (current MVP + partial Phase 1 access governance)
+**Status:** Implemented (current MVP + scoped access governance + partial multi-scope runtime alignment)
 **Source:** spec.md (primary), repository code (validation)
 
 ---
 
 ## Overview
 
-Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task reviewers make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants and an Access Management MVP; remaining Phase 1 work is centered on broader permission hardening, verification, and production rollout details.
+Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task reviewers make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants, scoped visibility through `Application + SNOW Group`, and an Access Management MVP; remaining Phase 1 work is centered on broader permission hardening, verification, and production rollout details.
 
-**Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a product-scoped authorization layer for access governance.
+**Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a deny-by-default authorization layer that combines product entry grants with scoped visibility governance.
 
 ---
 
@@ -92,7 +92,7 @@ Deployment Agent is a controlled, human-in-the-loop deployment workflow system e
 | C6 | Single review owner per Release Flow | Spec §9.1 |
 | C7 | Task reruns preserve same `task_id`; new execution history per attempt | Spec §9.4 |
 | C8 | Deployment Agent product entry is deny-by-default in Phase 1 | Spec FR-70 |
-| C9 | Product access is managed through local Access Grants rather than a separate user account system | Spec US-21 / US-22 |
+| C9 | Product access and scoped visibility are managed through local Access Grants rather than a separate user account system | Spec US-21 / US-24 |
 | C10 | Access enforcement must be consistent across menus, routes, and APIs | Spec FR-75 / FR-76 |
 
 ### Resolved Design Decisions
@@ -115,12 +115,12 @@ Deployment Agent is a controlled, human-in-the-loop deployment workflow system e
 | Entity | Description | Key Attributes |
 |--------|------------|----------------|
 | Release Flow | Deployment journey across stages | project_id, release_id (system-generated), current_stage, flow_status, review_status |
-| Request | Stage-scoped unit within a Release Flow | stage, request_status |
+| Request | Stage-scoped unit within a Release Flow | stage, request_status, snow_group, application, agent, owner |
 | Task | Atomic executable step (one per Excel row) | execution_type (MANUAL/AUTO), task_status, input_parameters (JSON), expected_output |
 | Task Execution History | Per-attempt execution record | attempt_number, execution_status, result_summary, external job fields (6) |
 | Configuration Item | Runtime config (Jenkins/Ansible URLs, credentials) | config_key (enum PK), config_value |
-| Audit Log Entry | Immutable operator action record | operator_id, action_type, context_payload (JSON) |
-| Access Grant | Product-level authorization record for one employee | employee_id, grant_status, assigned_roles, last_login_at, updated_by |
+| Audit Log Entry | Immutable operator action record | operator_id, action_type, application, snow_group, agent, context_payload (JSON) |
+| Access Grant | Product authorization record for one employee | employee_id, grant_status, assigned_roles, scope_grants, last_login_at, updated_by |
 
 ### Entity Relationships
 
@@ -128,8 +128,8 @@ Deployment Agent is a controlled, human-in-the-loop deployment workflow system e
 Release Flow ──1:N──► Request ──1:N──► Task ──1:N──► Task Execution History
 
 Configuration Item  (independent)
-Audit Log Entry     (independent, soft references to Release Flow / Request / Task)
-Access Grant        (independent, product-scope authorization record)
+Audit Log Entry     (independent, soft references to Release Flow / Request / Task + scope fields)
+Access Grant        (independent, product entry + scoped visibility record)
 ```
 
 ### Excel Template Field Mapping
@@ -151,6 +151,9 @@ Access Grant        (independent, product-scope authorization record)
 | Activity category, Common, Dependencies, Validation | Store | Task.import_metadata (JSON) | Metadata blob |
 | Status, Start/End date/time | Drop | — | Not imported |
 | Stage | From upload UI | Request.stage | Core |
+| Application | From upload UI | Request.application | Runtime scope |
+| SNOW Group | From upload UI | Request.snow_group | Runtime scope |
+| Agent | From upload UI | Request.agent | Runtime scope |
 | Release ID | System-generated | ReleaseFlow.release_id | Core |
 
 ---
@@ -209,8 +212,8 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 
 - **Pattern:** Internal authorization lookup after successful authentication
 - **Source of truth:** Deployment Agent persistence store
-- **Purpose:** Determine whether an authenticated employee may enter the product and what effective roles/permissions apply
-- **Current contract:** `auth/login` and `auth/me` return a compatibility `role` plus `roles[]` and effective `permissions[]`
+- **Purpose:** Determine whether an authenticated employee may enter the product, what effective roles/permissions apply, and which `Application + SNOW Group` scopes are visible/manageable
+- **Current contract:** `auth/login` and `auth/me` return a compatibility `role` plus `roles[]`, effective `permissions[]`, and `scopes[]`
 
 ---
 
@@ -222,13 +225,13 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | GET | /auth/me | Current user | Session |
 | POST | /auth/logout | End session | Session |
 | GET | /access-grants | List access grants | DEVOPS_ADMIN |
-| POST | /access-grants | Create access grant | DEVOPS_ADMIN |
-| PATCH | /access-grants/{employeeId} | Update roles / metadata | DEVOPS_ADMIN |
+| POST | /access-grants | Create access grant with roles / scope grants | DEVOPS_ADMIN |
+| PATCH | /access-grants/{employeeId} | Update roles / scope grants / metadata | DEVOPS_ADMIN |
 | POST | /access-grants/{employeeId}/suspend | Suspend product access | DEVOPS_ADMIN |
 | POST | /access-grants/{employeeId}/reactivate | Reactivate product access | DEVOPS_ADMIN |
 | POST | /upload | Excel import | DEVELOPER, TL, DEVOPS_ADMIN |
-| GET | /release-flows | List flows (paginated) | Any |
-| GET | /release-flows/{id} | Flow detail with tasks | Any |
+| GET | /release-flows | List flows (paginated) | Any authenticated within scoped visibility |
+| GET | /release-flows/{id} | Flow detail with tasks | Any authenticated within scoped visibility |
 | GET | /tasks | List tasks by request | Any |
 | GET | /tasks/{id} | Task detail | Any |
 | PUT | /tasks/{id}/input | Edit task input | Task owner or DEVOPS_ADMIN |
@@ -238,7 +241,7 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | POST | /tasks/{id}/decision | Apply decision | Task owner or DEVOPS_ADMIN |
 | GET | /config | List config items | Any |
 | POST | /config | Upsert config item | DEVOPS_ADMIN |
-| GET | /audit-logs | List audit entries | Any authenticated |
+| GET | /audit-logs | List audit entries | Any authenticated within scoped visibility |
 
 All endpoints prefixed with `/api/deployment-agent`.
 
@@ -248,8 +251,9 @@ All endpoints prefixed with `/api/deployment-agent`.
 
 - **Session management:** `IF_REQUIRED` — session created on login, read by SessionAuthFilter
 - **Filter chain:** SessionAuthFilter → HeaderAuthFilter (test fallback) → Spring Security
-- **Authentication / authorization split:** Team Book provides enterprise identity; local Access Grants provide product entry authorization and effective roles for Phase 1
+- **Authentication / authorization split:** Team Book provides enterprise identity; local Access Grants provide product entry authorization, effective roles, and `Application + SNOW Group` scope grants for Phase 1
 - **RBAC / permissions:** Enforced server-side in controllers and domain services; frontend route guards and UI visibility must align with the same effective permissions
+- **Global admin rule:** `DEVOPS_ADMIN` with an empty scope list is treated as a global admin context
 - **CSRF:** Disabled (REST API with session cookies)
 - **Audit isolation:** AuditLoggerService uses `REQUIRES_NEW` propagation — audit writes persist even if the business transaction rolls back
 - **Optimistic locking:** `@Version` on ReleaseFlow, Request, Task — concurrent updates return 409
