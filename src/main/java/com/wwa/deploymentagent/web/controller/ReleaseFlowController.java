@@ -40,6 +40,9 @@ public class ReleaseFlowController {
             @RequestParam(required = false) String project,
             @RequestParam(required = false) FlowStatus status,
             @RequestParam(required = false) Stage stage,
+            @RequestParam(required = false) String application,
+            @RequestParam(required = false) String snowGroup,
+            @RequestParam(required = false) String agent,
             @RequestParam(defaultValue = "false") boolean includeArchived,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -51,7 +54,8 @@ public class ReleaseFlowController {
         validateArchivedViewer(includeArchived, user);
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
-        Page<ReleaseFlow> result = releaseFlowService.list(project, status, stage, pageable, includeArchived);
+        Page<ReleaseFlow> result = releaseFlowService.list(
+                project, status, stage, application, snowGroup, agent, user, pageable, includeArchived);
         Map<String, List<Request>> requestsByReleaseFlowId = releaseFlowService.findRequestsByReleaseFlowIds(
                 result.getContent().stream().map(ReleaseFlow::getId).toList(),
                 includeArchived);
@@ -74,7 +78,14 @@ public class ReleaseFlowController {
         validateArchivedViewer(includeArchived, user);
 
         ReleaseFlow rf = releaseFlowService.getById(id, includeArchived);
-        List<RequestDto> requestDtos = releaseFlowService.findRequestsForFlow(id, includeArchived).stream()
+        List<Request> visibleRequests = filterVisibleRequests(
+                releaseFlowService.findRequestsForFlow(id, includeArchived),
+                user);
+        if (visibleRequests.isEmpty()) {
+            throw new ForbiddenAppException("view_release_flow");
+        }
+
+        List<RequestDto> requestDtos = visibleRequests.stream()
                 .map(req -> {
                     List<TaskDto> taskDtos = req.getTasks().stream()
                             .map(TaskDto::from)
@@ -98,6 +109,9 @@ public class ReleaseFlowController {
             @RequestBody RequestRundownUpdateDto body,
             @AuthenticationPrincipal UserContext user) {
         validateRundownEditor(user);
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
+        validateRequestScope(user, requestForValidation, "update_rundown");
+        validateOwnerEdit(user, body);
 
         Request request = releaseFlowService.updateRequestRundown(flowId, requestId, body);
         List<TaskDto> taskDtos = request.getTasks().stream()
@@ -112,6 +126,10 @@ public class ReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateRundownEditor(user);
+        validateRequestScope(
+                user,
+                findRequestForScopeValidation(flowId, requestId, false),
+                "archive_rundown");
         return ResponseEntity.ok(releaseFlowService.archiveRequestRundown(flowId, requestId, user));
     }
 
@@ -121,6 +139,10 @@ public class ReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateAdmin(user, "restore_rundown");
+        validateRequestScope(
+                user,
+                findRequestForScopeValidation(flowId, requestId, true),
+                "restore_rundown");
         return ResponseEntity.ok(releaseFlowService.restoreRequestRundown(flowId, requestId, user));
     }
 
@@ -130,6 +152,10 @@ public class ReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateAdmin(user, "purge_rundown");
+        validateRequestScope(
+                user,
+                findRequestForScopeValidation(flowId, requestId, true),
+                "purge_rundown");
         return ResponseEntity.ok(releaseFlowService.purgeArchivedRequestRundown(flowId, requestId, user));
     }
 
@@ -138,7 +164,9 @@ public class ReleaseFlowController {
             @PathVariable String flowId,
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
-        validateRundownEditor(user);
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
+        validateRequestScope(user, requestForValidation, "start_deployment");
+        validateRundownOperator(user, requestForValidation, "start_deployment");
 
         Request request = releaseFlowService.startRequestDeployment(flowId, requestId, user);
         List<TaskDto> taskDtos = request.getTasks().stream()
@@ -152,7 +180,9 @@ public class ReleaseFlowController {
             @PathVariable String flowId,
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
-        validateRundownEditor(user);
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
+        validateRequestScope(user, requestForValidation, "mark_request_failed");
+        validateRundownOperator(user, requestForValidation, "mark_request_failed");
 
         Request request = releaseFlowService.markRequestFailed(flowId, requestId, user);
         List<TaskDto> taskDtos = request.getTasks().stream()
@@ -181,5 +211,77 @@ public class ReleaseFlowController {
         if (user == null || !user.hasRole("DEVOPS_ADMIN")) {
             throw new ForbiddenAppException(action);
         }
+    }
+
+    private void validateOwnerEdit(UserContext user, RequestRundownUpdateDto body) {
+        if (body == null) {
+            return;
+        }
+        if (body.owner() != null && (user == null || !user.hasRole("DEVOPS_ADMIN"))) {
+            throw new ForbiddenAppException("update_rundown_owner");
+        }
+    }
+
+    private List<Request> filterVisibleRequests(List<Request> requests, UserContext user) {
+        if (user == null || user.isGlobalDevOpsAdmin()) {
+            return requests;
+        }
+        return requests.stream()
+                .filter(request -> user.hasScopedAccess(request.getApplication(), request.getSnowGroup()))
+                .toList();
+    }
+
+    private Request findRequestForScopeValidation(String flowId, String requestId, boolean includeArchived) {
+        return releaseFlowService.findRequestsForFlow(flowId, includeArchived).stream()
+                .filter(request -> request.getId().equals(requestId))
+                .findFirst()
+                .orElseThrow(() -> new ForbiddenAppException("request_scope_lookup"));
+    }
+
+    private void validateRequestScope(UserContext user, Request request, String action) {
+        if (user == null) {
+            throw new ForbiddenAppException(action);
+        }
+        if (user.isGlobalDevOpsAdmin()) {
+            return;
+        }
+        if (!user.hasScopedAccess(request.getApplication(), request.getSnowGroup())) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private void validateRundownOperator(UserContext user, Request request, String action) {
+        if (user == null) {
+            throw new ForbiddenAppException(action);
+        }
+        if (user.hasRole("DEVOPS_ADMIN")) {
+            return;
+        }
+        if ((!user.hasRole("DEVELOPER") && !user.hasRole("TL")) || !isRundownOwner(user, request)) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private boolean isRundownOwner(UserContext user, Request request) {
+        String owner = normalizeIdentity(request.getOwner());
+        if (owner == null) {
+            return false;
+        }
+
+        String displayName = user.displayName() == null ? null : user.displayName().replaceAll("\\s*\\(.*\\)$", "").trim();
+        String firstName = displayName == null || displayName.isBlank() ? null : displayName.split("\\s+")[0];
+
+        return List.of(user.userId(), displayName, firstName)
+                .stream()
+                .map(this::normalizeIdentity)
+                .filter(value -> value != null)
+                .anyMatch(owner::equals);
+    }
+
+    private String normalizeIdentity(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 }

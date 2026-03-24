@@ -4,7 +4,9 @@ import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import org.springframework.http.MediaType;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.helper.TestDataHelper;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +40,12 @@ class ReleaseFlowControllerTest {
     @Autowired
     private TestDataHelper helper;
 
+    @Autowired
+    private RequestRepository requestRepository;
+
+    @Autowired
+    private ReleaseFlowService releaseFlowService;
+
     // ─── list ────────────────────────────────────────────────────────────────
 
     @Test
@@ -54,7 +62,8 @@ class ReleaseFlowControllerTest {
     @Test
     @DisplayName("list_returnsFlows_withSeedData - seeded release flow appears in content")
     void list_returnsFlows_withSeedData() throws Exception {
-        helper.seedReleaseFlow();
+        ReleaseFlow releaseFlow = helper.seedReleaseFlow();
+        helper.seedRequest(releaseFlow);
 
         mockMvc.perform(get(BASE)
                         .header("X-User-Id", "user1")
@@ -79,6 +88,39 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.data[0].sitStatus").value("Completed"))
                 .andExpect(jsonPath("$.data[0].uatStatus").value("Running"))
                 .andExpect(jsonPath("$.data[0].prodStatus").value("Pending"));
+    }
+
+    @Test
+    @DisplayName("list_filtersByScopeFields_andReturnsScopeSummary")
+    void list_filtersByScopeFields_andReturnsScopeSummary() throws Exception {
+        ReleaseFlow releaseFlow = helper.seedReleaseFlow();
+        Request matchingRequest = helper.seedRequest(releaseFlow);
+        matchingRequest.setApplication("AMH HCC");
+        matchingRequest.setSnowGroup("HTSA-CSI-HCC-AMH-PRJ");
+        matchingRequest.setAgent("Deployment Agent");
+        matchingRequest.setOwner("alice");
+        requestRepository.save(matchingRequest);
+
+        ReleaseFlow otherFlow = releaseFlowService.create(
+                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", Stage.SIT);
+        Request otherRequest = helper.seedRequest(otherFlow);
+        otherRequest.setApplication("PowerCARD");
+        otherRequest.setSnowGroup("HTSA-CSI-CARD-PRD");
+        otherRequest.setAgent("PowerCARD Agent");
+        requestRepository.save(otherRequest);
+
+        mockMvc.perform(get(BASE)
+                        .param("application", "AMH")
+                        .param("snowGroup", "HTSA-CSI-HCC")
+                        .param("agent", "Deployment")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].application").value("AMH HCC"))
+                .andExpect(jsonPath("$.data[0].snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
+                .andExpect(jsonPath("$.data[0].agent").value("Deployment Agent"))
+                .andExpect(jsonPath("$.data[0].owner").value("alice"));
     }
 
     // ─── getById ─────────────────────────────────────────────────────────────
@@ -112,6 +154,7 @@ class ReleaseFlowControllerTest {
                                 {
                                   "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
                                   "application": "AMH HCC",
+                                  "agent": "Deployment Agent",
                                   "site": "HK",
                                   "estimatedRemainingMinutes": 120
                                 }
@@ -122,8 +165,28 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.id").value(req.getId()))
                 .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
                 .andExpect(jsonPath("$.application").value("AMH HCC"))
+                .andExpect(jsonPath("$.agent").value("Deployment Agent"))
                 .andExpect(jsonPath("$.site").value("HK"))
                 .andExpect(jsonPath("$.estimatedRemainingMinutes").value(120));
+    }
+
+    @Test
+    @DisplayName("updateRequestRundown_allowsDevOpsAdminToChangeOwner")
+    void updateRequestRundown_allowsAdminToChangeOwner() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+
+        mockMvc.perform(patch(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/rundown")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "owner": "alice"
+                                }
+                                """)
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.owner").value("alice"));
     }
 
     @Test
@@ -131,6 +194,8 @@ class ReleaseFlowControllerTest {
     void startRequestDeployment_movesFirstTaskToReady() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
         Request req = helper.seedRequest(rf);
+        req.setOwner("emp-001");
+        requestRepository.save(req);
         helper.seedTask(req);
 
         mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/start")
@@ -146,6 +211,8 @@ class ReleaseFlowControllerTest {
     void markRequestFailed_marksActiveTasksFailed() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
         Request req = helper.seedRequest(rf);
+        req.setOwner("emp-001");
+        requestRepository.save(req);
         helper.seedTask(req);
 
         mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/fail")
@@ -154,6 +221,36 @@ class ReleaseFlowControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requestStatus").value("Failed"))
                 .andExpect(jsonPath("$.tasks[0].taskStatus").value("Failed"));
+    }
+
+    @Test
+    @DisplayName("startRequestDeployment_forbidsNonOwnerNonAdminUsers")
+    void startRequestDeployment_forbidsNonOwner() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        req.setOwner("alice");
+        requestRepository.save(req);
+        helper.seedTask(req);
+
+        mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/start")
+                        .header("X-User-Id", "emp-002")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("markRequestFailed_forbidsNonOwnerNonAdminUsers")
+    void markRequestFailed_forbidsNonOwner() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        req.setOwner("alice");
+        requestRepository.save(req);
+        helper.seedTask(req);
+
+        mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + req.getId() + "/fail")
+                        .header("X-User-Id", "emp-002")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

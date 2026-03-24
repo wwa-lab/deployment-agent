@@ -51,6 +51,9 @@ public class UploadController {
     public ResponseEntity<UploadResponseDto> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam("stage") String stageParam,
+            @RequestParam(value = "snowGroup", required = false) String snowGroup,
+            @RequestParam(value = "application", required = false) String application,
+            @RequestParam(value = "agent", required = false) String agent,
             @AuthenticationPrincipal UserContext user) throws IOException {
         validateUploadRole(user);
 
@@ -67,7 +70,7 @@ public class UploadController {
             throw new ValidationAppException("Uploaded file is empty");
         }
 
-        ImportResult result = importService.importFile(file.getBytes(), stage, user);
+        ImportResult result = importService.importFile(file.getBytes(), stage, user, snowGroup, application, agent);
         return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 

@@ -51,6 +51,12 @@ public class Request {
     @Column(name = "application", length = 255)
     private String application;
 
+    @Column(name = "agent", length = 255)
+    private String agent;
+
+    @Column(name = "owner", length = 255)
+    private String owner;
+
     @Column(name = "site", length = 100)
     private String site;
 

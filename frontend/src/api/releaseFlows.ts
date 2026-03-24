@@ -12,6 +12,9 @@ export interface ListReleaseFlowsParams {
   project?: string
   status?: string
   stage?: string
+  application?: string
+  snowGroup?: string
+  agent?: string
   includeArchived?: boolean
   page?: number
   size?: number
@@ -35,6 +38,8 @@ export async function getReleaseFlow(
 export interface UpdateRequestRundownInput {
   snowGroup?: string
   application?: string
+  agent?: string
+  owner?: string
   site?: string
   estimatedRemainingMinutes?: number
 }

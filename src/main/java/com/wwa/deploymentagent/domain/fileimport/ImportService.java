@@ -51,6 +51,17 @@ public class ImportService {
 
     @Transactional
     public ImportResult importFile(byte[] fileBytes, Stage stage, UserContext user) throws IOException {
+        return importFile(fileBytes, stage, user, null, null, null);
+    }
+
+    @Transactional
+    public ImportResult importFile(
+            byte[] fileBytes,
+            Stage stage,
+            UserContext user,
+            String snowGroup,
+            String application,
+            String agent) throws IOException {
         ParseResult parsed = excelParserService.parse(fileBytes);
         if (parsed.hasErrors()) {
             throw new ImportValidationException(parsed.errors());
@@ -72,10 +83,11 @@ public class ImportService {
             String projectId   = entry.getKey();
             List<ParsedTaskRow> rows = entry.getValue();
             String projectName = rows.get(0).projectName();
+            String requestOwner = inferRequestOwner(rows, user);
 
             ReleaseFlow rf = findOrCreateReleaseFlow(projectId, projectName, stage);
 
-            Request request = findOrCreateRequest(rf, stage, user);
+            Request request = findOrCreateRequest(rf, stage, user, snowGroup, application, agent, requestOwner);
 
             for (ParsedTaskRow row : rows) {
                 upsertTask(request, row);
@@ -87,9 +99,21 @@ public class ImportService {
         }
 
         auditLogger.log(user, AuditActionType.upload, lastReleaseFlowId, null, null,
-                Map.of("stage", stage.name(), "taskCount", totalTaskCount));
+                Map.of(
+                        "stage", stage.name(),
+                        "taskCount", totalTaskCount,
+                        "snowGroup", normalizeBlank(snowGroup) != null ? normalizeBlank(snowGroup) : "",
+                        "application", normalizeBlank(application) != null ? normalizeBlank(application) : "",
+                        "agent", normalizeBlank(agent) != null ? normalizeBlank(agent) : ""));
 
-        return new ImportResult(lastReleaseFlowId, lastReleaseId, stage, totalTaskCount);
+        return new ImportResult(
+                lastReleaseFlowId,
+                lastReleaseId,
+                stage,
+                totalTaskCount,
+                normalizeBlank(snowGroup),
+                normalizeBlank(application),
+                normalizeBlank(agent));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -107,19 +131,33 @@ public class ImportService {
         return releaseFlowService.create(projectId, projectName, genReleaseId, genReleaseId, stage);
     }
 
-    private Request findOrCreateRequest(ReleaseFlow rf, Stage stage, UserContext user) {
-        return requestRepository.findByReleaseFlowIdAndStageAndArchivedAtIsNull(rf.getId(), stage)
+    private Request findOrCreateRequest(
+            ReleaseFlow rf,
+            Stage stage,
+            UserContext user,
+            String snowGroup,
+            String application,
+            String agent,
+            String owner) {
+        Request request = requestRepository.findByReleaseFlowIdAndStageAndArchivedAtIsNull(rf.getId(), stage)
                 .orElseGet(() -> {
                     Request req = new Request();
                     req.setReleaseFlow(rf);
                     req.setStage(stage);
                     req.setRequestStatus(RequestStatus.Pending);
-                    req.setApplication(rf.getProjectName());
                     req.setCreatedBy(user.userId());
                     req.setArchivedAt(null);
                     req.setArchivedBy(null);
-                    return requestRepository.save(req);
+                    return req;
                 });
+
+        request.setSnowGroup(coalesceScopeValue(snowGroup, request.getSnowGroup()));
+        request.setApplication(coalesceScopeValue(application, request.getApplication(), rf.getProjectName()));
+        request.setAgent(coalesceScopeValue(agent, request.getAgent()));
+        if (normalizeBlank(request.getOwner()) == null) {
+            request.setOwner(normalizeBlank(owner));
+        }
+        return requestRepository.save(request);
     }
 
     private void upsertTask(Request request, ParsedTaskRow row) {
@@ -151,5 +189,41 @@ public class ImportService {
 
     private static String normalizeId(String id) {
         return id.toLowerCase().replaceAll("[^a-z0-9]", "");
+    }
+
+    private String inferRequestOwner(List<ParsedTaskRow> rows, UserContext user) {
+        List<String> uniqueOwners = rows.stream()
+                .map(ParsedTaskRow::owner)
+                .map(this::normalizeBlank)
+                .filter(value -> value != null)
+                .distinct()
+                .toList();
+
+        if (uniqueOwners.size() == 1) {
+            return uniqueOwners.get(0);
+        }
+
+        return normalizeBlank(user.displayName()) != null ? normalizeBlank(user.displayName()) : user.userId();
+    }
+
+    private String coalesceScopeValue(String preferred, String existing) {
+        String normalizedPreferred = normalizeBlank(preferred);
+        return normalizedPreferred != null ? normalizedPreferred : normalizeBlank(existing);
+    }
+
+    private String coalesceScopeValue(String preferred, String existing, String fallback) {
+        String normalizedPreferred = normalizeBlank(preferred);
+        if (normalizedPreferred != null) {
+            return normalizedPreferred;
+        }
+        String normalizedExisting = normalizeBlank(existing);
+        if (normalizedExisting != null) {
+            return normalizedExisting;
+        }
+        return normalizeBlank(fallback);
+    }
+
+    private String normalizeBlank(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
+import com.wwa.deploymentagent.contracts.AccessScope;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.RequestArchiveResultDto;
 import com.wwa.deploymentagent.contracts.dto.RequestPurgeResultDto;
@@ -22,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -147,6 +149,81 @@ class ReleaseFlowServiceTest {
 
         Page<ReleaseFlow> sitFlows = releaseFlowService.list(null, null, Stage.SIT, PageRequest.of(0, 10));
         assertThat(sitFlows.getContent()).allMatch(rf -> rf.getCurrentStage() == Stage.SIT);
+    }
+
+    @Test
+    @DisplayName("list filtered by application, SNOW Group, and agent returns matching flows only")
+    void list_filteredByScopeFields() {
+        ReleaseFlow matchingFlow = helper.seedReleaseFlow();
+        Request matchingRequest = helper.seedRequest(matchingFlow);
+        matchingRequest.setApplication("AMH HCC");
+        matchingRequest.setSnowGroup("HTSA-CSI-HCC-AMH-PRJ");
+        matchingRequest.setAgent("Deployment Agent");
+        requestRepository.save(matchingRequest);
+
+        ReleaseFlow otherFlow = releaseFlowService.create(
+                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", Stage.SIT);
+        Request otherRequest = helper.seedRequest(otherFlow);
+        otherRequest.setApplication("PowerCARD");
+        otherRequest.setSnowGroup("HTSA-CSI-CARD-PRD");
+        otherRequest.setAgent("PowerCARD Agent");
+        requestRepository.save(otherRequest);
+
+        Page<ReleaseFlow> result = releaseFlowService.list(
+                null,
+                null,
+                null,
+                "AMH",
+                "HTSA-CSI-HCC",
+                "Deployment",
+                PageRequest.of(0, 10),
+                false);
+
+        assertThat(result.getContent())
+                .extracting(ReleaseFlow::getProjectId)
+                .containsExactly("PROJ-001");
+    }
+
+    @Test
+    @DisplayName("list restricts non-global users to release flows inside their Application / SNOW Group scope")
+    void list_respectsUserScope() {
+        ReleaseFlow matchingFlow = helper.seedReleaseFlow();
+        Request matchingRequest = helper.seedRequest(matchingFlow);
+        matchingRequest.setApplication("AMH HCC");
+        matchingRequest.setSnowGroup("HTSA-CSI-HCC-AMH-PRJ");
+        requestRepository.save(matchingRequest);
+
+        ReleaseFlow hiddenFlow = releaseFlowService.create(
+                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", Stage.SIT);
+        Request hiddenRequest = helper.seedRequest(hiddenFlow);
+        hiddenRequest.setApplication("PowerCARD");
+        hiddenRequest.setSnowGroup("HTSA-CSI-CARD-PRD");
+        requestRepository.save(hiddenRequest);
+
+        UserContext scopedUser = new UserContext(
+                "emp-admin-001",
+                "DEVOPS_ADMIN",
+                List.of("DEVOPS_ADMIN"),
+                Set.of("access.manage"),
+                "Scoped Admin",
+                List.of(new AccessScope("AMH HCC", "HTSA-CSI-HCC-AMH-PRJ"))
+        );
+
+        Page<ReleaseFlow> result = releaseFlowService.list(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                scopedUser,
+                PageRequest.of(0, 10),
+                false
+        );
+
+        assertThat(result.getContent())
+                .extracting(ReleaseFlow::getProjectId)
+                .containsExactly("PROJ-001");
     }
 
     // ─── advanceStage ─────────────────────────────────────────────────────────

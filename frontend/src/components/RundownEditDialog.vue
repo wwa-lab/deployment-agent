@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { updateRequestRundown } from '../api/releaseFlows'
+import { useUserStore } from '../stores/user'
 import type { Request } from '../types'
 
 const props = defineProps<{ request: Request }>()
 const emit = defineEmits<{ saved: []; close: [] }>()
+const userStore = useUserStore()
 
 const form = reactive({
   snowGroup: props.request.snowGroup ?? '',
   application: props.request.application ?? '',
+  agent: props.request.agent ?? '',
+  owner: props.request.owner ?? '',
   site: props.request.site ?? '',
   estimatedRemainingMinutes:
     props.request.estimatedRemainingMinutes !== undefined &&
@@ -35,6 +39,8 @@ async function submit() {
     await updateRequestRundown(props.request.releaseFlowId, props.request.id, {
       snowGroup: form.snowGroup || undefined,
       application: form.application || undefined,
+      agent: form.agent || undefined,
+      owner: userStore.isDevOpsAdmin ? form.owner || undefined : undefined,
       site: form.site || undefined,
       estimatedRemainingMinutes: estimated ? Number(estimated) : undefined,
     })
@@ -66,6 +72,29 @@ async function submit() {
         <div class="form-group">
           <label class="form-label">Application</label>
           <input v-model="form.application" type="text" class="form-control" placeholder="e.g. AMH HCC" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Agent</label>
+          <input v-model="form.agent" type="text" class="form-control" placeholder="e.g. Deployment Agent" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Rundown Owner</label>
+          <input
+            v-model="form.owner"
+            type="text"
+            class="form-control"
+            :disabled="!userStore.isDevOpsAdmin"
+            placeholder="e.g. alice or emp-001"
+          />
+          <small class="form-hint">
+            {{
+              userStore.isDevOpsAdmin
+                ? 'DEVOPS_ADMIN controls who can start or fail this rundown.'
+                : 'Only DEVOPS_ADMIN can change the rundown owner.'
+            }}
+          </small>
         </div>
 
         <div class="form-group">

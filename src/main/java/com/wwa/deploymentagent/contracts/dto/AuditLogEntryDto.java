@@ -17,6 +17,9 @@ public record AuditLogEntryDto(
         String releaseFlowId,
         String requestId,
         String taskId,
+        String application,
+        String snowGroup,
+        String agent,
         Map<String, Object> contextPayload
 ) {
     private static final Set<String> SENSITIVE_KEY_MARKERS = Set.of("token", "secret", "password");
@@ -31,6 +34,9 @@ public record AuditLogEntryDto(
                 entry.getReleaseFlowId(),
                 entry.getRequestId(),
                 entry.getTaskId(),
+                entry.getApplication(),
+                entry.getSnowGroup(),
+                entry.getAgent(),
                 sanitizeContext(entry.getActionType(), entry.getContextPayload())
         );
     }

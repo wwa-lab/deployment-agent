@@ -146,11 +146,11 @@ async function createUploadTemplate() {
     emit('submit', {
       name: inferredName,
       version: '1.0',
-      agent: props.agents[0] ?? 'Deployment Agent',
-      category: props.categories[0] ?? 'development',
-      snowGroup: props.snowGroups[0] ?? '',
-      application: props.applications[0] ?? '',
-      site: props.sites[0] ?? '',
+      agent: props.initialDraft?.agent ?? props.agents[0] ?? 'Deployment Agent',
+      category: props.initialDraft?.category ?? props.categories[0] ?? 'development',
+      snowGroup: props.initialDraft?.snowGroup ?? props.snowGroups[0] ?? '',
+      application: props.initialDraft?.application ?? props.applications[0] ?? '',
+      site: props.initialDraft?.site ?? props.sites[0] ?? '',
       estDurationMinutes: 60,
       description: `Imported locally from ${uploadFile.value.name}. Task parsing will be connected once template import API is ready.`,
       source: 'upload',
@@ -233,7 +233,7 @@ async function createUploadTemplate() {
 
           <div class="template-form-grid">
             <div class="form-row">
-              <label class="form-label">SNOW Owning Group <span class="required">*</span></label>
+              <label class="form-label">SNOW Group <span class="required">*</span></label>
               <select v-model="manualForm.snowGroup" class="form-control">
                 <option v-for="group in snowGroups" :key="group" :value="group">
                   {{ group }}

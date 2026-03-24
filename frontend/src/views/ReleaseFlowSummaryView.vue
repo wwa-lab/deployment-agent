@@ -27,7 +27,10 @@ onUnmounted(() => {
   store.stopPolling()
 })
 
-function onFilterChange(key: 'project' | 'status' | 'stage', value: string) {
+function onFilterChange(
+  key: 'project' | 'status' | 'stage' | 'application' | 'snowGroup' | 'agent',
+  value: string,
+) {
   store.setFilter(key, value || undefined)
   store.fetchList()
 }
@@ -83,6 +86,28 @@ function stageStatus(flow: { sitStatus: RequestStatus; uatStatus: RequestStatus;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size)))
 const showArchived = computed(() => store.filters.includeArchived === true)
+const uploadScope = computed(() => ({
+  application: store.filters.application,
+  snowGroup: store.filters.snowGroup,
+  agent: store.filters.agent,
+}))
+
+function scopeSummary(flow: {
+  application?: string
+  snowGroup?: string
+  agent?: string
+  projectName: string
+}) {
+  return {
+    application: flow.application || flow.projectName,
+    snowGroup: flow.snowGroup || '—',
+    agent: flow.agent || '—',
+  }
+}
+
+function rundownOwnerLabel(owner?: string) {
+  return owner?.trim() || '—'
+}
 
 function toggleArchivedVisibility() {
   if (!userStore.isDevOpsAdmin) return
@@ -143,6 +168,36 @@ function toggleArchivedVisibility() {
         </select>
       </div>
       <div class="filter-group">
+        <label class="form-label">Application</label>
+        <input
+          class="form-control"
+          type="text"
+          placeholder="Filter by application..."
+          :value="store.filters.application ?? ''"
+          @input="onFilterChange('application', ($event.target as HTMLInputElement).value)"
+        />
+      </div>
+      <div class="filter-group">
+        <label class="form-label">SNOW Group</label>
+        <input
+          class="form-control"
+          type="text"
+          placeholder="Filter by SNOW group..."
+          :value="store.filters.snowGroup ?? ''"
+          @input="onFilterChange('snowGroup', ($event.target as HTMLInputElement).value)"
+        />
+      </div>
+      <div class="filter-group">
+        <label class="form-label">Agent</label>
+        <input
+          class="form-control"
+          type="text"
+          placeholder="Filter by agent..."
+          :value="store.filters.agent ?? ''"
+          @input="onFilterChange('agent', ($event.target as HTMLInputElement).value)"
+        />
+      </div>
+      <div class="filter-group">
         <label class="form-label">Stage</label>
         <select
           class="form-control"
@@ -174,6 +229,8 @@ function toggleArchivedVisibility() {
           <tr>
             <th>Project</th>
             <th>Release ID</th>
+            <th>Scope</th>
+            <th>Rundown Owner</th>
             <th v-for="stage in stages" :key="stage" class="stage-column">{{ stage }}</th>
             <th>Overall Status</th>
           </tr>
@@ -191,6 +248,12 @@ function toggleArchivedVisibility() {
               <div class="release-id">{{ flow.releaseId }}</div>
               <span v-if="flow.archivedAt" class="badge badge-rejected archive-chip">Archived</span>
             </td>
+            <td class="scope-cell">
+              <div class="scope-primary">{{ scopeSummary(flow).application }}</div>
+              <div class="scope-meta">SNOW: {{ scopeSummary(flow).snowGroup }}</div>
+              <div class="scope-meta">Agent: {{ scopeSummary(flow).agent }}</div>
+            </td>
+            <td class="owner-cell">{{ rundownOwnerLabel(flow.owner) }}</td>
             <td v-for="stage in stages" :key="`${flow.id}-${stage}`" class="stage-column">
               <span class="badge" :class="statusBadgeClass(stageStatus(flow, stage))">
                 {{ statusLabel(stageStatus(flow, stage)) }}
@@ -237,7 +300,7 @@ function toggleArchivedVisibility() {
     </div>
 
     <!-- Upload dialog -->
-    <UploadDialog v-if="showUpload" @close="showUpload = false" />
+    <UploadDialog v-if="showUpload" :initial-scope="uploadScope" @close="showUpload = false" />
   </div>
 </template>
 
@@ -310,6 +373,29 @@ function toggleArchivedVisibility() {
   font-family: monospace;
   font-size: 13px;
   color: #2563eb;
+}
+
+.scope-cell {
+  min-width: 220px;
+}
+
+.owner-cell {
+  min-width: 140px;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #334155;
+}
+
+.scope-primary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.scope-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .archive-chip,

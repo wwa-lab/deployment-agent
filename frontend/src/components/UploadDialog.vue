@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { downloadTemplate, uploadFile } from '../api/upload'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
 import type { Stage, UploadResponse } from '../types'
+
+const props = defineProps<{
+  initialScope?: {
+    application?: string
+    snowGroup?: string
+    agent?: string
+  }
+}>()
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -16,6 +24,11 @@ const uploading = ref(false)
 const downloadingTemplate = ref(false)
 const error = ref('')
 const successResult = ref<UploadResponse | null>(null)
+const scopeForm = reactive({
+  application: props.initialScope?.application ?? '',
+  snowGroup: props.initialScope?.snowGroup ?? '',
+  agent: props.initialScope?.agent ?? '',
+})
 
 const canUseUpload = computed(() => userStore.canUploadRelease)
 const canSubmit = computed(() =>
@@ -33,7 +46,11 @@ async function submit() {
   uploading.value = true
   error.value = ''
   try {
-    successResult.value = await uploadFile(file.value, stage.value as Stage)
+    successResult.value = await uploadFile(file.value, stage.value as Stage, {
+      application: scopeForm.application.trim() || undefined,
+      snowGroup: scopeForm.snowGroup.trim() || undefined,
+      agent: scopeForm.agent.trim() || undefined,
+    })
     await store.fetchList()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Upload failed'
@@ -82,6 +99,15 @@ function close() {
           Release ID: <code>{{ successResult.releaseId }}</code><br />
           Stage: {{ successResult.stage }}<br />
           Tasks created: {{ successResult.taskCount }}
+          <template v-if="successResult.application || successResult.snowGroup || successResult.agent">
+            <br />
+            Scope:
+            {{ successResult.application || '—' }}
+            /
+            {{ successResult.snowGroup || '—' }}
+            /
+            {{ successResult.agent || '—' }}
+          </template>
         </div>
 
         <template v-else>
@@ -98,6 +124,39 @@ function close() {
               <option value="UAT">UAT</option>
               <option value="PROD">PROD</option>
             </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Application</label>
+            <input
+              v-model="scopeForm.application"
+              type="text"
+              class="form-control"
+              placeholder="e.g. AMH HCC"
+              :disabled="!canUseUpload"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">SNOW Group</label>
+            <input
+              v-model="scopeForm.snowGroup"
+              type="text"
+              class="form-control"
+              placeholder="e.g. HTSA-CSI-HCC-AMH-PRJ"
+              :disabled="!canUseUpload"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Agent</label>
+            <input
+              v-model="scopeForm.agent"
+              type="text"
+              class="form-control"
+              placeholder="e.g. Deployment Agent"
+              :disabled="!canUseUpload"
+            />
           </div>
 
           <div class="form-group">

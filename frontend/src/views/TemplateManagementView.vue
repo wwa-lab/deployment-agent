@@ -309,6 +309,13 @@ const sites = computed(() =>
   Array.from(new Set(templates.value.map((template) => template.site))).sort(),
 )
 
+const activeScopeFilters = computed(() => ({
+  agent: selectedAgent.value === 'All' ? undefined : selectedAgent.value,
+  snowGroup: selectedSnowGroup.value === 'All' ? undefined : selectedSnowGroup.value,
+  application: selectedApplication.value === 'All' ? undefined : selectedApplication.value,
+  site: selectedSite.value === 'All' ? undefined : selectedSite.value,
+}))
+
 const filteredTemplates = computed(() => {
   const keyword = search.value.trim().toLowerCase()
 
@@ -342,6 +349,13 @@ const filteredTemplates = computed(() => {
     )
   })
 })
+
+const filteredScopeSummary = computed(() => ({
+  application: activeScopeFilters.value.application ?? 'All Applications',
+  snowGroup: activeScopeFilters.value.snowGroup ?? 'All SNOW Groups',
+  agent: activeScopeFilters.value.agent ?? 'All Agents',
+  site: activeScopeFilters.value.site ?? 'All Sites',
+}))
 
 const selectedTemplate = computed(() => {
   const explicitSelection = filteredTemplates.value.find(
@@ -377,6 +391,34 @@ const selectedTemplateActivityCategories = computed(() =>
 )
 
 const selectedTemplateNextStep = computed(() => (selectedTemplate.value?.tasks.length ?? 0) + 1)
+
+const createTemplateDefaults = computed<Partial<CreateTemplateDraft> | undefined>(() => {
+  if (editingTemplate.value) {
+    return {
+      name: editingTemplate.value.name,
+      version: editingTemplate.value.version,
+      agent: editingTemplate.value.agent,
+      category: editingTemplate.value.category,
+      snowGroup: editingTemplate.value.snowGroup,
+      application: editingTemplate.value.application,
+      site: editingTemplate.value.site,
+      estDurationMinutes: parseDurationToMinutes(editingTemplate.value.estDuration),
+      description: editingTemplate.value.description,
+      source: 'manual',
+    }
+  }
+
+  return {
+    agent: activeScopeFilters.value.agent ?? agents.value[0] ?? 'Deployment Agent',
+    snowGroup: activeScopeFilters.value.snowGroup ?? snowGroups.value[0] ?? '',
+    application: activeScopeFilters.value.application ?? applications.value[0] ?? '',
+    site: activeScopeFilters.value.site ?? sites.value[0] ?? '',
+    category: selectedCategory.value === 'All' ? categories.value[0] ?? 'development' : selectedCategory.value,
+    version: '1.0',
+    estDurationMinutes: 60,
+    source: 'manual',
+  }
+})
 
 function parseDependencyList(value?: string): string[] {
   if (!value) return []
@@ -793,9 +835,44 @@ function submitTemplate(draft: CreateTemplateDraft) {
       </div>
     </div>
 
+    <section class="card scope-summary-card">
+      <div class="scope-summary-header">
+        <div>
+          <h2 class="panel-title">Current Scope</h2>
+          <p class="scope-summary-copy">
+            Narrow templates by Application, SNOW Group, Agent, and Site before choosing the right rollout blueprint.
+          </p>
+        </div>
+        <div class="scope-template-count">
+          {{ filteredTemplates.length }} template{{ filteredTemplates.length === 1 ? '' : 's' }}
+        </div>
+      </div>
+      <div class="scope-summary-grid">
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">Application</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.application }}</div>
+        </div>
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">SNOW Group</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.snowGroup }}</div>
+        </div>
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">Agent</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.agent }}</div>
+        </div>
+        <div class="scope-summary-item">
+          <div class="scope-summary-label">Site</div>
+          <div class="scope-summary-value">{{ filteredScopeSummary.site }}</div>
+        </div>
+      </div>
+    </section>
+
     <div class="template-layout">
       <aside class="card filters-panel">
         <h2 class="panel-title">Filters</h2>
+        <p class="filter-copy">
+          These filters drive both the list below and the default scope for any new template you create.
+        </p>
 
         <div class="filter-stack">
           <div class="filter-item">
@@ -883,6 +960,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
                 <th>Template Name</th>
                 <th>Version</th>
                 <th>Category</th>
+                <th>Agent</th>
                 <th>SNOW Group</th>
                 <th>Application</th>
                 <th>Site</th>
@@ -905,6 +983,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
                 <td>
                   <span class="category-pill">{{ template.category }}</span>
                 </td>
+                <td>{{ template.agent }}</td>
                 <td>{{ template.snowGroup }}</td>
                 <td>{{ template.application }}</td>
                 <td>
@@ -991,6 +1070,12 @@ function submitTemplate(draft: CreateTemplateDraft) {
                 <div class="detail-label">Estimated Duration</div>
                 <div class="detail-value">{{ selectedTemplate.estDuration }}</div>
               </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Scope Context</div>
+            <div class="details-grid">
               <div class="detail-item">
                 <div class="detail-label">Agent</div>
                 <div class="detail-value">{{ selectedTemplate.agent }}</div>
@@ -1217,22 +1302,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
       :applications="applications"
       :sites="sites"
       :mode="editingTemplate ? 'edit' : 'create'"
-      :initial-draft="
-        editingTemplate
-          ? {
-              name: editingTemplate.name,
-              version: editingTemplate.version,
-              agent: editingTemplate.agent,
-              category: editingTemplate.category,
-              snowGroup: editingTemplate.snowGroup,
-              application: editingTemplate.application,
-              site: editingTemplate.site,
-              estDurationMinutes: parseDurationToMinutes(editingTemplate.estDuration),
-              description: editingTemplate.description,
-              source: 'manual',
-            }
-          : undefined
-      "
+      :initial-draft="createTemplateDefaults"
       @close="closeCreateTemplateDialog"
       @submit="submitTemplate"
     />
@@ -1295,6 +1365,63 @@ function submitTemplate(draft: CreateTemplateDraft) {
   line-height: 1.6;
 }
 
+.scope-summary-card {
+  padding: 18px;
+}
+
+.scope-summary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.scope-summary-copy {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.scope-template-count {
+  white-space: nowrap;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scope-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.scope-summary-item {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.scope-summary-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.scope-summary-value {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .template-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
@@ -1304,6 +1431,13 @@ function submitTemplate(draft: CreateTemplateDraft) {
 
 .filters-panel {
   padding: 18px;
+}
+
+.filter-copy {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #64748b;
 }
 
 .filter-stack {
@@ -1713,6 +1847,10 @@ function submitTemplate(draft: CreateTemplateDraft) {
 }
 
 @media (max-width: 800px) {
+  .scope-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .details-grid {
     grid-template-columns: 1fr;
   }

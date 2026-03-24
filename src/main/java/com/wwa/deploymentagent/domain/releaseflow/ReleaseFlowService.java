@@ -18,6 +18,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,14 +87,69 @@ public class ReleaseFlowService {
             String projectId,
             FlowStatus flowStatus,
             Stage stage,
+            String application,
+            String snowGroup,
+            String agent,
+            UserContext user,
             Pageable pageable,
             boolean includeArchived) {
-        return releaseFlowRepository.search(projectId, flowStatus, stage, includeArchived, pageable);
+        String normalizedApplication = normalizeBlank(application);
+        String normalizedSnowGroup = normalizeBlank(snowGroup);
+        String normalizedAgent = normalizeBlank(agent);
+        boolean scopeRestricted = user != null && !user.isGlobalDevOpsAdmin();
+
+        if (!scopeRestricted
+                && normalizedApplication == null
+                && normalizedSnowGroup == null
+                && normalizedAgent == null) {
+            return releaseFlowRepository.search(projectId, flowStatus, stage, includeArchived, pageable);
+        }
+
+        Page<ReleaseFlow> basePage = releaseFlowRepository.search(
+                projectId,
+                flowStatus,
+                stage,
+                includeArchived,
+                Pageable.unpaged());
+        List<ReleaseFlow> baseFlows = basePage.getContent();
+        Map<String, List<Request>> requestsByReleaseFlowId = findRequestsByReleaseFlowIds(
+                baseFlows.stream().map(ReleaseFlow::getId).toList(),
+                includeArchived);
+
+        List<ReleaseFlow> filtered = baseFlows.stream()
+                .filter(releaseFlow -> matchesScope(
+                        releaseFlow,
+                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of()),
+                        normalizedApplication,
+                        normalizedSnowGroup,
+                        normalizedAgent))
+                .filter(releaseFlow -> matchesUserScope(
+                        user,
+                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of())))
+                .toList();
+
+        int fromIndex = Math.min((int) pageable.getOffset(), filtered.size());
+        int toIndex = Math.min(fromIndex + pageable.getPageSize(), filtered.size());
+        List<ReleaseFlow> pageContent = filtered.subList(fromIndex, toIndex);
+
+        return new PageImpl<>(pageContent, pageable, filtered.size());
     }
 
     @Transactional(readOnly = true)
     public Page<ReleaseFlow> list(String projectId, FlowStatus flowStatus, Stage stage, Pageable pageable) {
-        return list(projectId, flowStatus, stage, pageable, false);
+        return list(projectId, flowStatus, stage, null, null, null, null, pageable, false);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReleaseFlow> list(String projectId,
+                                  FlowStatus flowStatus,
+                                  Stage stage,
+                                  String application,
+                                  String snowGroup,
+                                  String agent,
+                                  Pageable pageable,
+                                  boolean includeArchived) {
+        return list(projectId, flowStatus, stage, application, snowGroup, agent, null, pageable, includeArchived);
     }
 
     @Transactional(readOnly = true)
@@ -192,6 +248,8 @@ public class ReleaseFlowService {
 
         request.setSnowGroup(normalizeBlank(update.snowGroup()));
         request.setApplication(normalizeBlank(update.application()));
+        request.setAgent(normalizeBlank(update.agent()));
+        request.setOwner(normalizeBlank(update.owner()));
         request.setSite(normalizeBlank(update.site()));
         request.setEstimatedRemainingMinutes(update.estimatedRemainingMinutes());
         Request saved = requestRepository.save(request);
@@ -476,5 +534,44 @@ public class ReleaseFlowService {
 
     private String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean matchesScope(
+            ReleaseFlow releaseFlow,
+            List<Request> requests,
+            String application,
+            String snowGroup,
+            String agent) {
+        if (requests == null || requests.isEmpty()) {
+            return matchesContains(releaseFlow.getProjectName(), application)
+                    && snowGroup == null
+                    && agent == null;
+        }
+
+        return requests.stream().anyMatch(request ->
+                matchesContains(request.getApplication() != null ? request.getApplication() : releaseFlow.getProjectName(), application)
+                        && matchesContains(request.getSnowGroup(), snowGroup)
+                        && matchesContains(request.getAgent(), agent));
+    }
+
+    private boolean matchesContains(String actualValue, String expectedFragment) {
+        if (expectedFragment == null) {
+            return true;
+        }
+        if (actualValue == null) {
+            return false;
+        }
+        return actualValue.toLowerCase().contains(expectedFragment.toLowerCase());
+    }
+
+    private boolean matchesUserScope(UserContext user, List<Request> requests) {
+        if (user == null || user.isGlobalDevOpsAdmin()) {
+            return true;
+        }
+        if (requests == null || requests.isEmpty()) {
+            return false;
+        }
+        return requests.stream()
+                .anyMatch(request -> user.hasScopedAccess(request.getApplication(), request.getSnowGroup()));
     }
 }

@@ -8,7 +8,15 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
   const total = ref(0)
   const page = ref(0)
   const size = ref(10)
-  const filters = ref<{ project?: string; status?: string; stage?: string; includeArchived?: boolean }>({})
+  const filters = ref<{
+    project?: string
+    status?: string
+    stage?: string
+    application?: string
+    snowGroup?: string
+    agent?: string
+    includeArchived?: boolean
+  }>({})
   const selectedId = ref<string | null>(null)
   const detail = ref<ReleaseFlowDetail | null>(null)
   const loading = ref(false)

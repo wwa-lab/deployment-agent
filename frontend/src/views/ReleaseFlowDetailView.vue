@@ -81,25 +81,27 @@ function normalizeIdentity(value: string | null | undefined): string {
   return (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
+function currentUserIdentityCandidates(): string[] {
+  const displayName = userStore.displayName.replace(/\s*\(.*\)$/, '').trim()
+  const firstName = displayName.split(/\s+/)[0] ?? ''
+
+  return [userStore.userId, displayName, firstName]
+    .map((value) => normalizeIdentity(value))
+    .filter(Boolean)
+}
+
+function matchesCurrentUserIdentity(value: string | null | undefined): boolean {
+  const normalizedValue = normalizeIdentity(value)
+  if (!normalizedValue) return false
+  return currentUserIdentityCandidates().includes(normalizedValue)
+}
+
 function isTaskAdmin(): boolean {
   return userStore.isDevOpsAdmin
 }
 
 function isTaskOwner(task: Task): boolean {
-  const owner = normalizeIdentity(task.owner)
-  if (!owner) return false
-
-  const displayName = userStore.displayName.replace(/\s*\(.*\)$/, '').trim()
-  const firstName = displayName.split(/\s+/)[0] ?? ''
-  const candidates = [
-    userStore.userId,
-    displayName,
-    firstName,
-  ]
-    .map((value) => normalizeIdentity(value))
-    .filter(Boolean)
-
-  return candidates.includes(owner)
+  return matchesCurrentUserIdentity(task.owner)
 }
 
 function canModifyTask(task: Task): boolean {
@@ -184,21 +186,56 @@ function taskActionReason(request: Request, reason: string | null): string | nul
   return archivedRequestReason(request) ?? reason
 }
 
+function isRundownOperator(request: Request): boolean {
+  if (userStore.isDevOpsAdmin) return true
+  if (!userStore.isDeveloper && !userStore.isTL) return false
+  return matchesCurrentUserIdentity(request.owner)
+}
+
+function hasPendingTasks(request: Request): boolean {
+  return request.tasks.some((task) => task.taskStatus === 'Pending')
+}
+
+function hasFailEligibleTasks(request: Request): boolean {
+  return request.tasks.some(
+    (task) => !['Approved', 'Skipped', 'Rejected', 'Failed'].includes(task.taskStatus),
+  )
+}
+
 function canStartDeployment(request: Request): boolean {
   return (
-    canEditRundown() &&
+    isRundownOperator(request) &&
     !isArchivedRequest(request) &&
     request.requestStatus === 'Pending' &&
-    request.tasks.some((task) => task.taskStatus === 'Pending')
+    hasPendingTasks(request)
   )
 }
 
 function canMarkRequestFailed(request: Request): boolean {
   return (
-    canEditRundown() &&
+    isRundownOperator(request) &&
     !isArchivedRequest(request) &&
-    !['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus)
+    !['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus) &&
+    hasFailEligibleTasks(request)
   )
+}
+
+function startDeploymentDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (request.requestStatus !== 'Pending') return 'Available only when rundown status is Pending'
+  if (!hasPendingTasks(request)) return 'No pending tasks remain to start'
+  return null
+}
+
+function markRequestFailedDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus)) {
+    return 'Available only while the rundown is still active'
+  }
+  if (!hasFailEligibleTasks(request)) return 'No active tasks remain to fail'
+  return null
 }
 
 const submittingAuto = ref<string | null>(null)
@@ -286,6 +323,7 @@ async function handleRefreshDetail() {
 }
 
 async function handleStartDeployment(request: Request) {
+  if (!canStartDeployment(request)) return
   requestActionLoadingId.value = `${request.id}:start`
   try {
     await startRequestDeployment(request.releaseFlowId, request.id)
@@ -298,6 +336,7 @@ async function handleStartDeployment(request: Request) {
 }
 
 async function handleMarkRequestFailed(request: Request) {
+  if (!canMarkRequestFailed(request)) return
   requestActionLoadingId.value = `${request.id}:fail`
   try {
     await markRequestFailed(request.releaseFlowId, request.id)
@@ -455,9 +494,6 @@ const activeRequestSummary = computed(() => {
 
   const uniqueTaskGroups = new Set(request.tasks.map((task) => task.taskGroupId))
   const taskNames = new Set(request.tasks.map((task) => task.taskName))
-  const uniqueOwners = Array.from(
-    new Set(request.tasks.map((task) => task.owner).filter((owner): owner is string => !!owner)),
-  )
   const manualCount = request.tasks.filter((task) => task.executionType === 'MANUAL').length
   const autoCount = request.tasks.filter((task) => task.executionType === 'AUTO').length
   const pendingReviewCount = request.tasks.filter((task) => task.taskStatus === 'Awaiting_Review').length
@@ -510,7 +546,6 @@ const activeRequestSummary = computed(() => {
 
   return {
     taskGroupCount: uniqueTaskGroups.size,
-    owners: uniqueOwners,
     manualCount,
     autoCount,
     manualPercent,
@@ -744,15 +779,17 @@ watch(() => store.detail, (val) => {
                   <span class="rundown-field-label">Application:</span>
                   <span class="rundown-field-value">{{ req.application ?? store.detail.projectName }}</span>
                 </div>
+                <div v-if="hasValue(req.agent)" class="rundown-field">
+                  <span class="rundown-field-label">Agent:</span>
+                  <span class="rundown-field-value">{{ req.agent }}</span>
+                </div>
+                <div class="rundown-field">
+                  <span class="rundown-field-label">Rundown Owner:</span>
+                  <span class="rundown-field-value">{{ req.owner ?? '—' }}</span>
+                </div>
                 <div v-if="hasValue(req.site)" class="rundown-field">
                   <span class="rundown-field-label">Site:</span>
                   <span class="rundown-field-value">{{ req.site }}</span>
-                </div>
-                <div class="rundown-field">
-                  <span class="rundown-field-label">Owners:</span>
-                  <span class="rundown-field-value">
-                    {{ activeRequestSummary.owners.length > 0 ? activeRequestSummary.owners.join(', ') : '—' }}
-                  </span>
                 </div>
                 <div class="rundown-field">
                   <span class="rundown-field-label">Execution Mix:</span>
@@ -834,19 +871,19 @@ watch(() => store.detail, (val) => {
             <div class="rundown-section">
               <div class="rundown-request-actions">
                 <button
-                  v-if="canStartDeployment(req)"
                   type="button"
                   class="btn btn-primary btn-start"
-                  :disabled="requestActionLoadingId === `${req.id}:start`"
+                  :disabled="!!startDeploymentDisabledReason(req) || requestActionLoadingId === `${req.id}:start`"
+                  :title="startDeploymentDisabledReason(req) ?? undefined"
                   @click="handleStartDeployment(req)"
                 >
                   {{ requestActionLoadingId === `${req.id}:start` ? 'Starting...' : 'Start Deployment' }}
                 </button>
                 <button
-                  v-if="canMarkRequestFailed(req)"
                   type="button"
                   class="btn btn-danger"
-                  :disabled="requestActionLoadingId === `${req.id}:fail`"
+                  :disabled="!!markRequestFailedDisabledReason(req) || requestActionLoadingId === `${req.id}:fail`"
+                  :title="markRequestFailedDisabledReason(req) ?? undefined"
                   @click="handleMarkRequestFailed(req)"
                 >
                   {{ requestActionLoadingId === `${req.id}:fail` ? 'Marking...' : 'Mark as Failed' }}
