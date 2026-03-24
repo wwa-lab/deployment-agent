@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.auth;
 
+import com.wwa.deploymentagent.contracts.AccessScope;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
 import com.wwa.deploymentagent.errors.AccessNotGrantedAppException;
@@ -33,6 +34,7 @@ class AuthServiceTest {
         assertThat(ctx.roles()).containsExactly("DEVELOPER");
         assertThat(ctx.permissions()).contains("release.upload", "release.view");
         assertThat(ctx.displayName()).contains("Alice Park");
+        assertThat(ctx.scopes()).containsExactly(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD));
     }
 
     @Test
@@ -50,6 +52,7 @@ class AuthServiceTest {
     void authenticate_devopsAdmin_returnsDevOpsRole() {
         UserContext ctx = authService.authenticate("emp-003", "any-password");
         assertThat(ctx.role()).isEqualTo("DEVOPS_ADMIN");
+        assertThat(ctx.scopes()).containsExactly(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD));
     }
 
     @Test

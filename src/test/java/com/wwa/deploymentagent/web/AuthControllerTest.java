@@ -43,6 +43,8 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.role").value("TL"))
                 .andExpect(jsonPath("$.roles[0]").value("TL"))
                 .andExpect(jsonPath("$.permissions").isArray())
+                .andExpect(jsonPath("$.scopes[0].application").value("*"))
+                .andExpect(jsonPath("$.scopes[0].snowGroup").value("*"))
                 .andExpect(jsonPath("$.displayName").isNotEmpty());
     }
 
@@ -126,7 +128,9 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.userId").value("emp-003"))
                 .andExpect(jsonPath("$.role").value("DEVOPS_ADMIN"))
                 .andExpect(jsonPath("$.roles[0]").value("DEVOPS_ADMIN"))
-                .andExpect(jsonPath("$.permissions").isArray());
+                .andExpect(jsonPath("$.permissions").isArray())
+                .andExpect(jsonPath("$.scopes[0].application").value("*"))
+                .andExpect(jsonPath("$.scopes[0].snowGroup").value("*"));
     }
 
     @Test

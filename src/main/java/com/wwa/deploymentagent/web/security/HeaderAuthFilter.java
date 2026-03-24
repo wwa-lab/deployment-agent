@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.web.security;
 
+import com.wwa.deploymentagent.contracts.AccessScope;
 import com.wwa.deploymentagent.contracts.UserContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Extracts WWA user identity from HTTP headers and populates the Spring SecurityContext.
@@ -55,7 +58,14 @@ public class HeaderAuthFilter extends OncePerRequestFilter {
         String role   = request.getHeader("X-User-Role");
 
         if (userId != null && !userId.isBlank() && role != null && !role.isBlank()) {
-            UserContext ctx = new UserContext(userId.trim(), role.trim());
+            UserContext ctx = new UserContext(
+                    userId.trim(),
+                    role.trim(),
+                    List.of(role.trim()),
+                    Set.of(),
+                    userId.trim(),
+                    List.of(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD))
+            );
             UserContextAuthentication auth = new UserContextAuthentication(ctx);
             SecurityContextHolder.getContext().setAuthentication(auth);
         }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import type { AccessGrant, AccessGrantStatus, UserRole } from '../types'
+import type { AccessGrant, AccessGrantStatus, AccessScope, UserRole } from '../types'
 
 const ROLE_OPTIONS: UserRole[] = ['DEVELOPER', 'TL', 'DEVOPS_ADMIN', 'AUDIT', 'MANAGEMENT']
 
@@ -17,6 +17,7 @@ const emit = defineEmits<{
     employeeId: string
     grantStatus: AccessGrantStatus
     assignedRoles: UserRole[]
+    scopeGrants: AccessScope[]
     note?: string
   }]
 }>()
@@ -25,11 +26,13 @@ const form = reactive<{
   employeeId: string
   grantStatus: AccessGrantStatus
   assignedRoles: UserRole[]
+  scopeGrants: AccessScope[]
   note: string
 }>({
   employeeId: '',
   grantStatus: 'ACTIVE',
   assignedRoles: [],
+  scopeGrants: [],
   note: '',
 })
 
@@ -50,6 +53,7 @@ const submitLabel = computed(() => {
 const employeeIdDisabled = computed(() => props.mode !== 'create')
 const statusDisabled = computed(() => props.mode !== 'create')
 const requiresRoles = computed(() => form.grantStatus === 'ACTIVE' || props.mode === 'reactivate')
+const allowsGlobalAccess = computed(() => form.assignedRoles.includes('DEVOPS_ADMIN'))
 
 watch(
   () => [props.mode, props.grant] as const,
@@ -59,6 +63,10 @@ watch(
       ? 'ACTIVE'
       : props.grant?.grantStatus ?? 'ACTIVE'
     form.assignedRoles = (props.grant?.assignedRoles ?? []).slice() as UserRole[]
+    form.scopeGrants = (props.grant?.scopeGrants ?? []).map((scope) => ({
+      application: scope.application,
+      snowGroup: scope.snowGroup,
+    }))
     form.note = props.grant?.note ?? ''
     localError.value = ''
   },
@@ -71,6 +79,17 @@ function toggleRole(role: UserRole) {
   } else {
     form.assignedRoles = [...form.assignedRoles, role]
   }
+}
+
+function addScope() {
+  form.scopeGrants = [
+    ...form.scopeGrants,
+    { application: '', snowGroup: '' },
+  ]
+}
+
+function removeScope(index: number) {
+  form.scopeGrants = form.scopeGrants.filter((_, currentIndex) => currentIndex !== index)
 }
 
 function submit() {
@@ -86,10 +105,31 @@ function submit() {
     return
   }
 
+  const normalizedScopes = form.scopeGrants
+    .map((scope) => ({
+      application: scope.application.trim(),
+      snowGroup: scope.snowGroup.trim(),
+    }))
+    .filter((scope) => scope.application.length > 0 || scope.snowGroup.length > 0)
+
+  const hasIncompleteScope = normalizedScopes.some(
+    (scope) => scope.application.length === 0 || scope.snowGroup.length === 0,
+  )
+  if (hasIncompleteScope) {
+    localError.value = 'Each scope needs both Application and SNOW Group.'
+    return
+  }
+
+  if (requiresRoles.value && normalizedScopes.length === 0 && !allowsGlobalAccess.value) {
+    localError.value = 'Active non-admin access grants need at least one scope.'
+    return
+  }
+
   emit('save', {
     employeeId: form.employeeId.trim(),
     grantStatus: props.mode === 'reactivate' ? 'ACTIVE' : form.grantStatus,
     assignedRoles: form.assignedRoles,
+    scopeGrants: normalizedScopes,
     note: form.note.trim() || undefined,
   })
 }
@@ -145,6 +185,41 @@ function submit() {
           <p class="field-hint">
             Suspended access grants may keep roles assigned, but reactivation requires at least one role.
           </p>
+        </div>
+
+        <div class="form-group">
+          <div class="scopes-header">
+            <label class="form-label">Scoped Visibility</label>
+            <button class="btn btn-secondary btn-sm" type="button" @click="addScope">Add Scope</button>
+          </div>
+          <p class="field-hint">
+            Use `Application + SNOW Group` to limit what this employee can see and manage. Leave
+            scopes empty only for global `DEVOPS_ADMIN`.
+          </p>
+
+          <div v-if="form.scopeGrants.length === 0" class="empty-scope-state">
+            No scopes configured yet.
+          </div>
+
+          <div v-else class="scope-grid">
+            <div v-for="(scope, index) in form.scopeGrants" :key="`${index}-${scope.application}-${scope.snowGroup}`" class="scope-row">
+              <input
+                v-model="scope.application"
+                class="form-control"
+                type="text"
+                placeholder="Application"
+              />
+              <input
+                v-model="scope.snowGroup"
+                class="form-control"
+                type="text"
+                placeholder="SNOW Group"
+              />
+              <button class="btn btn-secondary btn-sm" type="button" @click="removeScope(index)">
+                Remove
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="form-group">
@@ -204,9 +279,48 @@ function submit() {
   color: #64748b;
 }
 
+.scopes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.empty-scope-state {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.scope-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.scope-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
 @media (max-width: 720px) {
   .role-grid {
     grid-template-columns: 1fr;
+  }
+
+  .scope-row {
+    grid-template-columns: 1fr;
+  }
+
+  .scopes-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

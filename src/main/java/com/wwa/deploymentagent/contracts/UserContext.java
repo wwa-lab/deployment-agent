@@ -12,7 +12,8 @@ public record UserContext(
         String role,
         List<String> roles,
         Set<String> permissions,
-        String displayName
+        String displayName,
+        List<AccessScope> scopes
 ) {
 
     public UserContext {
@@ -36,14 +37,20 @@ public record UserContext(
                         .toList())
         );
 
+        List<AccessScope> normalizedScopes = scopes == null ? List.of() : scopes.stream()
+                .filter(scope -> scope != null && !scope.isEmpty())
+                .distinct()
+                .toList();
+
         role = normalizedRole;
         roles = normalizedRoles;
         permissions = normalizedPermissions;
         displayName = (displayName == null || displayName.isBlank()) ? userId : displayName;
+        scopes = normalizedScopes;
     }
 
     public UserContext(String userId, String role) {
-        this(userId, role, role == null || role.isBlank() ? List.of() : List.of(role), Set.of(), userId);
+        this(userId, role, role == null || role.isBlank() ? List.of() : List.of(role), Set.of(), userId, List.of());
     }
 
     public boolean hasRole(String expectedRole) {
@@ -52,5 +59,32 @@ public record UserContext(
 
     public boolean hasPermission(String expectedPermission) {
         return expectedPermission != null && permissions.contains(expectedPermission);
+    }
+
+    public boolean isGlobalDevOpsAdmin() {
+        return hasRole("DEVOPS_ADMIN") && scopes.isEmpty();
+    }
+
+    public boolean hasScopedAccess(String application, String snowGroup) {
+        if (isGlobalDevOpsAdmin()) {
+            return true;
+        }
+        if (scopes.isEmpty()) {
+            return false;
+        }
+        return scopes.stream().anyMatch(scope -> scope.matches(application, snowGroup));
+    }
+
+    public boolean canManageScopes(List<AccessScope> targetScopes) {
+        if (isGlobalDevOpsAdmin()) {
+            return true;
+        }
+        if (!hasRole("DEVOPS_ADMIN")) {
+            return false;
+        }
+        if (targetScopes == null || targetScopes.isEmpty()) {
+            return false;
+        }
+        return targetScopes.stream().allMatch(scope -> hasScopedAccess(scope.application(), scope.snowGroup()));
     }
 }

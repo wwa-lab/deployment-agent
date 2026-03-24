@@ -77,6 +77,12 @@ class AccessGrantControllerTest {
                                   "employeeId": "emp-005",
                                   "grantStatus": "ACTIVE",
                                   "assignedRoles": ["AUDIT", "MANAGEMENT"],
+                                  "scopeGrants": [
+                                    {
+                                      "application": "AMH HCC",
+                                      "snowGroup": "HTSA-CSI-HCC-AMH-PRJ"
+                                    }
+                                  ],
                                   "note": "Initial onboarding"
                                 }
                                 """)
@@ -89,10 +95,14 @@ class AccessGrantControllerTest {
                 .andExpect(jsonPath("$.assignedRoles.length()").value(2))
                 .andExpect(jsonPath("$.assignedRoles[0]").value("AUDIT"))
                 .andExpect(jsonPath("$.assignedRoles[1]").value("MANAGEMENT"))
+                .andExpect(jsonPath("$.scopeGrants.length()").value(1))
+                .andExpect(jsonPath("$.scopeGrants[0].application").value("AMH HCC"))
+                .andExpect(jsonPath("$.scopeGrants[0].snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
                 .andExpect(jsonPath("$.updatedBy").value("emp-003"));
 
         AccessGrant saved = accessGrantRepository.findById("emp-005").orElseThrow();
         assertThat(saved.getAssignedRoles()).containsExactly("AUDIT", "MANAGEMENT");
+        assertThat(saved.getScopeGrants()).hasSize(1);
 
         AuditLogEntry audit = auditLogRepository.findByActionType(
                         AuditActionType.access_grant_create,

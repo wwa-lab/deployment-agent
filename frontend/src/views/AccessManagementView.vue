@@ -65,6 +65,7 @@ async function submitDialog(payload: {
   employeeId: string
   grantStatus: AccessGrantStatus
   assignedRoles: AccessGrant['assignedRoles']
+  scopeGrants: AccessGrant['scopeGrants']
   note?: string
 }) {
   dialogSaving.value = true
@@ -146,8 +147,8 @@ function statusClass(status: AccessGrantStatus) {
         <p class="view-eyebrow">WWA Shared Capability</p>
         <h1 class="view-title">Access Management</h1>
         <p class="view-subtitle">
-          Manage who can enter Deployment Agent, what product roles they hold, and whether their
-          access is active or suspended.
+          Manage who can enter Deployment Agent, what product roles they hold, and which
+          `Application + SNOW Group` scopes they can view or administer.
         </p>
       </div>
       <button
@@ -165,8 +166,9 @@ function statusClass(status: AccessGrantStatus) {
       :class="canManageAccess ? 'helper-banner-muted' : 'helper-banner-warn'"
     >
       <template v-if="canManageAccess">
-        Access grants are product-scoped. Use this workspace to grant, suspend, reactivate, and
-        update roles without changing Team Book identity records.
+        Access grants control product entry, while scope grants control which `Application + SNOW
+        Group` data the employee can view or administer. Use this workspace to manage both without
+        changing Team Book identity records.
       </template>
       <template v-else>
         Access Management is restricted to `DEVOPS_ADMIN`. The menu remains visible so teammates can
@@ -241,6 +243,7 @@ function statusClass(status: AccessGrantStatus) {
                 <th>Employee</th>
                 <th>Status</th>
                 <th>Roles</th>
+                <th>Scopes</th>
                 <th>Last Login</th>
                 <th>Updated</th>
                 <th>Actions</th>
@@ -265,6 +268,18 @@ function statusClass(status: AccessGrantStatus) {
                     </span>
                     <span v-if="grant.assignedRoles.length === 0" class="cell-meta">No roles assigned</span>
                   </div>
+                </td>
+                <td>
+                  <div v-if="grant.scopeGrants.length > 0" class="scope-stack">
+                    <span
+                      v-for="scope in grant.scopeGrants"
+                      :key="`${scope.application}-${scope.snowGroup}`"
+                      class="scope-pill"
+                    >
+                      {{ scope.application }} / {{ scope.snowGroup }}
+                    </span>
+                  </div>
+                  <div v-else class="cell-meta">Global access</div>
                 </td>
                 <td>{{ formatTimestamp(grant.lastLoginAt) }}</td>
                 <td>
@@ -502,7 +517,8 @@ function statusClass(status: AccessGrantStatus) {
 }
 
 .status-badge,
-.role-pill {
+.role-pill,
+.scope-pill {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
@@ -530,6 +546,17 @@ function statusClass(status: AccessGrantStatus) {
 .role-pill {
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.scope-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scope-pill {
+  background: #f1f5f9;
+  color: #334155;
 }
 
 .action-row {

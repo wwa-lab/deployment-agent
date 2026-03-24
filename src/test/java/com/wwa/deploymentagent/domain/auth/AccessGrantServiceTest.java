@@ -1,5 +1,7 @@
 package com.wwa.deploymentagent.domain.auth;
 
+import com.wwa.deploymentagent.contracts.AccessScope;
+import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
 import com.wwa.deploymentagent.contracts.enums.Role;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,5 +51,49 @@ class AccessGrantServiceTest {
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent()).extracting(AccessGrant::getEmployeeId)
                 .containsExactly("emp-list-001");
+    }
+
+    @Test
+    @DisplayName("scoped admin list only returns grants within visible Application / SNOW Group scopes")
+    void list_scopedAdminSeesOnlyMatchingScopes() {
+        AccessGrant matchingGrant = new AccessGrant();
+        matchingGrant.setEmployeeId("emp-scope-001");
+        matchingGrant.setDisplayNameSnapshot("Scoped User");
+        matchingGrant.setGrantStatus(AccessGrantStatus.ACTIVE);
+        matchingGrant.setAssignedRoles(List.of(Role.TL.name()));
+        matchingGrant.setScopeGrants(List.of(new AccessScope("AMH HCC", "HTSA-CSI-HCC-AMH-PRJ")));
+        matchingGrant.setCreatedBy("seed");
+        matchingGrant.setUpdatedBy("seed");
+        accessGrantRepository.save(matchingGrant);
+
+        AccessGrant hiddenGrant = new AccessGrant();
+        hiddenGrant.setEmployeeId("emp-scope-002");
+        hiddenGrant.setDisplayNameSnapshot("Other Scoped User");
+        hiddenGrant.setGrantStatus(AccessGrantStatus.ACTIVE);
+        hiddenGrant.setAssignedRoles(List.of(Role.TL.name()));
+        hiddenGrant.setScopeGrants(List.of(new AccessScope("PowerCARD", "HTSA-CSI-CARD-PRD")));
+        hiddenGrant.setCreatedBy("seed");
+        hiddenGrant.setUpdatedBy("seed");
+        accessGrantRepository.saveAndFlush(hiddenGrant);
+
+        UserContext scopedAdmin = new UserContext(
+                "emp-admin-001",
+                "DEVOPS_ADMIN",
+                List.of("DEVOPS_ADMIN"),
+                Set.of("access.manage"),
+                "Scoped Admin",
+                List.of(new AccessScope("AMH HCC", "HTSA-CSI-HCC-AMH-PRJ"))
+        );
+
+        Page<AccessGrant> result = accessGrantService.list(
+                null,
+                AccessGrantStatus.ACTIVE,
+                PageRequest.of(0, 20),
+                scopedAdmin
+        );
+
+        assertThat(result.getContent()).extracting(AccessGrant::getEmployeeId)
+                .contains("emp-scope-001")
+                .doesNotContain("emp-scope-002");
     }
 }

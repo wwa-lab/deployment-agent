@@ -1,6 +1,8 @@
 package com.wwa.deploymentagent.domain.auth;
 
+import com.wwa.deploymentagent.contracts.AccessScope;
 import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
+import com.wwa.deploymentagent.util.AccessScopeListJsonAttributeConverter;
 import com.wwa.deploymentagent.util.StringListJsonAttributeConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -39,6 +41,10 @@ public class AccessGrant {
     @Column(name = "assigned_roles", columnDefinition = "CLOB", nullable = false)
     @Convert(converter = StringListJsonAttributeConverter.class)
     private List<String> assignedRoles = new ArrayList<>();
+
+    @Column(name = "scope_grants", columnDefinition = "CLOB", nullable = false)
+    @Convert(converter = AccessScopeListJsonAttributeConverter.class)
+    private List<AccessScope> scopeGrants = new ArrayList<>();
 
     @Column(name = "note", length = 1000)
     private String note;

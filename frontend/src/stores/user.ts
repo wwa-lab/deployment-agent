@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { UserPermission, UserRole } from '../types'
+import type { AccessScope, UserPermission, UserRole } from '../types'
 import { login as apiLogin, logout as apiLogout, checkSession } from '../api/auth'
 
 export const useUserStore = defineStore('user', () => {
   const userId = ref<string>('')
   const roles = ref<UserRole[]>([])
   const permissions = ref<UserPermission[]>([])
+  const scopes = ref<AccessScope[]>([])
   const displayName = ref<string>('')
   const isAuthenticated = ref(false)
 
@@ -29,6 +30,7 @@ export const useUserStore = defineStore('user', () => {
     roles: UserRole[]
     permissions: UserPermission[]
     displayName: string
+    scopes: AccessScope[]
   }) {
     userId.value = response.userId
     roles.value = response.roles.length > 0
@@ -37,6 +39,7 @@ export const useUserStore = defineStore('user', () => {
         ? [response.role]
         : []
     permissions.value = response.permissions ?? []
+    scopes.value = response.scopes ?? []
     displayName.value = response.displayName
     isAuthenticated.value = true
   }
@@ -51,6 +54,7 @@ export const useUserStore = defineStore('user', () => {
     userId.value = ''
     roles.value = []
     permissions.value = []
+    scopes.value = []
     displayName.value = ''
     isAuthenticated.value = false
   }
@@ -63,6 +67,7 @@ export const useUserStore = defineStore('user', () => {
       userId.value = ''
       roles.value = []
       permissions.value = []
+      scopes.value = []
       displayName.value = ''
       isAuthenticated.value = false
     }
@@ -73,6 +78,7 @@ export const useUserStore = defineStore('user', () => {
     role,
     roles,
     permissions,
+    scopes,
     displayName,
     isAuthenticated,
     isTL,

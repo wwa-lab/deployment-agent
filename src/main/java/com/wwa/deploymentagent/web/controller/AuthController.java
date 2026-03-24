@@ -44,7 +44,8 @@ public class AuthController {
                 userContext.role(),
                 userContext.roles(),
                 userContext.permissions(),
-                userContext.displayName()
+                userContext.displayName(),
+                userContext.scopes()
         ));
     }
 
@@ -65,7 +66,8 @@ public class AuthController {
                 userContext.role(),
                 userContext.roles(),
                 userContext.permissions(),
-                userContext.displayName()
+                userContext.displayName(),
+                userContext.scopes()
         ));
     }
 

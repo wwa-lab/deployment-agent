@@ -38,7 +38,8 @@ public class AccessGrantController {
         Page<AccessGrant> result = accessGrantService.list(
                 query,
                 status,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"))
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt")),
+                user
         );
 
         List<AccessGrantDto> data = result.getContent().stream()
@@ -60,7 +61,13 @@ public class AccessGrantController {
     ) {
         validateAccessManager(user);
         return ResponseEntity.ok(AccessGrantDto.from(
-                accessGrantService.createGrant(body.employeeId(), body.grantStatus(), body.assignedRoles(), body.note(), user)
+                accessGrantService.createGrant(
+                        body.employeeId(),
+                        body.grantStatus(),
+                        body.assignedRoles(),
+                        body.scopeGrants(),
+                        body.note(),
+                        user)
         ));
     }
 
@@ -72,7 +79,12 @@ public class AccessGrantController {
     ) {
         validateAccessManager(user);
         return ResponseEntity.ok(AccessGrantDto.from(
-                accessGrantService.updateGrant(employeeId, body.assignedRoles(), body.note(), user)
+                accessGrantService.updateGrant(
+                        employeeId,
+                        body.assignedRoles(),
+                        body.scopeGrants(),
+                        body.note(),
+                        user)
         ));
     }
 
@@ -99,6 +111,7 @@ public class AccessGrantController {
                 accessGrantService.reactivateGrant(
                         employeeId,
                         body == null ? null : body.assignedRoles(),
+                        body == null ? null : body.scopeGrants(),
                         body == null ? null : body.note(),
                         user
                 )

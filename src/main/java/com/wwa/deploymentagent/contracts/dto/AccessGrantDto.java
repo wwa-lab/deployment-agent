@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.contracts.dto;
 
+import com.wwa.deploymentagent.contracts.AccessScope;
 import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
 import com.wwa.deploymentagent.domain.auth.AccessGrant;
 import jakarta.validation.constraints.NotBlank;
@@ -13,6 +14,7 @@ public record AccessGrantDto(
         String displayName,
         AccessGrantStatus grantStatus,
         List<String> assignedRoles,
+        List<AccessScope> scopeGrants,
         String note,
         Instant lastLoginAt,
         String createdBy,
@@ -26,6 +28,7 @@ public record AccessGrantDto(
                 grant.getDisplayNameSnapshot(),
                 grant.getGrantStatus(),
                 List.copyOf(grant.getAssignedRoles()),
+                List.copyOf(grant.getScopeGrants()),
                 grant.getNote(),
                 grant.getLastLoginAt(),
                 grant.getCreatedBy(),
@@ -39,11 +42,13 @@ public record AccessGrantDto(
             @NotBlank String employeeId,
             @NotNull AccessGrantStatus grantStatus,
             List<@NotBlank String> assignedRoles,
+            List<AccessScope> scopeGrants,
             String note
     ) {}
 
     public record UpdateRequest(
             List<@NotBlank String> assignedRoles,
+            List<AccessScope> scopeGrants,
             String note
     ) {}
 
@@ -53,6 +58,7 @@ public record AccessGrantDto(
 
     public record ReactivateRequest(
             List<@NotBlank String> assignedRoles,
+            List<AccessScope> scopeGrants,
             String note
     ) {}
 }

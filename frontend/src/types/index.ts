@@ -41,6 +41,11 @@ export type ConfigKey =
   | 'execution_callback_endpoint'
 export type ConfigIntegrationId = 'jenkins' | 'ansible' | 'callback'
 
+export interface AccessScope {
+  application: string
+  snowGroup: string
+}
+
 // Task
 export interface Task {
   id: string
@@ -91,6 +96,8 @@ export interface Request {
   requestStatus: RequestStatus
   snowGroup?: string
   application?: string
+  agent?: string
+  owner?: string
   site?: string
   createdBy?: string
   estimatedRemainingMinutes?: number
@@ -114,6 +121,10 @@ export interface ReleaseFlowListItem {
   reviewStatus: ReviewStatus
   archivedAt?: string
   archivedBy?: string
+  snowGroup?: string
+  application?: string
+  agent?: string
+  owner?: string
   sitStatus: RequestStatus
   uatStatus: RequestStatus
   prodStatus: RequestStatus
@@ -147,6 +158,10 @@ export interface ConfigComponentRow {
   id: ConfigIntegrationId
   label: string
   category: string
+  application?: string
+  owningGroup?: string
+  agent?: string
+  scopeSource?: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
   endpointKey?: ConfigKey
   userKey?: ConfigKey
   secretKey?: ConfigKey
@@ -177,6 +192,9 @@ export interface AuditLogEntry {
   releaseFlowId?: string
   requestId?: string
   taskId?: string
+  application?: string
+  snowGroup?: string
+  agent?: string
   contextPayload?: Record<string, unknown>
 }
 
@@ -185,6 +203,7 @@ export interface AccessGrant {
   displayName: string
   grantStatus: AccessGrantStatus
   assignedRoles: UserRole[]
+  scopeGrants: AccessScope[]
   note?: string
   lastLoginAt?: string
   createdBy?: string
@@ -223,6 +242,9 @@ export interface UploadResponse {
   releaseId: string
   stage: Stage
   taskCount: number
+  snowGroup?: string
+  application?: string
+  agent?: string
 }
 
 export interface RequestArchiveResult {
@@ -307,4 +329,5 @@ export interface AuthResponse {
   roles: UserRole[]
   permissions: UserPermission[]
   displayName: string
+  scopes: AccessScope[]
 }

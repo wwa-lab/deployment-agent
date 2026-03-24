@@ -7,7 +7,7 @@ import {
   suspendAccessGrant,
   updateAccessGrant,
 } from '../api/accessGrants'
-import type { AccessGrant, AccessGrantStatus, UserRole } from '../types'
+import type { AccessGrant, AccessGrantStatus, AccessScope, UserRole } from '../types'
 
 export const useAccessGrantStore = defineStore('accessGrants', () => {
   const grants = ref<AccessGrant[]>([])
@@ -42,6 +42,7 @@ export const useAccessGrantStore = defineStore('accessGrants', () => {
     employeeId: string
     grantStatus: AccessGrantStatus
     assignedRoles: UserRole[]
+    scopeGrants: AccessScope[]
     note?: string
   }) {
     error.value = ''
@@ -53,6 +54,7 @@ export const useAccessGrantStore = defineStore('accessGrants', () => {
   async function editGrant(input: {
     employeeId: string
     assignedRoles: UserRole[]
+    scopeGrants: AccessScope[]
     note?: string
   }) {
     error.value = ''
@@ -71,6 +73,7 @@ export const useAccessGrantStore = defineStore('accessGrants', () => {
   async function reactivateGrant(input: {
     employeeId: string
     assignedRoles: UserRole[]
+    scopeGrants: AccessScope[]
     note?: string
   }) {
     error.value = ''

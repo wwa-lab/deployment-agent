@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.auth;
 
+import com.wwa.deploymentagent.contracts.AccessScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +39,7 @@ public class AccessGrantBootstrapRunner implements ApplicationRunner {
                     employee.employeeId(),
                     employee.displayName(),
                     List.of(employee.role()),
+                    List.of(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD)),
                     "Bootstrap grant for known non-production employee"
             );
         }
@@ -60,6 +62,7 @@ public class AccessGrantBootstrapRunner implements ApplicationRunner {
                             employeeId,
                             displayName,
                             List.of("DEVOPS_ADMIN"),
+                            List.of(),
                             "Bootstrap admin grant from app.auth.bootstrap-admin-ids"
                     );
                 });
