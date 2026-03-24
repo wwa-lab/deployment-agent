@@ -1,6 +1,9 @@
 package com.wwa.deploymentagent.domain.auth;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
+import com.wwa.deploymentagent.errors.AccessNotGrantedAppException;
+import com.wwa.deploymentagent.errors.AccessSuspendedAppException;
 import com.wwa.deploymentagent.errors.UnauthorizedAppException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,21 +21,28 @@ class AuthServiceTest {
 
     @Autowired
     private AuthService authService;
+    @Autowired
+    private AccessGrantRepository accessGrantRepository;
 
     @Test
-    @DisplayName("valid employee ID → returns UserContext with correct role")
+    @DisplayName("valid employee ID → returns UserContext with roles and permissions")
     void authenticate_validEmployee_returnsContext() {
         UserContext ctx = authService.authenticate("emp-001", "any-password");
         assertThat(ctx.userId()).isEqualTo("emp-001");
         assertThat(ctx.role()).isEqualTo("DEVELOPER");
+        assertThat(ctx.roles()).containsExactly("DEVELOPER");
+        assertThat(ctx.permissions()).contains("release.upload", "release.view");
+        assertThat(ctx.displayName()).contains("Alice Park");
     }
 
     @Test
-    @DisplayName("TL employee → returns TL role")
+    @DisplayName("TL employee → returns TL role and workflow permissions")
     void authenticate_tlEmployee_returnsTLRole() {
         UserContext ctx = authService.authenticate("emp-002", "any-password");
         assertThat(ctx.userId()).isEqualTo("emp-002");
         assertThat(ctx.role()).isEqualTo("TL");
+        assertThat(ctx.roles()).containsExactly("TL");
+        assertThat(ctx.permissions()).contains("task.edit", "task.run", "task.review");
     }
 
     @Test
@@ -54,6 +64,41 @@ class AuthServiceTest {
     void authenticate_management_returnsManagementRole() {
         UserContext ctx = authService.authenticate("emp-005", "any-password");
         assertThat(ctx.role()).isEqualTo("MANAGEMENT");
+        assertThat(ctx.permissions()).containsExactly("audit.view");
+    }
+
+    @Test
+    @DisplayName("employee without access grant → throws AccessNotGrantedAppException")
+    void authenticate_missingAccessGrant_throwsForbidden() {
+        AccessGrant grant = accessGrantRepository.findById("emp-005").orElseThrow();
+        accessGrantRepository.deleteById("emp-005");
+
+        try {
+            assertThatThrownBy(() -> authService.authenticate("emp-005", "any-password"))
+                    .isInstanceOf(AccessNotGrantedAppException.class)
+                    .hasMessageContaining("Access not granted");
+        } finally {
+            accessGrantRepository.save(grant);
+        }
+    }
+
+    @Test
+    @DisplayName("suspended access grant → throws AccessSuspendedAppException")
+    void authenticate_suspendedGrant_throwsForbidden() {
+        AccessGrant grant = accessGrantRepository.findById("emp-004").orElseThrow();
+        AccessGrantStatus originalStatus = grant.getGrantStatus();
+        grant.setGrantStatus(AccessGrantStatus.SUSPENDED);
+        accessGrantRepository.save(grant);
+
+        try {
+            assertThatThrownBy(() -> authService.authenticate("emp-004", "any-password"))
+                    .isInstanceOf(AccessSuspendedAppException.class)
+                    .hasMessageContaining("Access suspended");
+        } finally {
+            AccessGrant persistedGrant = accessGrantRepository.findById("emp-004").orElseThrow();
+            persistedGrant.setGrantStatus(originalStatus);
+            accessGrantRepository.save(persistedGrant);
+        }
     }
 
     @Test

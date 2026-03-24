@@ -2,6 +2,9 @@ package com.wwa.deploymentagent.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wwa.deploymentagent.contracts.dto.LoginRequestDto;
+import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
+import com.wwa.deploymentagent.domain.auth.AccessGrant;
+import com.wwa.deploymentagent.domain.auth.AccessGrantRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,9 +28,10 @@ class AuthControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private AccessGrantRepository accessGrantRepository;
 
     @Test
-    @DisplayName("POST /auth/login with valid credentials → 200 + user info")
+    @DisplayName("POST /auth/login with valid credentials → 200 + auth context")
     void login_validCredentials_returnsOk() throws Exception {
         LoginRequestDto body = new LoginRequestDto("emp-002", "password");
 
@@ -37,6 +41,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("emp-002"))
                 .andExpect(jsonPath("$.role").value("TL"))
+                .andExpect(jsonPath("$.roles[0]").value("TL"))
+                .andExpect(jsonPath("$.permissions").isArray())
                 .andExpect(jsonPath("$.displayName").isNotEmpty());
     }
 
@@ -49,6 +55,48 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /auth/login without access grant → 403")
+    void login_missingGrant_returns403() throws Exception {
+        AccessGrant grant = accessGrantRepository.findById("emp-005").orElseThrow();
+        accessGrantRepository.deleteById("emp-005");
+
+        try {
+            LoginRequestDto body = new LoginRequestDto("emp-005", "password");
+
+            mockMvc.perform(post("/api/deployment-agent/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(body)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("ACCESS_NOT_GRANTED"));
+        } finally {
+            accessGrantRepository.save(grant);
+        }
+    }
+
+    @Test
+    @DisplayName("POST /auth/login with suspended access grant → 403")
+    void login_suspendedGrant_returns403() throws Exception {
+        AccessGrant grant = accessGrantRepository.findById("emp-004").orElseThrow();
+        AccessGrantStatus originalStatus = grant.getGrantStatus();
+        grant.setGrantStatus(AccessGrantStatus.SUSPENDED);
+        accessGrantRepository.save(grant);
+
+        try {
+            LoginRequestDto body = new LoginRequestDto("emp-004", "password");
+
+            mockMvc.perform(post("/api/deployment-agent/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(body)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("ACCESS_SUSPENDED"));
+        } finally {
+            AccessGrant persistedGrant = accessGrantRepository.findById("emp-004").orElseThrow();
+            persistedGrant.setGrantStatus(originalStatus);
+            accessGrantRepository.save(persistedGrant);
+        }
     }
 
     @Test
@@ -76,7 +124,9 @@ class AuthControllerTest {
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("emp-003"))
-                .andExpect(jsonPath("$.role").value("DEVOPS_ADMIN"));
+                .andExpect(jsonPath("$.role").value("DEVOPS_ADMIN"))
+                .andExpect(jsonPath("$.roles[0]").value("DEVOPS_ADMIN"))
+                .andExpect(jsonPath("$.permissions").isArray());
     }
 
     @Test

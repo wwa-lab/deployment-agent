@@ -14,6 +14,23 @@ export type TaskStatus =
 export type ExecutionType = 'MANUAL' | 'AUTO'
 export type RequestStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Rejected'
 export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT' | 'MANAGEMENT'
+export type AccessGrantStatus = 'ACTIVE' | 'SUSPENDED'
+export type UserPermission =
+  | 'release.view'
+  | 'release.upload'
+  | 'release.view_archived'
+  | 'release.rundown.edit'
+  | 'release.rundown.archive'
+  | 'release.rundown.restore'
+  | 'release.rundown.purge'
+  | 'release.rundown.start'
+  | 'release.rundown.fail'
+  | 'task.edit'
+  | 'task.run'
+  | 'task.review'
+  | 'config.manage'
+  | 'audit.view'
+  | 'access.manage'
 export type ConfigKey =
   | 'jenkins_url'
   | 'jenkins_user'
@@ -28,6 +45,7 @@ export type ConfigIntegrationId = 'jenkins' | 'ansible' | 'callback'
 export interface Task {
   id: string
   category?: string
+  dependencies?: string
   taskGroupId: string
   taskGroupName: string
   stepSeq: number
@@ -76,6 +94,8 @@ export interface Request {
   site?: string
   createdBy?: string
   estimatedRemainingMinutes?: number
+  archivedAt?: string
+  archivedBy?: string
   createdAt?: string
   updatedAt?: string
   version: number
@@ -92,6 +112,8 @@ export interface ReleaseFlowListItem {
   currentStage: Stage
   flowStatus: FlowStatus
   reviewStatus: ReviewStatus
+  archivedAt?: string
+  archivedBy?: string
   sitStatus: RequestStatus
   uatStatus: RequestStatus
   prodStatus: RequestStatus
@@ -107,6 +129,8 @@ export interface ReleaseFlowDetail {
   currentStage: Stage
   flowStatus: FlowStatus
   reviewStatus: ReviewStatus
+  archivedAt?: string
+  archivedBy?: string
   requests: Request[]
 }
 
@@ -156,6 +180,19 @@ export interface AuditLogEntry {
   contextPayload?: Record<string, unknown>
 }
 
+export interface AccessGrant {
+  employeeId: string
+  displayName: string
+  grantStatus: AccessGrantStatus
+  assignedRoles: UserRole[]
+  note?: string
+  lastLoginAt?: string
+  createdBy?: string
+  createdAt?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
 // TaskResult
 export interface TaskResult {
   taskId: string
@@ -186,6 +223,24 @@ export interface UploadResponse {
   releaseId: string
   stage: Stage
   taskCount: number
+}
+
+export interface RequestArchiveResult {
+  releaseFlowId: string
+  requestId: string
+  stage: Stage
+  requestArchived: boolean
+  releaseFlowArchived: boolean
+  activeRequestCount: number
+}
+
+export interface RequestPurgeResult {
+  releaseFlowId: string
+  requestId: string
+  stage: Stage
+  releaseFlowDeleted: boolean
+  remainingRequestCount: number
+  activeRequestCount: number
 }
 
 // Template management
@@ -248,6 +303,8 @@ export interface CreateTemplateDraft {
 // Auth
 export interface AuthResponse {
   userId: string
-  role: UserRole
+  role?: UserRole
+  roles: UserRole[]
+  permissions: UserPermission[]
   displayName: string
 }

@@ -59,6 +59,14 @@ const navItems = computed<NavItem[]>(() => [
     icon: '📊',
     visible: true,
   },
+  {
+    key: 'access-management',
+    label: 'Access Management',
+    to: '/wwa/access-management',
+    icon: '🛂',
+    visible: true,
+    locked: !userStore.canManageAccess,
+  },
 ])
 
 const primaryNavItems: PrimaryNavItem[] = [

@@ -14,13 +14,14 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final TeamBookAuthenticationProvider authProvider;
+    private final AccessGrantService accessGrantService;
 
     /**
      * Authenticate a user and return their context.
      *
      * @param employeeId employee identifier
      * @param password   password
-     * @return UserContext with userId and role
+     * @return UserContext with product access roles and permissions
      * @throws UnauthorizedAppException if authentication fails
      */
     public UserContext authenticate(String employeeId, String password) {
@@ -28,15 +29,14 @@ public class AuthService {
                 .orElseThrow(() -> new UnauthorizedAppException(
                         "Invalid employee ID or password"));
 
-        return new UserContext(employee.employeeId(), employee.role());
+        return accessGrantService.authorizeAuthenticatedEmployee(employee);
     }
 
     /**
      * Look up display name for an authenticated employee.
      */
     public String getDisplayName(String employeeId) {
-        // Re-use the provider to look up the name (stub accepts any password)
-        return authProvider.authenticate(employeeId, "lookup")
+        return authProvider.findByEmployeeId(employeeId)
                 .map(TeamBookEmployee::displayName)
                 .orElse(employeeId);
     }

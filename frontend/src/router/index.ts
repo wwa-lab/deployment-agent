@@ -83,6 +83,15 @@ const router = createRouter({
             sectionTitle: 'Audit Log',
           },
         },
+        {
+          path: 'access-management',
+          name: 'wwa-access-management',
+          component: () => import('../views/AccessManagementView.vue'),
+          meta: {
+            section: 'access-management',
+            sectionTitle: 'Access Management',
+          },
+        },
       ],
     },
   ],

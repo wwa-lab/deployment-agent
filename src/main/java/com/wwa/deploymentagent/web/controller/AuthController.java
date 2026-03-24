@@ -39,12 +39,12 @@ public class AuthController {
         UserContextAuthentication auth = new UserContextAuthentication(userContext);
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        String displayName = authService.getDisplayName(userContext.userId());
-
         return ResponseEntity.ok(new AuthResponseDto(
                 userContext.userId(),
                 userContext.role(),
-                displayName
+                userContext.roles(),
+                userContext.permissions(),
+                userContext.displayName()
         ));
     }
 
@@ -60,12 +60,12 @@ public class AuthController {
             return ResponseEntity.status(401).build();
         }
 
-        String displayName = authService.getDisplayName(userContext.userId());
-
         return ResponseEntity.ok(new AuthResponseDto(
                 userContext.userId(),
                 userContext.role(),
-                displayName
+                userContext.roles(),
+                userContext.permissions(),
+                userContext.displayName()
         ));
     }
 

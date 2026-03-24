@@ -53,6 +53,10 @@ function actionLabel(log: AuditLogEntry): string {
     auto_submit: 'Auto Submit',
     request_start: 'Start Deployment',
     request_fail: 'Mark as Failed',
+    access_grant_create: 'Access Granted',
+    access_grant_update: 'Access Updated',
+    access_grant_suspend: 'Access Suspended',
+    access_grant_reactivate: 'Access Reactivated',
   }
 
   return labels[log.actionType] ?? log.actionType
@@ -128,6 +132,15 @@ function detailText(log: AuditLogEntry): string {
     case 'request_start':
     case 'request_fail':
       return `Stage: ${String(payload.stage ?? '—')}`
+    case 'access_grant_create':
+    case 'access_grant_update':
+    case 'access_grant_suspend':
+    case 'access_grant_reactivate':
+      return `Employee: ${String(payload.employeeId ?? '—')}${
+        payload.newGrantStatus ? ` | Status: ${String(payload.newGrantStatus)}` : ''
+      }${
+        payload.newAssignedRoles ? ` | Roles: ${String(payload.newAssignedRoles)}` : ''
+      }`
     default:
       return compactJson(payload) || 'No additional detail'
   }

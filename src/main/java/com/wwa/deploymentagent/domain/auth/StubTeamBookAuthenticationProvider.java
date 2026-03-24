@@ -3,6 +3,7 @@ package com.wwa.deploymentagent.domain.auth;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,5 +29,18 @@ public class StubTeamBookAuthenticationProvider implements TeamBookAuthenticatio
             return Optional.empty();
         }
         return Optional.ofNullable(EMPLOYEES.get(employeeId));
+    }
+
+    @Override
+    public Optional<TeamBookEmployee> findByEmployeeId(String employeeId) {
+        if (employeeId == null || employeeId.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(EMPLOYEES.get(employeeId));
+    }
+
+    @Override
+    public List<TeamBookEmployee> listKnownEmployees() {
+        return EMPLOYEES.values().stream().toList();
     }
 }
