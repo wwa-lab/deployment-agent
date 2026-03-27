@@ -1,10 +1,14 @@
-# Deployment Agent
+# Release Agent
 
-Deployment Agent is a workflow-driven platform for managing deployment requests, template-based execution, and delivery process validation.
+Release Agent is a workflow-driven release orchestration workspace for managing deployment requests, template-based execution, and delivery process validation.
 
 ## Overview
 
-This repository is the main engineering workspace for Deployment Agent.
+This repository is the main engineering workspace for Release Agent.
+
+The recommended product name is now **Release Agent** because the workspace covers the full release-flow lifecycle, human review gates, and execution coordination, not only deployment submission. Current technical identifiers remain unchanged for now, including the repository name, Java package name, route slug `/wwa/deployment-agent`, and API prefix `/api/deployment-agent`.
+
+At the platform layer, `WWA` now refers to the **WWA Agent Workspace Hub**. In documentation, this is the shared DevOps hub above individual agent workspaces; `WWA` remains the short label used in routes and UI navigation.
 
 It is designed to support structured delivery workflows, including:
 

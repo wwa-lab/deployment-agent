@@ -1,4 +1,4 @@
-# Data Flow: Deployment Agent
+# Data Flow: Release Agent
 
 > **Source**: architecture.md, spec.md, design.md
 > **Last updated**: 2026-03-24
@@ -7,7 +7,7 @@
 
 ## Overview
 
-This document describes how data flows through the Deployment Agent system, from external inputs (authentication, access-management actions, Excel upload, task actions) through processing layers to persistence and external systems.
+This document describes how data flows through the Release Agent system, from external inputs (authentication, access-management actions, Excel upload, task actions) through processing layers to persistence and external systems.
 
 ---
 
@@ -208,7 +208,7 @@ flowchart LR
 
 - Authentication confirms enterprise identity through Team Book
 - Authorization then resolves local product access and `Application + SNOW Group` visibility through Access Grants
-- Users without an active Access Grant are blocked before entering the Deployment Agent workspace
+- Users without an active Access Grant are blocked before entering the Release Agent workspace
 - Frontend route visibility and backend endpoint access are expected to use the same effective permission set and scope evaluation in Phase 1
 
 ---

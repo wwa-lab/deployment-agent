@@ -2,11 +2,13 @@
 
 ## Unreleased
 
+- Renamed the workspace across repository documentation from `Deployment Agent` to `Release Agent` so the product name better matches the current positioning around release orchestration, review control, and execution coordination; current technical identifiers such as `deployment-agent`, `/wwa/deployment-agent`, and `/api/deployment-agent` remain unchanged for now.
+- Reworked Configuration Management so the Component tab now persists real component metadata and drives the raw Configuration table from the same source, while built-in Jenkins/Ansible/callback credentials are encrypted at rest and no longer written to audit logs in plaintext.
 - Added a recommended upload-time `Release Identifier` field so users can explicitly group repeated SIT/UAT/PROD uploads into the intended rundown, while duplicate same-stage uploads under the same identifier are now blocked with a clear validation error.
 - Fixed upload import so re-uploading the same project/stage creates a new release rundown instead of overwriting the existing active one; later-stage uploads now attach to the newest eligible release flow that does not already contain that stage.
 - Fixed the logged-in WWA top-bar title so agent workspace pages no longer repeat the same label as `Workspace › Page` when both values are identical.
 - Added a persistent `WWA Home` return action in the logged-in workspace top bar, so users can jump back to the WWA home page without reopening the left-side flyout.
-- Added a first-screen explanation that expands WWA to "Work With Agent" on the login page, the WWA home page, and the default Deployment Agent landing page.
+- Added a first-screen explanation that expands WWA to "Work With Agent" on the login page, the WWA home page, and the default Release Agent landing page.
 - Removed placeholder application entries from the WWA sidebar so the shell only shows real workspace navigation.
 - Added working Excel template download support in the upload dialog.
 - Restored local-profile authentication filters so session-backed user context is available during frontend testing.
@@ -39,14 +41,14 @@
 - Added an Access Management workspace in the frontend with admin grant lifecycle controls, locked navigation for non-admin users, and audit-log labels for access-governance actions.
 - Extended Access Management from product-only grants into scoped visibility grants backed by `Application / SNOW Group`, added scope editing to the access dialog, returned `scopes` in auth/session responses, and enforced the same scope boundary across release-flow visibility and audit-log visibility.
 - Added a first-class rundown owner field, defaulted new rundown ownership from a single imported task owner or the uploader, showed the owner in rundown details, and limited `Start Deployment` / `Mark as Failed` to the rundown owner or DEVOPS_ADMIN.
-- Added `Rundown Owner` to the Deployment Agent summary list so users can see who controls each rundown before opening the detail page.
+- Added `Rundown Owner` to the Release Agent summary list so users can see who controls each rundown before opening the detail page.
 - Moved dependency summary metrics out of the top Rundown Information block and into a lighter Task Dependencies panel above the task table, so stage metadata stays focused on execution status while dependency troubleshooting stays near Blocked By / Blocks details.
 - Realigned task-row actions with the prototype by always showing Edit, View Result, and a Decision dropdown, with state-based disabling.
 - Added tooltips to disabled task actions so users can see whether an action is blocked by role or task status.
 - Simplified task action permissions so only the task owner or a DEVOPS_ADMIN can edit input, record results, submit auto execution, or apply decisions.
 - Moved MANUAL task result submission into the Edit dialog so task-row actions stay closer to the prototype.
 - Wired View Result to execution history so external job links and stored execution output can be viewed from the task result modal.
-- Reworked the frontend shell from a standalone Deployment Agent sidebar into a WWA workspace with second-level navigation for Deployment Agent, Template Management, Configuration Management, and Audit Log.
+- Reworked the frontend shell from a standalone Release Agent sidebar into a WWA workspace with second-level navigation for Release Agent, Template Management, Configuration Management, and Audit Log.
 - Redesigned Template Management details to treat each template as a multi-task deployment blueprint, with task tables aligned to the current deployment task structure.
 - Added a lightweight More menu for each release template row with Clone, Edit, and Delete as template-maintenance entry points.
 - Added a Create New Template modal with Manual Entry and Upload Excel tabs, reusing the current Excel-template download capability and creating local template drafts for frontend preview.
@@ -66,7 +68,7 @@
 - Simplified Audit Log again into an action-record view with User, Time, Type, and Detail columns, plus Staff Id search for faster tracing.
 - Fixed the Audit Log API wiring so the shared audit page loads correctly for signed-in users, and clarified the page copy around platform traceability versus task-level activity.
 - Added a task-level Activity dialog on the release-flow detail page so users can trace who did what on a task, when it happened, and the related input/output from audit and execution records.
-- Redesigned the Deployment Agent summary table so SIT, UAT, and PROD stage statuses are visible at a glance without opening the flow detail page.
+- Redesigned the Release Agent summary table so SIT, UAT, and PROD stage statuses are visible at a glance without opening the flow detail page.
 - Reworked the workspace shell into a clearer two-level navigation so WWA appears as a first-level menu and its capabilities expand as second-level items.
 - Added first-level placeholder applications around WWA so the left navigation reads like a broader platform shell while only WWA opens a working second-level flyout on the right.
 - Fixed the WWA flyout positioning so the second-level workspace menu is no longer clipped by the sidebar scroll container.

@@ -1,8 +1,8 @@
-# Multi-Agent Integration Standard (Link-to-WWA Mode) v0.1
+# WWA Agent Workspace Hub Integration Standard (Link-to-WWA Mode) v0.1
 
 **Date:** 2026-03-26
 **Status:** Draft
-**Owner:** WWA platform direction
+**Owner:** WWA Agent Workspace Hub direction
 
 ---
 
@@ -10,12 +10,14 @@
 
 This standard defines how future agents should integrate with FinBlock and WWA.
 
+In this document, `WWA` refers to the **WWA Agent Workspace Hub**, the shared DevOps hub above individual agent workspaces.
+
 This version adopts the `Link-to-WWA` model:
 
 - `FinBlock` does not host agent platform capabilities.
 - `FinBlock` provides one stable entry link to `WWA`.
 - Users authenticate in `WWA`, navigate within `WWA`, and then enter a specific agent workspace.
-- Each agent remains an independent microservice and is presented consistently under the `WWA` platform shell.
+- Each agent remains an independent microservice and is presented consistently under the `WWA Agent Workspace Hub`.
 
 The goal is to avoid redesigning authentication, navigation, permissions, and audit behavior every time a new agent is added.
 
@@ -24,9 +26,9 @@ The goal is to avoid redesigning authentication, navigation, permissions, and au
 ## 2. Product Positioning
 
 - `FinBlock`: business system and upstream entry point
-- `WWA`: unified agent platform shell
+- `WWA Agent Workspace Hub` (`WWA`): unified DevOps hub for agent workspaces
 - `Agent Workspace`: independent microservice workspace for a specific agent domain
-- `Deployment Agent`: the first mature workspace under `WWA`
+- `Release Agent`: the first mature workspace under `WWA`
 - Future agents such as `Testing Agent`: follow the same integration standard
 
 This model should be understood as:
@@ -55,7 +57,7 @@ not:
 2. The browser opens the WWA entry page.
 3. The user completes authentication in WWA.
 4. WWA shows the list of available agents based on access rights.
-5. The user selects an agent such as `Deployment Agent` or `Testing Agent`.
+5. The user selects an agent such as `Release Agent` or `Testing Agent`.
 6. The user performs work inside the selected agent workspace.
 7. The user can switch to other agents inside WWA or return to FinBlock.
 
@@ -80,7 +82,7 @@ FinBlock does not need to:
 
 ---
 
-## 6. WWA Platform Shell Responsibilities
+## 6. WWA Agent Workspace Hub Responsibilities
 
 WWA is the unified shell and must provide the shared platform experience.
 
@@ -119,7 +121,7 @@ Each agent is responsible for:
 Each agent should not rebuild:
 
 - login pages
-- the overall platform shell
+- the overall Agent Workspace Hub shell
 - platform entry permissions
 - the platform-level audit entry point
 - a separate return-to-FinBlock pattern
@@ -183,7 +185,7 @@ WWA navigation must ensure that users can always tell:
 Recommended hierarchy:
 
 - level 1: `WWA`
-- level 2: `Deployment Agent`, `Testing Agent`, other future agents
+- level 2: `Release Agent`, `Testing Agent`, other future agents
 - shared areas: `Access Management`, `Audit Log`, other future shared capabilities
 
 Agent access must flow through the WWA shell rather than through scattered hardcoded URLs.
@@ -194,7 +196,7 @@ Agent access must flow through the WWA shell rather than through scattered hardc
 
 WWA must have a dedicated home page.
 
-WWA must not simply redirect all users into Deployment Agent by default, because that would make future agents feel secondary and would blur the distinction between the platform and its first workspace.
+WWA must not simply redirect all users into Release Agent by default, because that would make future agents feel secondary and would blur the distinction between the platform and its first workspace.
 
 The WWA home page should include:
 
@@ -269,7 +271,7 @@ Rules:
 
 Current guidance:
 
-- `Template Management` should remain Deployment-Agent-centric for now
+- `Template Management` should remain Release-Agent-centric for now
 - after the second agent is onboarded, reassess whether template management should become a shared WWA entry point
 
 ---
@@ -299,7 +301,7 @@ An agent is not ready for WWA integration until the following are clear:
   - owns the WWA entry point
   - does not own agent-internal workflows
 
-- `WWA platform team`
+- `WWA Agent Workspace Hub team`
   - owns shell navigation
   - owns unified authentication
   - owns platform access management
@@ -316,8 +318,8 @@ An agent is not ready for WWA integration until the following are clear:
 
 ## 17. Recommended Delivery Sequence
 
-1. Formally position the current system as `WWA + Deployment Agent`.
-2. Create a dedicated WWA home page instead of defaulting directly into Deployment Agent.
+1. Formally position the current system as `WWA + Release Agent`.
+2. Create a dedicated WWA home page instead of defaulting directly into Release Agent.
 3. Stabilize unified login, shell navigation, platform access, and platform audit.
 4. Onboard a second agent using the same model.
 5. Use the second onboarding to validate and refine this standard.
@@ -343,7 +345,7 @@ This is a deliberate sequencing choice. The first priority is to establish a sta
 The operating model for this standard is:
 
 - `FinBlock` provides entry
-- `WWA` provides the platform shell
+- `WWA` provides the Agent Workspace Hub
 - each `Agent` provides a specialized workspace
 
 The integration target is a unified platform experience built on independently evolving agent services, not a growing collection of unrelated external tools.

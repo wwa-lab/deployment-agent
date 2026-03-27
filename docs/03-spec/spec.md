@@ -1,4 +1,4 @@
-# Feature Specification: Deployment Agent MVP
+# Feature Specification: Release Agent MVP
 
 > **Source stories:** US-01 through US-11, US-21 through US-25
 > **Spec status:** Draft – Ready for Architecture with tracked open decisions
@@ -9,10 +9,12 @@
 ## 1. Overview
 
 ### 1.1 Feature Summary
-Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. It enables users to upload deployment requests via a fixed Excel template, create and monitor Release Flows across SIT / UAT / PROD stages, inspect task execution results, make explicit human decisions (Approve / Reject / Rerun / Skip), maintain key integration configuration, review audit records, and control product access plus scoped visibility through admin-managed access grants.
+Release Agent is a controlled, human-in-the-loop release orchestration workspace embedded within the WWA Agent Workspace Hub. It enables users to upload deployment requests via a fixed Excel template, create and monitor Release Flows across SIT / UAT / PROD stages, inspect task execution results, make explicit human decisions (Approve / Reject / Rerun / Skip), maintain key integration configuration, review audit records, and control product access plus scoped visibility through admin-managed access grants.
 
 ### 1.2 Business Objective
 Provide a unified and traceable deployment workspace that makes deployment execution visible, reviewable, auditable, explicitly controlled by humans before progression, and protected by product-entry and scoped-visibility governance.
+
+**Naming note:** `Release Agent` is the product/workspace name used in documentation. `WWA` refers to the `WWA Agent Workspace Hub` at the platform layer. Current implementation identifiers remain `deployment-agent` in routes, API prefixes, and package naming until a dedicated migration is approved.
 
 ### 1.3 MVP Objective
 Ensure the core workflow can successfully run through:
@@ -22,7 +24,7 @@ Ensure the core workflow can successfully run through:
 ### 1.4 In-Scope Outcome
 The MVP shall support the following end-to-end capabilities:
 
-1. Access Deployment Agent workspace within WWA
+1. Access Release Agent workspace within WWA
 2. Upload deployment requests through a fixed Excel template
 3. Create or update Release Flow records from imported request data
 4. Monitor Release Flow progress across SIT / UAT / PROD
@@ -33,7 +35,7 @@ The MVP shall support the following end-to-end capabilities:
 9. Record key operator actions in audit logs
 10. Maintain core integration configuration in UI
 11. View minimal read-only audit log list in MVP
-12. Enforce deny-by-default product entry using Deployment Agent access grants
+12. Enforce deny-by-default product entry using Release Agent access grants
 13. Allow DevOps Admin to manage access grants, roles, scope grants, and access status
 14. Record access-governance changes in audit logs
 15. Restrict rundown-level control actions to the rundown owner or DevOps Admin
@@ -44,7 +46,7 @@ The MVP shall support the following end-to-end capabilities:
 
 | Story ID | Title | Capability |
 |---|---|---|
-| US-01 | Access Deployment Agent workspace within WWA platform navigation | Workspace navigation |
+| US-01 | Access Release Agent workspace within WWA Agent Workspace Hub navigation | Workspace navigation |
 | US-02 | Upload deployment request via Excel file | Request upload |
 | US-03 | Create or update Release Flow from imported deployment request | Release Flow creation/update |
 | US-04 | View Release Flow summary with stage progress | Release monitoring |
@@ -55,7 +57,7 @@ The MVP shall support the following end-to-end capabilities:
 | US-09 | Record operator actions for audit traceability | Audit logging |
 | US-10 | Maintain integration configuration in UI | Configuration management |
 | US-11 | View audit logs for compliance review | Audit log viewing |
-| US-21 | Manage Deployment Agent access grants | Access grant lifecycle |
+| US-21 | Manage Release Agent access grants | Access grant lifecycle |
 | US-22 | Authorize product entry with deny-by-default access control | Product access authorization |
 | US-23 | Use an Access Management console for authorization operations | Access management console |
 | US-24 | Enforce effective permissions consistently across UI and API | Permission enforcement |
@@ -75,7 +77,7 @@ The MVP shall support the following end-to-end capabilities:
   - Makes Approve / Reject / Rerun / Skip decisions
 - **DevOps Admin**
   - Maintains integration configuration
-  - Manages Deployment Agent access grants and roles
+  - Manages Release Agent access grants and roles
   - Views operational status as needed
 - **Audit / Management User**
   - Views audit logs for compliance and accountability
@@ -84,7 +86,7 @@ The MVP shall support the following end-to-end capabilities:
 - **Authentication System**
   - Provides enterprise identity context
 - **Access Grant Store**
-  - Resolves Deployment Agent access status, assigned roles, and last-login metadata
+  - Resolves Release Agent access status, assigned roles, and last-login metadata
 - **Execution Integrations**
   - External systems such as Jenkins and Ansible that execute or orchestrate tasks
 - **Audit Storage**
@@ -94,15 +96,15 @@ The MVP shall support the following end-to-end capabilities:
 
 ## 4. Terminology
 
-- **Workspace**: The Deployment Agent application area inside WWA
-- **Dashboard**: The main Deployment Agent view that includes summary, details, and task sections
+- **Workspace**: The Release Agent application area inside WWA
+- **Dashboard**: The main Release Agent view that includes summary, details, and task sections
 - **Release Flow**: Top-level business object representing a deployment journey across multiple stages
 - **Request**: A stage-scoped unit within a Release Flow
 - **Task**: An executable unit within a Request
 - **Current Stage**: The current stage of a Release Flow, such as SIT, UAT, or PROD
 - **Review Gate**: The point after execution where TL must explicitly decide how to proceed
-- **Access Grant**: A product authorization record that determines whether an enterprise user may enter Deployment Agent and which `Application + SNOW Group` scopes are visible/manageable
-- **Effective Permissions**: The combined permissions derived from a user's assigned Deployment Agent roles
+- **Access Grant**: A product authorization record that determines whether an enterprise user may enter Release Agent and which `Application + SNOW Group` scopes are visible/manageable
+- **Effective Permissions**: The combined permissions derived from a user's assigned Release Agent roles
 - **Suspended Access**: An access state in which the employee identity still exists but product entry is blocked
 - **Rundown Owner**: The user designated to control request-level actions such as `Start Deployment` and `Mark as Failed`
 
@@ -216,13 +218,13 @@ Minimum attributes:
 - `updated_at`
 
 #### Access Grant
-Represents product-level authorization for one enterprise employee within Deployment Agent.
+Represents product-level authorization for one enterprise employee within Release Agent.
 
 Minimum attributes:
 - `employee_id`
 - `display_name_snapshot`
 - `grant_status` — `ACTIVE` | `SUSPENDED`
-- `assigned_roles` — one or more Deployment Agent roles
+- `assigned_roles` — one or more Release Agent roles
 - `note`
 - `last_login_at`
 - `created_by`
@@ -250,9 +252,9 @@ Minimum attributes:
 13. Access Management
 
 ### 6.2 Workflow Boundaries
-- **Entry point**: An authenticated and authorized user enters Deployment Agent; the deployment workflow begins when a Developer uploads a deployment request
+- **Entry point**: An authenticated and authorized user enters Release Agent; the deployment workflow begins when a Developer uploads a deployment request
 - **Exit point**: Release Flow reaches a terminal state (`Completed`, `Rejected`, or `Failed`)
-- **Out-of-band transitions**: Access can be denied for users without a Deployment Agent access grant or with a suspended access grant
+- **Out-of-band transitions**: Access can be denied for users without a Release Agent access grant or with a suspended access grant
 - **Core control rule**: No flow progression after execution completion is allowed without explicit human decision
 
 ---
@@ -264,14 +266,14 @@ Minimum attributes:
 ### 7.1 Workspace Navigation
 
 - **FR-01**: The system shall display WWA as a level-1 navigation entry.
-- **FR-02**: The system shall display Deployment Agent as a level-2 navigation entry under WWA.
-- **FR-03**: When a user selects Deployment Agent, the system shall load the Deployment Agent workspace.
+- **FR-02**: The system shall display Release Agent as a level-2 navigation entry under WWA.
+- **FR-03**: When a user selects Release Agent, the system shall load the Release Agent workspace.
 - **FR-04**: The left-side navigation shall display the shared entries Template Management, Configuration Management, and Audit Log.
-- **FR-05**: Access to the Deployment Agent workspace shall be restricted by authenticated role context.
+- **FR-05**: Access to the Release Agent workspace shall be restricted by authenticated role context.
 
 ### 7.2 Request Upload and Validation
 
-- **FR-06**: The system shall provide an `Upload Excel` action in the Deployment Agent workspace.
+- **FR-06**: The system shall provide an `Upload Excel` action in the Release Agent workspace.
 - **FR-07**: Selecting `Upload Excel` shall open a dialog containing a Stage selector (SIT / UAT / PROD), a file picker, `Download Template`, `View Sample`, and `Upload`.
 - **FR-07a**: The upload dialog Stage selector shall be a required input. The user must select Stage before submitting the file.
 - **FR-07b**: Stage is not read from the Excel file; it is always provided explicitly by the user at upload time.
@@ -298,7 +300,7 @@ Minimum attributes:
 
 ### 7.4 Release Flow Summary
 
-- **FR-21**: The system shall display a Release Flow Summary list in the Deployment Agent dashboard.
+- **FR-21**: The system shall display a Release Flow Summary list in the Release Agent dashboard.
 - **FR-22**: Each Release Flow row shall display the Release Flow identifier, active scope summary, rundown owner, and stage summary status for SIT, UAT, and PROD.
 - **FR-23**: Stage summary statuses shown in the summary list shall use only `Done`, `Running`, or `Pending`.
 - **FR-24**: The system shall support filtering of Release Flows by project, status, stage, application, SNOW group, and agent.
@@ -379,11 +381,11 @@ Minimum attributes:
 
 ### 7.12 Product Access Authorization
 
-- **FR-70**: The system shall enforce deny-by-default entry for Deployment Agent using a local Access Grant record. *(Source: US-22)*
+- **FR-70**: The system shall enforce deny-by-default entry for Release Agent using a local Access Grant record. *(Source: US-22)*
 - **FR-71**: If an enterprise-authenticated employee has no Access Grant, the system shall deny product entry and display an `Access not granted` message. *(Source: US-22)*
 - **FR-72**: If an employee has a suspended Access Grant, the system shall deny product entry and display an `Access suspended` message. *(Source: US-21, US-22)*
-- **FR-73**: If an employee has an active Access Grant, the system shall resolve and return the employee's effective Deployment Agent roles, permissions, and applicable scope grants. *(Source: US-22, US-24)*
-- **FR-74**: The system shall support one or more assigned Deployment Agent roles per authorized employee. *(Source: US-24)*
+- **FR-73**: If an employee has an active Access Grant, the system shall resolve and return the employee's effective Release Agent roles, permissions, and applicable scope grants. *(Source: US-22, US-24)*
+- **FR-74**: The system shall support one or more assigned Release Agent roles per authorized employee. *(Source: US-24)*
 - **FR-75**: Menus, routes, page access, and API access shall be enforced consistently using effective permissions. *(Source: US-24)*
 - **FR-76**: If a user lacks permission for a route or API, the frontend shall block entry and the backend shall reject the operation. *(Source: US-23, US-24)*
 
@@ -407,7 +409,7 @@ Minimum attributes:
 
 ```mermaid
 flowchart TD
-    A[User authenticates and requests Deployment Agent] --> A1{Access grant active?}
+    A[User authenticates and requests Release Agent] --> A1{Access grant active?}
     A1 -- No --> A2[Display access denied message]
     A1 -- Yes --> B[Developer uploads Excel file]
     B --> C{Validation passes?}
@@ -447,10 +449,10 @@ flowchart TD
 
 ### 8.2 Main Flow
 
-1. User authenticates and requests access to Deployment Agent from WWA
+1. User authenticates and requests access to Release Agent from WWA
 2. System resolves the user's Access Grant and effective permissions
 3. If the user is not granted or is suspended, the system blocks entry and shows an access-state message
-4. If the user is authorized, the Deployment Agent workspace is displayed
+4. If the user is authorized, the Release Agent workspace is displayed
 5. Developer uploads an Excel request file
 6. System validates the file
 7. System imports request data and creates/updates Release Flow records
@@ -668,7 +670,7 @@ Access Grant validation requirements:
 
 ### 11.1 Security
 - The system shall use authenticated identity, effective permissions, and scope grants for access control.
-- Deployment Agent product entry shall use deny-by-default access control based on local Access Grants.
+- Release Agent product entry shall use deny-by-default access control based on local Access Grants.
 - Release Flow and Audit visibility shall be constrained by `Application + SNOW Group` scope grants unless the user is a global DevOps Admin.
 - Audit logs shall not be editable or deletable by end users.
 - Configuration editing shall be limited to authorized DevOps Admin users.
@@ -720,7 +722,7 @@ Environment-specific configuration override matrices are out of scope for MVP.
 - Execution integrations run tasks and produce execution outputs
 - Configuration management provides runtime configuration values
 - Audit storage persists operator action history
-- Access Grant resolution determines whether authenticated users may enter Deployment Agent
+- Access Grant resolution determines whether authenticated users may enter Release Agent
 
 ### 12.3 Credentials / Secrets
 Credential and secret storage mechanism is an architecture decision and is not frozen in this spec.
@@ -735,7 +737,7 @@ The architecture solution must ensure:
 ## 13. Dependencies
 
 ### 13.1 Upstream Dependencies
-- WWA platform navigation framework
+- WWA Agent Workspace Hub navigation framework
 - Authentication and role context
 - Access Grant persistence and permission resolution
 - Excel parsing capability
@@ -801,7 +803,7 @@ The following are explicitly out of scope for MVP:
 
 | ID | Question | Owner |
 |---|---|---|
-| OQ-01 | What is the exact routing path for Deployment Agent under WWA? | Product / UX |
+| OQ-01 | What is the exact routing path for Release Agent under WWA? | Product / UX |
 | OQ-02 | Should breadcrumb navigation be shown in the workspace? | Product / UX |
 | OQ-03 | What is the full frozen Excel template schema? | Product |
 | OQ-04 | What is the maximum Excel file size? | Product / Engineering |
@@ -857,7 +859,7 @@ These items are tracked in `Open Questions` and `Risks / Ambiguities` and are no
 
 ## 18. Summary
 
-Deployment Agent MVP is a controlled deployment workspace within WWA that supports request upload, Release Flow creation and monitoring, task inspection, task-level human decisions, managed configuration, audit traceability, and Phase 1 product access governance through Access Grants.
+Release Agent MVP is a controlled deployment workspace within WWA that supports request upload, Release Flow creation and monitoring, task inspection, task-level human decisions, managed configuration, audit traceability, and Phase 1 product access governance through Access Grants.
 
 This specification intentionally freezes:
 - the core workflow

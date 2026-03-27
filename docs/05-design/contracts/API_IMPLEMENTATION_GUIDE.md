@@ -1,4 +1,4 @@
-# Deployment Agent — API Implementation Guide
+# Release Agent — API Implementation Guide
 
 **Date:** 2026-03-24
 **Version:** 1.2 (current MVP + partial Phase 1 Access Management implementation)
@@ -10,7 +10,7 @@
 
 ## Overview
 
-This guide describes the backend API surface for Deployment Agent. It covers the current MVP workflow APIs plus the currently implemented auth/access-management surface used for deny-by-default product entry and scoped visibility.
+This guide describes the backend API surface for Release Agent. It covers the current MVP workflow APIs plus the currently implemented auth/access-management surface used for deny-by-default product entry and scoped visibility.
 
 **Interpretation rule**
 - Implemented auth/access-management endpoints are described as current behavior.
@@ -245,7 +245,7 @@ Invalidates the current session.
 
 ### GET /access-grants
 
-Lists product Access Grants for Deployment Agent administration.
+Lists product Access Grants for Release Agent administration.
 
 **Query Parameters**
 
@@ -355,7 +355,7 @@ Parses an Excel file (`AMH_HCC_task`) and creates or updates a Release Flow for 
   "taskCount": 12,
   "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
   "application": "AMH HCC",
-  "agent": "Deployment Agent"
+  "agent": "Release Agent"
 }
 ```
 
@@ -415,7 +415,7 @@ Returns a paginated list of Release Flows.
       "reviewStatus": "Pending_Review",
       "application": "AMH HCC",
       "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
-      "agent": "Deployment Agent",
+      "agent": "Release Agent",
       "owner": "alice"
     }
   ],
@@ -624,7 +624,7 @@ Applies a human decision to a task and triggers progression logic.
 
 ### GET /config
 
-Returns configuration items for Deployment Agent integrations.
+Returns configuration items for Release Agent integrations.
 
 ### POST /config
 

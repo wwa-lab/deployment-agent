@@ -79,7 +79,7 @@ Work through this checklist before raising a shell integration request.
 
 - [ ] Configuration ownership is declared: is any configuration platform-shared or all agent-private?
 - [ ] If agent-private: agent manages its own configuration page or section, separate from WWA Configuration Management
-- [ ] If platform-shared (rare): coordinate with WWA platform team before introducing a new `ConfigKey`
+- [ ] If platform-shared (rare): coordinate with the WWA Agent Workspace Hub team before introducing a new `ConfigKey`
 - [ ] Jenkins, Ansible, and other agent-specific execution settings remain agent-private (see `docs/00-context/wwa-product-positioning.md`)
 
 ---
@@ -97,19 +97,19 @@ Work through this checklist before raising a shell integration request.
 
 - [ ] Agent entry flow tested: `FinBlock link → WWA Home → Agent card → Agent workspace`
 - [ ] Return flow tested: `Agent workspace → WWA Home → FinBlock link`
-- [ ] Existing Deployment Agent workflows are unaffected (run `mvn test` — all 167+ tests pass)
+- [ ] Existing Release Agent workflows are unaffected (run `mvn test` — all 167+ tests pass)
 - [ ] Frontend typecheck passes: `cd frontend && npx vue-tsc --noEmit`
 - [ ] No structural changes to `WorkspaceLayout.vue` were required (if changes were needed, treat as shell defects)
 
 ---
 
-## Deployment Agent Reference (completed checklist)
+## Release Agent Reference (completed checklist)
 
-The following shows the completed state for Deployment Agent as the reference implementation.
+The following shows the completed state for Release Agent as the reference implementation.
 
 | Item | Status |
 |------|--------|
-| Agent name confirmed | ✓ Deployment Agent |
+| Agent name confirmed | ✓ Release Agent |
 | Shell registration | ✓ `agentRegistry.ts`, key `deployment-agent` |
 | Route registered | ✓ `/wwa/deployment-agent` in `router/index.ts` |
 | WWA Home card | ✓ Rendered via agentRegistry |

@@ -4,10 +4,10 @@
 Where are the requirements coming from?
 
 - User interviews
-  - Requirements come from ongoing discussions with the project sponsor and core users around the WWA operating model and the first agent workspace, Deployment Agent.
+  - Requirements come from ongoing discussions with the project sponsor and core users around the WWA Agent Workspace Hub operating model and the first agent workspace, Release Agent.
 
 - Business goals
-  - Establish WWA (Work With Agent) as a reusable platform layer, with Deployment Agent as the first implemented workspace.
+  - Establish WWA Agent Workspace Hub (`WWA`) as a reusable DevOps platform layer, with Release Agent as the first implemented workspace.
   - Improve deployment execution visibility, control, and traceability through a structured human-in-the-loop workflow.
   - Enable later reuse of shared capabilities such as Template Management, Configuration Management, and Audit Log.
 
@@ -48,7 +48,7 @@ What do users actually need?
 
 - Audit teams or management need to inspect key actions and process traces through auditable records.
 
-- Users need a single Deployment Agent workspace inside WWA to manage deployment activities in a structured way.
+- Users need a single Release Agent workspace inside WWA to manage deployment activities in a structured way.
 
 - Users need a summary view that shows each release flow and its stage progress across SIT / UAT / PROD with simple status values such as Done, Running, and Pending. :contentReference[oaicite:4]{index=4}
 
@@ -63,18 +63,18 @@ What capabilities are currently being considered?
 
 - Build WWA as a two-level navigation structure: WWA as a first-level menu with a second-level flyout panel containing workspace entries.
 
-- Include first-level placeholder applications alongside WWA so the sidebar reads like a broader platform shell.
+- Include first-level placeholder applications alongside WWA so the sidebar reads like a broader hub shell.
 
 - Shared capability entries under WWA flyout:
-  - Deployment Agent
+  - Release Agent
   - Template Management
   - Configuration Management
   - Audit Log
-  - Deployment Agent
+  - Release Agent
 
 - Show shared-capability navigation for users without access, with page-level access guidance instead of hiding menu entries.
 
-- Build the Deployment Agent main page with the following sections:
+- Build the Release Agent main page with the following sections:
   - page introduction area
   - filter area
   - Deployment Flow Summary with SIT / UAT / PROD stage status columns
@@ -163,7 +163,7 @@ What are the expectations around performance, maintainability, reliability, secu
 
 - Maintainability
   - WWA should be designed as a reusable platform layer, not as a one-off page. :contentReference[oaicite:12]{index=12}
-  - Shared capabilities should be separated from Deployment-Agent-specific logic.
+  - Shared capabilities should be separated from Release-Agent-specific logic.
 
 - Reliability
   - The system must not auto-progress after execution; human review is required before moving forward. :contentReference[oaicite:14]{index=14}
@@ -174,7 +174,7 @@ What are the expectations around performance, maintainability, reliability, secu
   - The workflow should make the current review state and responsible owner visible.
 
 - Security and control
-  - Deployment Agent MVP is not intended to be fully autonomous. :contentReference[oaicite:16]{index=16}
+  - Release Agent MVP is not intended to be fully autonomous. :contentReference[oaicite:16]{index=16}
   - Human-in-the-loop decision control is a core control mechanism, not an optional enhancement.
 
 - Traceability
@@ -200,11 +200,11 @@ What is still unclear?
 ## Assumptions
 What assumptions are currently being made?
 
-- WWA is a platform layer that will host multiple future agent workspaces, and Deployment Agent is the first one.
+- WWA is a platform layer that will host multiple future agent workspaces, and Release Agent is the first one.
 
 - The MVP is for FinBlock and is not intended to launch multiple agents simultaneously. :contentReference[oaicite:20]{index=20}
 
-- The MVP is a controlled execution workspace, not a fully autonomous deployment agent. :contentReference[oaicite:22]{index=22}
+- The MVP is a controlled execution workspace, not a fully autonomous release agent. :contentReference[oaicite:22]{index=22}
 
 - Primary actor assumptions for the current workflow are:
   - Developer uploads requests

@@ -1,10 +1,10 @@
-# WWA / Deployment Agent Requirement
+# WWA Agent Workspace Hub / Release Agent Requirement
 
 ## 1. Background
 
-The company is introducing a new operating model called **WWA (Work With Agent)**. The first agent workspace to be implemented under WWA is **Deployment Agent**.
+The company is introducing a platform layer called **WWA Agent Workspace Hub**. `WWA` remains the short label used in navigation and route naming. The first agent workspace to be implemented under WWA is **Release Agent**.
 
-The purpose of this requirement is to define the MVP scope for Deployment Agent in FinBlock.
+The purpose of this requirement is to define the MVP scope for Release Agent in FinBlock.
 
 This MVP is **not** intended to be a fully autonomous agent. Instead, it is designed as a **human-in-the-loop controlled execution workspace** for deployment activities.
 
@@ -24,13 +24,13 @@ The design should also prepare WWA to become a reusable platform layer for futur
 
 ## 2. Product Positioning
 
-### 2.1 WWA Positioning
+### 2.1 WWA Agent Workspace Hub Positioning
 
-WWA should not be treated as a single page. It should be designed as a reusable platform layer that can support multiple agent workspaces in the future.
+WWA Agent Workspace Hub should not be treated as a single page. It should be designed as a reusable DevOps hub layer that can support multiple agent workspaces in the future.
 
-### 2.2 Deployment Agent Positioning
+### 2.2 Release Agent Positioning
 
-Deployment Agent is the first workspace under WWA. It is responsible for deployment request onboarding, execution tracking, result review, and human decision control.
+Release Agent is the first workspace under WWA. It is responsible for deployment request onboarding, execution tracking, result review, and human decision control.
 
 ### 2.3 Future Reuse
 
@@ -74,7 +74,7 @@ The workflow should support API-based orchestration today and remain compatible 
 Add the following menu structure in FinBlock:
 
 - WWA (level-1 menu)
-  - Deployment Agent (level-2 menu)
+  - Release Agent (level-2 menu)
 
 WWA should also reserve shared capability entries for future use:
 
@@ -82,9 +82,9 @@ WWA should also reserve shared capability entries for future use:
 - Configuration Management
 - Audit Log
 
-#### B. Deployment Agent Main Page
+#### B. Release Agent Main Page
 
-The Deployment Agent page should include:
+The Release Agent page should include:
 
 1. Page introduction area
 2. Filter area
@@ -97,7 +97,7 @@ The Deployment Agent page should include:
 
 Display:
 
-- page title: Deployment Agent
+- page title: Release Agent
 - explanation of WWA
 - note that the current phase uses API-based orchestration and human review
 
@@ -382,7 +382,7 @@ The configuration model should be flexible enough to be reused by future agents.
 
 WWA should evolve into a reusable platform layer.
 
-The following should be treated as shared capabilities, not Deployment-Agent-only features:
+The following should be treated as shared capabilities, not Release-Agent-only features:
 
 - Template Management
 - Configuration Management
@@ -398,8 +398,8 @@ This allows future agents to add only their own main workspace and agent-specifi
 
 The MVP should deliver at least the following:
 
-1. WWA / Deployment Agent navigation
-2. Deployment Agent main page
+1. WWA / Release Agent navigation
+2. Release Agent main page
 3. Excel upload capability using the existing fixed template
 4. Deployment Flow Summary
 5. Selected Release Flow Details
@@ -426,5 +426,4 @@ The MVP can be considered successful if:
 
 ## 12. One-Line Summary
 
-**WWA / Deployment Agent MVP = Excel Upload + Release Flow Tracking + Task Result Review + Human Decision Control + Basic Audit Log + Basic Configuration Management**
-
+**WWA / Release Agent MVP = Excel Upload + Release Flow Tracking + Task Result Review + Human Decision Control + Basic Audit Log + Basic Configuration Management**

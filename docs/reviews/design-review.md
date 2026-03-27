@@ -1,4 +1,4 @@
-# Design Review — Deployment Agent Frontend (2026-03-23)
+# Design Review — Release Agent Frontend (2026-03-23)
 
 ## Scope
 

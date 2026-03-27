@@ -1,7 +1,9 @@
-# Deployment Agent UAT Runbook
+# Release Agent UAT Runbook
 
 > **Audience:** Delivery lead, DevOps engineer, backend engineer, frontend engineer, UAT coordinator  
-> **Purpose:** Bring Deployment Agent into an internal/UAT environment in a controlled way and verify the product in the order `Database -> Backend -> Frontend -> Integrated UAT`
+> **Purpose:** Bring Release Agent into an internal/UAT environment in a controlled way and verify the product in the order `Database -> Backend -> Frontend -> Integrated UAT`
+
+> **Naming note:** the workspace display name is now `Release Agent`, but the current implementation still uses technical identifiers such as `/api/deployment-agent` and `/wwa/deployment-agent`.
 
 ---
 
@@ -80,7 +82,7 @@ Reference: [README.md](/Users/leo/wwa-lab/deployment-agent/README.md), [StubTeam
 
 ### 4.1 Create Oracle schema/user
 
-Create the Oracle schema/user that will own Deployment Agent tables.
+Create the Oracle schema/user that will own Release Agent tables.
 
 Minimum expectation:
 

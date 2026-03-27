@@ -1,4 +1,4 @@
-# Detailed Design: Deployment Agent
+# Detailed Design: Release Agent
 
 **Date:** 2026-03-24
 **Status:** Implemented (current MVP + partial Phase 1 access governance)
@@ -8,7 +8,10 @@
 
 ## Overview
 
-This document translates the current Deployment Agent architecture into implementation-facing design guidance for backend services, frontend behavior, data structures, integrations, and operational rules. It covers the current MVP workflow plus the now-implemented Phase 1 access-governance foundation through Access Grants, scoped visibility, and Access Management.
+This document translates the current Release Agent architecture into implementation-facing design guidance for backend services, frontend behavior, data structures, integrations, and operational rules. It covers the current MVP workflow plus the now-implemented Phase 1 access-governance foundation through Access Grants, scoped visibility, and Access Management.
+
+`Release Agent` is the product/workspace name used in this document. Current implementation identifiers remain `deployment-agent` in route, API, and package naming until a dedicated migration is approved.
+`WWA` is the short label for the `WWA Agent Workspace Hub`, which is the shared DevOps hub above individual agent workspaces.
 
 ```mermaid
 flowchart LR
@@ -40,9 +43,9 @@ flowchart LR
 
 ### Design Objective
 
-- Preserve the current controlled deployment workflow model: upload, execute, review, and progress.
+- Preserve the current controlled release orchestration model: upload, execute, review, and progress.
 - Make state handling, validation, and audit behavior explicit enough for implementation and test planning.
-- Extend the design to cover deny-by-default product access and DevOps-admin-managed authorization without turning Deployment Agent into a separate account system.
+- Extend the design to cover deny-by-default product access and DevOps-admin-managed authorization without turning Release Agent into a separate account system.
 
 ### Relationship to Source Architecture
 
@@ -54,10 +57,10 @@ flowchart LR
 
 ## Source Architecture
 
-**System name:** Deployment Agent (WWA embedded workspace)
+**System name:** Release Agent (workspace inside the WWA Agent Workspace Hub)
 
 **Architecture summary carried forward:**
-- Vue 3 SPA frontend inside the WWA workspace shell
+- Vue 3 SPA frontend inside the WWA Agent Workspace Hub shell
 - Spring Boot REST backend with session-based authentication
 - Oracle persistence for workflow, configuration, audit, and implemented Access Grant data
 - Human-gated task progression with explicit review decisions
@@ -76,7 +79,7 @@ flowchart LR
 ## Design Assumptions
 
 - [Resolved] AUTO execution in MVP is submission-only. The system records submission outcome and external job links but does not rely on a callback pipeline in the current design baseline.
-- [Resolved] Jenkins and Ansible credentials are stored in Deployment Agent configuration records for MVP.
+- [Resolved] Jenkins and Ansible credentials are stored in Release Agent configuration records for MVP.
 - Access Grant multi-role assignment is stored as a JSON array in Oracle for parity with existing structured attributes.
 - `auth/login` and `auth/me` return a compatibility `role` plus `roles[]`, effective `permissions[]`, and applicable `scopes[]`.
 - [Assumption] Task dependency data remains informational in MVP and does not gate execution order beyond current progression rules.
@@ -110,7 +113,7 @@ flowchart LR
 
 - Frontend communicates with backend via REST/JSON and session cookies
 - Backend owns workflow state, authorization resolution, and audit persistence
-- Team Book authenticates enterprise identity only; Deployment Agent owns product authorization
+- Team Book authenticates enterprise identity only; Release Agent owns product authorization
 - Jenkins and Ansible are synchronous submission integrations with externally hosted execution detail
 
 ---
@@ -139,7 +142,7 @@ flowchart LR
 ### 2. Access Grant Resolution Module
 
 **Responsibilities**
-- Resolve whether an authenticated employee may enter Deployment Agent
+- Resolve whether an authenticated employee may enter Release Agent
 - Load the employee's Access Grant record
 - Reject entry when no grant exists or when the grant is suspended
 - Compute effective roles and permissions from assigned product roles
@@ -361,7 +364,7 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 ### Access Management Interfaces
 
 **Purpose**
-- List and manage Access Grants for Deployment Agent
+- List and manage Access Grants for Release Agent
 
 **Main Interfaces**
 - `GET /access-grants`
@@ -659,7 +662,7 @@ Expected columns include:
 
 1. User submits login credentials
 2. Team Book authenticates enterprise identity
-3. Deployment Agent resolves local Access Grant
+3. Release Agent resolves local Access Grant
 4. System either:
    - denies entry with access-state message, or
    - creates session with authorization profile
@@ -755,8 +758,8 @@ Expected columns include:
 - Basic Auth values loaded from configuration
 
 **Failure / Retry Behavior**
-- Submission failures are handled inside Deployment Agent and mark task submission failed
-- Downstream remote-job retries are out of scope for Deployment Agent
+- Submission failures are handled inside Release Agent and mark task submission failed
+- Downstream remote-job retries are out of scope for Release Agent
 
 ### Ansible Tower
 
@@ -873,7 +876,7 @@ Audit should record at least:
 ### Critical Test Scenarios
 
 - Login succeeds but product access is denied because no grant exists
-- Suspended user cannot enter Deployment Agent
+- Suspended user cannot enter Release Agent
 - Access grant is created and takes effect on next login
 - Upload creates a new Release Flow and first executable task
 - MANUAL task run -> result record -> review decision -> progression
@@ -933,4 +936,4 @@ Audit should record at least:
 
 ## Summary
 
-The current Deployment Agent design centers on controlled workflow execution, explicit human review, strong auditability, and operational clarity. Phase 1 extends that foundation by introducing local Access Grants, deny-by-default product entry, and an admin-managed Access Management capability, while preserving the existing separation between enterprise identity and product authorization. The design is intentionally explicit about current MVP tradeoffs, especially around AUTO execution completion and dependency handling, so follow-on implementation work can proceed with fewer hidden assumptions.
+The current Release Agent design centers on controlled workflow execution, explicit human review, strong auditability, and operational clarity. Phase 1 extends that foundation by introducing local Access Grants, deny-by-default product entry, and an admin-managed Access Management capability, while preserving the existing separation between enterprise identity and product authorization. The design is intentionally explicit about current MVP tradeoffs, especially around AUTO execution completion and dependency handling, so follow-on implementation work can proceed with fewer hidden assumptions.

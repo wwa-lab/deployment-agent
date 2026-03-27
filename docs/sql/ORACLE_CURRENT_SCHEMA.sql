@@ -1,4 +1,4 @@
--- Deployment Agent Oracle current schema
+-- Release Agent Oracle current schema
 -- Generated for greenfield UAT / internal environment setup.
 -- Use this script for a fresh Oracle schema.
 -- Do not run V2-V9 incremental scripts on top of this file for a brand-new database,
@@ -125,6 +125,25 @@ CREATE TABLE DA_CONFIGURATION_ITEM (
     updated_by   VARCHAR2(255)  NOT NULL,
     updated_at   TIMESTAMP(6)   NOT NULL,
     CONSTRAINT PK_DA_CONFIGURATION_ITEM PRIMARY KEY (config_key)
+);
+
+CREATE TABLE DA_CONFIGURATION_COMPONENT (
+    component_id        VARCHAR2(50)   NOT NULL,
+    system_type         VARCHAR2(30)   NOT NULL,
+    display_name        VARCHAR2(255)  NOT NULL,
+    area                VARCHAR2(100)  NOT NULL,
+    application         VARCHAR2(255),
+    snow_group          VARCHAR2(255),
+    agent               VARCHAR2(255),
+    service_endpoint    VARCHAR2(2000),
+    service_user        VARCHAR2(255),
+    credential_value    VARCHAR2(4000),
+    track_service_user  NUMBER(1)      NOT NULL,
+    track_credential    NUMBER(1)      NOT NULL,
+    description         VARCHAR2(500),
+    updated_by          VARCHAR2(255)  NOT NULL,
+    updated_at          TIMESTAMP(6)   NOT NULL,
+    CONSTRAINT PK_DA_CONFIGURATION_COMPONENT PRIMARY KEY (component_id)
 );
 
 CREATE TABLE DA_AUDIT_LOG_ENTRY (

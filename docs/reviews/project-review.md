@@ -1,4 +1,4 @@
-# Deployment Agent — Full Project Review
+# Release Agent — Full Project Review
 
 **Date:** 2026-03-27
 **Scope:** Architecture, code quality, security, testing, frontend/backend patterns, production readiness
@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-Deployment Agent is a well-structured workflow platform for managing enterprise deployments across SIT, UAT, and PROD stages. The codebase demonstrates strong architectural discipline with clean layer separation, a thoughtful domain model, and a deny-by-default security posture. The project is at an advanced MVP/Phase 1 stage with 167 passing tests, comprehensive audit trails, and a functional Vue 3 SPA.
+Release Agent is a well-structured workflow platform for managing enterprise deployments across SIT, UAT, and PROD stages. The codebase demonstrates strong architectural discipline with clean layer separation, a thoughtful domain model, and a deny-by-default security posture. The project is at an advanced MVP/Phase 1 stage with 167 passing tests, comprehensive audit trails, and a functional Vue 3 SPA.
 
 **Overall assessment:** The project shows the work of a careful, methodical team. The architecture is sound, the domain logic is well-isolated, and the security model is above average for an internal tool. The main areas for improvement are around scalability of the list/filter path, frontend component size, and completing the remaining production integrations (Team Book, AUTO callbacks).
 
@@ -204,4 +204,4 @@ Deployment Agent is a well-structured workflow platform for managing enterprise 
 
 ## 10. Conclusion
 
-Deployment Agent is a well-engineered internal tool with strong fundamentals. The domain model is clean, the security posture is above average, and the codebase is consistent and maintainable. The main gaps are around scalability of the list query path, production infrastructure (migrations, monitoring, CSRF), and frontend test coverage. None of these are blockers for an initial internal release, but the high-priority items (especially CSRF and the stale-state bug) should be addressed before broader rollout.
+Release Agent is a well-engineered internal tool with strong fundamentals. The domain model is clean, the security posture is above average, and the codebase is consistent and maintainable. The main gaps are around scalability of the list query path, production infrastructure (migrations, monitoring, CSRF), and frontend test coverage. None of these are blockers for an initial internal release, but the high-priority items (especially CSRF and the stale-state bug) should be addressed before broader rollout.
