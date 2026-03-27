@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Removed placeholder application entries from the WWA sidebar so the shell only shows real workspace navigation.
 - Added working Excel template download support in the upload dialog.
 - Restored local-profile authentication filters so session-backed user context is available during frontend testing.
 - Added a Rundown Information panel on the release-flow detail page for each stage tab.

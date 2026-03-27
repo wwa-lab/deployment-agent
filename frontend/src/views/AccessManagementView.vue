@@ -145,7 +145,8 @@ function statusClass(status: AccessGrantStatus) {
     <div class="view-header">
       <div>
         <p class="view-eyebrow">WWA Shared Capability</p>
-        <h1 class="view-title">Access Management</h1>
+        <h1 class="view-title">WWA Access Management</h1>
+        <p class="view-subtitle">Controls platform entry and agent workspace visibility across all WWA workspaces.</p>
         <p class="view-subtitle">
           Manage who can enter Deployment Agent, what product roles they hold, and which
           `Application + SNOW Group` scopes they can view or administer.

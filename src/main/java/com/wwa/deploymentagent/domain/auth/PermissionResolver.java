@@ -38,6 +38,7 @@ public class PermissionResolver {
         EnumMap<Role, Set<PermissionKey>> permissions = new EnumMap<>(Role.class);
 
         permissions.put(Role.DEVELOPER, Set.of(
+                PermissionKey.PLATFORM_ENTER,
                 PermissionKey.RELEASE_VIEW,
                 PermissionKey.RELEASE_UPLOAD,
                 PermissionKey.RELEASE_RUNDOWN_EDIT,
@@ -60,15 +61,25 @@ public class PermissionResolver {
                 Set.of(
                         PermissionKey.CONFIG_MANAGE,
                         PermissionKey.AUDIT_VIEW,
+                        PermissionKey.PLATFORM_AUDIT_VIEW,
                         PermissionKey.ACCESS_MANAGE,
+                        PermissionKey.PLATFORM_ACCESS_MANAGE,
                         PermissionKey.RELEASE_VIEW_ARCHIVED,
                         PermissionKey.RELEASE_RUNDOWN_RESTORE,
                         PermissionKey.RELEASE_RUNDOWN_PURGE
                 )
         ));
 
-        permissions.put(Role.AUDIT, Set.of(PermissionKey.AUDIT_VIEW));
-        permissions.put(Role.MANAGEMENT, Set.of(PermissionKey.AUDIT_VIEW));
+        permissions.put(Role.AUDIT, Set.of(
+                PermissionKey.PLATFORM_ENTER,
+                PermissionKey.AUDIT_VIEW,
+                PermissionKey.PLATFORM_AUDIT_VIEW
+        ));
+        permissions.put(Role.MANAGEMENT, Set.of(
+                PermissionKey.PLATFORM_ENTER,
+                PermissionKey.AUDIT_VIEW,
+                PermissionKey.PLATFORM_AUDIT_VIEW
+        ));
 
         return Map.copyOf(permissions);
     }

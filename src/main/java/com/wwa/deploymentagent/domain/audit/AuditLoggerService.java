@@ -57,6 +57,9 @@ public class AuditLoggerService {
             entry.setApplication(scope.application());
             entry.setSnowGroup(scope.snowGroup());
             entry.setAgent(scope.agent());
+            // Platform audit standard fields (WWA-009)
+            entry.setAgentName("deployment-agent");
+            entry.setSourceSystem("wwa-api");
             entry.setContextPayload(enrichContext(context, scope));
             auditLogRepository.save(entry);
         } catch (Exception ex) {

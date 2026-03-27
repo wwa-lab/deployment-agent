@@ -1,16 +1,32 @@
 # System Architecture: Deployment Agent
 
-**Date:** 2026-03-24
-**Status:** Implemented (current MVP + scoped access governance + partial multi-scope runtime alignment)
+**Date:** 2026-03-26
+**Status:** Implemented (MVP + scoped access governance) — platform transition in progress (see `docs/06-tasks/wwa-migration-plan.md`)
 **Source:** spec.md (primary), repository code (validation)
+
+---
+
+## Platform Context
+
+Deployment Agent is the **first workspace** under the **WWA platform shell**. The operating model is:
+
+```
+FinBlock  →  WWA (platform shell)  →  Deployment Agent (first workspace)
+```
+
+- **FinBlock** provides one stable entry link to WWA.
+- **WWA** owns authentication, top-level navigation, platform access management, and platform-level audit.
+- **Deployment Agent** owns deployment workflows, release flow lifecycle, and execution integrations.
+
+Shared capabilities (Audit Log, Access Management, Configuration Management) are presented inside the WWA shell but their ownership boundary is documented in `docs/00-context/wwa-product-positioning.md`.
 
 ---
 
 ## Overview
 
-Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task reviewers make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants, scoped visibility through `Application + SNOW Group`, and an Access Management MVP; remaining Phase 1 work is centered on broader permission hardening, verification, and production rollout details.
+Deployment Agent is a controlled, human-in-the-loop deployment workflow system operating as the first agent workspace within the WWA platform. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task reviewers make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants, scoped visibility through `Application + SNOW Group`, and an Access Management MVP.
 
-**Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a deny-by-default authorization layer that combines product entry grants with scoped visibility governance.
+**Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a deny-by-default authorization layer that combines platform entry grants with scoped visibility governance.
 
 ---
 

@@ -12,7 +12,7 @@ const router = createRouter({
     },
     {
       path: '/',
-      redirect: '/wwa/deployment-agent',
+      redirect: '/wwa/home',
     },
     {
       path: '/release-flows',
@@ -36,7 +36,16 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: { name: 'wwa-deployment-agent' },
+          redirect: { name: 'wwa-home' },
+        },
+        {
+          path: 'home',
+          name: 'wwa-home',
+          component: () => import('../views/WwaHomeView.vue'),
+          meta: {
+            section: 'home',
+            sectionTitle: 'Home',
+          },
         },
         {
           path: 'deployment-agent',
@@ -104,7 +113,7 @@ router.beforeEach(async (to) => {
   if (to.meta.public) {
     // Redirect to home if already authenticated
     if (userStore.isAuthenticated) {
-      return { name: 'wwa-deployment-agent' }
+      return { name: 'wwa-home' }
     }
     return
   }

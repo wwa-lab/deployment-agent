@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useUserStore } from '../stores/user'
 import { useRoute, useRouter } from 'vue-router'
+import { agentRegistry, platformCapabilities } from '../config/agentRegistry'
+import { FINBLOCK_URL } from '../config/platformConfig'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -12,80 +14,33 @@ const wwaButtonRef = ref<HTMLElement | null>(null)
 const flyoutTop = ref(0)
 const isWwaFlyoutOpen = ref(false)
 
-type NavItem = {
-  key: string
-  label: string
-  to: string
-  icon: string
-  visible: boolean
-  locked?: boolean
-}
+// Derived from flyout state — was previously referenced but never declared (bug fix WWA-005)
+const isWwaExpanded = computed(() => isWwaFlyoutOpen.value)
 
 type PrimaryNavItem = {
   key: string
   label: string
   icon: string
-  enabled: boolean
   expandable?: boolean
-  placeholder?: boolean
 }
 
-const navItems = computed<NavItem[]>(() => [
-  {
-    key: 'deployment-agent',
-    label: 'Deployment Agent',
-    to: '/wwa/deployment-agent',
-    icon: '🚀',
-    visible: true,
-  },
-  {
-    key: 'template-management',
-    label: 'Template Management',
-    to: '/wwa/template-management',
-    icon: '🧩',
-    visible: true,
-  },
-  {
-    key: 'configuration-management',
-    label: 'Configuration Management',
-    to: '/wwa/configuration-management',
-    icon: '⚙️',
-    visible: true,
-  },
-  {
-    key: 'audit-log',
-    label: 'Audit Log',
-    to: '/wwa/audit-log',
-    icon: '📊',
-    visible: true,
-  },
-  {
-    key: 'access-management',
-    label: 'Access Management',
-    to: '/wwa/access-management',
-    icon: '🛂',
-    visible: true,
-    locked: !userStore.canManageAccess,
-  },
-])
-
 const primaryNavItems: PrimaryNavItem[] = [
-  { key: 'common', label: 'Common', icon: '□', enabled: false, placeholder: true },
-  { key: 'amh-frontend', label: 'AMH FrontEnd', icon: '★', enabled: false, placeholder: true },
-  { key: 'amh-backend', label: 'AMH BackEnd', icon: '¥', enabled: false, placeholder: true },
-  { key: 'powercard', label: 'PowerCARD', icon: '◔', enabled: false, placeholder: true },
-  { key: 'deliverable-status', label: 'Deliverable_Status', icon: '¥', enabled: false, placeholder: true },
-  { key: 'diy', label: 'DIY(Do It Yourself)', icon: '¥', enabled: false, placeholder: true },
-  { key: 'wwa', label: 'WWA', icon: '◫', enabled: true, expandable: true },
-  { key: 'agentic-sdlc', label: 'Agentic SDLC', icon: '◫', enabled: false, placeholder: true },
-  { key: 'about-us', label: 'AboutUs', icon: '◭', enabled: false, placeholder: true },
+  { key: 'wwa', label: 'WWA', icon: '◫', expandable: true },
 ]
 
 const activeSectionTitle = computed(() => (route.meta.sectionTitle as string) ?? 'WWA')
 const isWwaWorkspace = computed(() => route.path.startsWith('/wwa'))
 
-function openWwaWorkspace() {
-  router.push('/wwa/deployment-agent')
+// Breadcrumb: show agent name when inside an agent workspace (not on home)
+const activeWorkspaceLabel = computed(() => {
+  const section = route.meta.section as string | undefined
+  if (!section || section === 'home') return null
+  const agent = agentRegistry.find((a) => a.key === section)
+  return agent?.name ?? null
+})
+
+function openWwaHome() {
+  router.push({ name: 'wwa-home' })
 }
 
 function setSidebarRef(element: Element | null) {
@@ -114,7 +69,7 @@ function handlePrimaryNav(item: PrimaryNavItem) {
   if (item.key === 'wwa') {
     if (!isWwaWorkspace.value) {
       isWwaFlyoutOpen.value = true
-      openWwaWorkspace()
+      openWwaHome()
       return
     }
 
@@ -168,12 +123,12 @@ watch(
       <div class="sidebar-logo">
         <span class="logo-icon">▣</span>
         <div class="logo-copy">
-          <span class="logo-text">Workspace Hub</span>
-          <span class="logo-subtitle">Application Navigation</span>
+          <span class="logo-text">WWA Platform</span>
+          <span class="logo-subtitle">Agent Workspace Hub</span>
         </div>
       </div>
       <div class="sidebar-scroll" :ref="setSidebarScrollRef" @scroll="updateFlyoutPosition">
-        <div class="sidebar-section-label">Platform Menu</div>
+        <div class="sidebar-section-label">Workspace</div>
 
         <nav class="sidebar-nav">
           <div
@@ -185,13 +140,8 @@ watch(
             <button
               :ref="item.key === 'wwa' ? setWwaButtonRef : undefined"
               class="primary-link"
-              :class="{
-                active: item.key === 'wwa' && isWwaWorkspace,
-                placeholder: item.placeholder,
-              }"
+              :class="{ active: item.key === 'wwa' && isWwaWorkspace }"
               type="button"
-              :aria-disabled="item.placeholder ? 'true' : 'false'"
-              :title="item.placeholder ? 'Platform shell placeholder. WWA is the only active workspace in this build.' : ''"
               @click="handlePrimaryNav(item)"
             >
               <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span>
@@ -202,13 +152,6 @@ watch(
                 aria-hidden="true"
               >
                 {{ isWwaExpanded ? '▾' : '▸' }}
-              </span>
-              <span
-                v-else
-                class="primary-chevron"
-                aria-hidden="true"
-              >
-                ▸
               </span>
             </button>
           </div>
@@ -221,18 +164,54 @@ watch(
         :style="{ top: `${flyoutTop}px` }"
       >
         <div class="secondary-nav">
+          <!-- WWA Home -->
           <router-link
-            v-for="child in navItems.filter((navItem) => navItem.visible)"
-            :key="child.key"
-            :to="child.to"
-            class="nav-link secondary-link"
-            :title="child.locked ? 'Visible in workspace, but access is role-restricted.' : ''"
+            to="/wwa/home"
+            class="nav-link secondary-link flyout-home"
             @click="closeWwaFlyout"
           >
-            <span class="nav-icon" aria-hidden="true">{{ child.icon }}</span>
-            <span class="nav-label">{{ child.label }}</span>
-            <span v-if="child.locked" class="nav-lock" aria-hidden="true">🔒</span>
+            <span class="nav-icon" aria-hidden="true">🏠</span>
+            <span class="nav-label">WWA Home</span>
           </router-link>
+
+          <!-- Agent Workspaces -->
+          <div class="flyout-section-label">Workspaces</div>
+          <router-link
+            v-for="agent in agentRegistry.filter((a) => a.enabled)"
+            :key="agent.key"
+            :to="agent.route"
+            class="nav-link secondary-link"
+            @click="closeWwaFlyout"
+          >
+            <span class="nav-icon" aria-hidden="true">{{ agent.icon }}</span>
+            <span class="nav-label">{{ agent.name }}</span>
+          </router-link>
+
+          <!-- Platform Capabilities -->
+          <div class="flyout-section-label">Platform</div>
+          <router-link
+            v-for="cap in platformCapabilities"
+            :key="cap.key"
+            :to="cap.to"
+            class="nav-link secondary-link"
+            :title="cap.accessPermission && !userStore.hasPermission(cap.accessPermission as never) ? 'Visible in workspace, but access is role-restricted.' : ''"
+            @click="closeWwaFlyout"
+          >
+            <span class="nav-icon" aria-hidden="true">{{ cap.icon }}</span>
+            <span class="nav-label">{{ cap.label }}</span>
+            <span
+              v-if="cap.accessPermission && !userStore.hasPermission(cap.accessPermission as never)"
+              class="nav-lock"
+              aria-hidden="true"
+            >🔒</span>
+          </router-link>
+
+          <!-- Return to FinBlock -->
+          <div class="flyout-section-label">Navigation</div>
+          <a :href="FINBLOCK_URL" class="nav-link secondary-link finblock-link">
+            <span class="nav-icon" aria-hidden="true">↩</span>
+            <span class="nav-label">Return to FinBlock</span>
+          </a>
         </div>
       </div>
     </aside>
@@ -241,9 +220,14 @@ watch(
       <header class="topbar">
         <div class="topbar-branding">
           <div class="topbar-kicker">WWA</div>
-          <div class="topbar-title">{{ activeSectionTitle }}</div>
+          <div class="topbar-title">
+            <span v-if="activeWorkspaceLabel" class="breadcrumb-workspace">{{ activeWorkspaceLabel }}</span>
+            <span v-if="activeWorkspaceLabel" class="breadcrumb-sep" aria-hidden="true"> › </span>
+            {{ activeSectionTitle }}
+          </div>
         </div>
         <div class="topbar-user">
+          <a :href="FINBLOCK_URL" class="finblock-topbar-link" title="Return to FinBlock">← FinBlock</a>
           <span class="user-name">{{ userStore.displayName || userStore.userId }}</span>
           <span class="badge badge-role">{{ userStore.role }}</span>
           <button class="btn btn-secondary btn-sm" @click="handleLogout">Logout</button>
@@ -364,23 +348,9 @@ watch(
   color: #f8fafc;
 }
 
-.primary-link:disabled {
-  cursor: default;
-  opacity: 1;
-}
-
 .primary-link.active {
   background: #334155;
   color: #f8fafc;
-}
-
-.primary-link.placeholder {
-  cursor: default;
-}
-
-.primary-link.placeholder:hover {
-  background: #273449;
-  color: #e2e8f0;
 }
 
 .primary-chevron {
@@ -409,6 +379,19 @@ watch(
   gap: 2px;
 }
 
+.flyout-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7b97c7;
+  padding: 10px 12px 4px;
+}
+
+.flyout-home {
+  margin-bottom: 4px;
+}
+
 .nav-link {
   display: flex;
   align-items: center;
@@ -419,12 +402,18 @@ watch(
   font-size: 14px;
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
+  text-decoration: none;
 }
 
 .secondary-link {
   font-size: 14px;
   color: #dbe7ff;
   border-radius: 8px;
+}
+
+.finblock-link {
+  color: #93c5fd;
+  font-style: italic;
 }
 
 .nav-label {
@@ -512,10 +501,34 @@ watch(
   color: #1e293b;
 }
 
+.breadcrumb-workspace {
+  font-weight: 400;
+  color: #64748b;
+}
+
+.breadcrumb-sep {
+  color: #94a3b8;
+}
+
 .topbar-user {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.finblock-topbar-link {
+  font-size: 12px;
+  color: #64748b;
+  text-decoration: none;
+  border: 1px solid #e2e8f0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.finblock-topbar-link:hover {
+  color: #2563eb;
+  border-color: #2563eb;
 }
 
 .user-name {

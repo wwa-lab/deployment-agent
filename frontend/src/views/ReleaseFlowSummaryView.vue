@@ -120,9 +120,9 @@ function toggleArchivedVisibility() {
   <div class="summary-view">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">WWA Agent</p>
+        <p class="view-eyebrow">WWA Workspace</p>
         <h1 class="view-title">Deployment Agent</h1>
-        <p class="view-subtitle">Track release flows, upload deployment files, and monitor stage progress.</p>
+        <p class="view-subtitle">Track release flows, upload deployment files, and monitor stage progress across SIT, UAT, and PROD.</p>
       </div>
       <div class="header-actions">
         <button
