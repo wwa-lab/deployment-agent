@@ -146,8 +146,8 @@ Minimum attributes:
 - `release_flow_id`
 - `project_id` — from template `Project ID`
 - `project_name` — from template `Project Name`
-- `release_id` — source TBD (not explicitly in AMH_HCC_task data rows; see OQ-25)
-- `current_stage` — SIT | UAT | PROD (source TBD; see OQ-25)
+- `release_id` — explicit release identifier when provided by template creation or import input; otherwise generated during Excel import as `{stage}-{normalized_project_id}-{seq}`
+- `current_stage` — persisted `SIT | UAT | PROD` stage for the release flow, initialized from the first created/imported stage
 - `flow_status`
 - `review_status`
 - `created_at`
@@ -839,7 +839,7 @@ The following are explicitly out of scope for MVP:
 | OQ-22 | What credential / secret storage solution will architecture adopt? | Architecture |
 | OQ-23 | ~~Is initial execution always auto-triggered from `Ready_For_Execution`?~~ **Resolved**: execution is explicit; owner/admin triggers `Run`, `Record Result`, or AUTO submission. | Closed |
 | OQ-24 | What is the final SLA / performance target for MVP operations? | Product / Engineering |
-| OQ-25 | ~~Where do Release ID and Stage come from?~~ **Resolved**: Stage is selected by user at upload time; Release ID is system-generated (`{stage}-{normalized_project_name}-{seq}`). | Closed |
+| OQ-25 | ~~Where do Release ID and Stage come from?~~ **Resolved**: Stage comes from the current rundown creation/import action. `release_id` is explicit when the caller provides a release identifier; otherwise Excel import generates `{stage}-{normalized_project_id}-{seq}`. | Closed |
 | OQ-28 | ~~What are the valid values for Execution Type?~~ **Resolved**: `MANUAL` \| `AUTO`. MANUAL = human-executed externally; AUTO = system-submitted to pipeline. | Closed |
 | OQ-29 | Should the `Access not granted` message include contact guidance to a DevOps Admin? | Product / UX |
 | OQ-30 | Should a later phase expand Access Management beyond the current provider-backed directory search and manual fallback model (for example, broader enterprise sync or richer directory attributes)? | Product |

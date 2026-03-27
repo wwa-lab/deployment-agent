@@ -1,5 +1,7 @@
 # Deployment Agent — Full Project Review
 
+> Historical review snapshot. Updated on 2026-03-28 to align package/file references with the current repository and to mark findings that have since been addressed in code.
+
 **Date:** 2026-03-27
 **Scope:** Architecture, code quality, security, testing, frontend/backend patterns, production readiness
 **Reviewer:** AI-assisted review (Claude)
@@ -18,7 +20,7 @@ Deployment Agent is a well-structured workflow platform for managing enterprise 
 
 ### Strengths
 
-**Clean layer separation.** The codebase enforces strict boundaries between controllers (`web/controller/`), domain logic (`domain/`), shared contracts (`contracts/`), and infrastructure (`config/`, `web/security/`). Controllers delegate to services; services delegate to repositories. There is no evidence of persistence logic leaking into controllers or business logic in entities — a common pitfall in Spring projects.
+**Clean layer separation.** The codebase enforces strict boundaries between controllers (`src/main/java/com/wwa/deploymentagent/web/controller/`), domain logic (`src/main/java/com/wwa/deploymentagent/domain/`), shared contracts (`src/main/java/com/wwa/deploymentagent/contracts/`), and infrastructure (`src/main/java/com/wwa/deploymentagent/config/`, `src/main/java/com/wwa/deploymentagent/web/security/`). Controllers delegate to services; services delegate to repositories. There is no evidence of persistence logic leaking into controllers or business logic in entities — a common pitfall in Spring projects.
 
 **Domain-centric design.** The `TaskStateMachine` is a standout example: a pure static utility with zero dependencies that defines all valid state transitions in one place. This makes the workflow rules easy to audit, test, and reason about. The `DecisionEngine` is similarly focused — it validates permissions and applies decisions without pulling in unrelated concerns.
 
@@ -46,7 +48,7 @@ Deployment Agent is a well-structured workflow platform for managing enterprise 
 
 **Effective use of Java 21 features.** Pattern matching in `switch` expressions (e.g., `DecisionEngine`), sealed/record types for DTOs, and `String::isBlank` are used naturally. The code reads cleanly without excessive boilerplate.
 
-**Comprehensive error hierarchy.** The `errors/` package contains 11 specific exception types (from `NotFoundAppException` to `AccessSuspendedAppException`), each mapping to a distinct HTTP status. The `GlobalExceptionHandler` converts these to structured JSON responses. This makes error behavior predictable for frontend consumers.
+**Comprehensive error hierarchy.** The backend exception package (`src/main/java/com/wwa/deploymentagent/errors/`) contains specific exception types (from `NotFoundAppException` to `AccessSuspendedAppException`), each mapping to a distinct HTTP status. The `GlobalExceptionHandler` converts these to structured JSON responses. This makes error behavior predictable for frontend consumers.
 
 **Audit logging is resilient.** The `REQUIRES_NEW` propagation on `AuditLoggerService.log()` with a catch-all that logs warnings but doesn't abort business operations is a sound design choice. The `ScopeSnapshot` record with its merge/fallback logic for resolving application/snowGroup/agent context is particularly well-crafted.
 
@@ -76,7 +78,7 @@ Deployment Agent is a well-structured workflow platform for managing enterprise 
 
 **CSRF is disabled.** `SecurityConfig` disables CSRF protection entirely. For a session-based application this is a security gap. If the app is accessed via a browser (which it is, via the Vue SPA), a malicious site could forge requests using the user's session cookie. At minimum, CSRF protection should be enabled for state-changing endpoints (POST, PUT, DELETE).
 
-**Jenkins credentials stored as plain text in the config table.** `ConfigKey` includes `jenkins_api_token` and `ansible_api_token`, stored via `ConfigurationItem` in the database. There is no evidence of encryption at rest. For an Oracle database this can be mitigated with TDE, but application-level encryption of sensitive config values would be a stronger defense.
+**Historical note: sensitive config encryption was a concern at review time.** The current codebase now includes `SensitiveValueCipher` plus `app.config.crypto.secret`-backed encryption for sensitive configuration values. The remaining concern is operational rather than structural: production environments still need secret rotation, secure key management, and DBA handling guidance.
 
 **Header auth fallback grants wildcard scope.** When `HeaderAuthFilter` is active (test/dev), it creates a `UserContext` with wildcard access scope grants. While this is gated by the `auth.header-fallback-enabled` flag, any misconfiguration in production would grant full access to anyone who sets the right headers. A defense-in-depth measure would be to additionally restrict header auth to non-production profiles at the code level (e.g., `@Profile("!prod")`).
 
@@ -98,9 +100,9 @@ Deployment Agent is a well-structured workflow platform for managing enterprise 
 
 ### Concerns
 
-**No unit tests for `TaskStateMachine`.** Despite being a pure function with no dependencies (ideal for unit testing), the state machine is only tested indirectly through integration tests. Direct unit tests for all valid/invalid transitions would be cheap to write and valuable as documentation.
+**Historical note: `TaskStateMachine` unit coverage has since been added.** Direct unit tests now exist in `src/test/java/com/wwa/deploymentagent/domain/task/TaskStateMachineTest.java`. Future review should focus on keeping those transitions complete as workflow rules evolve.
 
-**No dedicated tests for `ReleaseFlowAggregation`.** The aggregation logic (task statuses → request status → stage status → flow status) is core business logic but appears to be tested only indirectly. Edge cases (all tasks skipped, mix of failed and approved, single-task requests) deserve explicit coverage.
+**Historical note: `ReleaseFlowAggregation` coverage has since been added.** Direct unit tests now exist in `src/test/java/com/wwa/deploymentagent/domain/releaseflow/ReleaseFlowAggregationTest.java`. Additional edge-case growth should happen there rather than only through integration tests.
 
 **No tests for `JenkinsExecutionAdapter` or `AnsibleExecutionAdapter`.** The external integration adapters have no test coverage. Even with fire-and-forget semantics, a test with a mocked `RestTemplate` verifying correct URL construction, header assembly, and parameter mapping would catch regressions.
 
@@ -114,7 +116,7 @@ Deployment Agent is a well-structured workflow platform for managing enterprise 
 
 **Clean store/API separation.** Pinia stores handle state management; API modules handle HTTP calls. This separation makes it straightforward to test stores with mocked API responses and to reason about data flow.
 
-**TypeScript throughout.** All stores, API modules, and types are written in TypeScript with explicit interfaces. The `types/index.ts` file defines 334 lines of well-organized interfaces and enums that mirror the backend contracts.
+**TypeScript throughout.** All stores, API modules, and types are written in TypeScript with explicit interfaces. The `frontend/src/types/index.ts` file defines a large, organized set of interfaces and enums that mirror the backend contracts.
 
 **Vue 3 Composition API consistently used.** All components use `<script setup>` with the Composition API. Reactive state is managed with `ref()` and `computed()`, and watchers are used for route-driven data loading.
 

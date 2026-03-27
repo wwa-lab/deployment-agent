@@ -6,24 +6,26 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Build And Test
 
-- Install: `pnpm install`
-- Dev: `pnpm dev`
-- Test: `pnpm test`
-- Typecheck: `pnpm typecheck`
-- Lint: `pnpm lint`
+- Backend test: `mvn test`
+- Backend local run: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
+- Frontend install/dev: `cd frontend && npm install && npm run dev`
+- Frontend build/typecheck: `cd frontend && npm run build`
 
 ## Architecture Boundaries
 
-- HTTP handlers live in `src/http/handlers/`
-- Domain logic lives in `src/domain/`
-- Do not put persistence logic in handlers
-- Shared types live in `src/contracts/`
+- REST controllers live in `src/main/java/com/wwa/deploymentagent/web/controller/`
+- Domain logic lives in `src/main/java/com/wwa/deploymentagent/domain/`
+- Do not put persistence logic in controllers
+- Shared types live in `src/main/java/com/wwa/deploymentagent/contracts/`
+- Security filters live in `src/main/java/com/wwa/deploymentagent/web/security/`
+- Spring configuration lives in `src/main/java/com/wwa/deploymentagent/config/`
+- Frontend source lives in `frontend/src/`
 
 ## Coding Conventions
 
 - Prefer pure functions in domain layer
 - Do not introduce new global state without explicit justification
-- Reuse existing error types from `src/errors/`
+- Reuse existing error types from `src/main/java/com/wwa/deploymentagent/errors/`
 
 ## Safety Rails
 
@@ -40,9 +42,10 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Verification
 
-- Backend changes: `make test` + `make lint`
-- API changes: update contract tests under `tests/contracts/`
-- UI changes: capture before/after screenshots
+- Backend changes: `mvn test`
+- API changes: update controller/contract tests under `src/test/java/com/wwa/deploymentagent/web/`
+- UI changes: `cd frontend && npm run build` and capture before/after screenshots
+- Oracle schema changes: provide DDL in `src/main/resources/db/migration/`
 
 ## Compact Instructions
 

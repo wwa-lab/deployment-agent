@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FinBlock - WWA / Release Agent</title>
+  <title>FinBlock - WWA / Deployment Agent (Historical Prototype)</title>
   <style>
     :root{
       --nav:#0f2240;
@@ -59,6 +59,7 @@
     .hero-title{font-size:28px;font-weight:700;margin:0 0 10px}
     .hero-sub{color:#4c5b6b;line-height:1.6;font-size:15px;margin:0;max-width:1100px}
     .info-note{margin-top:14px;border:1px solid var(--info-border);background:var(--info-bg);color:var(--info-text);border-radius:4px;padding:12px 14px;font-size:14px;}
+    .prototype-note{margin-bottom:18px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:4px;padding:12px 14px;font-size:14px;line-height:1.6;}
     .success-note{margin-bottom:18px;border:1px solid var(--success-border);background:var(--success-bg);color:var(--success);border-radius:4px;padding:12px 14px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:16px;}
     .section-title{font-size:20px;font-weight:700;margin:0;}
     .panel-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px;}
@@ -124,7 +125,7 @@
         <div class="menu-item active">
           <div class="left"><span>◫</span><span>WWA</span></div><span>‹</span>
           <div class="flyout">
-            <div class="flyout-item active"><span>☰</span><span>Release Agent</span></div>
+            <div class="flyout-item active"><span>☰</span><span>Deployment Agent</span></div>
             <div class="flyout-item"><span>☰</span><span>Template Management</span></div>
             <div class="flyout-item"><span>☰</span><span>Configuration Management</span></div>
             <div class="flyout-item"><span>☰</span><span>Audit Log</span></div>
@@ -137,7 +138,7 @@
 
     <section class="content">
       <div class="topbar">
-        <div class="crumb"><span>☰</span><span>WWA / Release Agent</span></div>
+        <div class="crumb"><span>☰</span><span>WWA / Deployment Agent</span></div>
         <div class="toolbar">
           <span>⌕</span><span>⛶</span>
           <span style="background:#49d6e8;color:#083944;border-radius:8px;padding:10px 12px;">🚀</span>
@@ -146,12 +147,17 @@
 
       <div class="tabs">
         <div class="tab">Overview</div>
-        <div class="tab active">Release Agent</div>
+        <div class="tab active">Deployment Agent</div>
       </div>
 
       <div class="page">
+        <div class="prototype-note">
+          Historical prototype snapshot for early requirements alignment. Current source of truth is the live
+          codebase plus the repository docs in <code>README.md</code>, <code>docs/03-spec/spec.md</code>,
+          <code>docs/04-architecture/architecture.md</code>, and <code>docs/05-design/design.md</code>.
+        </div>
         <div class="hero">
-          <h1 class="hero-title">Release Agent</h1>
+          <h1 class="hero-title">Deployment Agent</h1>
           <p class="hero-sub">
             <strong>WWA</strong> is the <strong>Agent Workspace Hub</strong>, the shared platform layer for task execution across the SDLC.
             This page focuses on deployment orchestration, release flow tracking, result review, and controlled human decision before moving to the next step.

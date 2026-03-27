@@ -31,21 +31,21 @@ Quality gates:
 7. `review-doc-quality`
 8. `review-code-against-design`
 
-Optional orchestration skill:
+Supporting review skill:
 
-9. `full-sdlc-pipeline`
+9. `review-docs-against-code`
 
 ---
 
 ## Standard Artifact Flow
 
-The default artifact flow is:
+The default artifact flow in this repository is:
 
-- `docs/user-stories.md`
-- `docs/spec.md`
-- `docs/architecture.md`
-- `docs/design.md`
-- `docs/tasks.md`
+- `docs/02-user-stories/user-stories.md`
+- `docs/03-spec/spec.md`
+- `docs/04-architecture/architecture.md`
+- `docs/05-design/design.md`
+- `docs/06-tasks/tasks.md`
 
 Implementation is then applied directly in the repository.
 
@@ -170,6 +170,17 @@ Typical use:
 - before testing handoff
 - before continuing implementation on top of generated code
 
+### `review-docs-against-code`
+Use when README files, runbooks, onboarding docs, AGENTS or CLAUDE instructions, or `docs/`
+content must be checked against the current repository implementation.
+
+Checks:
+- build, run, test, and setup command drift
+- file and path references
+- API base paths and route examples
+- config names and environment variables
+- roles, states, workflow, and architecture claims
+
 ---
 
 ## Recommended Default Workflow
@@ -207,11 +218,11 @@ Do not jump directly from requirement to code unless the user explicitly chooses
 
 ### 2. Prefer standard artifact locations
 Use these default paths unless the user requests otherwise:
-- `docs/user-stories.md`
-- `docs/spec.md`
-- `docs/architecture.md`
-- `docs/design.md`
-- `docs/tasks.md`
+- `docs/02-user-stories/user-stories.md`
+- `docs/03-spec/spec.md`
+- `docs/04-architecture/architecture.md`
+- `docs/05-design/design.md`
+- `docs/06-tasks/tasks.md`
 
 ### 3. Surface ambiguity instead of silently inventing detail
 If requirements, design intent, or implementation scope are unclear, capture:
@@ -242,31 +253,34 @@ When implementing code:
 ## Recommended Commands / Prompts
 
 ### Start from raw requirement
-`Use full-sdlc-pipeline on this requirement in Review Mode and stop at design-to-tasks.`
+`Use req-to-user-story first, then continue through user-story-to-spec, spec-to-architecture, architecture-to-design, and design-to-tasks in Review Mode.`
 
 ### Create stories only
 `Use req-to-user-story on this requirement and produce Jira-ready stories.`
 
 ### Convert stories to spec
-`Use user-story-to-spec to consolidate these stories into docs/spec.md.`
+`Use user-story-to-spec to consolidate these stories into docs/03-spec/spec.md.`
 
 ### Generate architecture
-`Use spec-to-architecture to convert docs/spec.md into docs/architecture.md.`
+`Use spec-to-architecture to convert docs/03-spec/spec.md into docs/04-architecture/architecture.md.`
 
 ### Generate design
-`Use architecture-to-design to convert docs/architecture.md into docs/design.md.`
+`Use architecture-to-design to convert docs/04-architecture/architecture.md into docs/05-design/design.md.`
 
 ### Generate tasks
-`Use design-to-tasks to convert docs/design.md into docs/tasks.md.`
+`Use design-to-tasks to convert docs/05-design/design.md into docs/06-tasks/tasks.md.`
 
 ### Implement code
 `Use tasks-to-code to implement the highest-priority coherent subset in the current repository.`
 
 ### Review a document
-`Use review-doc-quality to review docs/design.md and assess whether it is ready for design-to-tasks.`
+`Use review-doc-quality to review docs/05-design/design.md and assess whether it is ready for design-to-tasks.`
 
 ### Review code fidelity
-`Use review-code-against-design to compare the current implementation against docs/design.md and docs/tasks.md.`
+`Use review-code-against-design to compare the current implementation against docs/05-design/design.md and docs/06-tasks/tasks.md.`
+
+### Review repo docs against code
+`Use review-docs-against-code to check README.md, AGENTS.md, or docs/UAT_RUNBOOK.md against the current repository code.`
 
 ---
 
