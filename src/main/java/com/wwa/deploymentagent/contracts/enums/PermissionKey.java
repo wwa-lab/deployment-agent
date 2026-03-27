@@ -23,8 +23,10 @@ public enum PermissionKey {
     TASK_RUN("task.run"),
     TASK_REVIEW("task.review"),
     CONFIG_MANAGE("config.manage"),
+    @Deprecated
     /** @deprecated Use PLATFORM_AUDIT_VIEW for platform-level audit access. Kept for backward compatibility. */
     AUDIT_VIEW("audit.view"),
+    @Deprecated
     /** @deprecated Use PLATFORM_ACCESS_MANAGE for platform-level access management. Kept for backward compatibility. */
     ACCESS_MANAGE("access.manage");
 

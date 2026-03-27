@@ -34,6 +34,7 @@ public class PermissionResolver {
         return Set.copyOf(permissions);
     }
 
+    @SuppressWarnings("deprecation")
     private static Map<Role, Set<PermissionKey>> buildRolePermissions() {
         EnumMap<Role, Set<PermissionKey>> permissions = new EnumMap<>(Role.class);
 
