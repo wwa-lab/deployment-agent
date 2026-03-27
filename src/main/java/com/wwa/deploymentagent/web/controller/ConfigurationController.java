@@ -1,8 +1,9 @@
 package com.wwa.deploymentagent.web.controller;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.ConfigurationComponentDto;
 import com.wwa.deploymentagent.contracts.dto.ConfigurationItemDto;
-import com.wwa.deploymentagent.domain.configuration.ConfigurationService;
+import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,14 +26,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ConfigurationController {
 
-    private final ConfigurationService configurationService;
+    private final ConfigurationComponentService configurationComponentService;
 
     @GetMapping
     public ResponseEntity<List<ConfigurationItemDto>> listAll() {
-        List<ConfigurationItemDto> dtos = configurationService.listAll().stream()
-                .map(ConfigurationItemDto::from)
-                .toList();
-        return ResponseEntity.ok(dtos);
+        return ResponseEntity.ok(configurationComponentService.listDerivedConfigItems());
     }
 
     @PostMapping
@@ -43,8 +41,39 @@ public class ConfigurationController {
             throw new ForbiddenAppException("config:update");
         }
 
-        ConfigurationItemDto dto = ConfigurationItemDto.from(
-                configurationService.upsert(body.key(), body.value(), body.description(), user));
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(
+                configurationComponentService.upsertDerivedConfigItem(body, user));
+    }
+
+    @GetMapping("/components")
+    public ResponseEntity<List<ConfigurationComponentDto>> listComponents() {
+        List<ConfigurationComponentDto> dtos = configurationComponentService.listComponents().stream()
+                .map(ConfigurationComponentDto::from)
+                .toList();
+        return ResponseEntity.ok(dtos);
+    }
+
+    @PostMapping("/components")
+    public ResponseEntity<ConfigurationComponentDto> upsertComponent(
+            @Valid @RequestBody ConfigurationComponentDto.UpsertRequest body,
+            @AuthenticationPrincipal UserContext user) {
+        if (!user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException("config:update");
+        }
+
+        return ResponseEntity.ok(
+                ConfigurationComponentDto.from(configurationComponentService.upsertComponent(body, user)));
+    }
+
+    @DeleteMapping("/components/{componentInstanceId}")
+    public ResponseEntity<Void> deleteComponent(
+            @PathVariable String componentInstanceId,
+            @AuthenticationPrincipal UserContext user) {
+        if (!user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException("config:update");
+        }
+
+        configurationComponentService.deleteComponent(componentInstanceId, user);
+        return ResponseEntity.noContent().build();
     }
 }

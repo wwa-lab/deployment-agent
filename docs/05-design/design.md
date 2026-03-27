@@ -1,7 +1,7 @@
 # Detailed Design: Deployment Agent
 
-**Date:** 2026-03-24
-**Status:** Implemented (current MVP + partial Phase 1 access governance)
+**Date:** 2026-03-27
+**Status:** Implemented (current MVP + partial Phase 1 access governance + template-based rundown creation)
 **Source:** `docs/04-architecture/architecture.md`, `docs/03-spec/spec.md`, repository validation
 
 ---
@@ -9,6 +9,9 @@
 ## Overview
 
 This document translates the current Deployment Agent architecture into implementation-facing design guidance for backend services, frontend behavior, data structures, integrations, and operational rules. It covers the current MVP workflow plus the now-implemented Phase 1 access-governance foundation through Access Grants, scoped visibility, and Access Management.
+
+`Deployment Agent` is the product/workspace name used in this document. Current implementation identifiers remain `deployment-agent` in route, API, and package naming until a dedicated migration is approved.
+`WWA` is the short label for the `WWA Agent Workspace Hub`, which is the shared DevOps hub above individual agent workspaces.
 
 ```mermaid
 flowchart LR
@@ -40,7 +43,7 @@ flowchart LR
 
 ### Design Objective
 
-- Preserve the current controlled deployment workflow model: upload, execute, review, and progress.
+- Preserve the current controlled release orchestration model: upload, execute, review, and progress.
 - Make state handling, validation, and audit behavior explicit enough for implementation and test planning.
 - Extend the design to cover deny-by-default product access and DevOps-admin-managed authorization without turning Deployment Agent into a separate account system.
 
@@ -54,10 +57,10 @@ flowchart LR
 
 ## Source Architecture
 
-**System name:** Deployment Agent (WWA embedded workspace)
+**System name:** Deployment Agent (workspace inside the WWA Agent Workspace Hub)
 
 **Architecture summary carried forward:**
-- Vue 3 SPA frontend inside the WWA workspace shell
+- Vue 3 SPA frontend inside the WWA Agent Workspace Hub shell
 - Spring Boot REST backend with session-based authentication
 - Oracle persistence for workflow, configuration, audit, and implemented Access Grant data
 - Human-gated task progression with explicit review decisions
@@ -90,7 +93,7 @@ flowchart LR
 
 1. Session-based authentication and local product authorization
 2. Access Grant resolution and Access Management administration
-3. Excel upload and Release Flow / Request / Task import
+3. Excel upload and template-based Release Flow / Request / Task creation
 4. Release Flow monitoring, stage-level rundown management, and archive lifecycle
 5. Task input editing, execution history, manual result recording, AUTO submission, and review decisions
 6. Configuration management for Jenkins / Ansible integration
@@ -103,7 +106,7 @@ flowchart LR
 - Self-service access requests or approval workflows
 - Real Team Book directory-backed search, unless confirmed later
 - Callback-based AUTO completion ingestion
-- Dynamic import schemas or template customization
+- Dynamic import schemas or schema-level Excel template customization
 - Parallel or DAG-based execution control from dependencies
 
 ### Design Boundaries
@@ -186,17 +189,24 @@ flowchart LR
 - Validate required data and map rows into Release Flow, Request, and Task records
 - Preserve selected non-core columns as import metadata
 - Default rundown owner from a single imported task owner or the uploader
-- Produce a single audit event for the upload action
+- Accept template-based rundown creation as a second import path (no file upload required)
+- Produce a single audit event for each import action
 
 **Key Interactions**
-- `UploadController` accepts multipart input
-- Import logic creates or updates Release Flow and Request records
+- `UploadController` accepts multipart Excel input
+- `ReleaseFlowController` (`POST /release-flows/from-template`) accepts JSON task lists from saved template records
+- `TemplateRundownCreationService` handles template-based creation: validates payload, finds or creates the Release Flow, creates the Request and Tasks
+- Both paths create or update Release Flow and Request records
 - First eligible task is promoted into executable state after import
 
 **Internal Design Concerns**
-- Stage and runtime scope come from the upload UI, not from spreadsheet rows
-- Import is atomic for the whole file
-- Release Flow grouping and release ID generation must remain deterministic
+- Stage and runtime scope come from the upload UI or the create-rundown dialog, not from spreadsheet rows or template records
+- Excel import is atomic for the whole file
+- Template-based import validates `releaseId` format (`{prefix}-{stage}-NN`) and rejects archived identifiers
+- Release Flow grouping and release ID normalization must remain deterministic across both paths
+- `projectId` is derived from `projectName` if not provided
+- Request scope fields (`snowGroup`, `application`, `agent`, `site`, `owner`) fall back to the previous attempt's values if not supplied
+- `estimatedRemainingMinutes` is summed from task durations if not explicitly provided
 - Dependency fields are imported and preserved but do not yet drive execution gating
 
 ### 5. Release Flow and Rundown Module
@@ -321,10 +331,13 @@ flowchart LR
 - Release Flow Summary
 - Release Flow Detail with stage tabs and rundown panel
 - Task table with action controls and execution history
-- Template and dependency maintenance views `[existing related capability]`
+- Template Management (`TemplateManagementView`) with task editing and **Create Rundown** action
 - Configuration Management
 - Audit Log
 - Access Management
+
+**Key Components**
+- `CreateRundownDialog` — modal launched from Template Management; collects project name, stage, release identifier, and optional scope fields; validates release identifier format client-side before submission
 
 **Internal Design Concerns**
 - Current task actions are state-driven and intentionally visible even when disabled
@@ -388,13 +401,15 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 - Import requests, view release state, mutate eligible tasks, and apply review decisions
 
 **Main Interfaces**
-- Upload: `POST /upload`
+- Excel upload: `POST /upload`
+- Template-based rundown creation: `POST /release-flows/from-template`
 - Release Flow list/detail and stage actions
 - Task detail, input update, execution history, manual result capture, AUTO submit
 - Decision endpoint
 
 **Validation Expectations**
-- Import validates stage and fixed worksheet schema
+- Excel import validates stage and fixed worksheet schema
+- Template import validates release identifier pattern, stage match, task presence, and archived release identifier exclusion
 - Upload and list/detail views validate runtime scope where applicable
 - Task mutations validate ownership/permission, current task state, and parent rundown lifecycle
 - Rundown-control actions validate scope plus rundown owner/admin rules
@@ -666,7 +681,7 @@ Expected columns include:
 5. Session context includes effective permissions and applicable scope grants
 6. Frontend menus, routes, and API access use effective permissions from that profile
 
-### 2. Upload and Import Flow
+### 2a. Upload and Import Flow (Excel)
 
 1. User selects stage and optional `Application / SNOW Group / Agent` scope, then uploads Excel file
 2. System validates worksheet, schema, and row data
@@ -675,6 +690,18 @@ Expected columns include:
 5. System persists data atomically
 6. First eligible task is promoted to `Ready_For_Execution`
 7. Audit event is recorded
+
+### 2b. Create Rundown from Template Flow
+
+1. User opens a saved template in Template Management and clicks **Create Rundown**
+2. `CreateRundownDialog` collects project name, stage, release identifier (`xxx-{stage}-NN`), and optional scope fields
+3. Client sends `POST /release-flows/from-template` with template metadata and flattened task list
+4. `TemplateRundownCreationService` validates payload (required fields, release identifier format, stage match)
+5. Service finds or creates the Release Flow by normalized release identifier
+6. Service creates Request with scope field fallback from the previous attempt's values where applicable
+7. Service creates Tasks sorted by step sequence
+8. Audit event is recorded with `source: "template"`, template name, and release identifier
+9. Response returns `releaseFlowId`, `releaseId`, stage, and task count — same shape as the Excel upload response
 
 ### 3. MANUAL Task Execution Flow
 

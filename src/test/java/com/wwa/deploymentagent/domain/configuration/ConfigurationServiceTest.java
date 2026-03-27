@@ -2,6 +2,8 @@ package com.wwa.deploymentagent.domain.configuration;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.ConfigKey;
+import com.wwa.deploymentagent.domain.audit.AuditLogRepository;
+import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ConfigurationServiceTest {
 
     @Autowired private ConfigurationService configurationService;
+    @Autowired private ConfigurationRepository configurationRepository;
+    @Autowired private AuditLogRepository auditLogRepository;
 
     private UserContext adminUser;
 
@@ -109,5 +113,26 @@ class ConfigurationServiceTest {
     void getByKey_missing_returnsEmpty() {
         Optional<ConfigurationItem> result = configurationService.getByKey(ConfigKey.jenkins_url);
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("sensitive values are encrypted at rest and excluded from audit payload")
+    void upsert_sensitiveValue_encryptsAndRedactsAudit() {
+        configurationService.upsert(ConfigKey.jenkins_api_token, "top-secret-token", null, adminUser);
+
+        ConfigurationItem stored = configurationRepository.findById(ConfigKey.jenkins_api_token).orElseThrow();
+
+        assertThat(stored.getConfigValue()).startsWith("enc:v1:");
+        assertThat(stored.getConfigValue()).isNotEqualTo("top-secret-token");
+        assertThat(configurationService.getDecryptedValue(ConfigKey.jenkins_api_token))
+                .contains("top-secret-token");
+
+        var auditEntries = auditLogRepository.findAll().stream()
+                .filter(entry -> entry.getActionType() == AuditActionType.config_update)
+                .toList();
+        assertThat(auditEntries).isNotEmpty();
+        assertThat(auditEntries.getLast().getContextPayload())
+                .doesNotContainValue("top-secret-token")
+                .containsEntry("credentialChanged", true);
     }
 }

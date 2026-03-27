@@ -9,10 +9,12 @@
 ## 1. Overview
 
 ### 1.1 Feature Summary
-Deployment Agent is a controlled, human-in-the-loop deployment workflow system embedded within the WWA platform. It enables users to upload deployment requests via a fixed Excel template, create and monitor Release Flows across SIT / UAT / PROD stages, inspect task execution results, make explicit human decisions (Approve / Reject / Rerun / Skip), maintain key integration configuration, review audit records, and control product access plus scoped visibility through admin-managed access grants.
+Deployment Agent is a controlled, human-in-the-loop release orchestration workspace embedded within the WWA Agent Workspace Hub. It enables users to upload deployment requests via a fixed Excel template, create and monitor Release Flows across SIT / UAT / PROD stages, inspect task execution results, make explicit human decisions (Approve / Reject / Rerun / Skip), maintain key integration configuration, review audit records, and control product access plus scoped visibility through admin-managed access grants.
 
 ### 1.2 Business Objective
 Provide a unified and traceable deployment workspace that makes deployment execution visible, reviewable, auditable, explicitly controlled by humans before progression, and protected by product-entry and scoped-visibility governance.
+
+**Naming note:** `Deployment Agent` is the product/workspace name used in documentation. `WWA` refers to the `WWA Agent Workspace Hub` at the platform layer. Current implementation identifiers remain `deployment-agent` in routes, API prefixes, and package naming until a dedicated migration is approved.
 
 ### 1.3 MVP Objective
 Ensure the core workflow can successfully run through:
@@ -44,7 +46,7 @@ The MVP shall support the following end-to-end capabilities:
 
 | Story ID | Title | Capability |
 |---|---|---|
-| US-01 | Access Deployment Agent workspace within WWA platform navigation | Workspace navigation |
+| US-01 | Access Deployment Agent workspace within WWA Agent Workspace Hub navigation | Workspace navigation |
 | US-02 | Upload deployment request via Excel file | Request upload |
 | US-03 | Create or update Release Flow from imported deployment request | Release Flow creation/update |
 | US-04 | View Release Flow summary with stage progress | Release monitoring |
@@ -735,7 +737,7 @@ The architecture solution must ensure:
 ## 13. Dependencies
 
 ### 13.1 Upstream Dependencies
-- WWA platform navigation framework
+- WWA Agent Workspace Hub navigation framework
 - Authentication and role context
 - Access Grant persistence and permission resolution
 - Excel parsing capability

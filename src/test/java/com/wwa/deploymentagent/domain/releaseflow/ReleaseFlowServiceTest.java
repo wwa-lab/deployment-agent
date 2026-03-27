@@ -315,6 +315,22 @@ class ReleaseFlowServiceTest {
     }
 
     @Test
+    @DisplayName("recompute uses latest attempt per stage for flow status when stage has retries")
+    void recomputeStatus_sameStageRetries_usesLatestAttempt() {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request firstAttempt = helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
+        helper.seedTask(firstAttempt, TaskStatus.Failed);
+
+        Request latestAttempt = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
+        helper.seedTask(latestAttempt, TaskStatus.Pending);
+
+        releaseFlowService.recomputeAndPersistStatus(rf.getId());
+
+        ReleaseFlow updated = releaseFlowRepository.findById(rf.getId()).orElseThrow();
+        assertThat(updated.getFlowStatus()).isEqualTo(FlowStatus.Pending);
+    }
+
+    @Test
     @DisplayName("recompute with no requests leaves flow status unchanged")
     void recomputeStatus_noRequests_unchanged() {
         ReleaseFlow rf = helper.seedReleaseFlow(); // Pending, no requests

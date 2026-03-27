@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- Enabled Template Management `Create Rundown` so eligible users can now launch a real release rundown from a template, review/edit the default scope in a create dialog, and land directly in the newly created rundown instead of seeing a permanently disabled placeholder button; the dialog now requires a release identifier in `xxx-sit-01 / xxx-uat-01 / xxx-prod-01` format and enforces stage alignment in both frontend and backend validation.
+- Fixed Configuration Management component actions so built-in platform-default rows can now be opened in the edit dialog even before they are first persisted, added visible `Delete` actions for component rows, and backed scoped component deletion with a new admin API while keeping unsaved built-in defaults protected from deletion.
+- Polished frontend UI copy across Configuration Management, Login, Release Summary, and Access Management by clarifying status-filter wording, fixing capitalization and phrasing (`Team Book`, `Human-in-the-Loop`, `SNOW Group`), and expanding abbreviated role labels for clearer page text.
+- Changed Configuration Management so entering the page now lands on the `Component` tab by default instead of opening the derived `Configuration` tab first.
+- Refreshed the WWA frontend background treatment with a lighter gradient-driven shell, upgraded glassy surface tokens, and more atmospheric login/home page styling so the workspace feels less flat while keeping dense business pages readable.
+- Clarified WWA intro copy across login and workspace landing pages so the product is positioned accurately as DevOps automation today, with AI-assisted capabilities described as a future direction rather than a current-state promise.
+- Pushed the WWA shell further toward a control-center look by adding grid-backed console panels, stronger operational hero treatments, and colder status-driven visual cues across the login experience, home page, and workspace chrome.
+- Fixed stitched release-family grouping for infix stage release identifiers (`<name>-sit-01`, `<name>-sit-02`, `<name>-uat-01`, `<name>-prod-01`), so repeated SIT uploads and later UAT/PROD uploads are now connected in one rollout chain instead of appearing as separate families.
+- Fixed `Run Task` dialog behavior so manual tasks can proceed with pre-filled script/parameters from Excel without forcing users to edit fields first; in run mode the primary action now allows direct run with unchanged inputs.
+- Fixed `Create New Template` dropdown defaults so Category / Agent / SNOW Group / Application / Site now auto-select a valid option when the dialog opens and re-align automatically if option lists refresh later, preventing blank-looking required selects.
+- Fixed Template Management option sources so deleting all available templates no longer empties the Create Template dropdown lists; stable baseline options now remain available for Category / Agent / SNOW Group / Application / Site.
+- Fixed Access Management `Add User` failures where Team Book search could find an employee but create still returned `Unknown employee ID`: backend create now falls back to directory exact-match lookup when direct ID lookup is unavailable, and grant creation now also supports manual `Staff ID + Name` entry when Team Book cannot resolve the employee.
+- Fixed Access Management `Edit/Reactivate` save behavior so updated scoped visibility (`scopeGrants`) is now correctly sent to the API instead of being dropped client-side.
+- Fixed Template Management row `More` dropdown behavior so action items are no longer clipped at the bottom of the table card, and the menu now dismisses when users click outside or press `Esc`.
+- Allowed repeated uploads for the same stage under the same release identifier by creating incremented stage attempts (`attempt #`), exposed attempt numbers in release-flow detail responses, and added summary attempt-view modes (`latest` vs `history`) so rollout overviews can focus on current progress or include historical outcomes.
+- Stitched release-family summary/detail views now keep stage-prefixed uploads such as `sit-01 / uat-01 / prod-01` connected in one overview, add an explicit `Current Stage` indicator plus missing-stage placeholders on the summary page, and teach upload-time release matching to treat those stage-prefixed identifiers as the same rollout family.
+- Fixed Configuration Management first-load failures by making the configuration read APIs stop auto-bootstrapping built-in component rows into the database; missing platform defaults are now synthesized in-memory for display and only persisted when an admin actually saves changes.
+- Added an `Add User` flow to Access Management so admins can search Team Book for directory users who do not yet have a WWA access grant, select a first-time employee, and create the grant from the same dialog without relying on the existing-grants list alone.
+- Renamed the workspace across repository documentation from `Deployment Agent` to `Release Agent` so the product name better matches the current positioning around release orchestration, review control, and execution coordination; current technical identifiers such as `deployment-agent`, `/wwa/deployment-agent`, and `/api/deployment-agent` remain unchanged for now.
+- Reworked Configuration Management so the Component tab now persists real scoped component metadata and drives the raw Configuration table from the same source; runtime config resolution now falls back from Agent Override to SNOW Group Default to Application Default to Platform Default, while built-in Jenkins/Ansible/callback credentials are encrypted at rest and no longer written to audit logs in plaintext.
+- Added a recommended upload-time `Release Identifier` field so users can explicitly group repeated SIT/UAT/PROD uploads into the intended rundown, while duplicate same-stage uploads under the same identifier are now blocked with a clear validation error.
+- Fixed upload import so re-uploading the same project/stage creates a new release rundown instead of overwriting the existing active one; later-stage uploads now attach to the newest eligible release flow that does not already contain that stage.
+- Fixed the logged-in WWA top-bar title so agent workspace pages no longer repeat the same label as `Workspace › Page` when both values are identical.
+- Added a persistent `WWA Home` return action in the logged-in workspace top bar, so users can jump back to the WWA home page without reopening the left-side flyout.
+- Added a first-screen explanation that expands WWA to "Work With Agent" on the login page, the WWA home page, and the default Release Agent landing page.
+- Removed placeholder application entries from the WWA sidebar so the shell only shows real workspace navigation.
 - Added working Excel template download support in the upload dialog.
 - Restored local-profile authentication filters so session-backed user context is available during frontend testing.
 - Added a Rundown Information panel on the release-flow detail page for each stage tab.
@@ -33,14 +59,14 @@
 - Added an Access Management workspace in the frontend with admin grant lifecycle controls, locked navigation for non-admin users, and audit-log labels for access-governance actions.
 - Extended Access Management from product-only grants into scoped visibility grants backed by `Application / SNOW Group`, added scope editing to the access dialog, returned `scopes` in auth/session responses, and enforced the same scope boundary across release-flow visibility and audit-log visibility.
 - Added a first-class rundown owner field, defaulted new rundown ownership from a single imported task owner or the uploader, showed the owner in rundown details, and limited `Start Deployment` / `Mark as Failed` to the rundown owner or DEVOPS_ADMIN.
-- Added `Rundown Owner` to the Deployment Agent summary list so users can see who controls each rundown before opening the detail page.
+- Added `Rundown Owner` to the Release Agent summary list so users can see who controls each rundown before opening the detail page.
 - Moved dependency summary metrics out of the top Rundown Information block and into a lighter Task Dependencies panel above the task table, so stage metadata stays focused on execution status while dependency troubleshooting stays near Blocked By / Blocks details.
 - Realigned task-row actions with the prototype by always showing Edit, View Result, and a Decision dropdown, with state-based disabling.
 - Added tooltips to disabled task actions so users can see whether an action is blocked by role or task status.
 - Simplified task action permissions so only the task owner or a DEVOPS_ADMIN can edit input, record results, submit auto execution, or apply decisions.
 - Moved MANUAL task result submission into the Edit dialog so task-row actions stay closer to the prototype.
 - Wired View Result to execution history so external job links and stored execution output can be viewed from the task result modal.
-- Reworked the frontend shell from a standalone Deployment Agent sidebar into a WWA workspace with second-level navigation for Deployment Agent, Template Management, Configuration Management, and Audit Log.
+- Reworked the frontend shell from a standalone Release Agent sidebar into a WWA workspace with second-level navigation for Release Agent, Template Management, Configuration Management, and Audit Log.
 - Redesigned Template Management details to treat each template as a multi-task deployment blueprint, with task tables aligned to the current deployment task structure.
 - Added a lightweight More menu for each release template row with Clone, Edit, and Delete as template-maintenance entry points.
 - Added a Create New Template modal with Manual Entry and Upload Excel tabs, reusing the current Excel-template download capability and creating local template drafts for frontend preview.
@@ -60,7 +86,7 @@
 - Simplified Audit Log again into an action-record view with User, Time, Type, and Detail columns, plus Staff Id search for faster tracing.
 - Fixed the Audit Log API wiring so the shared audit page loads correctly for signed-in users, and clarified the page copy around platform traceability versus task-level activity.
 - Added a task-level Activity dialog on the release-flow detail page so users can trace who did what on a task, when it happened, and the related input/output from audit and execution records.
-- Redesigned the Deployment Agent summary table so SIT, UAT, and PROD stage statuses are visible at a glance without opening the flow detail page.
+- Redesigned the Release Agent summary table so SIT, UAT, and PROD stage statuses are visible at a glance without opening the flow detail page.
 - Reworked the workspace shell into a clearer two-level navigation so WWA appears as a first-level menu and its capabilities expand as second-level items.
 - Added first-level placeholder applications around WWA so the left navigation reads like a broader platform shell while only WWA opens a working second-level flyout on the right.
 - Fixed the WWA flyout positioning so the second-level workspace menu is no longer clipped by the sidebar scroll container.

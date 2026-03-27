@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
 import UploadDialog from '../components/UploadDialog.vue'
-import type { FlowStatus, RequestStatus, Stage } from '../types'
+import type { FlowStatus, ReleaseFlowListItem, RequestStatus, Stage } from '../types'
 
 const router = useRouter()
 const store = useReleaseFlowStore()
@@ -14,6 +14,10 @@ const showUpload = ref(false)
 
 const flowStatuses: FlowStatus[] = ['Pending', 'Running', 'Completed', 'Failed', 'Rejected']
 const stages: Stage[] = ['SIT', 'UAT', 'PROD']
+const attemptViews = [
+  { value: 'latest', label: 'Latest Attempt' },
+  { value: 'history', label: 'Include History' },
+] as const
 
 onMounted(() => {
   if (!userStore.isDevOpsAdmin && store.filters.includeArchived) {
@@ -28,17 +32,21 @@ onUnmounted(() => {
 })
 
 function onFilterChange(
-  key: 'project' | 'status' | 'stage' | 'application' | 'snowGroup' | 'agent',
+  key: 'project' | 'status' | 'stage' | 'application' | 'snowGroup' | 'agent' | 'attemptView',
   value: string,
 ) {
   store.setFilter(key, value || undefined)
   store.fetchList()
 }
 
-function goToDetail(id: string) {
+function goToDetail(flow: ReleaseFlowListItem) {
+  const linked = flow.linkedReleaseFlowIds.length > 1 ? flow.linkedReleaseFlowIds.join(',') : undefined
   router.push({
-    path: `/wwa/deployment-agent/release-flows/${id}`,
-    query: showArchived.value ? { archived: '1' } : {},
+    path: `/wwa/deployment-agent/release-flows/${flow.id}`,
+    query: {
+      ...(showArchived.value ? { archived: '1' } : {}),
+      ...(linked ? { linked } : {}),
+    },
   })
 }
 
@@ -84,6 +92,15 @@ function stageStatus(flow: { sitStatus: RequestStatus; uatStatus: RequestStatus;
   return stageMap[stage]
 }
 
+function stagePresent(flow: ReleaseFlowListItem, stage: Stage) {
+  const stageMap: Record<Stage, boolean> = {
+    SIT: flow.sitPresent,
+    UAT: flow.uatPresent,
+    PROD: flow.prodPresent,
+  }
+  return stageMap[stage]
+}
+
 const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size)))
 const showArchived = computed(() => store.filters.includeArchived === true)
 const uploadScope = computed(() => ({
@@ -109,6 +126,11 @@ function rundownOwnerLabel(owner?: string) {
   return owner?.trim() || '—'
 }
 
+function linkedReleaseLabel(flow: ReleaseFlowListItem) {
+  if (flow.linkedReleaseCount <= 1) return null
+  return `${flow.linkedReleaseCount} linked uploads`
+}
+
 function toggleArchivedVisibility() {
   if (!userStore.isDevOpsAdmin) return
   store.setFilter('includeArchived', showArchived.value ? undefined : true)
@@ -120,9 +142,9 @@ function toggleArchivedVisibility() {
   <div class="summary-view">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">WWA Agent</p>
+        <p class="view-eyebrow">WWA Workspace</p>
         <h1 class="view-title">Deployment Agent</h1>
-        <p class="view-subtitle">Track release flows, upload deployment files, and monitor stage progress.</p>
+        <p class="view-subtitle">Track release flows, upload deployment files, and monitor stage progress across SIT, UAT, and PROD.</p>
       </div>
       <div class="header-actions">
         <button
@@ -143,6 +165,16 @@ function toggleArchivedVisibility() {
         </button>
       </div>
     </div>
+
+    <section class="wwa-intro-card" aria-labelledby="wwa-deployment-intro-title">
+      <div class="wwa-intro-kicker">WWA Today</div>
+      <h2 id="wwa-deployment-intro-title" class="wwa-intro-title">DevOps automation with human control</h2>
+      <p class="wwa-intro-text">
+        WWA currently focuses on DevOps automation. Deployment Agent is the release-execution
+        workspace for tracking and progressing rundowns across SIT, UAT, and PROD, with AI-assisted
+        capabilities planned for future phases.
+      </p>
+    </section>
 
     <!-- Filter bar -->
     <div class="filter-bar card">
@@ -182,7 +214,7 @@ function toggleArchivedVisibility() {
         <input
           class="form-control"
           type="text"
-          placeholder="Filter by SNOW group..."
+          placeholder="Filter by SNOW Group..."
           :value="store.filters.snowGroup ?? ''"
           @input="onFilterChange('snowGroup', ($event.target as HTMLInputElement).value)"
         />
@@ -208,6 +240,18 @@ function toggleArchivedVisibility() {
           <option v-for="s in stages" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
+      <div class="filter-group">
+        <label class="form-label">Attempt View</label>
+        <select
+          class="form-control"
+          :value="store.filters.attemptView ?? 'latest'"
+          @change="onFilterChange('attemptView', ($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="mode in attemptViews" :key="mode.value" :value="mode.value">
+            {{ mode.label }}
+          </option>
+        </select>
+      </div>
     </div>
 
     <!-- Loading state -->
@@ -231,6 +275,7 @@ function toggleArchivedVisibility() {
             <th>Release ID</th>
             <th>Scope</th>
             <th>Rundown Owner</th>
+            <th>Current Stage</th>
             <th v-for="stage in stages" :key="stage" class="stage-column">{{ stage }}</th>
             <th>Overall Status</th>
           </tr>
@@ -241,11 +286,14 @@ function toggleArchivedVisibility() {
             :key="flow.id"
             class="clickable"
             :class="{ 'row-archived': !!flow.archivedAt }"
-            @click="goToDetail(flow.id)"
+            @click="goToDetail(flow)"
           >
             <td>{{ flow.projectName }}</td>
             <td>
               <div class="release-id">{{ flow.releaseId }}</div>
+              <div v-if="linkedReleaseLabel(flow)" class="release-linkage">
+                {{ linkedReleaseLabel(flow) }}
+              </div>
               <span v-if="flow.archivedAt" class="badge badge-rejected archive-chip">Archived</span>
             </td>
             <td class="scope-cell">
@@ -254,10 +302,14 @@ function toggleArchivedVisibility() {
               <div class="scope-meta">Agent: {{ scopeSummary(flow).agent }}</div>
             </td>
             <td class="owner-cell">{{ rundownOwnerLabel(flow.owner) }}</td>
+            <td class="stage-column">
+              <span class="badge badge-running">{{ flow.currentStage }}</span>
+            </td>
             <td v-for="stage in stages" :key="`${flow.id}-${stage}`" class="stage-column">
-              <span class="badge" :class="statusBadgeClass(stageStatus(flow, stage))">
+              <span v-if="stagePresent(flow, stage)" class="badge" :class="statusBadgeClass(stageStatus(flow, stage))">
                 {{ statusLabel(stageStatus(flow, stage)) }}
               </span>
+              <span v-else class="stage-empty">—</span>
             </td>
             <td>
               <span class="badge" :class="statusBadgeClass(flow.flowStatus)">
@@ -375,6 +427,12 @@ function toggleArchivedVisibility() {
   color: #2563eb;
 }
 
+.release-linkage {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
 .scope-cell {
   min-width: 220px;
 }
@@ -410,6 +468,11 @@ function toggleArchivedVisibility() {
 .stage-column {
   text-align: center;
   white-space: nowrap;
+}
+
+.stage-empty {
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .pagination {

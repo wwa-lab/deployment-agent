@@ -23,8 +23,12 @@ import java.util.LinkedHashMap;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class AccessGrantService {
@@ -79,6 +83,31 @@ public class AccessGrantService {
         return new PageImpl<>(filtered.subList(start, end), pageable, filtered.size());
     }
 
+    @Transactional(readOnly = true)
+    public List<AccessGrantDirectoryCandidate> searchDirectory(String query, int limit, UserContext user) {
+        String normalizedQuery = normalizeSearchQuery(query);
+        if (normalizedQuery == null || limit <= 0) {
+            return List.of();
+        }
+
+        List<TeamBookEmployee> employees = authProvider.searchEmployees(normalizedQuery, Math.min(limit, 20));
+        if (employees.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, AccessGrant> grantsById = accessGrantRepository.findAllById(
+                        employees.stream()
+                                .map(TeamBookEmployee::employeeId)
+                                .toList())
+                .stream()
+                .collect(Collectors.toMap(AccessGrant::getEmployeeId, Function.identity()));
+
+        return employees.stream()
+                .map(employee -> toDirectoryCandidate(employee, grantsById.get(employee.employeeId()), user))
+                .filter(candidate -> candidate != null)
+                .toList();
+    }
+
     @Transactional
     public UserContext authorizeAuthenticatedEmployee(TeamBookEmployee employee) {
         AccessGrant grant = accessGrantRepository.findById(employee.employeeId())
@@ -110,6 +139,7 @@ public class AccessGrantService {
 
     @Transactional
     public AccessGrant createGrant(String employeeId,
+                                   String displayName,
                                    AccessGrantStatus grantStatus,
                                    Collection<String> assignedRoles,
                                    Collection<AccessScope> scopeGrants,
@@ -120,8 +150,11 @@ public class AccessGrantService {
             throw new ConflictAppException("Access grant already exists for employee: " + normalizedEmployeeId);
         }
 
-        TeamBookEmployee employee = authProvider.findByEmployeeId(normalizedEmployeeId)
-                .orElseThrow(() -> new ValidationAppException("Unknown employee ID: " + normalizedEmployeeId));
+        Optional<TeamBookEmployee> employee = resolveTeamBookEmployeeForGrantCreation(normalizedEmployeeId);
+        String resolvedDisplayName = employee
+                .map(TeamBookEmployee::displayName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElseGet(() -> normalizeManualDisplayName(displayName));
 
         List<String> normalizedRoles = normalizeRolesForMutation(assignedRoles);
         List<AccessScope> normalizedScopes = normalizeScopesForMutation(scopeGrants);
@@ -130,7 +163,7 @@ public class AccessGrantService {
 
         AccessGrant grant = new AccessGrant();
         grant.setEmployeeId(normalizedEmployeeId);
-        grant.setDisplayNameSnapshot(employee.displayName());
+        grant.setDisplayNameSnapshot(resolvedDisplayName);
         grant.setGrantStatus(grantStatus);
         grant.setAssignedRoles(normalizedRoles);
         grant.setScopeGrants(normalizedScopes);
@@ -297,20 +330,51 @@ public class AccessGrantService {
         return employeeId.trim();
     }
 
+    private Optional<TeamBookEmployee> resolveTeamBookEmployeeForGrantCreation(String normalizedEmployeeId) {
+        return authProvider.findByEmployeeId(normalizedEmployeeId)
+                .or(() -> authProvider.searchEmployees(normalizedEmployeeId, 20).stream()
+                        .filter(candidate -> candidate.employeeId() != null
+                                && normalizedEmployeeId.equalsIgnoreCase(candidate.employeeId().trim()))
+                        .findFirst());
+    }
+
+    private String normalizeManualDisplayName(String displayName) {
+        String normalizedDisplayName = normalizeBlank(displayName);
+        if (normalizedDisplayName == null) {
+            throw new ValidationAppException(
+                    "Display name is required when employee ID cannot be resolved from Team Book.");
+        }
+        return normalizedDisplayName;
+    }
+
     private String normalizeSearchQuery(String query) {
         if (query == null || query.isBlank()) {
             return null;
         }
-        return query.trim().toLowerCase();
+        return query.trim().toLowerCase(Locale.ROOT);
     }
 
     private boolean matchesQuery(AccessGrant grant, String normalizedQuery) {
-        return grant.getEmployeeId().toLowerCase().contains(normalizedQuery)
-                || grant.getDisplayNameSnapshot().toLowerCase().contains(normalizedQuery);
+        return grant.getEmployeeId().toLowerCase(Locale.ROOT).contains(normalizedQuery)
+                || grant.getDisplayNameSnapshot().toLowerCase(Locale.ROOT).contains(normalizedQuery);
     }
 
     private String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private AccessGrantDirectoryCandidate toDirectoryCandidate(TeamBookEmployee employee,
+                                                               AccessGrant grant,
+                                                               UserContext user) {
+        if (grant != null && !canViewGrant(user, grant)) {
+            return null;
+        }
+        return new AccessGrantDirectoryCandidate(
+                employee.employeeId(),
+                employee.displayName(),
+                grant != null,
+                grant == null ? null : grant.getGrantStatus()
+        );
     }
 
     private List<String> normalizeRolesForMutation(Collection<String> rawRoles) {

@@ -1,8 +1,8 @@
-# WWA / Deployment Agent Requirement
+# WWA Agent Workspace Hub / Deployment Agent Requirement
 
 ## 1. Background
 
-The company is introducing a new operating model called **WWA (Work With Agent)**. The first agent workspace to be implemented under WWA is **Deployment Agent**.
+The company is introducing a platform layer called **WWA Agent Workspace Hub**. `WWA` remains the short label used in navigation and route naming. The first agent workspace to be implemented under WWA is **Deployment Agent**.
 
 The purpose of this requirement is to define the MVP scope for Deployment Agent in FinBlock.
 
@@ -24,9 +24,9 @@ The design should also prepare WWA to become a reusable platform layer for futur
 
 ## 2. Product Positioning
 
-### 2.1 WWA Positioning
+### 2.1 WWA Agent Workspace Hub Positioning
 
-WWA should not be treated as a single page. It should be designed as a reusable platform layer that can support multiple agent workspaces in the future.
+WWA Agent Workspace Hub should not be treated as a single page. It should be designed as a reusable DevOps hub layer that can support multiple agent workspaces in the future.
 
 ### 2.2 Deployment Agent Positioning
 
@@ -382,7 +382,7 @@ The configuration model should be flexible enough to be reused by future agents.
 
 WWA should evolve into a reusable platform layer.
 
-The following should be treated as shared capabilities, not Deployment-Agent-only features:
+The following should be treated as shared capabilities, not Release-Agent-only features:
 
 - Template Management
 - Configuration Management
@@ -427,4 +427,3 @@ The MVP can be considered successful if:
 ## 12. One-Line Summary
 
 **WWA / Deployment Agent MVP = Excel Upload + Release Flow Tracking + Task Result Review + Human Decision Control + Basic Audit Log + Basic Configuration Management**
-

@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import CreateRundownDialog from '../components/CreateRundownDialog.vue'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
 import TemplateTaskDialog from '../components/TemplateTaskDialog.vue'
-import type { CreateTemplateDraft, TemplateRecord, TemplateTask, TemplateTaskDraft } from '../types'
+import { agentRegistry } from '../config/agentRegistry'
+import type {
+  CreateTemplateDraft,
+  TemplateRecord,
+  TemplateTask,
+  TemplateTaskDraft,
+  UploadResponse,
+} from '../types'
 
+const router = useRouter()
 const userStore = useUserStore()
 
 const templates = ref<TemplateRecord[]>([
@@ -276,6 +286,7 @@ const selectedSite = ref('All')
 const selectedTemplateId = ref('')
 const activeMoreMenuId = ref('')
 const actionFeedback = ref('')
+const creatingRundownTemplateId = ref('')
 const showCreateTemplateDialog = ref(false)
 const editingTemplateId = ref('')
 const deletingTemplateId = ref('')
@@ -289,24 +300,60 @@ const defaultActivityCategories = [
   'post-release',
 ]
 
+const defaultTemplateCategories = ['development', 'release', 'production']
+const defaultTemplateApplications = ['AMH HCC']
+const defaultTemplateSnowGroups = ['HTSA-CSI-HCC-AMH-PRJ']
+const defaultTemplateSites = ['HK', 'SG']
+const defaultTemplateAgents = [
+  ...new Set(agentRegistry.filter((agent) => agent.enabled).map((agent) => agent.name)),
+]
+
+function mergeOptionLists(...sources: string[][]): string[] {
+  return Array.from(
+    new Set(
+      sources
+        .flat()
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b))
+}
+
 const categories = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.category))).sort(),
+  mergeOptionLists(
+    defaultTemplateCategories,
+    templates.value.map((template) => template.category),
+  ),
 )
 
 const agents = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.agent))).sort(),
+  mergeOptionLists(
+    defaultTemplateAgents.length > 0 ? defaultTemplateAgents : ['Deployment Agent'],
+    templates.value.map((template) => template.agent),
+  ),
 )
 
 const snowGroups = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.snowGroup))).sort(),
+  mergeOptionLists(
+    defaultTemplateSnowGroups,
+    userStore.scopes.map((scope) => scope.snowGroup),
+    templates.value.map((template) => template.snowGroup),
+  ),
 )
 
 const applications = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.application))).sort(),
+  mergeOptionLists(
+    defaultTemplateApplications,
+    userStore.scopes.map((scope) => scope.application),
+    templates.value.map((template) => template.application),
+  ),
 )
 
 const sites = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.site))).sort(),
+  mergeOptionLists(
+    defaultTemplateSites,
+    templates.value.map((template) => template.site),
+  ),
 )
 
 const activeScopeFilters = computed(() => ({
@@ -371,6 +418,10 @@ const editingTemplate = computed(() =>
 
 const deletingTemplate = computed(() =>
   templates.value.find((template) => template.id === deletingTemplateId.value) ?? null,
+)
+
+const creatingRundownTemplate = computed(() =>
+  templates.value.find((template) => template.id === creatingRundownTemplateId.value) ?? null,
 )
 
 const editingTask = computed(() =>
@@ -531,6 +582,25 @@ function toggleMoreMenu(templateId: string) {
   activeMoreMenuId.value = activeMoreMenuId.value === templateId ? '' : templateId
 }
 
+function closeMoreMenu() {
+  activeMoreMenuId.value = ''
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!activeMoreMenuId.value) return
+
+  const target = event.target
+  if (!(target instanceof Element) || !target.closest('.more-menu-wrap')) {
+    closeMoreMenu()
+  }
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    closeMoreMenu()
+  }
+}
+
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
@@ -635,9 +705,38 @@ function openCreateTemplateDialog() {
   actionFeedback.value = ''
 }
 
+function createRundownDisabledReason(template: TemplateRecord): string {
+  if (!userStore.canUploadRelease) {
+    return 'Create rundown is available to DEVELOPER, TL, and DEVOPS_ADMIN users.'
+  }
+  if (template.tasks.length === 0) {
+    return 'Add at least one task before creating a rundown from this template.'
+  }
+  return ''
+}
+
+function openCreateRundownDialog(template: TemplateRecord) {
+  if (createRundownDisabledReason(template)) return
+  selectedTemplateId.value = template.id
+  creatingRundownTemplateId.value = template.id
+  activeMoreMenuId.value = ''
+  actionFeedback.value = ''
+}
+
 function closeCreateTemplateDialog() {
   showCreateTemplateDialog.value = false
   editingTemplateId.value = ''
+}
+
+function closeCreateRundownDialog() {
+  creatingRundownTemplateId.value = ''
+}
+
+function handleRundownCreated(result: UploadResponse) {
+  const templateName = creatingRundownTemplate.value?.name ?? 'template'
+  creatingRundownTemplateId.value = ''
+  actionFeedback.value = `Created release rundown from "${templateName}" as ${result.releaseId}.`
+  void router.push(`/wwa/deployment-agent/release-flows/${result.releaseFlowId}`)
 }
 
 function closeDeleteTemplateDialog() {
@@ -821,6 +920,16 @@ function submitTemplate(draft: CreateTemplateDraft) {
 
   actionFeedback.value = `Created local upload preview for "${draft.sourceFileName}". Excel parsing is not wired yet, so this draft starts without tasks.`
 }
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('keydown', handleDocumentKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('keydown', handleDocumentKeydown)
+})
 </script>
 
 <template>
@@ -994,7 +1103,13 @@ function submitTemplate(draft: CreateTemplateDraft) {
                 <td class="description-cell">{{ template.description }}</td>
                 <td>
                   <div class="action-btns" @click.stop>
-                    <button class="btn btn-primary btn-sm" type="button" disabled>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      type="button"
+                      :disabled="!!createRundownDisabledReason(template)"
+                      :title="createRundownDisabledReason(template)"
+                      @click="openCreateRundownDialog(template)"
+                    >
                       Create Rundown
                     </button>
                     <div class="more-menu-wrap">
@@ -1294,6 +1409,13 @@ function submitTemplate(draft: CreateTemplateDraft) {
       </div>
     </div>
 
+    <CreateRundownDialog
+      v-if="creatingRundownTemplate"
+      :template="creatingRundownTemplate"
+      @close="closeCreateRundownDialog"
+      @created="handleRundownCreated"
+    />
+
     <CreateTemplateDialog
       v-if="showCreateTemplateDialog"
       :agents="agents"
@@ -1486,7 +1608,11 @@ function submitTemplate(draft: CreateTemplateDraft) {
 }
 
 .table-card {
-  overflow: hidden;
+  overflow: visible;
+}
+
+.table-card > .data-table {
+  overflow: visible;
 }
 
 .table-head {

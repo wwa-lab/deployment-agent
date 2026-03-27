@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the MVP user stories for Deployment Agent under the WWA platform.
+This document defines the MVP user stories for Deployment Agent under the WWA Agent Workspace Hub.
 The MVP focuses on enabling a controlled, human-in-the-loop deployment workflow that allows users to upload requests, monitor release progress, inspect execution results, make explicit decisions, maintain key configuration, and review audit records.
 
 The main MVP objective is:
@@ -25,11 +25,11 @@ Task operations such as View Result, Edit, Approve, Reject, Rerun, and Skip occu
 ## User Story 1
 
 **Title**
-Access Deployment Agent workspace within WWA platform navigation
+Access Deployment Agent workspace within WWA Agent Workspace Hub navigation
 
 **Story**
 As a Developer, TL, DevOps Admin, or Audit/Management user,
-I want to access the Deployment Agent workspace from the WWA platform menu,
+I want to access the Deployment Agent workspace from the WWA Agent Workspace Hub menu,
 so that I can use a unified workspace for deployment-related activities.
 
 **Acceptance Criteria**
@@ -48,7 +48,7 @@ so that I can use a unified workspace for deployment-related activities.
 
 **Notes / Assumptions**
 
-- WWA is a reusable platform layer for future agent workspaces.
+- WWA Agent Workspace Hub is a reusable platform layer for future agent workspaces.
 - Deployment Agent is the first workspace implemented under WWA.
 
 **Dependencies**
@@ -669,12 +669,12 @@ so that each template defines the exact task sequence and gate structure for a d
 ## User Story 14
 
 **Title**
-Navigate WWA platform with two-level menu and workspace flyout
+Navigate WWA Agent Workspace Hub with two-level menu and workspace flyout
 
 **Story**
 As any authenticated user,
 I want to navigate WWA capabilities through a clear two-level navigation structure,
-so that I can access Deployment Agent, Template Management, Configuration Management, and Audit Log from a unified platform shell.
+so that I can access Deployment Agent, Template Management, Configuration Management, and Audit Log from a unified Agent Workspace Hub.
 
 **Acceptance Criteria**
 
@@ -700,7 +700,7 @@ so that I can access Deployment Agent, Template Management, Configuration Manage
 
 6. Given first-level placeholder applications exist alongside WWA,
    When the user views the navigation,
-   Then the left sidebar reads like a broader platform shell with only WWA opening a working second-level flyout.
+   Then the left sidebar reads like a broader hub shell with only WWA opening a working second-level flyout.
 
 **Notes / Assumptions**
 
@@ -1138,7 +1138,7 @@ so that authorization administration is traceable and reviewable.
 
 ## Summary
 
-These user stories define the full capabilities for Deployment Agent under the WWA platform.
+These user stories define the full capabilities for Deployment Agent under the WWA Agent Workspace Hub.
 They cover the core deployment workflow, platform navigation, template management, task governance, and shared capabilities.
 
 ### Core workflow

@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.web.controller;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.AccessGrantDirectoryCandidateDto;
 import com.wwa.deploymentagent.contracts.dto.AccessGrantDto;
 import com.wwa.deploymentagent.contracts.dto.PaginatedResponseDto;
 import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
@@ -54,6 +55,18 @@ public class AccessGrantController {
         ));
     }
 
+    @GetMapping("/directory")
+    public ResponseEntity<List<AccessGrantDirectoryCandidateDto>> searchDirectory(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "8") int limit,
+            @AuthenticationPrincipal UserContext user
+    ) {
+        validateAccessManager(user);
+        return ResponseEntity.ok(accessGrantService.searchDirectory(query, limit, user).stream()
+                .map(AccessGrantDirectoryCandidateDto::from)
+                .toList());
+    }
+
     @PostMapping
     public ResponseEntity<AccessGrantDto> create(
             @Valid @RequestBody AccessGrantDto.CreateRequest body,
@@ -63,6 +76,7 @@ public class AccessGrantController {
         return ResponseEntity.ok(AccessGrantDto.from(
                 accessGrantService.createGrant(
                         body.employeeId(),
+                        body.displayName(),
                         body.grantStatus(),
                         body.assignedRoles(),
                         body.scopeGrants(),

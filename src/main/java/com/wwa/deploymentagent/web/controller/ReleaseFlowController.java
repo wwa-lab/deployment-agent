@@ -6,7 +6,9 @@ import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.releaseflow.TemplateRundownCreationService;
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ import java.util.Map;
 public class ReleaseFlowController {
 
     private final ReleaseFlowService releaseFlowService;
+    private final TemplateRundownCreationService templateRundownCreationService;
 
     @GetMapping
     public ResponseEntity<PaginatedResponseDto<ReleaseFlowListItemDto>> list(
@@ -43,6 +46,8 @@ public class ReleaseFlowController {
             @RequestParam(required = false) String application,
             @RequestParam(required = false) String snowGroup,
             @RequestParam(required = false) String agent,
+            @RequestParam(defaultValue = "flow") String view,
+            @RequestParam(defaultValue = "latest") String attemptView,
             @RequestParam(defaultValue = "false") boolean includeArchived,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -52,8 +57,20 @@ public class ReleaseFlowController {
         if (size < 1) throw new ValidationAppException("Invalid size parameter", size);
         if (size > 100) throw new ValidationAppException("Page size cannot exceed 100", size);
         validateArchivedViewer(includeArchived, user);
+        validateViewMode(view);
+        validateAttemptView(attemptView);
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        if ("stitched".equalsIgnoreCase(view)) {
+            Page<ReleaseFlowListItemDto> stitchedResult = releaseFlowService.listStitchedSummaries(
+                    project, status, stage, application, snowGroup, agent, user, attemptView, pageable, includeArchived);
+            return ResponseEntity.ok(new PaginatedResponseDto<>(
+                    stitchedResult.getContent(),
+                    stitchedResult.getTotalElements(),
+                    stitchedResult.getNumber(),
+                    stitchedResult.getSize()));
+        }
+
         Page<ReleaseFlow> result = releaseFlowService.list(
                 project, status, stage, application, snowGroup, agent, user, pageable, includeArchived);
         Map<String, List<Request>> requestsByReleaseFlowId = releaseFlowService.findRequestsByReleaseFlowIds(
@@ -63,7 +80,8 @@ public class ReleaseFlowController {
         List<ReleaseFlowListItemDto> dtos = result.getContent().stream()
                 .map(releaseFlow -> ReleaseFlowListItemDto.from(
                         releaseFlow,
-                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of())))
+                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of()),
+                        attemptView))
                 .toList();
 
         return ResponseEntity.ok(new PaginatedResponseDto<>(
@@ -73,9 +91,14 @@ public class ReleaseFlowController {
     @GetMapping("/{id}")
     public ResponseEntity<ReleaseFlowDetailDto> getById(
             @PathVariable String id,
+            @RequestParam(required = false) String linked,
             @RequestParam(defaultValue = "false") boolean includeArchived,
             @AuthenticationPrincipal UserContext user) {
         validateArchivedViewer(includeArchived, user);
+        List<String> linkedFlowIds = parseLinkedFlowIds(linked);
+        if (!linkedFlowIds.isEmpty()) {
+            return ResponseEntity.ok(releaseFlowService.getStitchedDetail(id, linkedFlowIds, includeArchived, user));
+        }
 
         ReleaseFlow rf = releaseFlowService.getById(id, includeArchived);
         List<Request> visibleRequests = filterVisibleRequests(
@@ -99,7 +122,19 @@ public class ReleaseFlowController {
                 rf.getReleaseId(), rf.getNormalizedReleaseId(),
                 rf.getCurrentStage(), rf.getFlowStatus(), rf.getReviewStatus(),
                 rf.getArchivedAt(), rf.getArchivedBy(),
+                false,
+                1,
+                List.of(rf.getReleaseId()),
                 requestDtos));
+    }
+
+    @PostMapping("/from-template")
+    public ResponseEntity<UploadResponseDto> createFromTemplate(
+            @RequestBody CreateRundownFromTemplateDto body,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        ImportResult result = templateRundownCreationService.createRundown(body, user);
+        return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 
     @PatchMapping("/{flowId}/requests/{requestId}/rundown")
@@ -207,6 +242,21 @@ public class ReleaseFlowController {
         validateAdmin(user, "view_archived_rundown");
     }
 
+    private void validateViewMode(String view) {
+        if ("flow".equalsIgnoreCase(view) || "stitched".equalsIgnoreCase(view)) {
+            return;
+        }
+        throw new ValidationAppException("Invalid view parameter: '" + view + "'. Must be flow or stitched.");
+    }
+
+    private void validateAttemptView(String attemptView) {
+        if ("latest".equalsIgnoreCase(attemptView) || "history".equalsIgnoreCase(attemptView)) {
+            return;
+        }
+        throw new ValidationAppException(
+                "Invalid attemptView parameter: '" + attemptView + "'. Must be latest or history.");
+    }
+
     private void validateAdmin(UserContext user, String action) {
         if (user == null || !user.hasRole("DEVOPS_ADMIN")) {
             throw new ForbiddenAppException(action);
@@ -283,5 +333,17 @@ public class ReleaseFlowController {
             return null;
         }
         return value.toLowerCase().replaceAll("[^a-z0-9]", "");
+    }
+
+    private List<String> parseLinkedFlowIds(String linked) {
+        if (linked == null || linked.isBlank()) {
+            return List.of();
+        }
+
+        return java.util.Arrays.stream(linked.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .toList();
     }
 }

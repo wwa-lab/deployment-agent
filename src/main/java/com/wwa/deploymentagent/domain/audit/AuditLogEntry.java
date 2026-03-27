@@ -72,6 +72,35 @@ public class AuditLogEntry {
     @Column(name = "snow_group", length = 255)
     private String snowGroup;
 
+    /**
+     * Name of the agent workspace that produced this entry.
+     * e.g. "deployment-agent". Satisfies the platform audit standard's {@code agentName} field.
+     * The legacy free-text {@code agent} column from the original schema is superseded by this field.
+     */
+    @Column(name = "agent_name", length = 255)
+    private String agentName;
+
+    /**
+     * The type of the primary business object affected.
+     * e.g. "ReleaseFlow", "Task", "AccessGrant". Platform audit standard: {@code targetType}.
+     */
+    @Column(name = "target_type", length = 100)
+    private String targetType;
+
+    /**
+     * The ID of the primary business object affected. Platform audit standard: {@code targetId}.
+     */
+    @Column(name = "target_id", length = 36)
+    private String targetId;
+
+    /**
+     * The system that triggered this action.
+     * e.g. "wwa-frontend", "wwa-api", "jenkins-callback". Platform audit standard: {@code sourceSystem}.
+     */
+    @Column(name = "source_system", length = 100)
+    private String sourceSystem;
+
+    /** Legacy free-text agent field. Superseded by {@code agentName}. Retained for backward compatibility. */
     @Column(name = "agent", length = 255)
     private String agent;
 

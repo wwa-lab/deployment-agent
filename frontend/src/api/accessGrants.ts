@@ -1,6 +1,7 @@
 import apiClient from './client'
 import type {
   AccessGrant,
+  AccessGrantDirectoryCandidate,
   AccessScope,
   AccessGrantStatus,
   PaginatedResponse,
@@ -19,8 +20,16 @@ export async function listAccessGrants(params: ListParams): Promise<PaginatedRes
   return response.data
 }
 
+export async function searchAccessGrantDirectory(query: string, limit = 8): Promise<AccessGrantDirectoryCandidate[]> {
+  const response = await apiClient.get('/access-grants/directory', {
+    params: { query, limit },
+  })
+  return response.data
+}
+
 export async function createAccessGrant(input: {
   employeeId: string
+  displayName?: string
   grantStatus: AccessGrantStatus
   assignedRoles: UserRole[]
   scopeGrants: AccessScope[]

@@ -60,3 +60,8 @@ export async function submitAutoExecution(taskId: string): Promise<Task> {
   const response = await apiClient.post(`/tasks/${taskId}/submit-auto`)
   return response.data
 }
+
+export async function startManualExecution(taskId: string): Promise<Task> {
+  const response = await apiClient.post(`/tasks/${taskId}/start-manual`)
+  return response.data
+}

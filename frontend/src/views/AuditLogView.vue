@@ -4,6 +4,28 @@ import { useAuditStore } from '../stores/audit'
 import type { AuditLogEntry } from '../types'
 
 const store = useAuditStore()
+
+// Platform-level action types: access governance events (WWA-010)
+const PLATFORM_ACTION_TYPES = new Set([
+  'access_grant_create',
+  'access_grant_update',
+  'access_grant_suspend',
+  'access_grant_reactivate',
+])
+
+type ScopeFilter = 'all' | 'platform' | 'agent'
+const scopeFilter = ref<ScopeFilter>('all')
+
+const filteredLogs = computed<AuditLogEntry[]>(() => {
+  if (scopeFilter.value === 'platform') {
+    return store.logs.filter((l) => PLATFORM_ACTION_TYPES.has(l.actionType))
+  }
+  if (scopeFilter.value === 'agent') {
+    return store.logs.filter((l) => !PLATFORM_ACTION_TYPES.has(l.actionType))
+  }
+  return store.logs
+})
+
 const operatorQuery = ref(store.operatorId)
 const applicationQuery = ref(store.application)
 const snowGroupQuery = ref(store.snowGroup)
@@ -188,9 +210,31 @@ function scopeValue(value?: string): string {
       </div>
     </div>
 
+    <div class="scope-tabs">
+      <button
+        class="scope-tab"
+        :class="{ active: scopeFilter === 'all' }"
+        type="button"
+        @click="scopeFilter = 'all'"
+      >All Events</button>
+      <button
+        class="scope-tab"
+        :class="{ active: scopeFilter === 'platform' }"
+        type="button"
+        @click="scopeFilter = 'platform'"
+      >Platform Events</button>
+      <button
+        class="scope-tab"
+        :class="{ active: scopeFilter === 'agent' }"
+        type="button"
+        @click="scopeFilter = 'agent'"
+      >Agent Activity</button>
+    </div>
+
     <div class="helper-banner helper-banner-muted">
-      Audit Log is read-only for all signed-in users. Use task-level Activity for step-by-step
-      execution history, and use this page for broader platform traceability.
+      Audit Log is read-only for all signed-in users. <b>Platform Events</b> cover access governance;
+      <b>Agent Activity</b> covers deployment workflow actions. Use task-level Activity for step-by-step
+      execution history.
     </div>
 
     <div class="toolbar-card">
@@ -281,7 +325,7 @@ function scopeValue(value?: string): string {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="log in store.logs" :key="log.id">
+            <tr v-for="log in filteredLogs" :key="log.id">
               <td>
                 <div class="user-name">{{ log.operatorId }}</div>
                 <div class="cell-meta">{{ log.operatorRole }}</div>
@@ -349,6 +393,35 @@ function scopeValue(value?: string): string {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.scope-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0;
+}
+
+.scope-tab {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.scope-tab:hover {
+  color: #1e293b;
+}
+
+.scope-tab.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
 }
 
 .view-header {

@@ -40,6 +40,7 @@ public record AccessGrantDto(
 
     public record CreateRequest(
             @NotBlank String employeeId,
+            String displayName,
             @NotNull AccessGrantStatus grantStatus,
             List<@NotBlank String> assignedRoles,
             List<AccessScope> scopeGrants,

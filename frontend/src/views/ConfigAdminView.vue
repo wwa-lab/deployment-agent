@@ -3,23 +3,25 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import ConfigComponentDialog from '../components/ConfigComponentDialog.vue'
 import { useConfigStore } from '../stores/config'
 import { useUserStore } from '../stores/user'
-import type {
-  ConfigComponentDraft,
-  ConfigComponentRow,
-  ConfigIntegrationId,
-  ConfigItem,
-  ConfigKey,
-} from '../types'
+import type { ConfigComponentDraft, ConfigComponentRow, ConfigIntegrationId, ConfigKey } from '../types'
+
+type ScopeSource = 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
 
 type ConfigCatalogRow = {
+  rowId: string
+  componentInstanceId?: string
+  componentId: ConfigIntegrationId
   key: ConfigKey
   label: string
   application: string
   owningGroup: string
   agent: string
-  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
+  scopeSource: ScopeSource
   integration: string
+  area: string
   value: string
+  configured: boolean
+  sensitive: boolean
   description?: string
   updatedBy?: string
   updatedAt?: string
@@ -29,11 +31,7 @@ const COMPONENT_DEFINITIONS: Array<{
   id: ConfigIntegrationId
   label: string
   category: string
-  application: string
-  owningGroup: string
-  agent: string
-  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
-  endpointKey?: ConfigKey
+  endpointKey: ConfigKey
   userKey?: ConfigKey
   secretKey?: ConfigKey
   defaultDescription: string
@@ -42,10 +40,6 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'jenkins',
     label: 'Jenkins Pipeline',
     category: 'CI/CD',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
     endpointKey: 'jenkins_url',
     userKey: 'jenkins_user',
     secretKey: 'jenkins_api_token',
@@ -55,10 +49,6 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'ansible',
     label: 'Ansible Automation',
     category: 'Execution',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
     endpointKey: 'ansible_url',
     userKey: 'ansible_user',
     secretKey: 'ansible_api_token',
@@ -68,86 +58,8 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'callback',
     label: 'Execution Callback',
     category: 'Integration',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
     endpointKey: 'execution_callback_endpoint',
     defaultDescription: 'HTTPS callback endpoint used by external tools to post execution updates.',
-  },
-]
-
-const CONFIG_CATALOG: Array<{
-  key: ConfigKey
-  label: string
-  application: string
-  owningGroup: string
-  agent: string
-  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
-  integration: string
-}> = [
-  {
-    key: 'jenkins_url',
-    label: 'JENKINS_URL',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Jenkins Pipeline',
-  },
-  {
-    key: 'jenkins_user',
-    label: 'JENKINS_USER',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Jenkins Pipeline',
-  },
-  {
-    key: 'jenkins_api_token',
-    label: 'JENKINS_API_TOKEN',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Jenkins Pipeline',
-  },
-  {
-    key: 'ansible_url',
-    label: 'ANSIBLE_URL',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Ansible Automation',
-  },
-  {
-    key: 'ansible_user',
-    label: 'ANSIBLE_USER',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Ansible Automation',
-  },
-  {
-    key: 'ansible_api_token',
-    label: 'ANSIBLE_API_TOKEN',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Ansible Automation',
-  },
-  {
-    key: 'execution_callback_endpoint',
-    label: 'EXECUTION_CALLBACK_ENDPOINT',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Execution Callback',
   },
 ]
 
@@ -157,8 +69,11 @@ const store = useConfigStore()
 const userStore = useUserStore()
 
 const canEdit = computed(() => userStore.isDevOpsAdmin)
+const componentDefinitionById = computed(
+  () => new Map(COMPONENT_DEFINITIONS.map((definition) => [definition.id, definition])),
+)
 
-const activeView = ref<'component' | 'raw'>('raw')
+const activeView = ref<'component' | 'raw'>('component')
 const searchTerm = ref('')
 const statusFilter = ref<'All' | ConfigComponentRow['status']>('All')
 const componentScopeFilters = reactive({
@@ -179,79 +94,63 @@ const appliedFilters = reactive({
   configItem: 'All',
 })
 
-const editingComponentId = ref<ConfigIntegrationId | null>(null)
+const editingComponent = ref<ConfigComponentRow | null>(null)
+const creatingComponent = ref(false)
 const componentSaving = ref(false)
+const deletingComponentId = ref<string | null>(null)
 const componentError = ref('')
 
-const editingKey = ref<string | null>(null)
+const editingRowId = ref<string | null>(null)
 const editForm = reactive<{ value: string; description: string }>({ value: '', description: '' })
-const savingKey = ref<string | null>(null)
+const savingRowId = ref<string | null>(null)
 const rowError = ref<Record<string, string>>({})
 const rowSuccess = ref<Record<string, boolean>>({})
 
 onMounted(() => {
-  store.fetchConfig()
-})
-
-const configItemsByKey = computed(() => {
-  return new Map(store.items.map((item) => [item.key, item]))
+  void store.fetchConfig()
 })
 
 const componentRows = computed<ConfigComponentRow[]>(() => {
-  return COMPONENT_DEFINITIONS.map((definition) => {
-    const endpointItem = definition.endpointKey
-      ? configItemsByKey.value.get(definition.endpointKey)
-      : undefined
-    const userItem = definition.userKey ? configItemsByKey.value.get(definition.userKey) : undefined
-    const secretItem = definition.secretKey
-      ? configItemsByKey.value.get(definition.secretKey)
-      : undefined
-
-    const existingItems = [endpointItem, userItem, secretItem].filter(
-      (item): item is ConfigItem => Boolean(item),
-    )
-    const configuredRequiredCount = [endpointItem, userItem, secretItem].filter(
-      (item) => item && item.value.trim().length > 0,
-    ).length
-    const requiredCount = [definition.endpointKey, definition.userKey, definition.secretKey].filter(Boolean)
-      .length
+  return store.components.map((component) => {
+    const definition = componentDefinitionById.value.get(component.componentId)
+    const requiredCount = 1 + (component.trackServiceUser ? 1 : 0) + (component.trackCredential ? 1 : 0)
+    const configuredRequiredCount =
+      (component.serviceEndpoint?.trim() ? 1 : 0) +
+      (component.trackServiceUser && component.serviceUser?.trim() ? 1 : 0) +
+      (component.trackCredential && component.credentialConfigured ? 1 : 0)
 
     let status: ConfigComponentRow['status'] = 'Needs Setup'
-    if (requiredCount > 0 && configuredRequiredCount === requiredCount) {
+    if (configuredRequiredCount === requiredCount && requiredCount > 0) {
       status = 'Ready'
     } else if (configuredRequiredCount > 0) {
       status = 'Partial'
     }
 
-    const latestItem = [...existingItems]
-      .sort((left, right) => {
-        const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0
-        const rightTime = right.updatedAt ? new Date(right.updatedAt).getTime() : 0
-        return rightTime - leftTime
-      })[0]
-
     return {
-      id: definition.id,
-      label: definition.label,
-      category: definition.category,
-      application: definition.application,
-      owningGroup: definition.owningGroup,
-      agent: definition.agent,
-      scopeSource: definition.scopeSource,
-      endpointKey: definition.endpointKey,
-      userKey: definition.userKey,
-      secretKey: definition.secretKey,
-      endpoint: endpointItem?.value ?? '',
-      serviceUser: userItem?.value,
-      secretValue: secretItem?.value,
-      secretState: definition.secretKey
-        ? secretItem?.value
+      id: component.componentInstanceId,
+      componentId: component.componentId,
+      label: component.displayName,
+      category: component.area,
+      application: component.application ?? '',
+      owningGroup: component.snowGroup ?? '',
+      agent: component.agent ?? '',
+      scopeSource: component.scopeSource,
+      endpointKey: definition?.endpointKey,
+      userKey: definition?.userKey,
+      secretKey: definition?.secretKey,
+      trackServiceUser: component.trackServiceUser,
+      trackCredential: component.trackCredential,
+      endpoint: component.serviceEndpoint ?? '',
+      serviceUser: component.serviceUser ?? '',
+      credentialConfigured: component.credentialConfigured,
+      secretState: component.trackCredential
+        ? component.credentialConfigured
           ? 'Configured'
           : 'Missing'
         : 'Not required',
-      description: endpointItem?.description || definition.defaultDescription,
-      updatedBy: latestItem?.updatedBy,
-      updatedAt: latestItem?.updatedAt,
+      description: component.description ?? definition?.defaultDescription,
+      updatedBy: component.updatedBy,
+      updatedAt: component.updatedAt,
       status,
     }
   })
@@ -259,16 +158,16 @@ const componentRows = computed<ConfigComponentRow[]>(() => {
 
 const componentOwningGroupOptions = computed(() => [
   'All',
-  ...new Set(componentRows.value.map((row) => row.owningGroup ?? '')),
-].filter(Boolean))
+  ...new Set(componentRows.value.map((row) => row.owningGroup).filter(Boolean)),
+])
 const componentApplicationOptions = computed(() => [
   'All',
-  ...new Set(componentRows.value.map((row) => row.application ?? '')),
-].filter(Boolean))
+  ...new Set(componentRows.value.map((row) => row.application).filter(Boolean)),
+])
 const componentAgentOptions = computed(() => [
   'All',
-  ...new Set(componentRows.value.map((row) => row.agent ?? '')),
-].filter(Boolean))
+  ...new Set(componentRows.value.map((row) => row.agent).filter(Boolean)),
+])
 
 const filteredComponentRows = computed(() => {
   const query = searchTerm.value.trim().toLowerCase()
@@ -293,22 +192,35 @@ const filteredComponentRows = computed(() => {
 })
 
 const rawRows = computed<ConfigCatalogRow[]>(() => {
-  return CONFIG_CATALOG.map((entry) => {
-    const item = configItemsByKey.value.get(entry.key)
+  return store.items.map((item) => {
+    const definition = item.componentId ? componentDefinitionById.value.get(item.componentId) : undefined
+
     return {
-      ...entry,
-      value: item?.value ?? '',
-      description: item?.description,
-      updatedBy: item?.updatedBy,
-      updatedAt: item?.updatedAt,
+      rowId: `${item.componentInstanceId ?? 'legacy'}:${item.key}`,
+      componentInstanceId: item.componentInstanceId,
+      componentId: item.componentId ?? definition?.id ?? 'jenkins',
+      key: item.key,
+      label: item.key.toUpperCase() as Uppercase<ConfigKey>,
+      application: item.application ?? '',
+      owningGroup: item.snowGroup ?? '',
+      agent: item.agent ?? '',
+      scopeSource: (item.scopeSource as ScopeSource | undefined) ?? 'Platform Default',
+      integration: item.integration ?? definition?.label ?? '',
+      area: item.area ?? definition?.category ?? '',
+      value: item.value ?? '',
+      configured: item.configured ?? Boolean(item.value),
+      sensitive: item.sensitive ?? SECRET_KEYS.includes(item.key),
+      description: item.description,
+      updatedBy: item.updatedBy,
+      updatedAt: item.updatedAt,
     }
   })
 })
 
-const owningGroupOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.owningGroup))])
-const applicationOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.application))])
-const agentOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.agent))])
-const configItemOptions = computed(() => ['All', ...rawRows.value.map((row) => row.label)])
+const owningGroupOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.owningGroup).filter(Boolean))])
+const applicationOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.application).filter(Boolean))])
+const agentOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.agent).filter(Boolean))])
+const configItemOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.label))])
 
 const filteredRawRows = computed(() => {
   return rawRows.value.filter((row) => {
@@ -324,13 +236,19 @@ const filteredRawRows = computed(() => {
   })
 })
 
-const editingComponent = computed(() => {
-  if (!editingComponentId.value) return null
-  return componentRows.value.find((row) => row.id === editingComponentId.value) ?? null
-})
+const componentDialogOptions = computed(() =>
+  COMPONENT_DEFINITIONS.map((definition) => ({
+    componentId: definition.id,
+    label: definition.label,
+    area: definition.category,
+    trackServiceUser: Boolean(definition.userKey),
+    trackCredential: Boolean(definition.secretKey),
+    defaultDescription: definition.defaultDescription,
+  })),
+)
 
-function refreshConfig() {
-  store.fetchConfig()
+async function refreshConfig() {
+  await store.fetchConfig()
 }
 
 function applyRawFilters() {
@@ -352,53 +270,47 @@ function selectView(view: 'component' | 'raw') {
   activeView.value = view
 }
 
+function openCreateComponent() {
+  if (!canEdit.value) return
+  creatingComponent.value = true
+  editingComponent.value = null
+  componentError.value = ''
+}
+
 function openComponentEditor(component: ConfigComponentRow) {
   if (!canEdit.value) return
-  editingComponentId.value = component.id
+  creatingComponent.value = false
+  editingComponent.value = component
   componentError.value = ''
 }
 
 function closeComponentEditor() {
-  editingComponentId.value = null
+  editingComponent.value = null
+  creatingComponent.value = false
   componentSaving.value = false
   componentError.value = ''
 }
 
 async function saveComponent(draft: ConfigComponentDraft) {
-  if (!editingComponent.value || !canEdit.value) return
+  if (!canEdit.value) return
 
   componentSaving.value = true
   componentError.value = ''
 
   try {
-    const updates: Array<{ key: ConfigKey; value: string; description?: string }> = []
-
-    if (editingComponent.value.endpointKey) {
-      updates.push({
-        key: editingComponent.value.endpointKey,
-        value: draft.endpoint,
-        description: draft.description ?? '',
-      })
-    }
-
-    if (editingComponent.value.userKey && draft.serviceUser) {
-      updates.push({
-        key: editingComponent.value.userKey,
-        value: draft.serviceUser,
-      })
-    }
-
-    if (editingComponent.value.secretKey && draft.secretValue) {
-      updates.push({
-        key: editingComponent.value.secretKey,
-        value: draft.secretValue,
-      })
-    }
-
-    for (const update of updates) {
-      await store.saveConfig(update)
-    }
-
+    await store.saveComponent({
+      componentInstanceId: creatingComponent.value ? undefined : editingComponent.value?.id,
+      componentId: draft.componentId,
+      displayName: draft.displayName,
+      area: draft.area,
+      application: draft.application,
+      snowGroup: draft.snowGroup,
+      agent: draft.agent,
+      serviceEndpoint: draft.endpoint,
+      serviceUser: draft.serviceUser,
+      credentialValue: draft.credentialValue,
+      description: draft.description,
+    })
     closeComponentEditor()
   } catch (error: unknown) {
     componentError.value =
@@ -408,41 +320,99 @@ async function saveComponent(draft: ConfigComponentDraft) {
   }
 }
 
+function describeComponentScope(component: ConfigComponentRow) {
+  if (component.agent?.trim()) {
+    return `Agent Override (${component.application} / ${component.owningGroup} / ${component.agent})`
+  }
+  if (component.owningGroup?.trim()) {
+    return `SNOW Group Default (${component.application} / ${component.owningGroup})`
+  }
+  if (component.application?.trim()) {
+    return `Application Default (${component.application})`
+  }
+  return 'Platform Default'
+}
+
+function deleteTitle(component: ConfigComponentRow) {
+  if (!canEdit.value) {
+    return 'DEVOPS_ADMIN can delete configuration.'
+  }
+  if (!component.id) {
+    return 'This built-in platform default has not been saved yet, so there is nothing to delete.'
+  }
+  return ''
+}
+
+async function deleteComponent(component: ConfigComponentRow) {
+  if (!canEdit.value || !component.id) return
+
+  const confirmed = window.confirm(
+    `Delete component "${component.label}" for ${describeComponentScope(component)}?`,
+  )
+  if (!confirmed) return
+
+  deletingComponentId.value = component.id
+  componentError.value = ''
+
+  try {
+    await store.removeComponent(component.id)
+    if (editingComponent.value?.id === component.id) {
+      closeComponentEditor()
+    }
+  } catch (error: unknown) {
+    componentError.value =
+      error instanceof Error ? error.message : 'Failed to delete component configuration'
+  } finally {
+    deletingComponentId.value = null
+  }
+}
+
 function startEdit(row: ConfigCatalogRow) {
-  editingKey.value = row.key
-  editForm.value = row.value
+  editingRowId.value = row.rowId
+  editForm.value = row.sensitive ? '' : row.value
   editForm.description = row.description ?? ''
-  rowError.value = { ...rowError.value, [row.key]: '' }
-  rowSuccess.value = { ...rowSuccess.value, [row.key]: false }
+  rowError.value = { ...rowError.value, [row.rowId]: '' }
+  rowSuccess.value = { ...rowSuccess.value, [row.rowId]: false }
 }
 
 function cancelEdit() {
-  editingKey.value = null
+  editingRowId.value = null
 }
 
 async function saveEdit(row: ConfigCatalogRow) {
   if (!canEdit.value) return
-  savingKey.value = row.key
-  rowError.value = { ...rowError.value, [row.key]: '' }
+  savingRowId.value = row.rowId
+  rowError.value = { ...rowError.value, [row.rowId]: '' }
+
+  if (!editForm.value.trim()) {
+    rowError.value = {
+      ...rowError.value,
+      [row.rowId]: row.sensitive ? 'Enter a new credential value.' : 'Value must not be blank.',
+    }
+    savingRowId.value = null
+    return
+  }
 
   try {
     await store.saveConfig({
+      componentInstanceId: row.componentInstanceId,
+      componentId: row.componentId,
       key: row.key,
       value: editForm.value,
       description: editForm.description,
     })
-    rowSuccess.value = { ...rowSuccess.value, [row.key]: true }
-    editingKey.value = null
+    rowSuccess.value = { ...rowSuccess.value, [row.rowId]: true }
+    editingRowId.value = null
     setTimeout(() => {
-      rowSuccess.value = { ...rowSuccess.value, [row.key]: false }
+      rowSuccess.value = { ...rowSuccess.value, [row.rowId]: false }
     }, 2000)
   } catch (error: unknown) {
     rowError.value = {
       ...rowError.value,
-      [row.key]: error instanceof Error ? error.message : 'Save failed',
+      [row.rowId]: error instanceof Error ? error.message : 'Save failed',
     }
   } finally {
-    savingKey.value = null
+    savingRowId.value = null
   }
 }
 
@@ -450,10 +420,12 @@ function isSecretKey(key: ConfigKey) {
   return SECRET_KEYS.includes(key)
 }
 
-function formatValue(item: { key: ConfigKey; value: string }) {
+function formatValue(item: Pick<ConfigCatalogRow, 'sensitive' | 'configured' | 'value'>) {
+  if (item.sensitive) {
+    return item.configured ? '••••••••' : '—'
+  }
   if (!item.value) return '—'
-  if (!isSecretKey(item.key)) return item.value
-  return '••••••••'
+  return item.value
 }
 
 function formatDate(value?: string) {
@@ -514,10 +486,11 @@ function displayValue(value?: string) {
 
     <div v-if="activeView === 'component'" class="component-workspace">
         <div class="helper-banner">
-          This view groups the current backend configuration keys into reusable integration
-          components. Scope fields show who this shared default is meant to serve today; true
-          per-agent overrides are not wired yet. Use <strong>Configuration</strong> only when you
-          need key-level edits.
+          This view manages scoped integration components directly. Runtime resolution now prefers
+          the most specific matching row in this order: <strong>Agent Override</strong>,
+          <strong>SNOW Group Default</strong>, <strong>Application Default</strong>, then
+          <strong>Platform Default</strong>. Use <strong>Configuration</strong> when you need
+          key-level edits against one scoped row.
         </div>
 
         <div v-if="store.error" class="alert alert-error">
@@ -539,7 +512,7 @@ function displayValue(value?: string) {
             <div class="toolbar-field">
               <label class="toolbar-label">Status</label>
               <select v-model="statusFilter" class="form-control">
-                <option value="All">All Statuses</option>
+                <option value="All">Any Status</option>
                 <option value="Ready">Ready</option>
                 <option value="Partial">Partial</option>
                 <option value="Needs Setup">Needs Setup</option>
@@ -580,9 +553,18 @@ function displayValue(value?: string) {
             <div>
               <h2 class="section-title">Available Components ({{ filteredComponentRows.length }})</h2>
               <p class="section-subtitle">
-                Fixed integrations backed by the current system configuration keys.
+                Scoped integration rows that can override shared defaults for a specific
+                application, SNOW Group, or agent.
               </p>
             </div>
+            <button
+              v-if="canEdit"
+              class="btn btn-primary"
+              type="button"
+              @click="openCreateComponent"
+            >
+              Add Scoped Component
+            </button>
           </div>
 
           <div v-if="filteredComponentRows.length === 0" class="empty-state">
@@ -638,15 +620,26 @@ function displayValue(value?: string) {
                   <td>{{ component.updatedBy ?? '—' }}</td>
                   <td class="timestamp">{{ formatDate(component.updatedAt) }}</td>
                   <td>
-                    <button
-                      class="btn btn-secondary btn-sm"
-                      type="button"
-                      :disabled="!canEdit"
-                      :title="canEdit ? '' : 'DEVOPS_ADMIN can edit configuration.'"
-                      @click="openComponentEditor(component)"
-                    >
-                      Edit
-                    </button>
+                    <div class="action-btns">
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        type="button"
+                        :disabled="!canEdit"
+                        :title="canEdit ? '' : 'DEVOPS_ADMIN can edit configuration.'"
+                        @click="openComponentEditor(component)"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        class="btn btn-danger btn-sm"
+                        type="button"
+                        :disabled="!canEdit || !component.id || deletingComponentId === component.id"
+                        :title="deleteTitle(component)"
+                        @click="deleteComponent(component)"
+                      >
+                        {{ deletingComponentId === component.id ? 'Deleting...' : 'Delete' }}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -657,9 +650,9 @@ function displayValue(value?: string) {
 
     <div v-else class="raw-workspace">
         <div class="helper-banner helper-banner-muted">
-          Configuration lists the fixed catalog of backend-managed settings. This view is closer to
-          a traditional admin table: filter by context, review values, and edit only when needed.
-          Today these keys still act as shared defaults, even when scoped ownership fields are shown.
+          Configuration lists the derived key rows behind each scoped component instance. When a
+          task runs, the backend resolves the most specific matching row for each tool based on its
+          Application, SNOW Group, and Agent context.
         </div>
 
         <div class="toolbar-card">
@@ -725,8 +718,8 @@ function displayValue(value?: string) {
             <div>
               <h2 class="section-title">Configuration Items ({{ filteredRawRows.length }})</h2>
               <p class="section-subtitle">
-                Current backend supports a fixed set of integration keys, so this table focuses on
-                review and maintenance rather than free-form creation.
+                Each row belongs to one scoped component instance; edits here update that same
+                component and therefore affect runtime resolution.
               </p>
             </div>
           </div>
@@ -747,7 +740,7 @@ function displayValue(value?: string) {
               </tr>
             </thead>
             <tbody>
-              <template v-for="row in filteredRawRows" :key="row.key">
+              <template v-for="row in filteredRawRows" :key="row.rowId">
                 <tr>
                   <td>{{ row.application }}</td>
                   <td>{{ row.owningGroup }}</td>
@@ -757,11 +750,11 @@ function displayValue(value?: string) {
                     <div class="config-item-meta">{{ row.integration }}</div>
                   </td>
                   <td class="config-value-cell">
-                    <template v-if="editingKey === row.key">
+                    <template v-if="editingRowId === row.rowId">
                       <input
                         v-model="editForm.value"
                         class="form-control inline-input"
-                        :type="isSecretKey(row.key) ? 'password' : 'text'"
+                        :type="row.sensitive ? 'password' : 'text'"
                       />
                       <input
                         v-model="editForm.description"
@@ -782,14 +775,14 @@ function displayValue(value?: string) {
                   <td class="timestamp">{{ formatDate(row.updatedAt) }}</td>
                   <td>
                     <div class="action-btns">
-                      <template v-if="editingKey === row.key">
+                      <template v-if="editingRowId === row.rowId">
                         <button
                           class="btn btn-primary btn-sm"
-                          :disabled="savingKey === row.key"
+                          :disabled="savingRowId === row.rowId"
                           @click="saveEdit(row)"
                         >
                           <span
-                            v-if="savingKey === row.key"
+                            v-if="savingRowId === row.rowId"
                             class="spinner"
                             style="width: 12px; height: 12px; border-width: 1px"
                           ></span>
@@ -810,10 +803,10 @@ function displayValue(value?: string) {
                     </div>
                   </td>
                 </tr>
-                <tr v-if="rowError[row.key] || rowSuccess[row.key]">
+                <tr v-if="rowError[row.rowId] || rowSuccess[row.rowId]">
                   <td colspan="9" class="feedback-row">
-                    <span v-if="rowError[row.key]" class="feedback-error">{{ rowError[row.key] }}</span>
-                    <span v-if="rowSuccess[row.key]" class="feedback-success">Saved successfully.</span>
+                    <span v-if="rowError[row.rowId]" class="feedback-error">{{ rowError[row.rowId] }}</span>
+                    <span v-if="rowSuccess[row.rowId]" class="feedback-success">Saved successfully.</span>
                   </td>
                 </tr>
               </template>
@@ -824,9 +817,11 @@ function displayValue(value?: string) {
     </div>
 
     <ConfigComponentDialog
-      v-if="editingComponent"
-      :key="editingComponent.id"
+      v-if="editingComponent || creatingComponent"
+      :key="editingComponent?.id ?? editingComponent?.componentId ?? 'new-component'"
       :component="editingComponent"
+      :mode="creatingComponent ? 'create' : 'edit'"
+      :component-options="componentDialogOptions"
       :saving="componentSaving"
       :error="componentError"
       @close="closeComponentEditor"

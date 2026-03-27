@@ -40,6 +40,7 @@ export const useAccessGrantStore = defineStore('accessGrants', () => {
 
   async function grantAccess(input: {
     employeeId: string
+    displayName?: string
     grantStatus: AccessGrantStatus
     assignedRoles: UserRole[]
     scopeGrants: AccessScope[]

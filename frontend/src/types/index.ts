@@ -93,6 +93,7 @@ export interface Request {
   id: string
   releaseFlowId: string
   stage: Stage
+  attemptNumber: number
   requestStatus: RequestStatus
   snowGroup?: string
   application?: string
@@ -128,6 +129,13 @@ export interface ReleaseFlowListItem {
   sitStatus: RequestStatus
   uatStatus: RequestStatus
   prodStatus: RequestStatus
+  sitPresent: boolean
+  uatPresent: boolean
+  prodPresent: boolean
+  stitched: boolean
+  linkedReleaseCount: number
+  linkedReleaseIds: string[]
+  linkedReleaseFlowIds: string[]
 }
 
 // ReleaseFlow (detail)
@@ -142,20 +150,54 @@ export interface ReleaseFlowDetail {
   reviewStatus: ReviewStatus
   archivedAt?: string
   archivedBy?: string
+  stitched: boolean
+  linkedReleaseCount: number
+  linkedReleaseIds: string[]
   requests: Request[]
 }
 
 // ConfigItem
 export interface ConfigItem {
+  componentInstanceId?: string
+  componentId?: ConfigIntegrationId
   key: ConfigKey
   value: string
+  description?: string
+  updatedBy?: string
+  updatedAt?: string
+  application?: string
+  snowGroup?: string
+  agent?: string
+  area?: string
+  integration?: string
+  scopeSource?: string
+  sensitive?: boolean
+  configured?: boolean
+}
+
+export interface ConfigComponent {
+  componentInstanceId?: string
+  componentId: ConfigIntegrationId
+  systemType: string
+  displayName: string
+  area: string
+  application?: string
+  snowGroup?: string
+  agent?: string
+  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
+  trackServiceUser: boolean
+  trackCredential: boolean
+  serviceEndpoint: string
+  serviceUser?: string
+  credentialConfigured: boolean
   description?: string
   updatedBy?: string
   updatedAt?: string
 }
 
 export interface ConfigComponentRow {
-  id: ConfigIntegrationId
+  id?: string
+  componentId: ConfigIntegrationId
   label: string
   category: string
   application?: string
@@ -165,9 +207,11 @@ export interface ConfigComponentRow {
   endpointKey?: ConfigKey
   userKey?: ConfigKey
   secretKey?: ConfigKey
+  trackServiceUser: boolean
+  trackCredential: boolean
   endpoint: string
   serviceUser?: string
-  secretValue?: string
+  credentialConfigured: boolean
   secretState: 'Configured' | 'Missing' | 'Not required'
   description?: string
   updatedBy?: string
@@ -176,9 +220,15 @@ export interface ConfigComponentRow {
 }
 
 export interface ConfigComponentDraft {
+  componentId: ConfigIntegrationId
+  displayName: string
+  area: string
+  application?: string
+  snowGroup?: string
+  agent?: string
   endpoint: string
   serviceUser?: string
-  secretValue?: string
+  credentialValue?: string
   description?: string
 }
 
@@ -210,6 +260,13 @@ export interface AccessGrant {
   createdAt?: string
   updatedBy?: string
   updatedAt?: string
+}
+
+export interface AccessGrantDirectoryCandidate {
+  employeeId: string
+  displayName: string
+  hasAccessGrant: boolean
+  grantStatus?: AccessGrantStatus
 }
 
 // TaskResult
@@ -245,6 +302,34 @@ export interface UploadResponse {
   snowGroup?: string
   application?: string
   agent?: string
+}
+
+export interface CreateRundownFromTemplateTaskInput {
+  category?: string
+  taskName: string
+  step: number
+  stepName: string
+  type: ExecutionType
+  critical: boolean
+  owner?: string
+  estDurationMinutes?: number
+  dependencies?: string
+}
+
+export interface CreateRundownFromTemplateInput {
+  templateId: string
+  templateName: string
+  projectId?: string
+  projectName: string
+  stage: Stage
+  releaseId?: string
+  snowGroup?: string
+  application?: string
+  agent?: string
+  site?: string
+  owner?: string
+  estimatedRemainingMinutes?: number
+  tasks: CreateRundownFromTemplateTaskInput[]
 }
 
 export interface RequestArchiveResult {

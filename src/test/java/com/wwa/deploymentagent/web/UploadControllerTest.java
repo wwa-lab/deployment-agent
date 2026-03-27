@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -19,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Transactional
 @DisplayName("UploadController")
 class UploadControllerTest {
 
@@ -52,7 +54,7 @@ class UploadControllerTest {
     }
 
     @Test
-    @DisplayName("POST /upload persists and returns uploaded scope context")
+    @DisplayName("POST /upload persists and returns uploaded scope context plus explicit release identifier")
     void upload_returnsScopeContext() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -63,12 +65,14 @@ class UploadControllerTest {
         mockMvc.perform(multipart("/api/deployment-agent/upload")
                         .file(file)
                         .param("stage", "SIT")
+                        .param("releaseId", "WFPROJ-20260327-01")
                         .param("application", "AMH HCC")
                         .param("snowGroup", "HTSA-CSI-HCC-AMH-PRJ")
                         .param("agent", "Deployment Agent")
                         .header("X-User-Id", "emp-003")
                         .header("X-User-Role", "DEVOPS_ADMIN"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.releaseId").value("WFPROJ-20260327-01"))
                 .andExpect(jsonPath("$.application").value("AMH HCC"))
                 .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
                 .andExpect(jsonPath("$.agent").value("Deployment Agent"));

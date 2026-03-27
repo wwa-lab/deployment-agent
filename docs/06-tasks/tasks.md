@@ -263,7 +263,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 - **Dependencies**: None
 - **Owner type**: backend
 - **Priority**: Could
-- **Notes**: Not part of the critical path for Access Management delivery.
+- **Notes**: Not part of the critical path for Access Management delivery. Detailed follow-up artifacts now live in `docs/05-design/multi-tool-execution-design.md` and `docs/06-tasks/multi-tool-execution-tasks.md`.
 
 ---
 

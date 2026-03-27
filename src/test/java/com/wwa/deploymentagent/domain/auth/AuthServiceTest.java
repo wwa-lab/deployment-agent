@@ -67,7 +67,8 @@ class AuthServiceTest {
     void authenticate_management_returnsManagementRole() {
         UserContext ctx = authService.authenticate("emp-005", "any-password");
         assertThat(ctx.role()).isEqualTo("MANAGEMENT");
-        assertThat(ctx.permissions()).containsExactly("audit.view");
+        // WWA-007: MANAGEMENT now also receives platform-level permission keys alongside the legacy audit.view key
+        assertThat(ctx.permissions()).contains("audit.view", "platform.enter", "platform.audit.view");
     }
 
     @Test

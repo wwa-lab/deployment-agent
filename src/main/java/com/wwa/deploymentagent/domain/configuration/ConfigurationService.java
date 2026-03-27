@@ -51,6 +51,7 @@ public class ConfigurationService {
     }
 
     private final ConfigurationRepository configurationRepository;
+    private final SensitiveValueCipher sensitiveValueCipher;
     private final AuditLoggerService auditLogger;
 
     @Transactional(readOnly = true)
@@ -61,6 +62,13 @@ public class ConfigurationService {
     @Transactional(readOnly = true)
     public Optional<ConfigurationItem> getByKey(ConfigKey key) {
         return configurationRepository.findById(key);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<String> getDecryptedValue(ConfigKey key) {
+        return configurationRepository.findById(key)
+                .map(ConfigurationItem::getConfigValue)
+                .map(value -> key.isSensitive() ? sensitiveValueCipher.decrypt(value) : value);
     }
 
     /**
@@ -82,24 +90,34 @@ public class ConfigurationService {
         }
 
         Optional<ConfigurationItem> existing = configurationRepository.findById(key);
-        String oldValue = existing.map(ConfigurationItem::getConfigValue).orElse(null);
+        String oldValue = existing.map(ConfigurationItem::getConfigValue)
+                .map(storedValue -> key.isSensitive() ? sensitiveValueCipher.decrypt(storedValue) : storedValue)
+                .orElse(null);
 
         ConfigurationItem item = existing.orElseGet(ConfigurationItem::new);
         item.setConfigKey(key);
-        item.setConfigValue(value);
+        item.setConfigValue(key.isSensitive() ? sensitiveValueCipher.encrypt(value) : value);
         if (description != null) item.setDescription(description);
         else if (existing.isPresent()) item.setDescription(existing.get().getDescription());
         item.setUpdatedBy(user.userId());
 
         ConfigurationItem saved = configurationRepository.save(item);
 
-        auditLogger.log(user, AuditActionType.config_update,
-                Map.of("configKey", key.name(),
-                       "oldValue", oldValue != null ? oldValue : "",
-                       "newValue", value,
-                       "application", "Deployment Agent",
-                       "snowGroup", "WWA Platform",
-                       "agent", "Deployment Agent"));
+        Map<String, Object> auditContext = new java.util.LinkedHashMap<>();
+        auditContext.put("configKey", key.name());
+        auditContext.put("application", "Deployment Agent");
+        auditContext.put("snowGroup", "WWA Platform");
+        auditContext.put("agent", "Deployment Agent");
+
+        if (key.isSensitive()) {
+            auditContext.put("sensitive", true);
+            auditContext.put("credentialChanged", !java.util.Objects.equals(oldValue, value));
+        } else {
+            auditContext.put("oldValue", oldValue != null ? oldValue : "");
+            auditContext.put("newValue", value);
+        }
+
+        auditLogger.log(user, AuditActionType.config_update, auditContext);
 
         return saved;
     }

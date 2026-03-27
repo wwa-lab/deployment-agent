@@ -4,8 +4,10 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.ExecutionStatus;
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
+import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.configuration.ConfigurationScope;
 import com.wwa.deploymentagent.domain.decision.ReleaseFlowProgressionService;
 import com.wwa.deploymentagent.domain.task.*;
 import com.wwa.deploymentagent.errors.ConflictAppException;
@@ -21,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AutoExecutionService – submits AUTO tasks to external execution systems
- * (Jenkins/Ansible) and records the submission result.
+ * AutoExecutionService – resolves the external tool target, submits AUTO tasks,
+ * and records rich execution metadata immediately after submission.
  *
  * <p>Guards:
  * <ul>
@@ -32,11 +34,11 @@ import java.util.Map;
  *
  * <p>Flow:
  * <ol>
- *   <li>Create execution history record</li>
- *   <li>Transition task to {@code Executing}</li>
- *   <li>Call the appropriate adapter (Jenkins/Ansible)</li>
- *   <li>Update execution history with external reference</li>
- *   <li>On failure: mark task as {@code Failed}</li>
+ *   <li>Resolve external tool target via {@link ExecutionTargetResolver}</li>
+ *   <li>Create execution history record and transition task to {@code Executing}</li>
+ *   <li>Call the correct adapter (Jenkins/Ansible)</li>
+ *   <li>Persist initial external references and seed {@code QUEUED} status</li>
+ *   <li>On failure: mark task as {@code Failed}, trigger progression recompute</li>
  *   <li>Audit the action</li>
  * </ol>
  */
@@ -49,6 +51,7 @@ public class AutoExecutionService {
     private final TaskExecutionHistoryRepository executionHistoryRepository;
     private final TaskPermissionService taskPermissionService;
     private final List<AutoExecutionAdapter> adapters;
+    private final ExecutionTargetResolver targetResolver;
     private final AuditLoggerService auditLogger;
     private final ReleaseFlowProgressionService progressionService;
     private final TaskService taskService;
@@ -69,9 +72,11 @@ public class AutoExecutionService {
                     "Task must be in Ready_For_Execution state, current: " + task.getTaskStatus().name());
         }
 
-        // Determine which adapter to use
-        String systemType = resolveSystemType(task.getInputParameters());
-        AutoExecutionAdapter adapter = findAdapter(systemType);
+        // Resolve target (throws ValidationAppException on bad input)
+        Map<String, Object> inputParams = task.getInputParameters() != null ? task.getInputParameters() : Map.of();
+        ExecutionTarget target = targetResolver.resolve(inputParams);
+        AutoExecutionAdapter adapter = findAdapter(target.systemType());
+        ConfigurationScope scope = ConfigurationScope.from(task.getRequest());
 
         // Create execution history record
         int maxAttempt = executionHistoryRepository.findMaxAttemptNumberByTaskId(taskId);
@@ -83,8 +88,13 @@ public class AutoExecutionService {
         history.setExecutionStatus(ExecutionStatus.Running);
         history.setInputSnapshot(task.getInputParameters());
         history.setStartTime(Instant.now());
-        history.setExternalSystemType(systemType);
+        history.setExternalSystemType(target.systemType());
         history.setSubmittedAt(Instant.now());
+        history.setExternalStatus(ExternalStatus.QUEUED);
+        history.setExternalStatusMessage("Submitting to " + target.systemType());
+        history.setConfigApplication(scope.application());
+        history.setConfigSnowGroup(scope.snowGroup());
+        history.setConfigAgent(scope.agent());
         TaskExecutionHistory savedHistory = executionHistoryRepository.save(history);
 
         // Transition task to Executing
@@ -93,18 +103,23 @@ public class AutoExecutionService {
         task.setStartTime(Instant.now());
 
         // Call external system
-        AutoSubmissionResult result = adapter.submit(
-                task.getInputParameters() != null ? task.getInputParameters() : Map.of());
+        AutoSubmissionResult result = adapter.submit(target, inputParams, scope);
 
         if (result.success()) {
             savedHistory.setSubmissionStatus("SUBMITTED");
             savedHistory.setSubmissionMessage(result.message());
             savedHistory.setExternalExecutionId(result.executionId());
             savedHistory.setExternalJobUrl(result.jobUrl());
+            savedHistory.setExternalLogUrl(result.logUrl());
+            savedHistory.setExternalApprovalUrl(result.approvalUrl());
+            savedHistory.setExternalStatus(ExternalStatus.QUEUED);
+            savedHistory.setExternalStatusMessage("Queued in " + target.systemType());
         } else {
             savedHistory.setSubmissionStatus("FAILED");
             savedHistory.setSubmissionMessage(result.message());
             savedHistory.setExecutionStatus(ExecutionStatus.Failed);
+            savedHistory.setExternalStatus(ExternalStatus.FAILED);
+            savedHistory.setExternalStatusMessage(result.message());
             savedHistory.setEndTime(Instant.now());
             task.setTaskStatus(TaskStatus.Failed);
             task.setEndTime(Instant.now());
@@ -116,9 +131,19 @@ public class AutoExecutionService {
         // Audit
         Map<String, Object> auditContext = new HashMap<>();
         auditContext.put("action", "auto_submit");
-        auditContext.put("systemType", systemType);
+        auditContext.put("systemType", target.systemType());
+        auditContext.put("targetKind", target.targetKind());
         auditContext.put("attemptNumber", nextAttempt);
         auditContext.put("submissionStatus", savedHistory.getSubmissionStatus());
+        if (scope.application() != null) {
+            auditContext.put("application", scope.application());
+        }
+        if (scope.snowGroup() != null) {
+            auditContext.put("snowGroup", scope.snowGroup());
+        }
+        if (scope.agent() != null) {
+            auditContext.put("agent", scope.agent());
+        }
         if (result.jobUrl() != null) {
             auditContext.put("externalJobUrl", result.jobUrl());
         }
@@ -129,21 +154,12 @@ public class AutoExecutionService {
                 taskId,
                 auditContext);
 
-        // If submission failed, trigger progression so flow status is updated
+        // If submission failed, trigger progression so flow status is recomputed
         if (!result.success()) {
             progressionService.progressAfterDecision(taskId);
         }
 
         return savedTask;
-    }
-
-    private String resolveSystemType(Map<String, Object> inputParameters) {
-        if (inputParameters == null) return "JENKINS";
-        Object system = inputParameters.get("system");
-        if (system instanceof String s && "ANSIBLE".equalsIgnoreCase(s)) {
-            return "ANSIBLE";
-        }
-        return "JENKINS";
     }
 
     private AutoExecutionAdapter findAdapter(String systemType) {

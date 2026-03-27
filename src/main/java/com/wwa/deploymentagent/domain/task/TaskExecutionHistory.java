@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.domain.task;
 
 import com.wwa.deploymentagent.contracts.enums.ExecutionStatus;
+import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.util.JsonAttributeConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -93,6 +94,39 @@ public class TaskExecutionHistory {
     /** Error message if submission failed. */
     @Column(name = "submission_message", length = 2000)
     private String submissionMessage;
+
+    /** Scope snapshot captured at submit time for configuration resolution stability. */
+    @Column(name = "config_application", length = 255)
+    private String configApplication;
+
+    @Column(name = "config_snow_group", length = 255)
+    private String configSnowGroup;
+
+    @Column(name = "config_agent", length = 255)
+    private String configAgent;
+
+    // ─── External status synchronization (polling) ────────────────────────────
+
+    /** Normalized remote state for UI and monitor decisions. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "external_status", length = 50)
+    private ExternalStatus externalStatus;
+
+    /** Human-readable explanation of the current remote state. */
+    @Column(name = "external_status_message", length = 2000)
+    private String externalStatusMessage;
+
+    /** Direct click-through to the remote console/log page. */
+    @Column(name = "external_log_url", length = 2000)
+    private String externalLogUrl;
+
+    /** Direct click-through to the remote approval page (workflow approvals). */
+    @Column(name = "external_approval_url", length = 2000)
+    private String externalApprovalUrl;
+
+    /** Timestamp of the last successful poll-based state refresh. */
+    @Column(name = "last_synced_at")
+    private Instant lastSyncedAt;
 
     @PrePersist
     protected void onCreate() {

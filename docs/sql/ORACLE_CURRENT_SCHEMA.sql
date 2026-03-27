@@ -1,8 +1,8 @@
 -- Deployment Agent Oracle current schema
 -- Generated for greenfield UAT / internal environment setup.
 -- Use this script for a fresh Oracle schema.
--- Do not run V2-V9 incremental scripts on top of this file for a brand-new database,
--- because this script already includes the current end-state columns.
+-- Do not run V2-V12 incremental scripts on top of this file for a brand-new database,
+-- because this script already includes the current end-state columns from V2 through V12.
 
 CREATE TABLE DA_RELEASE_FLOW (
     id                    VARCHAR2(36)   NOT NULL,
@@ -29,6 +29,7 @@ CREATE TABLE DA_REQUEST (
     id                          VARCHAR2(36)   NOT NULL,
     release_flow_id             VARCHAR2(36)   NOT NULL,
     stage                       VARCHAR2(10)   NOT NULL,
+    attempt_number              NUMBER(10,0)   DEFAULT 1 NOT NULL,
     request_status              VARCHAR2(30)   NOT NULL,
     snow_group                  VARCHAR2(255),
     application                 VARCHAR2(255),
@@ -49,6 +50,9 @@ CREATE TABLE DA_REQUEST (
 
 CREATE INDEX IDX_REQ_FLOW_STAGE
     ON DA_REQUEST (release_flow_id, stage);
+
+CREATE UNIQUE INDEX UK_REQ_FLOW_STAGE_ATTEMPT
+    ON DA_REQUEST (release_flow_id, stage, attempt_number);
 
 CREATE TABLE DA_TASK (
     id                     VARCHAR2(36)   NOT NULL,
@@ -107,6 +111,9 @@ CREATE TABLE DA_TASK_EXECUTION_HISTORY (
     submitted_at          TIMESTAMP(6),
     submission_status     VARCHAR2(30),
     submission_message    VARCHAR2(2000),
+    config_application    VARCHAR2(255),
+    config_snow_group     VARCHAR2(255),
+    config_agent          VARCHAR2(255),
     CONSTRAINT PK_DA_TASK_EXEC_HISTORY PRIMARY KEY (id),
     CONSTRAINT FK_TEH_TASK
         FOREIGN KEY (task_id) REFERENCES DA_TASK (id)
@@ -126,6 +133,39 @@ CREATE TABLE DA_CONFIGURATION_ITEM (
     updated_at   TIMESTAMP(6)   NOT NULL,
     CONSTRAINT PK_DA_CONFIGURATION_ITEM PRIMARY KEY (config_key)
 );
+
+CREATE TABLE DA_CONFIGURATION_COMPONENT (
+    id                  VARCHAR2(36)   NOT NULL,
+    component_id        VARCHAR2(50)   NOT NULL,
+    scope_key           VARCHAR2(500)  NOT NULL,
+    system_type         VARCHAR2(30)   NOT NULL,
+    display_name        VARCHAR2(255)  NOT NULL,
+    area                VARCHAR2(100)  NOT NULL,
+    application         VARCHAR2(255),
+    snow_group          VARCHAR2(255),
+    agent               VARCHAR2(255),
+    service_endpoint    VARCHAR2(2000),
+    service_user        VARCHAR2(255),
+    credential_value    VARCHAR2(4000),
+    track_service_user  NUMBER(1)      NOT NULL,
+    track_credential    NUMBER(1)      NOT NULL,
+    description         VARCHAR2(500),
+    updated_by          VARCHAR2(255)  NOT NULL,
+    updated_at          TIMESTAMP(6)   NOT NULL,
+    CONSTRAINT PK_DA_CONFIGURATION_COMPONENT PRIMARY KEY (id)
+);
+
+CREATE INDEX IDX_DCC_COMPONENT
+    ON DA_CONFIGURATION_COMPONENT (component_id);
+
+CREATE INDEX IDX_DCC_SYSTEM_TYPE
+    ON DA_CONFIGURATION_COMPONENT (system_type);
+
+CREATE INDEX IDX_DCC_SCOPE
+    ON DA_CONFIGURATION_COMPONENT (application, snow_group, agent);
+
+CREATE UNIQUE INDEX UK_DCC_COMPONENT_SCOPE
+    ON DA_CONFIGURATION_COMPONENT (component_id, scope_key);
 
 CREATE TABLE DA_AUDIT_LOG_ENTRY (
     id              VARCHAR2(36)   NOT NULL,

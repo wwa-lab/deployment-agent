@@ -51,6 +51,7 @@ public class TestDataHelper {
         Request req = new Request();
         req.setReleaseFlow(releaseFlow);
         req.setStage(stage);
+        req.setAttemptNumber(requestRepository.findMaxAttemptNumberByReleaseFlowIdAndStage(releaseFlow.getId(), stage) + 1);
         req.setRequestStatus(status);
         Request saved = requestRepository.save(req);
         entityManager.flush();

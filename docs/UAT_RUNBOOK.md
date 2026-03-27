@@ -3,6 +3,8 @@
 > **Audience:** Delivery lead, DevOps engineer, backend engineer, frontend engineer, UAT coordinator  
 > **Purpose:** Bring Deployment Agent into an internal/UAT environment in a controlled way and verify the product in the order `Database -> Backend -> Frontend -> Integrated UAT`
 
+> **Naming note:** the workspace display name is now `Deployment Agent`, but the current implementation still uses technical identifiers such as `/api/deployment-agent` and `/wwa/deployment-agent`.
+
 ---
 
 ## 1. Recommended UAT Mode
@@ -39,7 +41,6 @@ For the current codebase, the most practical internal UAT setup is:
 
 ### Current non-blocking limitations
 
-- Template Management is still lighter-weight than Release / Audit / Access in backend enforcement.
 - Configuration Management is not yet a fully implemented per-scope override model.
 - Execution Target Catalog is not implemented yet.
 
@@ -108,8 +109,8 @@ Recommended steps:
 
 ### 4.2.2 Important note
 
-- If you use [ORACLE_CURRENT_SCHEMA.sql](/Users/leo/wwa-lab/deployment-agent/docs/sql/ORACLE_CURRENT_SCHEMA.sql) on a **fresh** database, do **not** run `V2-V9` again on top of it.
-- The `V2-V9` files remain useful as historical incremental scripts or for upgrading an older baseline.
+- If you use [ORACLE_CURRENT_SCHEMA.sql](/Users/leo/wwa-lab/deployment-agent/docs/sql/ORACLE_CURRENT_SCHEMA.sql) on a **fresh** database, do **not** run `V2-V12` again on top of it.
+- The `V2-V12` files remain useful as historical incremental scripts or for upgrading an older baseline.
 
 ### 4.3 Validate database readiness
 
@@ -210,6 +211,7 @@ With the session cookie, validate at least:
 - `GET /api/deployment-agent/release-flows`
 - `GET /api/deployment-agent/audit-logs`
 - `GET /api/deployment-agent/access-grants` as `emp-003`
+- `POST /api/deployment-agent/release-flows/from-template` — confirm `403` without a valid role, `400` on a malformed release identifier
 
 ---
 
@@ -295,7 +297,7 @@ Validate:
 - Access Management visibility
 - scoped visibility behavior
 
-### Scenario B — Upload to Release Flow
+### Scenario B — Upload to Release Flow (Excel)
 
 Validate:
 
@@ -303,6 +305,23 @@ Validate:
 - `Application / SNOW Group / Agent` captured correctly
 - Release Flow created or updated correctly
 - Rundown Owner assigned correctly
+
+### Scenario B2 — Create Rundown from Template
+
+Prerequisites: at least one template record exists in Template Management with tasks defined.
+
+Validate:
+
+1. Navigate to Template Management and open a template that has at least one task
+2. Click **Create Rundown** — `CreateRundownDialog` opens and pre-fills scope fields from the template record
+3. Enter a valid Project Name (required)
+4. Select a Stage (`SIT`, `UAT`, or `PROD`)
+5. Enter a Release Identifier in the pattern `xxx-{stage}-NN` (e.g. `amh-hcc-sit-01`) — confirm client-side validation rejects a mismatched stage segment
+6. Submit — confirm `POST /release-flows/from-template` returns `200` with correct `releaseFlowId`, `stage`, and `taskCount`
+7. Navigate to the Release Flow summary page — confirm the new rundown appears under the correct stage tab
+8. Confirm `estimatedRemainingMinutes` is calculated from task durations if not explicitly provided
+9. Confirm the audit log contains an entry with `source: "template"` and the correct template name
+10. Attempt to reuse an archived release identifier — confirm validation error is returned
 
 ### Scenario C — Rundown controls
 
@@ -349,6 +368,7 @@ UAT should not be marked ready unless all of the following are true:
 - frontend is deployed and can call backend via `/api/deployment-agent`
 - login/session works through the chosen UAT auth mode
 - upload, summary, detail, task flow, audit, and access management all work
+- template-based rundown creation is validated (Scenario B2)
 - owner/admin restriction on rundown controls is validated
 - at least one archive/restore path is verified
 - known limitations are documented to stakeholders
@@ -359,7 +379,7 @@ UAT should not be marked ready unless all of the following are true:
 
 - Current UAT auth is expected to use the stub Team Book provider unless a real provider is separately implemented.
 - The repository does not currently provide a complete baseline Oracle schema script alongside the incremental migration files.
-- Template Management and Configuration Management are not yet as fully backend-enforced as Release / Audit / Access.
+- Configuration Management is not yet a fully implemented per-scope override model.
 - Execution Target Catalog is not implemented yet.
 
 ---

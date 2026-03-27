@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { editTask, recordResult } from '../api/tasks'
+import { editTask, recordResult, startManualExecution } from '../api/tasks'
 import type { Task } from '../types'
 
 const props = withDefaults(defineProps<{ task: Task; mode?: 'edit' | 'run' }>(), {
@@ -25,7 +25,7 @@ const fieldErrors = reactive<{ script?: string; parameters?: string; resultSumma
 const canSubmitManualResult = computed(
   () =>
     props.task.executionType === 'MANUAL' &&
-    props.task.taskStatus === 'Ready_For_Execution',
+    (props.task.taskStatus === 'Ready_For_Execution' || props.task.taskStatus === 'Executing'),
 )
 
 const hasInputChanges = computed(
@@ -38,9 +38,34 @@ const isSubmittingResult = computed(
     (form.resultSummary.trim().length > 0 || form.resultLogs.trim().length > 0),
 )
 
+const isStartingManualExecution = computed(
+  () =>
+    props.mode === 'run' &&
+    props.task.executionType === 'MANUAL' &&
+    props.task.taskStatus === 'Ready_For_Execution' &&
+    !isSubmittingResult.value,
+)
+
+const requiresResultForRunningManualTask = computed(
+  () =>
+    props.mode === 'run' &&
+    props.task.executionType === 'MANUAL' &&
+    props.task.taskStatus === 'Executing' &&
+    !isSubmittingResult.value,
+)
+
+const canEditInputFields = computed(
+  () =>
+    !(props.mode === 'run' && props.task.executionType === 'MANUAL' && props.task.taskStatus === 'Executing'),
+)
+
 const submitLabel = computed(() =>
   saving.value
     ? 'Saving...'
+    : isStartingManualExecution.value
+      ? 'Run'
+    : requiresResultForRunningManualTask.value
+      ? 'Submit Result'
     : isSubmittingResult.value
       ? 'Save & Submit Result'
       : 'Save',
@@ -51,9 +76,11 @@ const dialogTitle = computed(() =>
 )
 
 const manualResultHelp = computed(() =>
-  props.mode === 'run'
-    ? 'Capture the outcome here after you complete the manual step. Submitting a result will move the task to review.'
-    : 'Add the execution outcome here if this manual step has been completed. Saving with a result summary will move the task to review.',
+  props.mode === 'run' && props.task.executionType === 'MANUAL' && props.task.taskStatus === 'Executing'
+    ? 'Manual execution is in progress. Submit a result summary to move this task to review.'
+    : props.mode === 'run'
+      ? 'Capture the outcome here after you complete the manual step. Submitting a result will move the task to review.'
+      : 'Add the execution outcome here if this manual step has been completed. Saving with a result summary will move the task to review.',
 )
 
 function validate(): boolean {
@@ -70,10 +97,13 @@ function validate(): boolean {
 
 async function submit() {
   if (!validate()) return
-  if (!hasInputChanges.value && !isSubmittingResult.value) {
-    error.value = canSubmitManualResult.value
-      ? 'Update the task or provide a result summary before saving.'
-      : 'No changes to save.'
+  if (requiresResultForRunningManualTask.value) {
+    error.value = 'Provide a result summary to complete this running task.'
+    return
+  }
+
+  if (!hasInputChanges.value && !isSubmittingResult.value && !isStartingManualExecution.value) {
+    error.value = 'No changes to save.'
     return
   }
 
@@ -94,6 +124,8 @@ async function submit() {
         },
         resultLogs: form.resultLogs.trim() || undefined,
       })
+    } else if (isStartingManualExecution.value) {
+      await startManualExecution(props.task.id)
     }
 
     emit('saved')
@@ -124,6 +156,7 @@ async function submit() {
             rows="5"
             placeholder="Enter script..."
             :class="{ 'input-error': fieldErrors.script }"
+            :disabled="!canEditInputFields"
           ></textarea>
           <span v-if="fieldErrors.script" class="field-error">{{ fieldErrors.script }}</span>
         </div>
@@ -136,6 +169,7 @@ async function submit() {
             rows="4"
             placeholder="Enter parameters (JSON or text)..."
             :class="{ 'input-error': fieldErrors.parameters }"
+            :disabled="!canEditInputFields"
           ></textarea>
           <span v-if="fieldErrors.parameters" class="field-error">{{ fieldErrors.parameters }}</span>
         </div>

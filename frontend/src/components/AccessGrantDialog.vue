@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import type { AccessGrant, AccessGrantStatus, AccessScope, UserRole } from '../types'
+import { searchAccessGrantDirectory } from '../api/accessGrants'
+import type {
+  AccessGrant,
+  AccessGrantDirectoryCandidate,
+  AccessGrantStatus,
+  AccessScope,
+  UserRole,
+} from '../types'
 
 const ROLE_OPTIONS: UserRole[] = ['DEVELOPER', 'TL', 'DEVOPS_ADMIN', 'AUDIT', 'MANAGEMENT']
 
@@ -15,6 +22,7 @@ const emit = defineEmits<{
   close: []
   save: [payload: {
     employeeId: string
+    displayName?: string
     grantStatus: AccessGrantStatus
     assignedRoles: UserRole[]
     scopeGrants: AccessScope[]
@@ -24,12 +32,14 @@ const emit = defineEmits<{
 
 const form = reactive<{
   employeeId: string
+  displayName: string
   grantStatus: AccessGrantStatus
   assignedRoles: UserRole[]
   scopeGrants: AccessScope[]
   note: string
 }>({
   employeeId: '',
+  displayName: '',
   grantStatus: 'ACTIVE',
   assignedRoles: [],
   scopeGrants: [],
@@ -37,15 +47,21 @@ const form = reactive<{
 })
 
 const localError = ref('')
+const directoryQuery = ref('')
+const directoryLoading = ref(false)
+const directoryError = ref('')
+const directoryResults = ref<AccessGrantDirectoryCandidate[]>([])
+const directorySearchPerformed = ref(false)
+const selectedCandidate = ref<AccessGrantDirectoryCandidate | null>(null)
 
 const dialogTitle = computed(() => {
-  if (props.mode === 'create') return 'Grant Product Access'
+  if (props.mode === 'create') return 'Add User Access'
   if (props.mode === 'reactivate') return 'Reactivate Access Grant'
   return 'Edit Access Grant'
 })
 
 const submitLabel = computed(() => {
-  if (props.mode === 'create') return 'Grant Access'
+  if (props.mode === 'create') return 'Add User'
   if (props.mode === 'reactivate') return 'Reactivate'
   return 'Save Changes'
 })
@@ -59,6 +75,7 @@ watch(
   () => [props.mode, props.grant] as const,
   () => {
     form.employeeId = props.grant?.employeeId ?? ''
+    form.displayName = props.grant?.displayName ?? ''
     form.grantStatus = props.mode === 'reactivate'
       ? 'ACTIVE'
       : props.grant?.grantStatus ?? 'ACTIVE'
@@ -68,9 +85,39 @@ watch(
       snowGroup: scope.snowGroup,
     }))
     form.note = props.grant?.note ?? ''
+    directoryQuery.value = ''
+    directoryLoading.value = false
+    directoryError.value = ''
+    directoryResults.value = []
+    directorySearchPerformed.value = false
+    selectedCandidate.value = null
     localError.value = ''
   },
   { immediate: true },
+)
+
+watch(
+  () => form.employeeId,
+  (employeeId) => {
+    const trimmedEmployeeId = employeeId.trim()
+    if (!trimmedEmployeeId) {
+      selectedCandidate.value = null
+      return
+    }
+
+    const normalizedEmployeeId = trimmedEmployeeId.toLowerCase()
+    const matchedCandidate = directoryResults.value.find(
+      (candidate) => candidate.employeeId.trim().toLowerCase() === normalizedEmployeeId,
+    )
+    if (matchedCandidate) {
+      selectedCandidate.value = matchedCandidate
+      return
+    }
+
+    if (selectedCandidate.value?.employeeId.trim().toLowerCase() !== normalizedEmployeeId) {
+      selectedCandidate.value = null
+    }
+  },
 )
 
 function toggleRole(role: UserRole) {
@@ -92,12 +139,54 @@ function removeScope(index: number) {
   form.scopeGrants = form.scopeGrants.filter((_, currentIndex) => currentIndex !== index)
 }
 
+async function runDirectorySearch() {
+  directoryError.value = ''
+  directorySearchPerformed.value = true
+
+  const trimmedQuery = directoryQuery.value.trim()
+  if (trimmedQuery.length < 2) {
+    directoryResults.value = []
+    directoryError.value = 'Enter at least 2 characters to search Team Book.'
+    return
+  }
+
+  directoryLoading.value = true
+  try {
+    directoryResults.value = await searchAccessGrantDirectory(trimmedQuery)
+  } catch (error: unknown) {
+    directoryResults.value = []
+    directoryError.value = error instanceof Error ? error.message : 'Failed to search Team Book'
+  } finally {
+    directoryLoading.value = false
+  }
+}
+
+function selectCandidateFromDirectory(candidate: AccessGrantDirectoryCandidate) {
+  if (candidate.hasAccessGrant) {
+    return
+  }
+
+  form.employeeId = candidate.employeeId
+  form.displayName = candidate.displayName
+  selectedCandidate.value = candidate
+  localError.value = ''
+}
+
 function submit() {
   localError.value = ''
 
-  if (!form.employeeId.trim()) {
+  const normalizedEmployeeId = form.employeeId.trim()
+  if (!normalizedEmployeeId) {
     localError.value = 'Employee ID is required.'
     return
+  }
+
+  if (props.mode === 'create') {
+    const normalizedDisplayName = form.displayName.trim()
+    if (!normalizedDisplayName) {
+      localError.value = 'Employee Name is required for manual access grant creation.'
+      return
+    }
   }
 
   if (requiresRoles.value && form.assignedRoles.length === 0) {
@@ -126,7 +215,8 @@ function submit() {
   }
 
   emit('save', {
-    employeeId: form.employeeId.trim(),
+    employeeId: normalizedEmployeeId,
+    displayName: props.mode === 'create' ? form.displayName.trim() : undefined,
     grantStatus: props.mode === 'reactivate' ? 'ACTIVE' : form.grantStatus,
     assignedRoles: form.assignedRoles,
     scopeGrants: normalizedScopes,
@@ -148,15 +238,95 @@ function submit() {
           {{ localError || error }}
         </div>
 
+        <div v-if="props.mode === 'create'" class="form-group">
+          <div class="scopes-header">
+            <label class="form-label">Find Team Book Employee</label>
+            <button
+              class="btn btn-secondary btn-sm"
+              type="button"
+              :disabled="directoryLoading"
+              @click="runDirectorySearch"
+            >
+              {{ directoryLoading ? 'Searching...' : 'Search' }}
+            </button>
+          </div>
+          <input
+            v-model="directoryQuery"
+            class="form-control"
+            type="text"
+            placeholder="Search by employee ID or display name"
+            @keyup.enter="runDirectorySearch"
+          />
+          <p class="field-hint">
+            Search Team Book to prefill staff ID and name, or skip search and enter `Staff ID + Name`
+            manually for self-maintained access records.
+          </p>
+
+          <div v-if="directoryError" class="directory-feedback directory-feedback-error">
+            {{ directoryError }}
+          </div>
+
+          <div v-else-if="directoryLoading" class="directory-feedback">
+            <span class="spinner" style="width: 14px; height: 14px; border-width: 2px"></span>
+            Searching Team Book...
+          </div>
+
+          <div v-else-if="directoryResults.length > 0" class="directory-results">
+            <button
+              v-for="candidate in directoryResults"
+              :key="candidate.employeeId"
+              class="directory-option"
+              :class="candidate.hasAccessGrant ? 'directory-option-disabled' : 'directory-option-ready'"
+              type="button"
+              :disabled="candidate.hasAccessGrant"
+              @click="selectCandidateFromDirectory(candidate)"
+            >
+              <span class="directory-option-main">
+                <span class="directory-option-name">{{ candidate.displayName }}</span>
+                <span class="directory-option-id mono">{{ candidate.employeeId }}</span>
+              </span>
+              <span
+                class="directory-chip"
+                :class="candidate.hasAccessGrant ? 'directory-chip-muted' : 'directory-chip-ready'"
+              >
+                {{ candidate.hasAccessGrant ? `Existing ${candidate.grantStatus ?? 'grant'}` : 'Ready to add' }}
+              </span>
+            </button>
+          </div>
+
+          <div v-else-if="directorySearchPerformed" class="directory-feedback">
+            No Team Book matches found for that search.
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Employee ID <span class="required">*</span></label>
           <input
             v-model="form.employeeId"
             class="form-control"
             type="text"
-            placeholder="e.g. emp-006"
+            :placeholder="props.mode === 'create' ? 'e.g. 43910156 or emp-006' : 'e.g. emp-006'"
             :disabled="employeeIdDisabled"
           />
+          <p class="field-hint">
+            This dialog creates a WWA access grant by Staff ID. Team Book search is optional in create mode.
+          </p>
+          <div v-if="selectedCandidate" class="directory-selected">
+            Selected employee: <strong>{{ selectedCandidate.displayName }}</strong>
+          </div>
+        </div>
+
+        <div v-if="props.mode === 'create'" class="form-group">
+          <label class="form-label">Employee Name <span class="required">*</span></label>
+          <input
+            v-model="form.displayName"
+            class="form-control"
+            type="text"
+            placeholder="e.g. Leo L Zhang"
+          />
+          <p class="field-hint">
+            If Team Book is unavailable, enter the display name manually for access records.
+          </p>
         </div>
 
         <div class="form-group">
@@ -279,6 +449,90 @@ function submit() {
   color: #64748b;
 }
 
+.directory-feedback {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.directory-feedback-error {
+  color: #b91c1c;
+}
+
+.directory-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.directory-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  text-align: left;
+}
+
+.directory-option-ready:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.directory-option-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.directory-option-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.directory-option-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.directory-option-id {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.directory-chip {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.directory-chip-ready {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.directory-chip-muted {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.directory-selected {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #1d4ed8;
+}
+
 .scopes-header {
   display: flex;
   align-items: center;
@@ -312,6 +566,11 @@ function submit() {
 @media (max-width: 720px) {
   .role-grid {
     grid-template-columns: 1fr;
+  }
+
+  .directory-option {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .scope-row {

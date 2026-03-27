@@ -80,6 +80,16 @@ class RecordResultServiceTest {
     }
 
     @Test
+    @DisplayName("MANUAL + Executing → task becomes Awaiting_Review")
+    void recordResult_executingState_transitionsToAwaitingReview() {
+        Task task = seedManualTask(TaskStatus.Executing);
+
+        Task result = recordResultService.recordResult(task.getId(), Map.of("outcome", "passed"), null, ownerUser);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Awaiting_Review);
+    }
+
+    @Test
     @DisplayName("admin can record result for a manual task")
     void recordResult_adminUser_succeeds() {
         Task task = seedManualTask(TaskStatus.Ready_For_Execution);

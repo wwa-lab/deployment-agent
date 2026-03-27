@@ -1,6 +1,15 @@
 package com.wwa.deploymentagent.contracts.enums;
 
 public enum PermissionKey {
+    // --- Platform-level permissions (WWA shell, shared capabilities) ---
+    /** Grants entry into the WWA platform. Future gate for platform-level access checks. */
+    PLATFORM_ENTER("platform.enter"),
+    /** Grants the ability to manage platform-level access grants (WWA Access Management page). */
+    PLATFORM_ACCESS_MANAGE("platform.access.manage"),
+    /** Grants visibility of the platform-level audit log view. */
+    PLATFORM_AUDIT_VIEW("platform.audit.view"),
+
+    // --- Deployment Agent workspace permissions (agent-private) ---
     RELEASE_VIEW("release.view"),
     RELEASE_UPLOAD("release.upload"),
     RELEASE_VIEW_ARCHIVED("release.view_archived"),
@@ -14,7 +23,11 @@ public enum PermissionKey {
     TASK_RUN("task.run"),
     TASK_REVIEW("task.review"),
     CONFIG_MANAGE("config.manage"),
+    @Deprecated
+    /** @deprecated Use PLATFORM_AUDIT_VIEW for platform-level audit access. Kept for backward compatibility. */
     AUDIT_VIEW("audit.view"),
+    @Deprecated
+    /** @deprecated Use PLATFORM_ACCESS_MANAGE for platform-level access management. Kept for backward compatibility. */
     ACCESS_MANAGE("access.manage");
 
     private final String value;

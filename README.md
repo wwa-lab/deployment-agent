@@ -1,15 +1,19 @@
 # Deployment Agent
 
-Deployment Agent is a workflow-driven platform for managing deployment requests, template-based execution, and delivery process validation.
+Deployment Agent is a workflow-driven release orchestration workspace for managing deployment requests, template-based execution, and delivery process validation.
 
 ## Overview
 
 This repository is the main engineering workspace for Deployment Agent.
 
+The product name is **Deployment Agent**. Current technical identifiers including the repository name, Java package name, route slug `/wwa/deployment-agent`, and API prefix `/api/deployment-agent` are consistent with this name.
+
+At the platform layer, `WWA` now refers to the **WWA Agent Workspace Hub**. In documentation, this is the shared DevOps hub above individual agent workspaces; `WWA` remains the short label used in routes and UI navigation.
+
 It is designed to support structured delivery workflows, including:
 
-- deployment request submission (Excel upload)
-- template-driven parameter configuration
+- deployment request submission (Excel upload or create from saved template)
+- template management with task library maintenance and one-click rundown creation
 - manual and automated task execution (Jenkins/Ansible)
 - execution tracking with external job URL linkage
 - human-in-the-loop decision gates (approve/reject/rerun/skip)
@@ -37,7 +41,7 @@ src/main/java/com/wwa/deploymentagent/
     decision/       # Decision engine + progression
     execution/      # AUTO execution adapters (Jenkins/Ansible)
     fileimport/     # Excel parsing + import
-    releaseflow/    # Release flow lifecycle
+    releaseflow/    # Release flow lifecycle + template-based rundown creation
     task/           # Task management
   errors/           # Custom exception hierarchy
   util/             # Utilities (JsonAttributeConverter)
@@ -57,7 +61,7 @@ frontend/           # Vue 3 SPA
   src/
     api/            # Axios API client + endpoint modules
     assets/         # Global CSS
-    components/     # Dialog components
+    components/     # Dialog components (UploadDialog, CreateRundownDialog, RecordResultDialog, …)
     router/         # Vue Router with auth guards
     stores/         # Pinia stores
     types/          # TypeScript type definitions
@@ -94,6 +98,7 @@ The application uses session-based login against the company Team Book.
 ## Current Status
 
 - MANUAL workflow: **UAT-ready** (upload, execute, review, decide, progress)
+- Template-based rundown creation: **UAT-ready** (create rundown from saved template via `POST /release-flows/from-template`)
 - AUTO execution: **UAT-ready with stub credentials** (submit to Jenkins/Ansible, failure handling, external job URL)
 - Authentication: **UAT-ready with stub provider** (login, session, logout, role-based access)
 - Audit attribution: **UAT-ready** (tied to authenticated session identity)

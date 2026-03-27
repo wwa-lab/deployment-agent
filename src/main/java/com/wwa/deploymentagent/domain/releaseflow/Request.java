@@ -16,13 +16,17 @@ import java.util.UUID;
 
 /**
  * Request – a stage-scoped grouping of tasks within a Release Flow.
- * One Request per (releaseFlow, stage) in MVP.
+ * Multiple attempts are allowed per (releaseFlow, stage).
  */
 @Entity
 @Table(
     name = "DA_REQUEST",
     indexes = {
-        @Index(name = "IDX_REQ_FLOW_STAGE", columnList = "release_flow_id, stage")
+        @Index(name = "IDX_REQ_FLOW_STAGE", columnList = "release_flow_id, stage"),
+        @Index(
+                name = "UK_REQ_FLOW_STAGE_ATTEMPT",
+                columnList = "release_flow_id, stage, attempt_number",
+                unique = true)
     }
 )
 @Getter
@@ -40,6 +44,9 @@ public class Request {
     @Enumerated(EnumType.STRING)
     @Column(name = "stage", length = 10, nullable = false)
     private Stage stage;
+
+    @Column(name = "attempt_number", nullable = false)
+    private Integer attemptNumber = 1;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "request_status", length = 30, nullable = false)
@@ -92,6 +99,9 @@ public class Request {
     protected void onCreate() {
         if (id == null) {
             id = UUID.randomUUID().toString();
+        }
+        if (attemptNumber == null || attemptNumber < 1) {
+            attemptNumber = 1;
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import org.springframework.http.MediaType;
@@ -18,6 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,6 +38,9 @@ class ReleaseFlowControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private TestDataHelper helper;
@@ -91,6 +96,30 @@ class ReleaseFlowControllerTest {
     }
 
     @Test
+    @DisplayName("list_viewStitched_attemptViewSwitchesBetweenLatestAndHistoryForRepeatedStageAttempts")
+    void list_viewStitched_attemptViewSwitchesBetweenLatestAndHistoryForRepeatedStageAttempts() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
+        helper.seedRequest(rf, Stage.SIT, RequestStatus.Completed);
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .param("attemptView", "latest")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].sitStatus").value("Completed"));
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .param("attemptView", "history")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].sitStatus").value("Failed"));
+    }
+
+    @Test
     @DisplayName("list_filtersByScopeFields_andReturnsScopeSummary")
     void list_filtersByScopeFields_andReturnsScopeSummary() throws Exception {
         ReleaseFlow releaseFlow = helper.seedReleaseFlow();
@@ -123,6 +152,89 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.data[0].owner").value("alice"));
     }
 
+    @Test
+    @DisplayName("list_viewStitched_groupsStagePrefixedReleaseFamilyIntoOneSummary")
+    void list_viewStitched_groupsStagePrefixedReleaseFamilyIntoOneSummary() throws Exception {
+        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "sit-01", "sit-01", Stage.SIT);
+        Request sitRequest = helper.seedRequest(sitFlow, Stage.SIT, RequestStatus.Completed);
+        sitRequest.setApplication("AMH HCC");
+        sitRequest.setOwner("alice");
+        requestRepository.save(sitRequest);
+
+        ReleaseFlow uatFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "uat-01", "uat-01", Stage.UAT);
+        Request uatRequest = helper.seedRequest(uatFlow, Stage.UAT, RequestStatus.Pending);
+        uatRequest.setApplication("AMH HCC");
+        uatRequest.setOwner("alice");
+        requestRepository.save(uatRequest);
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].stitched").value(true))
+                .andExpect(jsonPath("$.data[0].linkedReleaseCount").value(2))
+                .andExpect(jsonPath("$.data[0].currentStage").value("UAT"))
+                .andExpect(jsonPath("$.data[0].sitPresent").value(true))
+                .andExpect(jsonPath("$.data[0].uatPresent").value(true))
+                .andExpect(jsonPath("$.data[0].prodPresent").value(false));
+    }
+
+    @Test
+    @DisplayName("list_viewStitched_groupsInfixStageIdentifiersAndKeepsLatestSitRetry")
+    void list_viewStitched_groupsInfixStageIdentifiersAndKeepsLatestSitRetry() throws Exception {
+        ReleaseFlow sitAttemptOneFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-sit-01",
+                "leo-sit-01",
+                Stage.SIT);
+        Request sitAttemptOne = helper.seedRequest(sitAttemptOneFlow, Stage.SIT, RequestStatus.Completed);
+        sitAttemptOne.setAttemptNumber(1);
+        requestRepository.save(sitAttemptOne);
+
+        ReleaseFlow sitAttemptTwoFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-sit-02",
+                "leo-sit-02",
+                Stage.SIT);
+        Request sitAttemptTwo = helper.seedRequest(sitAttemptTwoFlow, Stage.SIT, RequestStatus.Pending);
+        sitAttemptTwo.setAttemptNumber(2);
+        requestRepository.save(sitAttemptTwo);
+
+        ReleaseFlow uatFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-uat-01",
+                "leo-uat-01",
+                Stage.UAT);
+        helper.seedRequest(uatFlow, Stage.UAT, RequestStatus.Pending);
+
+        ReleaseFlow prodFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-prod-01",
+                "leo-prod-01",
+                Stage.PROD);
+        helper.seedRequest(prodFlow, Stage.PROD, RequestStatus.Pending);
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .param("attemptView", "latest")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].stitched").value(true))
+                .andExpect(jsonPath("$.data[0].linkedReleaseCount").value(4))
+                .andExpect(jsonPath("$.data[0].currentStage").value("PROD"))
+                .andExpect(jsonPath("$.data[0].sitStatus").value("Pending"))
+                .andExpect(jsonPath("$.data[0].uatPresent").value(true))
+                .andExpect(jsonPath("$.data[0].prodPresent").value(true));
+    }
+
     // ─── getById ─────────────────────────────────────────────────────────────
 
     @Test
@@ -139,6 +251,248 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.id").value(rf.getId()))
                 .andExpect(jsonPath("$.projectId").value(rf.getProjectId()))
                 .andExpect(jsonPath("$.requests[0].releaseFlowId").value(rf.getId()));
+    }
+
+    @Test
+    @DisplayName("getById_returnsAttemptNumbers_forRepeatedStageRequests")
+    void getById_returnsAttemptNumbers_forRepeatedStageRequests() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request first = helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
+        Request second = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
+        helper.seedTask(first);
+        helper.seedTask(second);
+
+        mockMvc.perform(get(BASE + "/" + rf.getId())
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requests.length()").value(2))
+                .andExpect(jsonPath("$.requests[*].attemptNumber", containsInAnyOrder(2, 1)));
+    }
+
+    @Test
+    @DisplayName("getById_withLinkedReleaseIds_returnsStitchedDetail")
+    void getById_withLinkedReleaseIds_returnsStitchedDetail() throws Exception {
+        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "sit-01", "sit-01", Stage.SIT);
+        Request sitRequest = helper.seedRequest(sitFlow, Stage.SIT, RequestStatus.Pending);
+        helper.seedTask(sitRequest);
+
+        ReleaseFlow prodFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "prod-01", "prod-01", Stage.PROD);
+        Request prodRequest = helper.seedRequest(prodFlow, Stage.PROD, RequestStatus.Pending);
+        helper.seedTask(prodRequest);
+
+        mockMvc.perform(get(BASE + "/" + prodFlow.getId())
+                        .param("linked", sitFlow.getId())
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stitched").value(true))
+                .andExpect(jsonPath("$.linkedReleaseCount").value(2))
+                .andExpect(jsonPath("$.currentStage").value("PROD"))
+                .andExpect(jsonPath("$.requests.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("createFromTemplate_createsRundownAndExposesTemplateTaskMetadata")
+    void createFromTemplate_createsRundownAndExposesTemplateTaskMetadata() throws Exception {
+        String createResponse = mockMvc.perform(post(BASE + "/from-template")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "templateId": "tpl-002",
+                                  "templateName": "AMH-HCC-SIT-TEMPLATE",
+                                  "projectName": "AMH HCC",
+                                  "stage": "SIT",
+                                  "releaseId": "amh-hcc-sit-01",
+                                  "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+                                  "application": "AMH HCC",
+                                  "agent": "Deployment Agent",
+                                  "site": "HK",
+                                  "owner": "Carol Lee",
+                                  "tasks": [
+                                    {
+                                      "category": "release preparation",
+                                      "taskName": "Prepare Deployment Package",
+                                      "step": 1,
+                                      "stepName": "collect sit release files",
+                                      "type": "MANUAL",
+                                      "critical": false,
+                                      "owner": "Carol Lee",
+                                      "estDurationMinutes": 10
+                                    },
+                                    {
+                                      "category": "release",
+                                      "taskName": "Deploy Application",
+                                      "step": 2,
+                                      "stepName": "deploy sit package",
+                                      "type": "AUTO",
+                                      "critical": true,
+                                      "owner": "Carol Lee",
+                                      "estDurationMinutes": 20,
+                                      "dependencies": "Prepare Deployment Package"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.releaseFlowId").isString())
+                .andExpect(jsonPath("$.releaseId").value("amh-hcc-sit-01"))
+                .andExpect(jsonPath("$.stage").value("SIT"))
+                .andExpect(jsonPath("$.taskCount").value(2))
+                .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
+                .andExpect(jsonPath("$.application").value("AMH HCC"))
+                .andExpect(jsonPath("$.agent").value("Deployment Agent"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String flowId = objectMapper.readTree(createResponse).path("releaseFlowId").asText();
+
+        mockMvc.perform(get(BASE + "/" + flowId)
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectName").value("AMH HCC"))
+                .andExpect(jsonPath("$.releaseId").value("amh-hcc-sit-01"))
+                .andExpect(jsonPath("$.currentStage").value("SIT"))
+                .andExpect(jsonPath("$.requests.length()").value(1))
+                .andExpect(jsonPath("$.requests[0].requestStatus").value("Pending"))
+                .andExpect(jsonPath("$.requests[0].site").value("HK"))
+                .andExpect(jsonPath("$.requests[0].owner").value("Carol Lee"))
+                .andExpect(jsonPath("$.requests[0].estimatedRemainingMinutes").value(30))
+                .andExpect(jsonPath("$.requests[0].tasks.length()").value(2))
+                .andExpect(jsonPath("$.requests[0].tasks[0].taskGroupName").value("Prepare Deployment Package"))
+                .andExpect(jsonPath("$.requests[0].tasks[0].taskName").value("collect sit release files"))
+                .andExpect(jsonPath("$.requests[0].tasks[0].category").value("release preparation"))
+                .andExpect(jsonPath("$.requests[0].tasks[1].dependencies").value("Prepare Deployment Package"))
+                .andExpect(jsonPath("$.requests[0].tasks[1].critical").value(true));
+    }
+
+    @Test
+    @DisplayName("createFromTemplate_nonReleaseOperator_returns403")
+    void createFromTemplate_nonReleaseOperator_returns403() throws Exception {
+        mockMvc.perform(post(BASE + "/from-template")
+                        .header("X-User-Id", "emp-009")
+                        .header("X-User-Role", "AUDIT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "templateId": "tpl-002",
+                                  "templateName": "AMH-HCC-SIT-TEMPLATE",
+                                  "projectName": "AMH HCC",
+                                  "stage": "SIT",
+                                  "tasks": [
+                                    {
+                                      "category": "release preparation",
+                                      "taskName": "Prepare Deployment Package",
+                                      "step": 1,
+                                      "stepName": "collect sit release files",
+                                      "type": "MANUAL",
+                                      "critical": false,
+                                      "owner": "Carol Lee",
+                                      "estDurationMinutes": 10
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("createFromTemplate_missingReleaseIdentifier_returns400")
+    void createFromTemplate_missingReleaseIdentifier_returns400() throws Exception {
+        mockMvc.perform(post(BASE + "/from-template")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "templateId": "tpl-002",
+                                  "templateName": "AMH-HCC-SIT-TEMPLATE",
+                                  "projectName": "AMH HCC",
+                                  "stage": "SIT",
+                                  "tasks": [
+                                    {
+                                      "category": "release preparation",
+                                      "taskName": "Prepare Deployment Package",
+                                      "step": 1,
+                                      "stepName": "collect sit release files",
+                                      "type": "MANUAL",
+                                      "critical": false,
+                                      "owner": "Carol Lee",
+                                      "estDurationMinutes": 10
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Release identifier is required."));
+    }
+
+    @Test
+    @DisplayName("createFromTemplate_invalidReleaseIdentifierShape_returns400")
+    void createFromTemplate_invalidReleaseIdentifierShape_returns400() throws Exception {
+        mockMvc.perform(post(BASE + "/from-template")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "templateId": "tpl-002",
+                                  "templateName": "AMH-HCC-SIT-TEMPLATE",
+                                  "projectName": "AMH HCC",
+                                  "stage": "SIT",
+                                  "releaseId": "amh-hcc-uat-00",
+                                  "tasks": [
+                                    {
+                                      "category": "release preparation",
+                                      "taskName": "Prepare Deployment Package",
+                                      "step": 1,
+                                      "stepName": "collect sit release files",
+                                      "type": "MANUAL",
+                                      "critical": false,
+                                      "owner": "Carol Lee",
+                                      "estDurationMinutes": 10
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Release identifier must match xxx-sit-01 / xxx-uat-01 / xxx-prod-01."));
+    }
+
+    @Test
+    @DisplayName("createFromTemplate_releaseIdentifierStageMustMatchSelectedStage")
+    void createFromTemplate_releaseIdentifierStageMustMatchSelectedStage() throws Exception {
+        mockMvc.perform(post(BASE + "/from-template")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "templateId": "tpl-002",
+                                  "templateName": "AMH-HCC-SIT-TEMPLATE",
+                                  "projectName": "AMH HCC",
+                                  "stage": "SIT",
+                                  "releaseId": "amh-hcc-uat-01",
+                                  "tasks": [
+                                    {
+                                      "category": "release preparation",
+                                      "taskName": "Prepare Deployment Package",
+                                      "step": 1,
+                                      "stepName": "collect sit release files",
+                                      "type": "MANUAL",
+                                      "critical": false,
+                                      "owner": "Carol Lee",
+                                      "estDurationMinutes": 10
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Release identifier stage segment must match the selected stage 'SIT'."));
     }
 
     @Test
