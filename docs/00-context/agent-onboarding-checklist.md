@@ -57,7 +57,7 @@ Work through this checklist before raising a shell integration request.
   - Which permission controls entry visibility to this agent on WWA Home?
   - Which permissions are agent-internal (actions within the agent workspace)?
 - [ ] Agent-level roles are defined and documented
-- [ ] Agent permissions are added to the permission taxonomy in `docs/00-context/wwa-permission-taxonomy.md`
+- [ ] Agent permissions are documented in the current source of truth, such as `src/main/java/com/wwa/deploymentagent/contracts/enums/PermissionKey.java`, the agent's spec/design doc, or a future shared platform taxonomy document under `docs/00-context/`
 - [ ] If the agent uses WWA Access Management, confirm that `AccessGrant` `assignedRoles` covers the agent's roles
 - [ ] Deny-by-default: users with no relevant grant should not see the agent card on WWA Home
 
@@ -70,7 +70,7 @@ Work through this checklist before raising a shell integration request.
   - `sourceSystem`: the system that triggered the action (e.g. `wwa-api`)
   - `targetType`: the affected domain object type (e.g. `TestRun`)
   - `targetId`: the affected domain object ID
-- [ ] Agent audit events are classifiable as "Platform Events" or "Agent Activity" using the taxonomy in `docs/00-context/wwa-audit-taxonomy.md`
+- [ ] Agent audit events are classifiable as "Platform Events" or "Agent Activity" using the current audit source of truth, such as `src/main/java/com/wwa/deploymentagent/contracts/enums/AuditActionType.java`, the agent design doc, or a future shared taxonomy document under `docs/00-context/`
 - [ ] Agent does not duplicate platform audit events (e.g. login, access grant changes are owned by WWA)
 
 ---
@@ -97,8 +97,8 @@ Work through this checklist before raising a shell integration request.
 
 - [ ] Agent entry flow tested: `FinBlock link → WWA Home → Agent card → Agent workspace`
 - [ ] Return flow tested: `Agent workspace → WWA Home → FinBlock link`
-- [ ] Existing Deployment Agent workflows are unaffected (run `mvn test` — all 167+ tests pass)
-- [ ] Frontend typecheck passes: `cd frontend && npx vue-tsc --noEmit`
+- [ ] Existing Deployment Agent workflows are unaffected (run `mvn test`)
+- [ ] Frontend verification passes: `cd frontend && npm run build`
 - [ ] No structural changes to `WorkspaceLayout.vue` were required (if changes were needed, treat as shell defects)
 
 ---
@@ -111,9 +111,9 @@ The following shows the completed state for Deployment Agent as the reference im
 |------|--------|
 | Agent name confirmed | ✓ Deployment Agent |
 | Shell registration | ✓ `agentRegistry.ts`, key `deployment-agent` |
-| Route registered | ✓ `/wwa/deployment-agent` in `router/index.ts` |
+| Route registered | ✓ `/wwa/deployment-agent` in `frontend/src/router/index.ts` |
 | WWA Home card | ✓ Rendered via agentRegistry |
 | Permission boundary | ✓ `platform.*` (entry) + `release.*` / `task.*` (agent-private) |
 | Audit fields | ✓ `agentName: "deployment-agent"`, `sourceSystem: "wwa-api"` |
 | Config ownership | ✓ All agent-private (Jenkins, Ansible) |
-| Operational owner | TBD — assign before production |
+| Operational owner | Unassigned — assign before production |

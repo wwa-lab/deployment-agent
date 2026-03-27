@@ -1,10 +1,10 @@
 # Deployment Agent — API Implementation Guide
 
-**Date:** 2026-03-27
-**Version:** 1.3 (current MVP + partial Phase 1 Access Management + template-based rundown creation)
+**Date:** 2026-03-28
+**Version:** 1.4 (current MVP + owner-driven task controls + Phase 1 Access Management + template-based rundown creation)
 **Base Path:** `/api/deployment-agent`
-**Backend:** Java 21 / Spring Boot 3.2.4 / Spring MVC
-**Auth:** Session-based Team Book login with local Access Grant resolution and effective permissions
+**Backend:** Java 21 / Spring Boot 3.2.0 / Spring MVC
+**Auth:** Session-based login via authentication-provider abstraction with local Access Grant resolution and effective permissions
 
 ---
 
@@ -24,28 +24,36 @@ This guide describes the backend API surface for Deployment Agent. It covers the
 
 | Operation | Endpoint | Notes |
 |-----------|----------|-------|
-| Login | `POST /auth/login` | Authenticates enterprise identity; Phase 1 also resolves product access |
+| Login | `POST /auth/login` | Authenticates the current login identity; Phase 1 also resolves product access |
 | Check session | `GET /auth/me` | Returns current authenticated context |
 | Logout | `POST /auth/logout` | Invalidates session |
 
 ### Authentication Chain
 
 1. `AuthController` receives login request
-2. `AuthService` validates credentials via `TeamBookAuthenticationProvider`
+2. `AuthService` validates credentials via the configured authentication provider (`TeamBookAuthenticationProvider` in code)
 3. Access Grant resolution runs after identity authentication
 4. Session stores authenticated user context
 5. `SessionAuthFilter` reconstructs request security context
 6. `HeaderAuthFilter` remains a controlled fallback for tests/local validation
 
+**Current baseline**
+- Local/dev/test environments use the stub provider.
+- Deployment Agent owns product authorization through local Access Grants; Team Book remains a future production-provider option.
+
 ### Roles and Effective Permissions
 
 | Role | Current / Intended Capability |
 |------|-------------------------------|
-| `DEVELOPER` | Upload and monitor Release Flows |
-| `TL` | Reviewer-style workflow actions in the current model |
+| `DEVELOPER` | Upload and monitor Release Flows; may act on tasks or rundowns when assigned as owner |
+| `TL` | Participates in release workflow like other delivery roles; task/rundown mutation is owner-driven rather than TL-only |
 | `DEVOPS_ADMIN` | Workflow management, configuration, archive/restore/purge, and Access Management |
 | `AUDIT` | Read-only audit visibility |
 | `MANAGEMENT` | Read-only audit / management visibility |
+
+**Current operational rule**
+- Task-level mutation endpoints (`edit`, `start-manual`, `record-result`, `submit-auto`, `decision`) are authorized for the task owner or `DEVOPS_ADMIN`, not for TL as a standalone reviewer role.
+- Request-level `start` / `fail` actions are authorized for the rundown owner or `DEVOPS_ADMIN`.
 
 **Phase 1 direction**
 - Product access is no longer “any authenticated user.”
@@ -112,6 +120,7 @@ All errors should return a consistent JSON body:
 | Operation | Method | Endpoint | Auth |
 |-----------|--------|----------|------|
 | List Access Grants | GET | `/access-grants` | DEVOPS_ADMIN |
+| Search enterprise directory | GET | `/access-grants/directory` | DEVOPS_ADMIN |
 | Create Access Grant | POST | `/access-grants` | DEVOPS_ADMIN |
 | Update Access Grant | PATCH | `/access-grants/{employeeId}` | DEVOPS_ADMIN |
 | Suspend Access Grant | POST | `/access-grants/{employeeId}/suspend` | DEVOPS_ADMIN |
@@ -145,6 +154,7 @@ All errors should return a consistent JSON body:
 | Get task detail | GET | `/tasks/{id}` | Any authenticated |
 | Edit task input | PUT | `/tasks/{id}/input` | Task owner or DEVOPS_ADMIN |
 | Get execution history | GET | `/tasks/{id}/executions` | Any authenticated |
+| Start MANUAL execution | POST | `/tasks/{id}/start-manual` | Task owner or DEVOPS_ADMIN |
 | Record MANUAL result | POST | `/tasks/{id}/record-result` | Task owner or DEVOPS_ADMIN |
 | Submit AUTO execution | POST | `/tasks/{id}/submit-auto` | Task owner or DEVOPS_ADMIN |
 
@@ -175,7 +185,7 @@ All errors should return a consistent JSON body:
 
 ### POST /auth/login
 
-Authenticates enterprise identity and creates an HTTP session.
+Authenticates the current login identity and creates an HTTP session.
 
 **Request Body**
 
@@ -203,9 +213,9 @@ Authenticates enterprise identity and creates an HTTP session.
 
 | Status | Code | When |
 |--------|------|------|
-| 401 | `UNAUTHORIZED` | Invalid enterprise credentials |
-| 403 | `ACCESS_NOT_GRANTED` | Valid identity but no Access Grant |
-| 403 | `ACCESS_SUSPENDED` | Valid identity but suspended Access Grant |
+| 401 | `UNAUTHORIZED` | Invalid login credentials |
+| 403 | `ACCESS_NOT_GRANTED` | Valid authenticated identity but no Access Grant |
+| 403 | `ACCESS_SUSPENDED` | Valid authenticated identity but suspended Access Grant |
 
 **Side effects**
 - Creates HTTP session
@@ -278,6 +288,34 @@ Lists product Access Grants for Deployment Agent administration.
   "size": 20
 }
 ```
+
+### GET /access-grants/directory
+
+Searches the authentication-provider directory for enterprise users, including users who do not yet have an Access Grant.
+
+**Query Parameters**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | String | Yes | Employee ID or display-name search term |
+| `limit` | int | No | Result cap; defaults to a bounded backend value |
+
+**Response** `200 OK`
+
+```json
+[
+  {
+    "employeeId": "emp-006",
+    "displayName": "Frank Han (Developer)",
+    "hasAccessGrant": false,
+    "grantStatus": null
+  }
+]
+```
+
+**Notes**
+- Used by the Add User flow in Access Management.
+- Directory search is provider-backed; local/dev behavior comes from the stub Team Book provider.
 
 ### POST /access-grants
 
@@ -647,6 +685,23 @@ Records a MANUAL task result and transitions the task into `Awaiting_Review`.
 - Moves task through execution bookkeeping into review state
 - Records audit entry
 
+### POST /tasks/{id}/start-manual
+
+Transitions a MANUAL task from `Ready_For_Execution` to `Executing`.
+
+**Auth:** Task owner or `DEVOPS_ADMIN`
+
+**Request Body:** None
+
+**Validation**
+- Task must be `MANUAL`
+- Task must be in `Ready_For_Execution`
+
+**Behavior**
+- Marks the task as `Executing`
+- Does not create a result record yet
+- Allows operators to begin a manual step without editing input first
+
 ### POST /tasks/{id}/submit-auto
 
 Submits an AUTO task to Jenkins or Ansible.
@@ -697,7 +752,7 @@ Applies a human decision to a task and triggers progression logic.
 | `approve` | `Awaiting_Review` | Marks task approved and promotes next eligible task |
 | `reject` | `Awaiting_Review` | Marks task rejected and propagates rejected state |
 | `rerun` | `Rejected` or `Failed` | Returns task to `Ready_For_Execution` and creates new attempt context |
-| `skip` | `Pending`, `Ready_For_Execution`, or reviewable state per implementation rules | Skips task and promotes next eligible task |
+| `skip` | `Pending` or `Ready_For_Execution` | Skips task and promotes next eligible task |
 
 **Errors**
 
@@ -826,7 +881,7 @@ Access Grant mutation follows the same optimistic-update discipline through its 
 |------------|----------------------|----------|---------|
 | Jenkins | `jenkins_url`, `jenkins_user`, `jenkins_api_token` | REST + Basic Auth | 10s connect / 30s read |
 | Ansible Tower | `ansible_url`, `ansible_user`, `ansible_api_token` | REST + Bearer Token | 10s connect / 30s read |
-| Team Book | — (stubbed in MVP) | Provider interface | — |
+| Authentication provider (`TeamBookAuthenticationProvider`) | — (stub in current baseline; Team Book adapter optional later) | Provider interface | — |
 
 ---
 

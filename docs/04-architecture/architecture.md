@@ -24,7 +24,7 @@ Shared capabilities (Audit Log, Access Management, Configuration Management) are
 
 ## Overview
 
-Deployment Agent is a controlled, human-in-the-loop release orchestration workspace operating as the first agent workspace within the WWA Agent Workspace Hub. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task reviewers make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants, scoped visibility through `Application + SNOW Group`, and an Access Management MVP.
+Deployment Agent is a controlled, human-in-the-loop release orchestration workspace operating as the first agent workspace within the WWA Agent Workspace Hub. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task owners or admins make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants, scoped visibility through `Application + SNOW Group`, and an Access Management MVP.
 
 **Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a deny-by-default authorization layer that combines platform entry grants with scoped visibility governance.
 
@@ -37,10 +37,10 @@ Deployment Agent is a controlled, human-in-the-loop release orchestration worksp
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Vue 3 (Composition API) · Vite 5 · Pinia · Vue Router 4 · Axios |
-| Backend | Java 21 · Spring Boot 3.2.4 · Spring MVC · Spring Data JPA · Spring Security |
+| Backend | Java 21 · Spring Boot 3.2.0 · Spring MVC · Spring Data JPA · Spring Security |
 | Database | Oracle (production) · H2 in-memory (tests) |
 | Build | Maven 3 (backend) · npm (frontend) |
-| Auth | Session-based login (Team Book provider) with header fallback for tests |
+| Auth | Session-based login via authentication-provider abstraction with header fallback for tests |
 
 ---
 
@@ -86,13 +86,14 @@ Deployment Agent is a controlled, human-in-the-loop release orchestration worksp
                │                      │ REST (fire-and-forget)
                ▼                      ▼
 ┌──────────────────────┐  ┌───────────────────────┐  ┌────────────────┐
-│  Oracle DB           │  │  Jenkins              │  │  Team Book     │
+│  Oracle DB           │  │  Jenkins              │  │  Configured    │
 │                      │  │  + Ansible Tower      │  │  Auth Provider │
-│  7 implemented       │  │                       │  │  (stub for MVP)│
-│  entities including  │  │  Jenkins: Basic Auth │  │                │
-│  access grants       │  │  Ansible: Bearer     │  │                │
-│  CLOB for JSON cols  │  │  10s connect / 30s   │  │                │
-│  Append-only audit   │  │  read timeout        │  │                │
+│  7 implemented       │  │                       │  │  (stub today,  │
+│  entities including  │  │  Jenkins: Basic Auth │  │  optional Team │
+│  workflow, audit,    │  │  Ansible: Bearer     │  │  Book adapter  │
+│  access grants, and  │  │  10s connect / 30s   │  │  later)        │
+│  CLOB for JSON cols  │  │  read timeout        │  │                │
+│  Append-only audit   │  │                       │  │                │
 └──────────────────────┘  └───────────────────────┘  └────────────────┘
 ```
 
@@ -107,7 +108,7 @@ Deployment Agent is a controlled, human-in-the-loop release orchestration worksp
 | C3 | Editable task statuses limited to `Pending` and `Ready_For_Execution` | Spec §7.7 |
 | C4 | Import is atomic at file level — all rows succeed or fail together | Spec FR-14 |
 | C5 | No auto-progression after execution without explicit human decision | Spec FR-53 |
-| C6 | Single review owner per Release Flow | Spec §9.1 |
+| C6 | Task and rundown mutation is owner-driven with `DEVOPS_ADMIN` override rather than TL-only review control | Spec §7.8 / Spec §9.1 |
 | C7 | Task reruns preserve same `task_id`; new execution history per attempt | Spec §9.4 |
 | C8 | Deployment Agent product entry is deny-by-default in Phase 1 | Spec FR-70 |
 | C9 | Product access and scoped visibility are managed through local Access Grants rather than a separate user account system | Spec US-21 / US-24 |
@@ -117,11 +118,11 @@ Deployment Agent is a controlled, human-in-the-loop release orchestration worksp
 
 | Decision | Resolution |
 |----------|-----------|
-| Auto-execution trigger | User-triggered: reviewer starts Run / records MANUAL result |
+| Auto-execution trigger | User-triggered: task owner or admin starts Run / records MANUAL result |
 | Secret store | Jenkins/Ansible credentials stored in config table; no external vault for MVP |
 | Execution callbacks | Deferred — MVP uses fire-and-forget; task stays in `Executing` after submission |
 | Result log storage | Full logs stay in Jenkins/Ansible; DA stores external job URL for click-through |
-| Authentication | Session-based Team Book login; stub provider for dev/test |
+| Authentication | Session-based login via configured authentication provider; stub provider for local/dev/test |
 | Product entry authorization | Phase 1 uses local Access Grants with deny-by-default semantics |
 
 ---
@@ -219,12 +220,12 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 - **Timeout:** 10s connect / 30s read
 - **Job URL:** Points to AWX UI (`/#/jobs/playbook/{id}`), not API
 
-### Team Book (Authentication)
+### Authentication Provider Boundary
 
-- **Pattern:** Interface-based provider
-- **MVP:** StubTeamBookAuthenticationProvider — 5 hardcoded users, any password
-- **Production:** Pending Team Book API contract (endpoint URL, request/response format, enterprise identity mapping)
-- **Responsibility boundary:** Team Book authenticates enterprise identity; Deployment Agent resolves product access through its own Access Grant store
+- **Pattern:** Interface-based provider (`TeamBookAuthenticationProvider` naming retained in code)
+- **Current baseline:** `StubTeamBookAuthenticationProvider` is active in local/dev/test and supplies both login fixtures and directory-search fixtures
+- **Future production option:** Team Book adapter once enterprise contract details are finalized
+- **Responsibility boundary:** Deployment Agent maintains product authorization through its own local Access Grant store
 
 ### Access Grant Resolution (Phase 1)
 
@@ -243,6 +244,7 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | GET | /auth/me | Current user | Session |
 | POST | /auth/logout | End session | Session |
 | GET | /access-grants | List access grants | DEVOPS_ADMIN |
+| GET | /access-grants/directory | Search provider-backed employee directory | DEVOPS_ADMIN |
 | POST | /access-grants | Create access grant with roles / scope grants | DEVOPS_ADMIN |
 | PATCH | /access-grants/{employeeId} | Update roles / scope grants / metadata | DEVOPS_ADMIN |
 | POST | /access-grants/{employeeId}/suspend | Suspend product access | DEVOPS_ADMIN |
@@ -254,6 +256,7 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | GET | /tasks/{id} | Task detail | Any |
 | PUT | /tasks/{id}/input | Edit task input | Task owner or DEVOPS_ADMIN |
 | GET | /tasks/{id}/executions | Execution history | Any |
+| POST | /tasks/{id}/start-manual | Start MANUAL task | Task owner or DEVOPS_ADMIN |
 | POST | /tasks/{id}/record-result | Record MANUAL result | Task owner or DEVOPS_ADMIN |
 | POST | /tasks/{id}/submit-auto | Submit AUTO task | Task owner or DEVOPS_ADMIN |
 | POST | /tasks/{id}/decision | Apply decision | Task owner or DEVOPS_ADMIN |
@@ -269,7 +272,7 @@ All endpoints prefixed with `/api/deployment-agent`.
 
 - **Session management:** `IF_REQUIRED` — session created on login, read by SessionAuthFilter
 - **Filter chain:** SessionAuthFilter → HeaderAuthFilter (test fallback) → Spring Security
-- **Authentication / authorization split:** Team Book provides enterprise identity; local Access Grants provide product entry authorization, effective roles, and `Application + SNOW Group` scope grants for Phase 1
+- **Authentication / authorization split:** the configured auth provider validates login identity; local Access Grants provide product entry authorization, effective roles, and `Application + SNOW Group` scope grants for Phase 1
 - **RBAC / permissions:** Enforced server-side in controllers and domain services; frontend route guards and UI visibility must align with the same effective permissions
 - **Global admin rule:** `DEVOPS_ADMIN` with an empty scope list is treated as a global admin context
 - **CSRF:** Disabled (REST API with session cookies)
@@ -281,6 +284,6 @@ All endpoints prefixed with `/api/deployment-agent`.
 
 ## Pending External Dependencies
 
-1. **Team Book API contract** — endpoint URL, request/response format, enterprise identity lookup rules
+1. **Future Team Book adapter contract** — endpoint URL, request/response format, enterprise identity lookup rules if the production path adopts Team Book
 2. **Jenkins/Ansible credentials** — entered at runtime via Config admin page
-3. **Enterprise directory expansion** — confirm whether a later phase should extend Access Management beyond the current existing-grants-only search scope
+3. **Enterprise directory enrichment** — confirm whether a later phase should extend Access Management beyond the current provider-backed directory search and manual display-name fallback

@@ -378,7 +378,7 @@ UAT should not be marked ready unless all of the following are true:
 ## 10. Known Limitations To Disclose During UAT
 
 - Current UAT auth is expected to use the stub Team Book provider unless a real provider is separately implemented.
-- The repository does not currently provide a complete baseline Oracle schema script alongside the incremental migration files.
+- The repository now provides a fresh-schema Oracle baseline script in `docs/sql/ORACLE_CURRENT_SCHEMA.sql`; a separate DBA validation or upgrade checklist is still recommended for non-empty environments.
 - Configuration Management is not yet a fully implemented per-scope override model.
 - Execution Target Catalog is not implemented yet.
 

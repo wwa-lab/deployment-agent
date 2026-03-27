@@ -1,7 +1,7 @@
 # Data Flow: Deployment Agent
 
 > **Source**: architecture.md, spec.md, design.md
-> **Last updated**: 2026-03-24
+> **Last updated**: 2026-03-28
 
 ---
 
@@ -84,12 +84,15 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Reviewer[Task Owner / DevOps Admin] -->|Records result| API[POST /tasks/:id/record-result]
-    API --> RRS[RecordResultService]
-    RRS --> SM[TaskStateMachine<br/>validates transition]
-    RRS --> TEH[(TaskExecutionHistory<br/>result_summary + result_logs)]
-    RRS --> T[(Task<br/>status → Awaiting_Review)]
-    RRS --> AL[(AuditLogEntry<br/>action: record_result)]
+    Operator["Task Owner / DevOps Admin"] -->|Run| StartAPI["POST /tasks/:id/start-manual"]
+    StartAPI --> TS["TaskService.startManualExecution"]
+    TS --> StartState["Task status -> Executing"]
+
+    Operator -->|Record Result| ResultAPI["POST /tasks/:id/record-result"]
+    ResultAPI --> RRS["RecordResultService"]
+    RRS --> TEH[("TaskExecutionHistory\nresult_summary + result_logs")]
+    RRS --> ReviewState["Task status -> Awaiting_Review"]
+    RRS --> AL[("AuditLogEntry\naction: record_result")]
 ```
 
 ### 2.2 AUTO Execution
@@ -170,10 +173,10 @@ Statuses bubble up from Task → Request → ReleaseFlow using pure functions in
 
 ```mermaid
 flowchart LR
-    User[User Browser] -->|POST /auth/login<br/>employeeId + password| Auth[AuthController]
-    Auth --> AS[AuthService]
-    AS --> TB[TeamBookAuthProvider]
-    TB -->|Stub: hardcoded 5 users<br/>Prod: Team Book API| Validate{Valid?}
+    User["User Browser"] -->|POST /auth/login<br/>employeeId + password| Auth["AuthController"]
+    Auth --> AS["AuthService"]
+    AS --> Provider["Configured Authentication Provider"]
+    Provider -->|Current: stub provider<br/>Future: Team Book adapter| Validate{"Valid credentials?"}
     Validate -->|Yes| AG[AccessGrant Resolution<br/>deny-by-default]
     Validate -->|No| Err[401 Unauthorized]
 
@@ -206,7 +209,7 @@ flowchart LR
 
 ### 4.2 Authorization Resolution Notes
 
-- Authentication confirms enterprise identity through Team Book
+- Authentication confirms login identity through the configured provider abstraction
 - Authorization then resolves local product access and `Application + SNOW Group` visibility through Access Grants
 - Users without an active Access Grant are blocked before entering the Deployment Agent workspace
 - Frontend route visibility and backend endpoint access are expected to use the same effective permission set and scope evaluation in Phase 1
@@ -248,21 +251,17 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    subgraph Sources["Audit Event Sources"]
-        Upload[Upload/Import]
-        Edit[Task Edit]
-        Result[Run / Record Result]
-        Decision[Decision]
-        AutoSub[Auto Submit]
-        Config[Config Update]
-        Access[Access Grant Create / Update / Suspend / Reactivate]
-    end
+    Upload["Upload/Import"] --> ALS["AuditLoggerService\nREQUIRES_NEW propagation"]
+    Edit["Task Edit"] --> ALS
+    Result["Run / Record Result"] --> ALS
+    Decision["Decision"] --> ALS
+    AutoSub["Auto Submit"] --> ALS
+    Config["Config Update"] --> ALS
+    Access["Access Grant Create / Update / Suspend / Reactivate"] --> ALS
 
-    Sources -->|AuditLoggerService.log()| ALS[AuditLoggerService<br/>REQUIRES_NEW propagation]
     ALS --> DB[(DA_AUDIT_LOG_ENTRY)]
-
-    DB --> AuditAPI[GET /audit-logs<br/>signed-in users, filtered by scope]
-    AuditAPI --> AuditView[Audit Log View<br/>read-only list]
+    DB --> AuditAPI["GET /audit-logs\nsigned-in users, filtered by scope"]
+    AuditAPI --> AuditView["Audit Log View\nread-only list"]
 ```
 
 ### Audit Entry Structure
@@ -292,17 +291,17 @@ flowchart TD
 
 ```mermaid
 flowchart TB
-    Login[Enterprise Login] --> Authz[Access Grant Resolution]
+    Login[Workspace Login] --> Authz[Access Grant Resolution]
     Authz -->|Authorized| Excel[Excel Upload]
     Authz -->|Denied| Blocked[Access Denied]
     Excel --> Import[Import Pipeline]
     Import --> RF[ReleaseFlow + Request + Tasks]
     RF --> Execution{Execution Path}
-    Execution -->|MANUAL| Manual[Reviewer records result]
+    Execution -->|MANUAL| Manual[Owner/Admin records result]
     Execution -->|AUTO| Auto[Submit to Jenkins/Ansible]
     Manual --> Review[Awaiting Review]
     Auto --> Review
-    Review --> Decision[Reviewer Decision]
+    Review --> Decision[Owner/Admin Decision]
     Decision -->|Approve/Skip| Progress[Progression Engine]
     Decision -->|Reject| Terminal[Flow Terminated]
     Decision -->|Rerun| Execution

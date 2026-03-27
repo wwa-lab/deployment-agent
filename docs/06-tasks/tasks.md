@@ -298,7 +298,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 - The auth/session contract is now fixed to compatibility `role` plus `roles[]`, `permissions[]`, and `scopes[]`; the remaining risk is incomplete enforcement across older workflow surfaces.
 - Deny-by-default requires a safe first-admin bootstrap path; without it, rollout can lock everyone out of the product.
 - Team Book production contract details may block completion of the real provider adapter.
-- Access Management currently searches existing grants only; expanding into enterprise directory search would materially change the backend/API/UI scope.
+- Access Management now supports provider-backed directory search plus manual display-name fallback; future enterprise sync or richer directory attributes would still materially change the backend/API/UI scope.
 - Existing workflow authorization logic may contain scattered assumptions that are easy to miss during migration to effective permissions.
 
 ---
@@ -306,6 +306,6 @@ This document breaks the updated Deployment Agent design into implementation-rea
 ## Open Questions
 
 1. What is the approved production bootstrap mechanism for the first `DEVOPS_ADMIN` under deny-by-default rules?
-2. Should a later phase expand Access Management beyond existing-grants-only search into enterprise user lookup?
+2. Should a later phase expand Access Management beyond the current provider-backed directory search and manual display-name fallback into broader enterprise user sync?
 3. Are grant updates required to capture a mandatory admin note for governance purposes?
 4. Should a later phase extend Access Management beyond the current product-entry grant plus `Application + SNOW Group` scope model into agent- or environment-scoped authorization?

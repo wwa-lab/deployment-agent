@@ -7,6 +7,8 @@
 
 **Naming note:** In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the platform layer above individual agent workspaces.
 
+> Historical planning artifact. This draft captured the transition plan before the WWA shell work fully landed. The "Current State Assessment" section is not the current source of truth for today's repo; use `README.md`, `frontend/src/router/index.ts`, and the current shell views for present-state behavior.
+
 ---
 
 ## 1. Current State Assessment
@@ -142,9 +144,9 @@
 
 | Action | File |
 |--------|------|
-| Add platform permission keys | `src/main/java/.../contracts/enums/PermissionKey.java` — add `PLATFORM_ENTER("platform.enter")`, `PLATFORM_ACCESS_MANAGE("platform.access.manage")`, `PLATFORM_AUDIT_VIEW("platform.audit.view")` |
-| Update PermissionResolver | `src/main/java/.../domain/auth/PermissionResolver.java` — map platform permissions to DEVOPS_ADMIN and appropriate roles |
-| Document permission taxonomy | `docs/00-context/wwa-permission-taxonomy.md` (create) — table showing platform-level vs agent-level permissions per role |
+| Add platform permission keys | `src/main/java/com/wwa/deploymentagent/contracts/enums/PermissionKey.java` — add `PLATFORM_ENTER("platform.enter")`, `PLATFORM_ACCESS_MANAGE("platform.access.manage")`, `PLATFORM_AUDIT_VIEW("platform.audit.view")` |
+| Update PermissionResolver | `src/main/java/com/wwa/deploymentagent/domain/auth/PermissionResolver.java` — map platform permissions to DEVOPS_ADMIN and appropriate roles |
+| Document permission taxonomy | Add or update a platform permission taxonomy note under `docs/00-context/` — table showing platform-level vs agent-level permissions per role |
 
 **Change description:** `AUDIT_VIEW` and `ACCESS_MANAGE` are currently agent-scoped keys used to gate shared platform pages. The intent must be clarified: platform-level visibility (entry and shared capability access) should eventually be owned by `platform.*` keys, while `release.*`, `task.*`, `config.*` remain agent-private. For backward compatibility in Phase 1, existing keys may remain; the new platform keys are additive.
 
@@ -158,8 +160,8 @@
 |--------|------|
 | Update page header wording | `frontend/src/views/AccessManagementView.vue` — change page title from "Access Management" (Deployment Agent implied) to "WWA Access Management" with subtitle "Controls platform entry and agent workspace visibility" |
 | Add scope concept to UI | `frontend/src/views/AccessManagementView.vue` — add column or badge showing which access grants are platform-wide versus agent-scoped |
-| Update Javadoc | `src/main/java/.../domain/auth/AccessGrant.java` — add class-level Javadoc clarifying the `scopeGrants` field and its intended multi-agent evolution |
-| Update API endpoint path | `src/main/java/.../web/controller/AccessGrantController.java` — consider moving from `/api/deployment-agent/access-grants` to `/api/wwa/access-grants` (coordinate with WWA-013 API prefix work) |
+| Update Javadoc | `src/main/java/com/wwa/deploymentagent/domain/auth/AccessGrant.java` — add class-level Javadoc clarifying the `scopeGrants` field and its intended multi-agent evolution |
+| Update API endpoint path | `src/main/java/com/wwa/deploymentagent/web/controller/AccessGrantController.java` — consider moving from `/api/deployment-agent/access-grants` to `/api/wwa/access-grants` (coordinate with WWA-013 API prefix work) |
 
 **Change description:** The data model (`AccessGrant` with `assignedRoles` + `scopeGrants`) is already extensible. This task is primarily a wording and conceptual reframe, not a data schema change. Do not break the 167 existing tests.
 
@@ -171,11 +173,11 @@
 
 | Action | File |
 |--------|------|
-| Add standard audit fields | `src/main/java/.../domain/audit/AuditLogEntry.java` — add `agentName VARCHAR(255)`, `targetType VARCHAR(100)`, `targetId VARCHAR(36)`, `sourceSystem VARCHAR(100)` columns |
-| Add schema migration | `src/main/resources/db/migration/` or `src/test/resources/schema.sql` — add `ALTER TABLE DA_AUDIT_LOG_ENTRY ADD ...` DDL for new columns |
-| Update H2 test schema | `src/test/resources/schema.sql` — add the same columns so existing tests do not break |
-| Update AuditLoggerService | `src/main/java/.../domain/audit/AuditLoggerService.java` — populate `agentName` = "deployment-agent" on all log calls |
-| Document audit taxonomy | `docs/00-context/wwa-audit-taxonomy.md` (create) — table separating platform audit events from agent activity events |
+| Add standard audit fields | `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLogEntry.java` — add `agentName VARCHAR(255)`, `targetType VARCHAR(100)`, `targetId VARCHAR(36)`, `sourceSystem VARCHAR(100)` columns |
+| Add schema migration | `src/main/resources/db/migration/` or equivalent test schema/bootstrap setup — add `ALTER TABLE DA_AUDIT_LOG_ENTRY ADD ...` DDL for new columns |
+| Update H2 test schema | test schema/bootstrap setup — add the same columns so existing tests do not break |
+| Update AuditLoggerService | `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLoggerService.java` — populate `agentName` = "deployment-agent" on all log calls |
+| Document audit taxonomy | Add or update an audit taxonomy note under `docs/00-context/` — separate platform audit events from agent activity events |
 
 **Change description:** The existing `agent` column (free-text, line 75 of `AuditLogEntry.java`) partially covers `agentName`. Rename or supplement it rather than add a duplicate. The new fields (`targetType`, `targetId`, `sourceSystem`) must be nullable so existing log calls do not need to be updated immediately.
 
@@ -189,7 +191,7 @@
 |--------|------|
 | Add filter tabs to audit view | `frontend/src/views/AuditLogView.vue` — add "Platform Events" and "Agent Activity" tabs; platform tab filters by `actionType IN (LOGIN, LOGOUT, ACCESS_GRANT_*, PLATFORM_*)`, agent tab shows the rest |
 | Update audit store | `frontend/src/stores/audit.ts` — add `scope` parameter to fetch calls |
-| Update audit API | `src/main/java/.../web/controller/AuditLogController.java` — accept optional `scope=platform|agent` query param |
+| Update audit API | `src/main/java/com/wwa/deploymentagent/web/controller/AuditLogController.java` — accept optional `scope=platform|agent` query param |
 
 **Change description:** Keep all events in the same `DA_AUDIT_LOG_ENTRY` table for now. The split is a view-level filter, not a physical separation. This avoids breaking existing queries.
 
@@ -201,7 +203,7 @@
 
 | Action | File |
 |--------|------|
-| Add config scope annotation | `src/main/java/.../contracts/enums/ConfigKey.java` — rename enum to add comments: `// Agent-private: Deployment Agent execution` above Jenkins/Ansible keys; add `// Platform-shared: reserved for future use` section |
+| Add config scope annotation | `src/main/java/com/wwa/deploymentagent/contracts/enums/ConfigKey.java` — rename enum to add comments: `// Agent-private: Deployment Agent execution` above Jenkins/Ansible keys; add `// Platform-shared: reserved for future use` section |
 | Update config UI wording | `frontend/src/views/ConfigAdminView.vue` — add section header "Deployment Agent Configuration" above the Jenkins/Ansible settings |
 
 **Change description:** All 7 current `ConfigKey` values (`jenkins_url`, `jenkins_user`, `jenkins_api_token`, `ansible_url`, `ansible_user`, `ansible_api_token`, `execution_callback_endpoint`) are agent-private. No config key belongs to the platform layer yet. Document this as an explicit decision.
@@ -270,7 +272,7 @@
 
 | Action | File |
 |--------|------|
-| Create shell acceptance test | `src/test/java/.../web/WwaShellAccessTest.java` (create) |
+| Create shell acceptance test | `src/test/java/com/wwa/deploymentagent/web/WwaShellAccessTest.java` (create) |
 | Test: unauthenticated redirect | Assert GET `/wwa/home` (via API session) redirects to login |
 | Test: authenticated home routing | Assert authenticated user with DEVELOPER role has access |
 | Test: shared capability access | Assert AUDIT role can reach audit log but not access management |
@@ -302,7 +304,7 @@
 |--------|------|
 | Add second agent to registry | `frontend/src/config/agentRegistry.ts` — add `Testing Agent` entry with `enabled: false` initially |
 | Define access rules | `docs/00-context/agent-onboarding-checklist.md` — complete checklist for Testing Agent |
-| Confirm platform audit participation | `docs/00-context/wwa-audit-taxonomy.md` — add Testing Agent audit event types |
+| Confirm platform audit participation | add Testing Agent audit event types in the current audit taxonomy note under `docs/00-context/` |
 
 **Change description:** Testing Agent is the obvious pilot candidate. No Testing Agent code is written in this task — this task is preparation and metadata only.
 
@@ -316,7 +318,7 @@
 |--------|------|
 | Enable second agent in registry | `frontend/src/config/agentRegistry.ts` — set `enabled: true` for Testing Agent |
 | Add Testing Agent route | `frontend/src/router/index.ts` — add `/wwa/testing-agent` route |
-| Create stub Testing Agent view | `frontend/src/views/TestingAgentView.vue` (create) — minimal placeholder |
+| Create stub Testing Agent view | add a future minimal `Testing Agent` placeholder view under `frontend/src/views/` |
 | Verify shell shows agent card | `frontend/src/views/WwaHomeView.vue` — confirm registry-driven card renders |
 | Verify no custom shell changes needed | `frontend/src/views/WorkspaceLayout.vue` — if changes are required, treat as platform bugs to fix |
 
@@ -393,9 +395,9 @@ The governance definition tasks (WWA-007, WWA-009, WWA-011, WWA-012) depend only
 |------|-----------------|--------|
 | WWA-005 | `frontend/src/views/WorkspaceLayout.vue` | M |
 | WWA-006 | `frontend/src/views/WorkspaceLayout.vue`, `frontend/src/config/platformConfig.ts` (create) | S |
-| WWA-007 | `src/main/java/.../contracts/enums/PermissionKey.java`, `PermissionResolver.java` | M |
-| WWA-009 | `src/main/java/.../domain/audit/AuditLogEntry.java`, `AuditLoggerService.java` | M |
-| WWA-011 | `src/main/java/.../contracts/enums/ConfigKey.java`, `frontend/src/views/ConfigAdminView.vue` | S |
+| WWA-007 | `src/main/java/com/wwa/deploymentagent/contracts/enums/PermissionKey.java`, `src/main/java/com/wwa/deploymentagent/domain/auth/PermissionResolver.java` | M |
+| WWA-009 | `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLogEntry.java`, `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLoggerService.java` | M |
+| WWA-011 | `src/main/java/com/wwa/deploymentagent/contracts/enums/ConfigKey.java`, `frontend/src/views/ConfigAdminView.vue` | S |
 | WWA-012 | `docs/00-context/wwa-product-positioning.md`, `frontend/src/router/index.ts` comment | S |
 
 **Coordination note:** WWA-005 and WWA-006 both touch `WorkspaceLayout.vue`. Assign to one engineer or merge carefully.
@@ -433,7 +435,7 @@ Both can run in parallel since they touch different files.
 
 | Task | Primary file(s) | Effort |
 |------|-----------------|--------|
-| WWA-016 | `src/test/java/.../web/WwaShellAccessTest.java` (create) | M |
+| WWA-016 | `src/test/java/com/wwa/deploymentagent/web/WwaShellAccessTest.java` (create) | M |
 
 ---
 
@@ -454,7 +456,7 @@ Both can run in parallel since they touch different files.
 
 | Task | Primary file(s) | Effort |
 |------|-----------------|--------|
-| WWA-019 | `frontend/src/config/agentRegistry.ts`, `frontend/src/router/index.ts`, `frontend/src/views/TestingAgentView.vue` (create) | L |
+| WWA-019 | `frontend/src/config/agentRegistry.ts`, `frontend/src/router/index.ts`, a future `Testing Agent` placeholder view under `frontend/src/views/` | L |
 | WWA-020 | `docs/00-context/multi-agent-integration-standard.md`, `docs/00-context/agent-onboarding-checklist.md` | M |
 
 ---
@@ -543,10 +545,10 @@ Files touched by the most tasks across all batches:
 | `frontend/src/views/WorkspaceLayout.vue` | WWA-005, WWA-006, WWA-013 | Shell hub: nav, breadcrumbs, logo, FinBlock link, `isWwaExpanded` bug fix |
 | `frontend/src/router/index.ts` | WWA-002, WWA-003, WWA-012, WWA-013, WWA-019 | Route definitions and redirect defaults |
 | `frontend/src/config/agentRegistry.ts` | WWA-004, WWA-018, WWA-019 | Agent registry: all dynamic nav and home card rendering depends on this |
-| `src/main/java/.../contracts/enums/PermissionKey.java` | WWA-007 | Platform permission keys affect `PermissionResolver`, `TaskPermissionService`, and all auth checks |
-| `src/main/java/.../domain/auth/PermissionResolver.java` | WWA-007 | Role-to-permission mapping; changes here affect all 167 auth-related tests |
-| `src/main/java/.../domain/audit/AuditLogEntry.java` | WWA-009 | New columns require H2 test schema update and `AuditLoggerService` changes |
-| `src/test/resources/schema.sql` | WWA-009, WWA-016 | Test database schema must stay in sync with entity changes |
+| `src/main/java/com/wwa/deploymentagent/contracts/enums/PermissionKey.java` | WWA-007 | Platform permission keys affect `PermissionResolver`, `TaskPermissionService`, and all auth checks |
+| `src/main/java/com/wwa/deploymentagent/domain/auth/PermissionResolver.java` | WWA-007 | Role-to-permission mapping; changes here affect all 167 auth-related tests |
+| `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLogEntry.java` | WWA-009 | New columns require test-schema/bootstrap updates and `AuditLoggerService` changes |
+| test schema/bootstrap setup | WWA-009, WWA-016 | Test database schema must stay in sync with entity changes |
 | `docs/00-context/multi-agent-integration-standard.md` | WWA-015, WWA-020 | The authoritative contract for agent onboarding |
 
 ---
@@ -556,12 +558,12 @@ Files touched by the most tasks across all batches:
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
 | `WorkspaceLayout.vue` concurrent edits cause merge conflicts | High | Medium | Assign all WorkspaceLayout changes in Batch 3 to one engineer; split other Batch 3 work to separate engineers |
-| `AuditLogEntry` schema change breaks existing H2 tests | Medium | High | Add new columns as nullable; update `src/test/resources/schema.sql` in the same commit as the entity change; verify `mvn test` before merging |
+| `AuditLogEntry` schema change breaks existing H2 tests | Medium | High | Add new columns as nullable; update the test schema/bootstrap setup in the same commit as the entity change; verify `mvn test` before merging |
 | `PermissionResolver` change causes silent auth regressions | Medium | High | Add new platform permission keys only; do not remove or rename existing keys until Phase 3; run `mvn test` after every change |
 | Default route change (`/` → `/wwa/home`) breaks bookmarked URLs | Low | Low | Keep legacy redirects for `/release-flows` and `/release-flows/:id` (already present in router) |
 | WWA home page is slow to render (agent cards async) | Low | Low | Use static registry in Phase 1; no API calls needed for home page |
 | Second agent (WWA-019) requires unexpected shell changes | Medium | High | If shell changes are needed, fix as defects in WWA-005/WWA-013 regression, not as normal scope for WWA-019 |
-| `isWwaExpanded` bug causes visual glitch until fixed | Current bug | Low | Fix in WWA-005 Batch 3 immediately; it is a one-line declaration |
+| Historical `isWwaExpanded` bug caused a visual glitch until fixed | Draft-time issue | Low | Fix in WWA-005 Batch 3 immediately; it is a one-line declaration |
 | Template Management prematurely refactored | Low | Medium | WWA-012 decision record must be visible to all engineers before Batch 3 begins |
 
 ---
@@ -610,13 +612,13 @@ All file paths referenced in this plan have been verified against the current re
 | `frontend/src/views/AuditLogView.vue` | ✓ |
 | `frontend/src/views/AccessManagementView.vue` | ✓ |
 | `frontend/src/views/ConfigAdminView.vue` | ✓ |
-| `src/main/java/.../contracts/enums/PermissionKey.java` | ✓ |
-| `src/main/java/.../domain/auth/PermissionResolver.java` | ✓ |
-| `src/main/java/.../domain/audit/AuditLogEntry.java` | ✓ |
-| `src/main/java/.../domain/audit/AuditLoggerService.java` | ✓ |
-| `src/main/java/.../contracts/enums/ConfigKey.java` | ✓ |
-| `src/main/java/.../web/controller/AccessGrantController.java` | ✓ |
-| `src/main/java/.../web/controller/AuditLogController.java` | ✓ |
+| `src/main/java/com/wwa/deploymentagent/contracts/enums/PermissionKey.java` | ✓ |
+| `src/main/java/com/wwa/deploymentagent/domain/auth/PermissionResolver.java` | ✓ |
+| `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLogEntry.java` | ✓ |
+| `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLoggerService.java` | ✓ |
+| `src/main/java/com/wwa/deploymentagent/contracts/enums/ConfigKey.java` | ✓ |
+| `src/main/java/com/wwa/deploymentagent/web/controller/AccessGrantController.java` | ✓ |
+| `src/main/java/com/wwa/deploymentagent/web/controller/AuditLogController.java` | ✓ |
 | `docs/04-architecture/architecture.md` | ✓ |
 | `docs/05-design/design.md` | ✓ |
 | `docs/00-context/multi-agent-integration-standard.md` | ✓ |
@@ -628,9 +630,9 @@ All file paths referenced in this plan have been verified against the current re
 | `frontend/src/views/WwaHomeView.vue` | To create (WWA-002) |
 | `frontend/src/config/agentRegistry.ts` | To create (WWA-004) |
 | `frontend/src/config/platformConfig.ts` | To create (WWA-006) |
-| `frontend/src/views/TestingAgentView.vue` | To create (WWA-019) |
-| `src/test/java/.../web/WwaShellAccessTest.java` | To create (WWA-016) |
+| future `Testing Agent` placeholder view under `frontend/src/views/` | To create (WWA-019) |
+| `src/test/java/com/wwa/deploymentagent/web/WwaShellAccessTest.java` | To create (WWA-016) |
 | `docs/00-context/wwa-product-positioning.md` | To create (WWA-001) |
-| `docs/00-context/wwa-permission-taxonomy.md` | To create (WWA-007) |
-| `docs/00-context/wwa-audit-taxonomy.md` | To create (WWA-009) |
+| platform permission taxonomy note under `docs/00-context/` | To create (WWA-007) |
+| platform audit taxonomy note under `docs/00-context/` | To create (WWA-009) |
 | `docs/00-context/agent-onboarding-checklist.md` | To create (WWA-015) |

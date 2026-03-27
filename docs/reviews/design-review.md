@@ -1,5 +1,7 @@
 # Design Review — Deployment Agent Frontend (2026-03-23)
 
+> Historical review snapshot. Updated on 2026-03-28 to keep file references and clearly resolved issues aligned with the current repository. Treat unresolved items here as dated findings, not as the sole current source of truth.
+
 ## Scope
 
 Review of the current frontend implementation against the updated user stories (1–20), CHANGELOG, and architectural intent. Covers code quality, design gaps, and alignment issues.
@@ -26,19 +28,19 @@ The frontend is well-structured with clear separation of concerns (views / compo
 
 **Recommendation**:
 1. Define backend REST endpoints for templates (`POST/GET/PUT/DELETE /api/deployment-agent/templates`).
-2. Create `frontend/src/api/templates.ts` with CRUD functions.
-3. Add a `template` Pinia store similar to `releaseFlow` store.
+2. Add a dedicated templates API module under `frontend/src/api/`.
+3. Add a dedicated template Pinia store under `frontend/src/stores/`, similar to `releaseFlow`.
 4. Remove hardcoded sample template data from the view component.
 
 ---
 
-### H2. `isWwaExpanded` variable referenced but not defined in WorkspaceLayout
+### H2. Historical navigation bug — `isWwaExpanded` was referenced before it was defined
 
 **Location**: `frontend/src/views/WorkspaceLayout.vue` (lines ~175, ~196)
 
-**Problem**: The template references `isWwaExpanded` but the actual reactive variable is `isWwaFlyoutOpen`. This causes a silent rendering failure — the flyout expansion indicator and CSS class never activate.
+**Problem at review time**: The template referenced `isWwaExpanded` but the actual reactive variable was `isWwaFlyoutOpen`. This caused a silent rendering failure — the flyout expansion indicator and CSS class never activated.
 
-**Recommendation**: Replace `isWwaExpanded` with `isWwaFlyoutOpen` in the template bindings.
+**Current status (2026-03-28)**: This issue has since been resolved. `WorkspaceLayout.vue` now defines `isWwaExpanded` as a computed alias of `isWwaFlyoutOpen`.
 
 ---
 
@@ -76,7 +78,7 @@ Note: This is a defense-in-depth concern. Backend API authorization is the prima
 
 **Problem**: Unlike releaseFlow, task, config, and audit — which all have dedicated Pinia stores — template management operates directly in the view component's local state. This makes it impossible for other components to access template data.
 
-**Recommendation**: Create `frontend/src/stores/template.ts` following the same pattern as other stores.
+**Recommendation**: Add a dedicated template store under `frontend/src/stores/` following the same pattern as other stores.
 
 ---
 
