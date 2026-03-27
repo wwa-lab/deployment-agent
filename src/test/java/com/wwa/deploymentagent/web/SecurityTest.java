@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.web;
 
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
+import com.wwa.deploymentagent.domain.fileimport.UploadTemplateService;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.domain.task.Task;
@@ -36,6 +37,9 @@ class SecurityTest {
 
     @Autowired
     private TestDataHelper helper;
+
+    @Autowired
+    private UploadTemplateService uploadTemplateService;
 
     // ─── Missing auth headers → 401 ──────────────────────────────────────────
 
@@ -91,20 +95,20 @@ class SecurityTest {
     }
 
     @Test
-    @DisplayName("upload_devopsAdminRole_returns403 - POST /upload multipart with DEVOPS_ADMIN returns 403")
-    void upload_devopsAdminRole_returns403() throws Exception {
+    @DisplayName("upload_devopsAdminRole_returns200 - POST /upload multipart with DEVOPS_ADMIN returns 200")
+    void upload_devopsAdminRole_returns200() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "test.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "dummy-content".getBytes());
+                uploadTemplateService.generateTemplate());
 
         mockMvc.perform(multipart(UPLOAD)
                         .file(file)
                         .param("stage", "SIT")
                         .header("X-User-Id", "admin-user")
                         .header("X-User-Role", "DEVOPS_ADMIN"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
