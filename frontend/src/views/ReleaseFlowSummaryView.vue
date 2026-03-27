@@ -167,12 +167,12 @@ function toggleArchivedVisibility() {
     </div>
 
     <section class="wwa-intro-card" aria-labelledby="wwa-deployment-intro-title">
-      <div class="wwa-intro-kicker">What WWA Means</div>
-      <h2 id="wwa-deployment-intro-title" class="wwa-intro-title">WWA = Work With Agent</h2>
+      <div class="wwa-intro-kicker">WWA Today</div>
+      <h2 id="wwa-deployment-intro-title" class="wwa-intro-title">DevOps automation with human control</h2>
       <p class="wwa-intro-text">
-        WWA is the internal workspace shell for agent-supported IT operations. Deployment Agent
-        is the release-execution workspace for tracking and progressing rundowns across SIT, UAT,
-        and PROD.
+        WWA currently focuses on DevOps automation. Deployment Agent is the release-execution
+        workspace for tracking and progressing rundowns across SIT, UAT, and PROD, with AI-assisted
+        capabilities planned for future phases.
       </p>
     </section>
 
@@ -214,7 +214,7 @@ function toggleArchivedVisibility() {
         <input
           class="form-control"
           type="text"
-          placeholder="Filter by SNOW group..."
+          placeholder="Filter by SNOW Group..."
           :value="store.filters.snowGroup ?? ''"
           @input="onFilterChange('snowGroup', ($event.target as HTMLInputElement).value)"
         />

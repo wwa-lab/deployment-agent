@@ -73,7 +73,7 @@ const componentDefinitionById = computed(
   () => new Map(COMPONENT_DEFINITIONS.map((definition) => [definition.id, definition])),
 )
 
-const activeView = ref<'component' | 'raw'>('raw')
+const activeView = ref<'component' | 'raw'>('component')
 const searchTerm = ref('')
 const statusFilter = ref<'All' | ConfigComponentRow['status']>('All')
 const componentScopeFilters = reactive({
@@ -470,7 +470,7 @@ function displayValue(value?: string) {
             <div class="toolbar-field">
               <label class="toolbar-label">Status</label>
               <select v-model="statusFilter" class="form-control">
-                <option value="All">All Statuses</option>
+                <option value="All">Any Status</option>
                 <option value="Ready">Ready</option>
                 <option value="Partial">Partial</option>
                 <option value="Needs Setup">Needs Setup</option>
@@ -512,7 +512,7 @@ function displayValue(value?: string) {
               <h2 class="section-title">Available Components ({{ filteredComponentRows.length }})</h2>
               <p class="section-subtitle">
                 Scoped integration rows that can override shared defaults for a specific
-                application, SNOW group, or agent.
+                application, SNOW Group, or agent.
               </p>
             </div>
             <button

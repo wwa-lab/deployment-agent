@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Polished frontend UI copy across Configuration Management, Login, Release Summary, and Access Management by clarifying status-filter wording, fixing capitalization and phrasing (`Team Book`, `Human-in-the-Loop`, `SNOW Group`), and expanding abbreviated role labels for clearer page text.
+- Changed Configuration Management so entering the page now lands on the `Component` tab by default instead of opening the derived `Configuration` tab first.
+- Refreshed the WWA frontend background treatment with a lighter gradient-driven shell, upgraded glassy surface tokens, and more atmospheric login/home page styling so the workspace feels less flat while keeping dense business pages readable.
+- Clarified WWA intro copy across login and workspace landing pages so the product is positioned accurately as DevOps automation today, with AI-assisted capabilities described as a future direction rather than a current-state promise.
+- Pushed the WWA shell further toward a control-center look by adding grid-backed console panels, stronger operational hero treatments, and colder status-driven visual cues across the login experience, home page, and workspace chrome.
 - Fixed stitched release-family grouping for infix stage release identifiers (`<name>-sit-01`, `<name>-sit-02`, `<name>-uat-01`, `<name>-prod-01`), so repeated SIT uploads and later UAT/PROD uploads are now connected in one rollout chain instead of appearing as separate families.
 - Fixed `Run Task` dialog behavior so manual tasks can proceed with pre-filled script/parameters from Excel without forcing users to edit fields first; in run mode the primary action now allows direct run with unchanged inputs.
 - Fixed `Create New Template` dropdown defaults so Category / Agent / SNOW Group / Application / Site now auto-select a valid option when the dialog opens and re-align automatically if option lists refresh later, preventing blank-looking required selects.
