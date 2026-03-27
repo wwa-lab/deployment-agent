@@ -5,6 +5,7 @@ import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.errors.ConflictAppException;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.InvalidStateTransitionException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
@@ -174,6 +175,38 @@ class TaskServiceTest {
                 .isInstanceOf(ValidationAppException.class);
     }
 
+    // ─── startManualExecution ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("startManualExecution transitions MANUAL task Ready_For_Execution → Executing")
+    void startManualExecution_manualReady_transitionsToExecuting() {
+        Task task = createManualTask(TaskStatus.Ready_For_Execution);
+
+        Task started = taskService.startManualExecution(task.getId(), ownerUser);
+
+        assertThat(started.getTaskStatus()).isEqualTo(TaskStatus.Executing);
+    }
+
+    @Test
+    @DisplayName("startManualExecution rejects AUTO tasks")
+    void startManualExecution_autoTask_throwsConflict() {
+        Task task = helper.seedTask(request, TaskStatus.Ready_For_Execution);
+
+        assertThatThrownBy(() -> taskService.startManualExecution(task.getId(), ownerUser))
+                .isInstanceOf(ConflictAppException.class)
+                .hasMessageContaining("not a MANUAL task");
+    }
+
+    @Test
+    @DisplayName("startManualExecution rejects non-ready MANUAL states")
+    void startManualExecution_manualPending_throwsConflict() {
+        Task task = createManualTask(TaskStatus.Pending);
+
+        assertThatThrownBy(() -> taskService.startManualExecution(task.getId(), ownerUser))
+                .isInstanceOf(ConflictAppException.class)
+                .hasMessageContaining("Ready_For_Execution");
+    }
+
     // ─── updateResultMetadata ────────────────────────────────────────────────
 
     @Test
@@ -186,5 +219,29 @@ class TaskServiceTest {
 
         assertThat(updated.getCurrentResultSummary()).containsEntry("status", "ok");
         assertThat(updated.getLatestExecutionId()).isEqualTo("exec-001");
+    }
+
+    private Task createManualTask(TaskStatus status) {
+        Task created = taskService.create(new CreateTaskInput(
+                request,
+                "TG-MANUAL",
+                "Manual Group",
+                1,
+                "manual-step",
+                ExecutionType.MANUAL,
+                false,
+                Map.of("script", "deploy.sh", "parameters", "--env sit"),
+                null,
+                "alice",
+                null,
+                null,
+                null));
+        if (status == TaskStatus.Pending) {
+            return created;
+        }
+        if (status == TaskStatus.Ready_For_Execution) {
+            return taskService.updateStatus(created.getId(), TaskStatus.Ready_For_Execution, ownerUser, null);
+        }
+        throw new IllegalArgumentException("Unsupported status for manual task helper: " + status);
     }
 }

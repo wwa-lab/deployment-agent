@@ -135,12 +135,19 @@ function decisionDisabledReason(task: Task): string | null {
 }
 
 function canRun(task: Task): boolean {
-  return canModifyTask(task) && task.taskStatus === 'Ready_For_Execution'
+  if (!canModifyTask(task)) return false
+  if (task.executionType === 'MANUAL') {
+    return task.taskStatus === 'Ready_For_Execution' || task.taskStatus === 'Executing'
+  }
+  return task.taskStatus === 'Ready_For_Execution'
 }
 
 function runDisabledReason(task: Task): string | null {
   if (canRun(task)) return null
   if (!canModifyTask(task)) return 'Task owner or admin only'
+  if (task.executionType === 'MANUAL') {
+    return 'Available only when task status is Ready_For_Execution or Executing'
+  }
   return 'Available only when task status is Ready_For_Execution'
 }
 
@@ -148,7 +155,10 @@ function runButtonLabel(task: Task): string {
   if (task.executionType === 'AUTO' && submittingAuto.value === task.id) {
     return 'Running...'
   }
-  if (task.taskStatus === 'Executing') {
+  if (task.executionType === 'MANUAL' && task.taskStatus === 'Executing') {
+    return 'Record Result'
+  }
+  if (task.executionType === 'AUTO' && task.taskStatus === 'Executing') {
     return 'Running...'
   }
   return 'Run'

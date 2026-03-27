@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed `Run Task` dialog behavior so manual tasks can proceed with pre-filled script/parameters from Excel without forcing users to edit fields first; in run mode the primary action now allows direct run with unchanged inputs.
 - Fixed `Create New Template` dropdown defaults so Category / Agent / SNOW Group / Application / Site now auto-select a valid option when the dialog opens and re-align automatically if option lists refresh later, preventing blank-looking required selects.
 - Fixed Template Management option sources so deleting all available templates no longer empties the Create Template dropdown lists; stable baseline options now remain available for Category / Agent / SNOW Group / Application / Site.
 - Fixed Template Management row `More` dropdown behavior so action items are no longer clipped at the bottom of the table card, and the menu now dismisses when users click outside or press `Esc`.

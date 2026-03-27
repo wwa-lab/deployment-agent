@@ -74,7 +74,7 @@ public class TaskController {
 
     /**
      * Record the result of a MANUAL task (owner or DEVOPS_ADMIN only).
-     * Guards: task must be MANUAL + in Ready_For_Execution state.
+     * Guards: task must be MANUAL + in Ready_For_Execution or Executing state.
      */
     @PostMapping("/{id}/record-result")
     public ResponseEntity<TaskDto> recordResult(
@@ -84,6 +84,17 @@ public class TaskController {
         return ResponseEntity.ok(
                 TaskDto.from(recordResultService.recordResult(
                         id, body.resultSummary(), body.resultLogs(), user)));
+    }
+
+    /**
+     * Start a MANUAL task execution (owner or DEVOPS_ADMIN only).
+     * Guards: task must be MANUAL + in Ready_For_Execution state.
+     */
+    @PostMapping("/{id}/start-manual")
+    public ResponseEntity<TaskDto> startManualExecution(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        return ResponseEntity.ok(TaskDto.from(taskService.startManualExecution(id, user)));
     }
 
     /**

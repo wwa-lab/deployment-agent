@@ -2,8 +2,10 @@ package com.wwa.deploymentagent.domain.task;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
+import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.errors.ConflictAppException;
 import com.wwa.deploymentagent.errors.InvalidStateTransitionException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
 import com.wwa.deploymentagent.errors.OptimisticLockConflictException;
@@ -136,6 +138,29 @@ public class TaskService {
                        "newValue", newInput));
 
         return saved;
+    }
+
+    /**
+     * Start MANUAL execution by transitioning Ready_For_Execution → Executing.
+     * Allows owners/admins to begin a manual step without first editing input fields.
+     */
+    @Transactional
+    public Task startManualExecution(String taskId, UserContext user) {
+        Task task = getById(taskId);
+        assertTaskRequestActive(task);
+        taskPermissionService.assertOwnerOrAdmin(task, user, "task:startManualExecution");
+
+        if (task.getExecutionType() != ExecutionType.MANUAL) {
+            throw new ConflictAppException(
+                    "Task " + taskId + " is not a MANUAL task; cannot start manual execution");
+        }
+        if (task.getTaskStatus() != TaskStatus.Ready_For_Execution) {
+            throw new ConflictAppException(
+                    "Task must be in Ready_For_Execution state to start, current: "
+                            + task.getTaskStatus().name());
+        }
+
+        return updateStatus(taskId, TaskStatus.Executing, user, "manual_execution_started");
     }
 
     /**

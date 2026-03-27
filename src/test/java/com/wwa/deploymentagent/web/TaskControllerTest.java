@@ -1,9 +1,13 @@
 package com.wwa.deploymentagent.web;
 
+import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.task.CreateTaskInput;
 import com.wwa.deploymentagent.domain.task.Task;
+import com.wwa.deploymentagent.domain.task.TaskService;
 import com.wwa.deploymentagent.helper.TestDataHelper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -33,6 +38,9 @@ class TaskControllerTest {
 
     @Autowired
     private TestDataHelper helper;
+
+    @Autowired
+    private TaskService taskService;
 
     // ─── listByRequest ────────────────────────────────────────────────────────
 
@@ -138,5 +146,57 @@ class TaskControllerTest {
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("startManualExecution_ownerRole_succeeds - POST /tasks/{id}/start-manual returns Executing")
+    void startManualExecution_ownerRole_succeeds() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        Task task = createManualTask(req, TaskStatus.Ready_For_Execution);
+
+        mockMvc.perform(post(BASE + "/" + task.getId() + "/start-manual")
+                        .header("X-User-Id", "emp-001")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskStatus").value("Executing"));
+    }
+
+    @Test
+    @DisplayName("startManualExecution_nonOwnerRole_returns403 - POST /tasks/{id}/start-manual with non-owner returns 403")
+    void startManualExecution_nonOwnerRole_returns403() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf);
+        Task task = createManualTask(req, TaskStatus.Ready_For_Execution);
+
+        mockMvc.perform(post(BASE + "/" + task.getId() + "/start-manual")
+                        .header("X-User-Id", "dev-user")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isForbidden());
+    }
+
+    private Task createManualTask(Request request, TaskStatus initialStatus) {
+        Task task = taskService.create(new CreateTaskInput(
+                request,
+                "TG-MANUAL",
+                "Manual Group",
+                1,
+                "manual-step",
+                ExecutionType.MANUAL,
+                false,
+                java.util.Map.of("script", "deploy.sh", "parameters", "--env uat"),
+                null,
+                "alice",
+                null,
+                null,
+                null));
+        if (initialStatus == TaskStatus.Ready_For_Execution) {
+            return taskService.updateStatus(
+                    task.getId(),
+                    TaskStatus.Ready_For_Execution,
+                    new UserContext("emp-001", "DEVELOPER"),
+                    null);
+        }
+        return task;
     }
 }

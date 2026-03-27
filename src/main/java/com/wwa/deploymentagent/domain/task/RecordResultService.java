@@ -22,7 +22,7 @@ import java.util.Map;
  * <p>Guards:
  * <ul>
  *   <li>Task must be {@code MANUAL} execution type</li>
- *   <li>Task must be in {@code Ready_For_Execution} state</li>
+ *   <li>Task must be in {@code Ready_For_Execution} or {@code Executing} state</li>
  * </ul>
  *
  * <p>Flow:
@@ -59,9 +59,11 @@ public class RecordResultService {
             throw new ConflictAppException(
                     "Task " + taskId + " is not a MANUAL task; cannot record result manually");
         }
-        if (task.getTaskStatus() != TaskStatus.Ready_For_Execution) {
+        if (task.getTaskStatus() != TaskStatus.Ready_For_Execution
+                && task.getTaskStatus() != TaskStatus.Executing) {
             throw new ConflictAppException(
-                    "Task must be in Ready_For_Execution state, current: " + task.getTaskStatus().name());
+                    "Task must be in Ready_For_Execution or Executing state, current: "
+                            + task.getTaskStatus().name());
         }
 
         // Create execution history record
