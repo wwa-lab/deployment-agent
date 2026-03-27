@@ -227,6 +227,52 @@ class ImportServiceTest {
     }
 
     @Test
+    @DisplayName("infix stage identifiers stitch repeated SIT uploads with UAT and PROD in one release flow")
+    void importFile_infixStageIdentifiers_stitchRetriesAndProgression() throws IOException {
+        ImportResult sitFirst = importService.importFile(
+                buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "sit-step-1", "MANUAL"),
+                Stage.SIT,
+                developer,
+                "leo-sit-01",
+                null,
+                null,
+                null);
+        ImportResult sitSecond = importService.importFile(
+                buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "sit-step-2", "MANUAL"),
+                Stage.SIT,
+                developer,
+                "leo-sit-02",
+                null,
+                null,
+                null);
+        ImportResult uatResult = importService.importFile(
+                buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "uat-step", "MANUAL"),
+                Stage.UAT,
+                developer,
+                "leo-uat-01",
+                null,
+                null,
+                null);
+        ImportResult prodResult = importService.importFile(
+                buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "prod-step", "MANUAL"),
+                Stage.PROD,
+                developer,
+                "leo-prod-01",
+                null,
+                null,
+                null);
+
+        assertThat(sitSecond.releaseFlowId()).isEqualTo(sitFirst.releaseFlowId());
+        assertThat(uatResult.releaseFlowId()).isEqualTo(sitFirst.releaseFlowId());
+        assertThat(prodResult.releaseFlowId()).isEqualTo(sitFirst.releaseFlowId());
+
+        var requests = requestRepository.findByReleaseFlowId(sitFirst.releaseFlowId());
+        assertThat(requests.stream().filter(request -> request.getStage() == Stage.SIT)).hasSize(2);
+        assertThat(requests.stream().filter(request -> request.getStage() == Stage.UAT)).hasSize(1);
+        assertThat(requests.stream().filter(request -> request.getStage() == Stage.PROD)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("system-generated release id can be reused as an explicit identifier for later stages")
     void importFile_generatedReleaseId_canBeReusedExplicitly() throws IOException {
         ImportResult sitResult = importService.importFile(

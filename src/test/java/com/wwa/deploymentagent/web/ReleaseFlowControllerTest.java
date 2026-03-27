@@ -177,6 +177,60 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.data[0].prodPresent").value(false));
     }
 
+    @Test
+    @DisplayName("list_viewStitched_groupsInfixStageIdentifiersAndKeepsLatestSitRetry")
+    void list_viewStitched_groupsInfixStageIdentifiersAndKeepsLatestSitRetry() throws Exception {
+        ReleaseFlow sitAttemptOneFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-sit-01",
+                "leo-sit-01",
+                Stage.SIT);
+        Request sitAttemptOne = helper.seedRequest(sitAttemptOneFlow, Stage.SIT, RequestStatus.Completed);
+        sitAttemptOne.setAttemptNumber(1);
+        requestRepository.save(sitAttemptOne);
+
+        ReleaseFlow sitAttemptTwoFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-sit-02",
+                "leo-sit-02",
+                Stage.SIT);
+        Request sitAttemptTwo = helper.seedRequest(sitAttemptTwoFlow, Stage.SIT, RequestStatus.Pending);
+        sitAttemptTwo.setAttemptNumber(2);
+        requestRepository.save(sitAttemptTwo);
+
+        ReleaseFlow uatFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-uat-01",
+                "leo-uat-01",
+                Stage.UAT);
+        helper.seedRequest(uatFlow, Stage.UAT, RequestStatus.Pending);
+
+        ReleaseFlow prodFlow = releaseFlowService.create(
+                "PROJ-STITCH-INFIX",
+                "Infix Project",
+                "leo-prod-01",
+                "leo-prod-01",
+                Stage.PROD);
+        helper.seedRequest(prodFlow, Stage.PROD, RequestStatus.Pending);
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .param("attemptView", "latest")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].stitched").value(true))
+                .andExpect(jsonPath("$.data[0].linkedReleaseCount").value(4))
+                .andExpect(jsonPath("$.data[0].currentStage").value("PROD"))
+                .andExpect(jsonPath("$.data[0].sitStatus").value("Pending"))
+                .andExpect(jsonPath("$.data[0].uatPresent").value(true))
+                .andExpect(jsonPath("$.data[0].prodPresent").value(true));
+    }
+
     // ─── getById ─────────────────────────────────────────────────────────────
 
     @Test
