@@ -1,31 +1,48 @@
 package com.wwa.deploymentagent.domain.configuration;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * Built-in integration component configuration shown in Configuration Management.
  *
- * <p>Each row represents one tool integration (Jenkins, Ansible, callback) and
- * acts as the source of truth for both the component workspace and the raw
- * configuration table derived from it.
+ * <p>Each row represents one scoped instance of a built-in tool integration
+ * (Jenkins, Ansible, callback). Multiple rows can exist for the same built-in
+ * component so runtime resolution can fall back from agent-specific overrides to
+ * platform defaults.
  */
 @Entity
-@Table(name = "DA_CONFIGURATION_COMPONENT")
+@Table(
+        name = "DA_CONFIGURATION_COMPONENT",
+        indexes = {
+                @Index(name = "IDX_DCC_COMPONENT", columnList = "component_id"),
+                @Index(name = "IDX_DCC_SYSTEM_TYPE", columnList = "system_type"),
+                @Index(name = "IDX_DCC_SCOPE", columnList = "application, snow_group, agent"),
+                @Index(name = "UK_DCC_COMPONENT_SCOPE", columnList = "component_id, scope_key", unique = true)
+        }
+)
 @Getter
 @Setter
 public class ConfigurationComponent {
 
     @Id
+    @Column(name = "id", length = 36, nullable = false, updatable = false)
+    private String id;
+
+    /**
+     * Stable built-in component identifier such as {@code jenkins} or
+     * {@code ansible}. Multiple scoped instances may share the same value.
+     */
     @Column(name = "component_id", length = 50, nullable = false)
     private String componentId;
+
+    @Column(name = "scope_key", length = 500, nullable = false)
+    private String scopeKey;
 
     @Column(name = "system_type", length = 30, nullable = false)
     private String systemType;
@@ -69,4 +86,11 @@ public class ConfigurationComponent {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (id == null) {
+            id = UUID.randomUUID().toString();
+        }
+    }
 }

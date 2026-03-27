@@ -8,19 +8,39 @@ import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 
 public record ConfigurationItemDto(
+        String componentInstanceId,
+        String componentId,
         ConfigKey configKey,
         String configValue,
         String description,
         String updatedBy,
-        Instant updatedAt
+        Instant updatedAt,
+        String application,
+        String snowGroup,
+        String agent,
+        String area,
+        String integration,
+        String scopeSource,
+        boolean sensitive,
+        boolean configured
 ) {
     public static ConfigurationItemDto from(ConfigurationItem item) {
         return new ConfigurationItemDto(
+                null,
+                null,
                 item.getConfigKey(),
                 item.getConfigValue(),
                 item.getDescription(),
                 item.getUpdatedBy(),
-                item.getUpdatedAt()
+                item.getUpdatedAt(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                item.getConfigKey().isSensitive(),
+                item.getConfigValue() != null && !item.getConfigValue().isBlank()
         );
     }
 
@@ -28,6 +48,8 @@ public record ConfigurationItemDto(
     public record UpsertRequest(
             @NotNull ConfigKey key,
             @NotBlank String value,
-            String description
+            String description,
+            String componentId,
+            String componentInstanceId
     ) {}
 }
