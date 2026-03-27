@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useUserStore } from '../stores/user'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
@@ -531,6 +531,25 @@ function toggleMoreMenu(templateId: string) {
   activeMoreMenuId.value = activeMoreMenuId.value === templateId ? '' : templateId
 }
 
+function closeMoreMenu() {
+  activeMoreMenuId.value = ''
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!activeMoreMenuId.value) return
+
+  const target = event.target
+  if (!(target instanceof Element) || !target.closest('.more-menu-wrap')) {
+    closeMoreMenu()
+  }
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    closeMoreMenu()
+  }
+}
+
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
@@ -821,6 +840,16 @@ function submitTemplate(draft: CreateTemplateDraft) {
 
   actionFeedback.value = `Created local upload preview for "${draft.sourceFileName}". Excel parsing is not wired yet, so this draft starts without tasks.`
 }
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('keydown', handleDocumentKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('keydown', handleDocumentKeydown)
+})
 </script>
 
 <template>
@@ -1486,7 +1515,11 @@ function submitTemplate(draft: CreateTemplateDraft) {
 }
 
 .table-card {
-  overflow: hidden;
+  overflow: visible;
+}
+
+.table-card > .data-table {
+  overflow: visible;
 }
 
 .table-head {

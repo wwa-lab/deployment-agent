@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed Template Management row `More` dropdown behavior so action items are no longer clipped at the bottom of the table card, and the menu now dismisses when users click outside or press `Esc`.
 - Allowed repeated uploads for the same stage under the same release identifier by creating incremented stage attempts (`attempt #`), exposed attempt numbers in release-flow detail responses, and added summary attempt-view modes (`latest` vs `history`) so rollout overviews can focus on current progress or include historical outcomes.
 - Stitched release-family summary/detail views now keep stage-prefixed uploads such as `sit-01 / uat-01 / prod-01` connected in one overview, add an explicit `Current Stage` indicator plus missing-stage placeholders on the summary page, and teach upload-time release matching to treat those stage-prefixed identifiers as the same rollout family.
 - Fixed Configuration Management first-load failures by making the configuration read APIs stop auto-bootstrapping built-in component rows into the database; missing platform defaults are now synthesized in-memory for display and only persisted when an admin actually saves changes.
