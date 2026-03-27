@@ -2,14 +2,14 @@
 
 ## Overview
 
-This document breaks the proposed multi-tool external execution design into implementation-ready work. The goal is to evolve Release Agent from submission-only AUTO execution into a routed, synchronized execution flow that can show external job/log/approval links and update task state when Jenkins or Ansible jobs finish.
+This document breaks the proposed multi-tool external execution design into implementation-ready work. The goal is to evolve Deployment Agent from submission-only AUTO execution into a routed, synchronized execution flow that can show external job/log/approval links and update task state when Jenkins or Ansible jobs finish.
 
 **Delivery objective**
 
 - Route each AUTO task to the correct external tool.
-- Preserve the current Release Agent task-review model.
+- Preserve the current Deployment Agent task-review model.
 - Surface external job, log, and approval context in Task Result and Task Activity.
-- Synchronize remote completion back into Release Agent so tasks do not remain indefinitely in `Executing`.
+- Synchronize remote completion back into Deployment Agent so tasks do not remain indefinitely in `Executing`.
 
 **Planning assumptions**
 
@@ -28,7 +28,7 @@ This document breaks the proposed multi-tool external execution design into impl
 
 ## Source Design
 
-**System name:** Release Agent
+**System name:** Deployment Agent
 
 **Design scope summary**
 
@@ -183,7 +183,7 @@ This document breaks the proposed multi-tool external execution design into impl
 
 ### EXE-008: Reconcile Terminal External States into Task Lifecycle
 
-- **Objective**: Translate synchronized external completion into Release Agent task state correctly.
+- **Objective**: Translate synchronized external completion into Deployment Agent task state correctly.
 - **Scope**: Implement `Executing -> Awaiting_Review` on remote success, `Executing -> Failed` on terminal remote failure, and update latest result metadata without bypassing the existing review gate.
 - **Dependencies**: EXE-007
 - **Owner type**: backend
@@ -304,11 +304,11 @@ This document breaks the proposed multi-tool external execution design into impl
 - Ansible approval support may depend on workflow-job features not used by all current templates.
 - Legacy plain-script tasks are convenient for compatibility but can mask routing ambiguity if the UI does not surface the resolved tool clearly.
 - Polling introduces recurring API load and operational tuning needs.
-- Preserving Release Agent review after external approval keeps governance intact but may be perceived as double approval unless communicated clearly.
+- Preserving Deployment Agent review after external approval keeps governance intact but may be perceived as double approval unless communicated clearly.
 
 ## Open Questions
 
-1. Should Release Agent always remain the final approval point after a remote external-approval step succeeds?
+1. Should Deployment Agent always remain the final approval point after a remote external-approval step succeeds?
 2. Which exact Ansible/AWX target types are in scope for the first implementation pass: job templates only, or workflow job templates as well?
 3. Do users need a manual `Refresh External Status` action in the UI, or is background polling sufficient?
 4. Is future callback support desirable enough to justify early contract work during this phase?

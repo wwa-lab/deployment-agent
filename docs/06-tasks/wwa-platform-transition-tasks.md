@@ -4,21 +4,21 @@
 
 This document breaks the current `Link-to-WWA` direction into implementation-ready tasks.
 
-The goal is not to rebuild Release Agent from scratch. The goal is to reposition the current workspace as the first agent under the broader `WWA Agent Workspace Hub`, while keeping FinBlock intentionally lightweight and preserving the existing Release Agent workflow baseline.
+The goal is not to rebuild Deployment Agent from scratch. The goal is to reposition the current workspace as the first agent under the broader `WWA Agent Workspace Hub`, while keeping FinBlock intentionally lightweight and preserving the existing Deployment Agent workflow baseline.
 
 In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevOps hub above individual workspaces.
 
 **Delivery objective**
 - Keep `FinBlock` limited to a single entry link to `WWA`
 - Establish `WWA` as the unified Agent Workspace Hub for authentication, navigation, access governance, and shared platform capabilities
-- Reposition `Release Agent` as the first `WWA` workspace instead of the implicit default product shell
+- Reposition `Deployment Agent` as the first `WWA` workspace instead of the implicit default product shell
 - Prepare the codebase and information architecture so a second and third agent can be added without redesigning the platform model
 
 **Planning assumptions**
 - FinBlock will not pass rich business context in the initial phase.
 - WWA will own authentication, top-level navigation, platform access, and platform-level audit.
 - Each agent will remain an independent microservice or independently deployable workspace.
-- Release Agent domain workflows should remain stable during the initial platform transition.
+- Deployment Agent domain workflows should remain stable during the initial platform transition.
 - Template and configuration capabilities should not be over-generalized too early.
 
 ### Current Workspace Alignment
@@ -26,11 +26,11 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 - **Already present in the current workspace**
   - `/wwa/...` route namespace and shared shell layout
   - visible shared-capability pages for `Configuration Management`, `Audit Log`, and `Access Management`
-  - a working Release Agent flow inside the shell
+  - a working Deployment Agent flow inside the shell
   - deny-by-default access patterns and a working access-management baseline
 - **Partially aligned**
-  - `WWA` exists structurally, but the product still defaults directly into `Release Agent`
-  - shared pages exist, but some wording and ownership still center on Release Agent
+  - `WWA` exists structurally, but the product still defaults directly into `Deployment Agent`
+  - shared pages exist, but some wording and ownership still center on Deployment Agent
   - navigation is already grouped, but only one real agent workspace is active
 - **Still missing**
   - a dedicated `WWA Home / Agent Directory`
@@ -51,7 +51,7 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 - Users click one `WWA` link in FinBlock
 - Users authenticate in WWA
 - Users land on a neutral WWA home page
-- Users select an accessible agent such as `Release Agent` or `Testing Agent`
+- Users select an accessible agent such as `Deployment Agent` or `Testing Agent`
 - Shared capabilities such as platform access management and platform audit remain visible in WWA
 - Agent-specific workflows stay inside the owning agent workspace
 
@@ -65,17 +65,17 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 2. WWA shell routing and navigation
 3. Platform-level access and audit model
 4. Shared-capability boundary clarification
-5. Release Agent workspace normalization
+5. Deployment Agent workspace normalization
 6. Multi-agent onboarding readiness
 
 ### Recommended Sequencing
 
 1. Lock product positioning and naming
 2. Add `WWA Home / Agent Directory`
-3. Stop defaulting directly into Release Agent
+3. Stop defaulting directly into Deployment Agent
 4. Clarify platform-level versus agent-level permissions and audit
 5. Normalize shared-capability ownership
-6. Reframe Release Agent as the first workspace
+6. Reframe Deployment Agent as the first workspace
 7. Onboard a second agent as the validation milestone
 
 ### Parallel Work Opportunities
@@ -112,7 +112,7 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 
 ### Verification
 - Validate WWA home flow
-- validate that Release Agent workflows still work after shell changes
+- validate that Deployment Agent workflows still work after shell changes
 - validate that platform shared pages still behave correctly
 - validate that a second agent can be introduced without redesigning the shell
 
@@ -122,22 +122,22 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 
 ### WWA-001: Confirm WWA Product Positioning and Naming
 - **Objective**: Lock the product model before UI and platform refactoring begins.
-- **Scope**: Confirm that `FinBlock -> WWA -> Agent Workspace` is the approved product structure; confirm naming for `WWA`, `Agent Workspace`, `Release Agent`, and future agent categories.
+- **Scope**: Confirm that `FinBlock -> WWA -> Agent Workspace` is the approved product structure; confirm naming for `WWA`, `Agent Workspace`, `Deployment Agent`, and future agent categories.
 - **Dependencies**: None
 - **Owner type**: product
 - **Priority**: Must
 - **Notes**: This decision should be treated as the foundation for all later route, permission, and documentation work.
 
 ### WWA-002: Add Dedicated WWA Home / Agent Directory
-- **Objective**: Make WWA feel like a platform, not just a redirector into Release Agent.
+- **Objective**: Make WWA feel like a platform, not just a redirector into Deployment Agent.
 - **Scope**: Design and build a neutral WWA home page that shows platform identity, available agents, shared capabilities, and future extensibility points.
 - **Dependencies**: WWA-001
 - **Owner type**: frontend
 - **Priority**: Must
-- **Notes**: WWA home should not assume Release Agent is the only destination.
+- **Notes**: WWA home should not assume Deployment Agent is the only destination.
 
 ### WWA-003: Change Default Routing to Land in WWA Home
-- **Objective**: Remove the current assumption that the default entry is Release Agent.
+- **Objective**: Remove the current assumption that the default entry is Deployment Agent.
 - **Scope**: Update route defaults, redirects, and entry behavior so `/` and the WWA entry land on the WWA home page rather than `/wwa/deployment-agent`.
 - **Dependencies**: WWA-002
 - **Owner type**: frontend
@@ -158,7 +158,7 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 - **Dependencies**: WWA-002, WWA-004
 - **Owner type**: frontend
 - **Priority**: Must
-- **Notes**: Avoid language that implies Release Agent owns the whole shell.
+- **Notes**: Avoid language that implies Deployment Agent owns the whole shell.
 
 ### WWA-006: Add a Clear Return-to-FinBlock Pattern
 - **Objective**: Ensure users can reliably return to the upstream business system.
@@ -177,7 +177,7 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 - **Notes**: This task is about authorization boundaries, not only UI wording.
 
 ### WWA-008: Reframe Access Management as a Platform Capability
-- **Objective**: Evolve Access Management from “who can enter Release Agent” into “who can enter WWA and which platform/agent capabilities they can see”.
+- **Objective**: Evolve Access Management from “who can enter Deployment Agent” into “who can enter WWA and which platform/agent capabilities they can see”.
 - **Scope**: Update the conceptual model, UX wording, data assumptions, and future API direction for Access Management so it supports a multi-agent platform.
 - **Dependencies**: WWA-007
 - **Owner type**: platform
@@ -202,7 +202,7 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 
 ### WWA-011: Classify Configuration Into Platform-Shared and Agent-Private
 - **Objective**: Prevent configuration management from becoming a catch-all page with unclear ownership.
-- **Scope**: Classify current configuration items, define which ones truly belong to the WWA Agent Workspace Hub, and which ones should remain inside Release Agent or other future agents.
+- **Scope**: Classify current configuration items, define which ones truly belong to the WWA Agent Workspace Hub, and which ones should remain inside Deployment Agent or other future agents.
 - **Dependencies**: WWA-001
 - **Owner type**: platform
 - **Priority**: Must
@@ -216,9 +216,9 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 - **Priority**: Must
 - **Notes**: This task is an explicit non-generalization decision and should be documented clearly.
 
-### WWA-013: Normalize Release Agent as the First Workspace
-- **Objective**: Reposition Release Agent from implicit shell owner to explicit first workspace under WWA.
-- **Scope**: Update navigation labels, page framing, entry points, and workspace cues while preserving existing Release Agent behavior, routes, and domain logic wherever possible.
+### WWA-013: Normalize Deployment Agent as the First Workspace
+- **Objective**: Reposition Deployment Agent from implicit shell owner to explicit first workspace under WWA.
+- **Scope**: Update navigation labels, page framing, entry points, and workspace cues while preserving existing Deployment Agent behavior, routes, and domain logic wherever possible.
 - **Dependencies**: WWA-003, WWA-005
 - **Owner type**: frontend
 - **Priority**: Must
@@ -226,7 +226,7 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 
 ### WWA-014: Update Supporting Documentation for the New Operating Model
 - **Objective**: Keep architecture, design, and implementation planning aligned with the new direction.
-- **Scope**: Update relevant documents so they describe WWA as the Agent Workspace Hub and Release Agent as its first workspace under the `Link-to-WWA` model.
+- **Scope**: Update relevant documents so they describe WWA as the Agent Workspace Hub and Deployment Agent as its first workspace under the `Link-to-WWA` model.
 - **Dependencies**: WWA-001
 - **Owner type**: architecture
 - **Priority**: Must
@@ -242,15 +242,15 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 
 ### WWA-016: Add Acceptance Tests for WWA Entry and Shell Behavior
 - **Objective**: Protect the platform transition from regressions.
-- **Scope**: Add coverage for login flow into WWA, WWA home routing, shell navigation, shared-capability access visibility, and Release Agent reachability from the WWA home page.
+- **Scope**: Add coverage for login flow into WWA, WWA home routing, shell navigation, shared-capability access visibility, and Deployment Agent reachability from the WWA home page.
 - **Dependencies**: WWA-002, WWA-003, WWA-005, WWA-013
 - **Owner type**: QA
 - **Priority**: Must
-- **Notes**: This should complement existing Release Agent workflow tests rather than replace them.
+- **Notes**: This should complement existing Deployment Agent workflow tests rather than replace them.
 
-### WWA-017: Validate Release Agent Regression Baseline Under the New Shell
+### WWA-017: Validate Deployment Agent Regression Baseline Under the New Shell
 - **Objective**: Ensure the platform transition does not break the existing first workspace.
-- **Scope**: Re-run core Release Agent flows under the new entry and shell model, including login, release summary, release detail, task actions, configuration visibility, and audit visibility.
+- **Scope**: Re-run core Deployment Agent flows under the new entry and shell model, including login, release summary, release detail, task actions, configuration visibility, and audit visibility.
 - **Dependencies**: WWA-013, WWA-016
 - **Owner type**: QA
 - **Priority**: Must
@@ -315,8 +315,8 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 ## Success Criteria
 
 - Users enter `WWA` from FinBlock through one stable link.
-- Users land on a real WWA home page rather than directly inside Release Agent.
-- Release Agent still works as the first workspace without major workflow regression.
+- Users land on a real WWA home page rather than directly inside Deployment Agent.
+- Deployment Agent still works as the first workspace without major workflow regression.
 - Shared capabilities read as platform-owned rather than Release-Agent-owned where appropriate.
 - A second agent can be added without redesigning the shell or product model.
 
@@ -324,10 +324,10 @@ In this document, `WWA` refers to the `WWA Agent Workspace Hub`, the shared DevO
 
 ## Risks and Guardrails
 
-- **Risk:** WWA remains visually or conceptually synonymous with Release Agent.
+- **Risk:** WWA remains visually or conceptually synonymous with Deployment Agent.
   - **Guardrail:** add a neutral WWA home page and platform-first navigation language.
 - **Risk:** shared capabilities are generalized too early.
-  - **Guardrail:** keep templates and agent-private configuration close to Release Agent until a second agent proves reuse.
+  - **Guardrail:** keep templates and agent-private configuration close to Deployment Agent until a second agent proves reuse.
 - **Risk:** access governance stays single-agent-shaped.
   - **Guardrail:** define platform access and agent access separately before the second agent arrives.
 - **Risk:** the second agent still requires a custom shell path.

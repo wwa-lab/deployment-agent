@@ -1,8 +1,8 @@
--- Release Agent Oracle current schema
+-- Deployment Agent Oracle current schema
 -- Generated for greenfield UAT / internal environment setup.
 -- Use this script for a fresh Oracle schema.
--- Do not run V2-V9 incremental scripts on top of this file for a brand-new database,
--- because this script already includes the current end-state columns.
+-- Do not run V2-V12 incremental scripts on top of this file for a brand-new database,
+-- because this script already includes the current end-state columns from V2 through V12.
 
 CREATE TABLE DA_RELEASE_FLOW (
     id                    VARCHAR2(36)   NOT NULL,

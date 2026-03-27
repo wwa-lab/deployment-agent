@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document extends Release Agent's current AUTO execution model from submission-only integration into a multi-tool execution orchestration flow. The target outcome is that each AUTO task can route to the correct external platform, surface tool-specific job and log links in the UI, expose external approval handoff when required, and synchronize terminal execution outcomes back into Release Agent task state.
+This document extends Deployment Agent's current AUTO execution model from submission-only integration into a multi-tool execution orchestration flow. The target outcome is that each AUTO task can route to the correct external platform, surface tool-specific job and log links in the UI, expose external approval handoff when required, and synchronize terminal execution outcomes back into Deployment Agent task state.
 
 ### Design Objective
 
@@ -16,19 +16,19 @@ This document extends Release Agent's current AUTO execution model from submissi
 - Accept tool targets from the task `script` field without forcing the user to maintain separate tool-specific screens.
 - Surface external job, log, and approval links in Task Result and Task Activity views.
 - Prevent successful AUTO submissions from remaining indefinitely in `Executing` after the remote job has already finished.
-- Preserve the existing Release Agent review gate before release-flow progression.
+- Preserve the existing Deployment Agent review gate before release-flow progression.
 
 ### Relationship to Source Architecture
 
 - This design keeps the existing layered architecture, Task / TaskExecutionHistory model, and review-driven progression rules.
 - This design supersedes the current MVP baseline that treats AUTO execution as fire-and-forget and leaves successfully submitted tasks in `Executing` until a later manual workaround.
 - This design preserves the current ownership boundary:
-  - Release Agent owns routing, state normalization, auditability, and UI presentation.
+  - Deployment Agent owns routing, state normalization, auditability, and UI presentation.
   - Jenkins and Ansible own actual remote execution and remote approval UX.
 
 ```mermaid
 flowchart LR
-    User["User in Release Agent UI"] --> Edit["Edit Task / Run Task"]
+    User["User in Deployment Agent UI"] --> Edit["Edit Task / Run Task"]
     Edit --> API["TaskController / AutoExecutionService"]
     API --> Resolver["ExecutionTargetResolver"]
     Resolver -->|Jenkins target| JenkinsAdapter["JenkinsExecutionAdapter"]
@@ -54,7 +54,7 @@ flowchart LR
 
 ## Source Architecture
 
-**System name:** Release Agent
+**System name:** Deployment Agent
 
 **Architecture summary carried forward:**
 
@@ -79,7 +79,7 @@ flowchart LR
   - `Pending -> Ready_For_Execution -> Executing -> Awaiting_Review -> Approved/Rejected`
   - `Executing -> Failed`
   - `Rejected/Failed -> Ready_For_Execution`
-- [Resolved] External approval inside Jenkins or Ansible does not replace Release Agent review. External approval is treated as part of remote execution; after remote execution finishes, the task still moves to `Awaiting_Review` in Release Agent.
+- [Resolved] External approval inside Jenkins or Ansible does not replace Deployment Agent review. External approval is treated as part of remote execution; after remote execution finishes, the task still moves to `Awaiting_Review` in Deployment Agent.
 - [Resolved] The `script` input should accept a full tool URL whenever available. The optional `system` input remains supported as an explicit override for legacy tasks and Excel imports.
 - [Resolved] Polling is the required synchronization path for the first implementation phase. Callback ingestion is optional future work, not a prerequisite for shipping this feature.
 - [Assumption] Jenkins jobs expose enough queue/build metadata to derive a stable build URL and console/log URL.
@@ -94,7 +94,7 @@ flowchart LR
 
 1. Per-task external tool resolution for AUTO tasks.
 2. Normalized external execution metadata for job, log, approval, and status display.
-3. Polling-based synchronization of remote execution state back into Release Agent.
+3. Polling-based synchronization of remote execution state back into Deployment Agent.
 4. Task Result and Task Activity UX updates for external execution visibility.
 5. Audit and observability behavior for submission and status synchronization.
 6. Backend and frontend test coverage for the new execution lifecycle.
@@ -113,7 +113,7 @@ flowchart LR
 - Frontend continues to call the existing task APIs and execution-history API.
 - Backend owns tool resolution, submission, polling, normalization, and state transitions.
 - External systems remain the source of raw job state and raw logs.
-- Release Agent stores normalized state plus URLs needed for click-through workflows.
+- Deployment Agent stores normalized state plus URLs needed for click-through workflows.
 
 ---
 
@@ -177,7 +177,7 @@ flowchart LR
 
 - Periodically scan active AUTO executions still in progress.
 - Poll the correct external adapter for the latest remote state.
-- Normalize raw tool-specific states into Release Agent execution semantics.
+- Normalize raw tool-specific states into Deployment Agent execution semantics.
 - Update execution history and task state when the remote job reaches a terminal state.
 
 **Key Interactions**
@@ -241,7 +241,7 @@ flowchart LR
 
 - Surface external execution metadata in a consistent UI shape.
 - Show users where to view logs and where to approve in the external tool when approval is pending.
-- Distinguish submission state, external execution state, and Release Agent review state.
+- Distinguish submission state, external execution state, and Deployment Agent review state.
 
 **Key Interactions**
 
@@ -255,7 +255,7 @@ flowchart LR
 - UI must make it obvious when a task is:
   - still running remotely
   - waiting for approval in the external tool
-  - completed remotely and waiting for review in Release Agent
+  - completed remotely and waiting for review in Deployment Agent
   - failed remotely
 
 ### 6. Audit and Observability Module
@@ -394,7 +394,7 @@ flowchart LR
 |---|---|---|
 | `externalStatus` | String enum | Normalized remote state |
 | `terminal` | Boolean | Whether the remote execution is terminal |
-| `executionStatus` | `ExecutionStatus` enum | Release Agent execution status to persist |
+| `executionStatus` | `ExecutionStatus` enum | Deployment Agent execution status to persist |
 | `statusMessage` | String | Human-readable status explanation |
 | `externalExecutionId` | String | Latest tool-native execution ID if updated |
 | `jobUrl` | URL-shaped String | Primary external job/build URL |
@@ -461,7 +461,7 @@ The execution-history record remains the source of truth for one AUTO execution 
 
 **Field semantics clarification**
 
-- `execution_status` remains the Release Agent lifecycle field on `TaskExecutionHistory`:
+- `execution_status` remains the Deployment Agent lifecycle field on `TaskExecutionHistory`:
   - `Running`
   - `Completed`
   - `Failed`
@@ -473,7 +473,7 @@ The execution-history record remains the source of truth for one AUTO execution 
 
 ### Normalized External Status Model
 
-| Normalized status | Terminal | Meaning | Release Agent effect |
+| Normalized status | Terminal | Meaning | Deployment Agent effect |
 |---|---|---|---|
 | `QUEUED` | No | Accepted by remote tool but not yet executing | Task stays `Executing`; execution stays `Running` |
 | `RUNNING` | No | Remote job currently executing | Task stays `Executing`; execution stays `Running` |
@@ -497,7 +497,7 @@ The top-level task state machine is intentionally preserved.
 - `Executing -> Failed`
   - occurs when remote execution reaches normalized `FAILED`, `ABORTED`, or `TIMED_OUT`
 - `Awaiting_Review -> Approved/Rejected`
-  - remains a Release Agent decision, not an external tool callback
+  - remains a Deployment Agent decision, not an external tool callback
 
 ---
 
@@ -543,7 +543,7 @@ The top-level task state machine is intentionally preserved.
 **Status semantics**
 
 - `WAITING_APPROVAL` must be visually distinct from plain `RUNNING`.
-- `SUCCEEDED` in the external tool must still allow the task to show `Awaiting_Review` as the next Release Agent step.
+- `SUCCEEDED` in the external tool must still allow the task to show `Awaiting_Review` as the next Deployment Agent step.
 
 ### Task Activity Modal
 
@@ -565,7 +565,7 @@ The top-level task state machine is intentionally preserved.
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant DA as Release Agent
+    participant DA as Deployment Agent
     participant XT as External Tool
     participant MON as Monitor
 
@@ -586,13 +586,13 @@ sequenceDiagram
     MON->>DA: Execution -> Completed
     MON->>DA: Task -> Awaiting_Review
 
-    U->>DA: Approve or Reject in Release Agent
+    U->>DA: Approve or Reject in Deployment Agent
 ```
 
 ### Submission Flow
 
 1. User edits task input.
-2. Release Agent validates the AUTO task input.
+2. Deployment Agent validates the AUTO task input.
 3. `ExecutionTargetResolver` determines the target system and normalized target details.
 4. `AutoExecutionService` creates a new execution-history attempt.
 5. Adapter submits the job to the external tool.
@@ -612,7 +612,7 @@ sequenceDiagram
    - `external_system_type` is set
 2. Monitor calls the correct adapter's poll method.
 3. Adapter returns a normalized status payload.
-4. Release Agent updates execution history:
+4. Deployment Agent updates execution history:
    - `external_status`
    - `external_status_message`
    - `external_job_url`
@@ -633,16 +633,16 @@ sequenceDiagram
      - `task_status -> Failed`
 6. Release-flow progression remains unchanged after sync:
    - task success does not auto-approve
-   - flow does not advance until Release Agent review occurs
+   - flow does not advance until Deployment Agent review occurs
    - terminal sync must update release-flow aggregates through the existing recomputation path, but must not treat remote completion as a human decision
 
 ### External Approval Handling
 
 - If a remote execution pauses for approval, the monitor normalizes that state to `WAITING_APPROVAL`.
-- Release Agent keeps the task in `Executing`.
+- Deployment Agent keeps the task in `Executing`.
 - Task Result surfaces the approval link and log link.
 - User performs the approval in Jenkins or Ansible.
-- After the remote job resumes and reaches a terminal outcome, the monitor performs the terminal-state transition inside Release Agent.
+- After the remote job resumes and reaches a terminal outcome, the monitor performs the terminal-state transition inside Deployment Agent.
 
 ### Retry / Rerun Behavior
 
@@ -750,7 +750,7 @@ sequenceDiagram
 
 - Polling must be idempotent.
 - Stale executions should be observable.
-- A transient polling failure must not automatically convert a remote running job into a failed Release Agent task.
+- A transient polling failure must not automatically convert a remote running job into a failed Deployment Agent task.
 
 ### Observability Expectations
 
@@ -758,7 +758,7 @@ sequenceDiagram
 - Count of stale executions not updated within threshold
 - Polling failure count by tool
 - Submission failure count by tool
-- Average sync latency from remote terminal state to Release Agent task update
+- Average sync latency from remote terminal state to Deployment Agent task update
 
 ---
 
@@ -833,7 +833,7 @@ sequenceDiagram
 
 ## Risks / Design Tradeoffs
 
-- Preserving the Release Agent review gate after external approval introduces a second human checkpoint, but it keeps the current controlled workflow model intact.
+- Preserving the Deployment Agent review gate after external approval introduces a second human checkpoint, but it keeps the current controlled workflow model intact.
 - Jenkins queue-to-build correlation can be tool-version-sensitive and may require careful adapter normalization.
 - Ansible approval behavior depends on whether the environment uses workflow approvals rather than plain job templates.
 - Polling is simpler to ship than callbacks but adds recurring load on external APIs.
@@ -843,7 +843,7 @@ sequenceDiagram
 
 ## Open Questions
 
-1. Should external approval in Jenkins or Ansible ever replace the Release Agent `Approve` decision, or must Release Agent always remain the final review gate?
+1. Should external approval in Jenkins or Ansible ever replace the Deployment Agent `Approve` decision, or must Deployment Agent always remain the final review gate?
 2. In the target Ansible environment, are approval flows based on workflow job templates, workflow approvals, or a separate process outside AWX/Tower?
 3. Is the production environment able to support callback/webhook delivery later, or should polling remain the long-term default?
 4. Should the UI expose a manual `Refresh External Status` action for owners/admins in addition to background polling?

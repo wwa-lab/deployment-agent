@@ -28,7 +28,7 @@ The goal is to avoid redesigning authentication, navigation, permissions, and au
 - `FinBlock`: business system and upstream entry point
 - `WWA Agent Workspace Hub` (`WWA`): unified DevOps hub for agent workspaces
 - `Agent Workspace`: independent microservice workspace for a specific agent domain
-- `Release Agent`: the first mature workspace under `WWA`
+- `Deployment Agent`: the first mature workspace under `WWA`
 - Future agents such as `Testing Agent`: follow the same integration standard
 
 This model should be understood as:
@@ -57,7 +57,7 @@ not:
 2. The browser opens the WWA entry page.
 3. The user completes authentication in WWA.
 4. WWA shows the list of available agents based on access rights.
-5. The user selects an agent such as `Release Agent` or `Testing Agent`.
+5. The user selects an agent such as `Deployment Agent` or `Testing Agent`.
 6. The user performs work inside the selected agent workspace.
 7. The user can switch to other agents inside WWA or return to FinBlock.
 
@@ -185,7 +185,7 @@ WWA navigation must ensure that users can always tell:
 Recommended hierarchy:
 
 - level 1: `WWA`
-- level 2: `Release Agent`, `Testing Agent`, other future agents
+- level 2: `Deployment Agent`, `Testing Agent`, other future agents
 - shared areas: `Access Management`, `Audit Log`, other future shared capabilities
 
 Agent access must flow through the WWA shell rather than through scattered hardcoded URLs.
@@ -196,7 +196,7 @@ Agent access must flow through the WWA shell rather than through scattered hardc
 
 WWA must have a dedicated home page.
 
-WWA must not simply redirect all users into Release Agent by default, because that would make future agents feel secondary and would blur the distinction between the platform and its first workspace.
+WWA must not simply redirect all users into Deployment Agent by default, because that would make future agents feel secondary and would blur the distinction between the platform and its first workspace.
 
 The WWA home page should include:
 
@@ -318,8 +318,8 @@ An agent is not ready for WWA integration until the following are clear:
 
 ## 17. Recommended Delivery Sequence
 
-1. Formally position the current system as `WWA + Release Agent`.
-2. Create a dedicated WWA home page instead of defaulting directly into Release Agent.
+1. Formally position the current system as `WWA + Deployment Agent`.
+2. Create a dedicated WWA home page instead of defaulting directly into Deployment Agent.
 3. Stabilize unified login, shell navigation, platform access, and platform audit.
 4. Onboard a second agent using the same model.
 5. Use the second onboarding to validate and refine this standard.

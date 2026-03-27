@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the MVP user stories for Release Agent under the WWA Agent Workspace Hub.
+This document defines the MVP user stories for Deployment Agent under the WWA Agent Workspace Hub.
 The MVP focuses on enabling a controlled, human-in-the-loop deployment workflow that allows users to upload requests, monitor release progress, inspect execution results, make explicit decisions, maintain key configuration, and review audit records.
 
 The main MVP objective is:
@@ -25,31 +25,31 @@ Task operations such as View Result, Edit, Approve, Reject, Rerun, and Skip occu
 ## User Story 1
 
 **Title**
-Access Release Agent workspace within WWA Agent Workspace Hub navigation
+Access Deployment Agent workspace within WWA Agent Workspace Hub navigation
 
 **Story**
 As a Developer, TL, DevOps Admin, or Audit/Management user,
-I want to access the Release Agent workspace from the WWA Agent Workspace Hub menu,
+I want to access the Deployment Agent workspace from the WWA Agent Workspace Hub menu,
 so that I can use a unified workspace for deployment-related activities.
 
 **Acceptance Criteria**
 
 1. Given the user is logged into the system,
    When the user views the main navigation,
-   Then the WWA level-1 menu is visible and contains Release Agent as a level-2 entry.
+   Then the WWA level-1 menu is visible and contains Deployment Agent as a level-2 entry.
 
-2. Given the user clicks the Release Agent entry,
+2. Given the user clicks the Deployment Agent entry,
    When the workspace page loads,
-   Then the Release Agent workspace is displayed.
+   Then the Deployment Agent workspace is displayed.
 
-3. Given the user is in the Release Agent workspace,
+3. Given the user is in the Deployment Agent workspace,
    When the user views the left-side navigation,
    Then the shared menu entries Template Management, Configuration Management, and Audit Log are visible.
 
 **Notes / Assumptions**
 
 - WWA Agent Workspace Hub is a reusable platform layer for future agent workspaces.
-- Release Agent is the first workspace implemented under WWA.
+- Deployment Agent is the first workspace implemented under WWA.
 
 **Dependencies**
 
@@ -62,7 +62,7 @@ so that I can use a unified workspace for deployment-related activities.
 
 **Open Questions**
 
-- What is the exact routing path for Release Agent?
+- What is the exact routing path for Deployment Agent?
 - Should breadcrumb navigation be shown in the workspace?
 
 ---
@@ -79,7 +79,7 @@ so that I can submit deployment input into the system.
 
 **Acceptance Criteria**
 
-1. Given the Developer is in the Release Agent workspace,
+1. Given the Developer is in the Deployment Agent workspace,
    When the Developer clicks the "Upload Excel" action,
    Then an upload dialog is displayed.
 
@@ -178,7 +178,7 @@ so that I can monitor release status at a glance.
 
 **Acceptance Criteria**
 
-1. Given the Release Agent workspace is open,
+1. Given the Deployment Agent workspace is open,
    When the user views the Deployment Flow Summary section,
    Then the system displays a list of Release Flows.
 
@@ -438,7 +438,7 @@ so that I can review deployment-related operations for compliance and accountabi
 
 **Acceptance Criteria**
 
-1. Given a user performs a supported key action in the Release Agent workspace,
+1. Given a user performs a supported key action in the Deployment Agent workspace,
    When the action is processed successfully,
    Then the system creates and persists an audit log entry for that action.
 
@@ -674,7 +674,7 @@ Navigate WWA Agent Workspace Hub with two-level menu and workspace flyout
 **Story**
 As any authenticated user,
 I want to navigate WWA capabilities through a clear two-level navigation structure,
-so that I can access Release Agent, Template Management, Configuration Management, and Audit Log from a unified Agent Workspace Hub.
+so that I can access Deployment Agent, Template Management, Configuration Management, and Audit Log from a unified Agent Workspace Hub.
 
 **Acceptance Criteria**
 
@@ -684,7 +684,7 @@ so that I can access Release Agent, Template Management, Configuration Managemen
 
 2. Given the user clicks WWA in the sidebar,
    When the flyout opens,
-   Then the second-level items include Release Agent, Template Management, Configuration Management, and Audit Log.
+   Then the second-level items include Deployment Agent, Template Management, Configuration Management, and Audit Log.
 
 3. Given the user selects a workspace page from the flyout,
    When the navigation completes,
@@ -887,7 +887,7 @@ so that I can assess release progress at a glance without opening each flow deta
 
 **Acceptance Criteria**
 
-1. Given the Release Agent summary page is open,
+1. Given the Deployment Agent summary page is open,
    When the user views the Release Flow table,
    Then SIT, UAT, and PROD status columns are visible for each row.
 
@@ -904,16 +904,16 @@ so that I can assess release progress at a glance without opening each flow deta
 ## User Story 21
 
 **Title**
-Manage Release Agent access grants
+Manage Deployment Agent access grants
 
 **Story**
 As a DevOps Admin,
-I want to grant, suspend, and reactivate Release Agent access for employees,
+I want to grant, suspend, and reactivate Deployment Agent access for employees,
 so that product access can be managed without building a separate user account system.
 
 **Acceptance Criteria**
 
-1. Given an employee has a valid enterprise identity but does not yet have Release Agent access,
+1. Given an employee has a valid enterprise identity but does not yet have Deployment Agent access,
    When the DevOps Admin creates an access grant,
    Then the system stores the employee ID, display name snapshot, status, assigned roles, scope grants, and note.
 
@@ -934,7 +934,7 @@ so that product access can be managed without building a separate user account s
 **Dependencies**
 
 - Enterprise identity source returns employee ID and display name.
-- A local access grant data model and service are added to Release Agent.
+- A local access grant data model and service are added to Deployment Agent.
 
 **Out of Scope**
 
@@ -955,20 +955,20 @@ Authorize product entry with deny-by-default access control
 
 **Story**
 As a platform owner,
-I want Release Agent to allow only explicitly authorized employees into the product,
+I want Deployment Agent to allow only explicitly authorized employees into the product,
 so that platform access is controlled and auditable.
 
 **Acceptance Criteria**
 
-1. Given an employee is successfully authenticated by Team Book but has no Release Agent access grant,
+1. Given an employee is successfully authenticated by Team Book but has no Deployment Agent access grant,
    When the employee logs in,
    Then the system denies entry and displays an "Access not granted" message.
 
-2. Given an employee has a suspended Release Agent access grant,
+2. Given an employee has a suspended Deployment Agent access grant,
    When the employee logs in,
    Then the system denies entry and displays an "Access suspended" message.
 
-3. Given an employee has an active Release Agent access grant,
+3. Given an employee has an active Deployment Agent access grant,
    When the employee logs in,
    Then the system returns the employee's effective roles, permissions, and applicable scope grants rather than relying on a single hardcoded role value.
 
@@ -1053,7 +1053,7 @@ so that the product behaves predictably and securely.
 **Acceptance Criteria**
 
 1. Given a user only has Developer permissions,
-   When the user enters Release Agent,
+   When the user enters Deployment Agent,
    Then the user sees only the menus and actions that the Developer permission set allows.
 
 2. Given a user lacks the permission required for a page or API,
@@ -1075,7 +1075,7 @@ so that the product behaves predictably and securely.
 
 **Dependencies**
 
-- Unified permission model is defined for Release Agent.
+- Unified permission model is defined for Deployment Agent.
 - Frontend navigation and route guards are updated to use permissions.
 
 **Out of Scope**
@@ -1138,7 +1138,7 @@ so that authorization administration is traceable and reviewable.
 
 ## Summary
 
-These user stories define the full capabilities for Release Agent under the WWA Agent Workspace Hub.
+These user stories define the full capabilities for Deployment Agent under the WWA Agent Workspace Hub.
 They cover the core deployment workflow, platform navigation, template management, task governance, and shared capabilities.
 
 ### Core workflow

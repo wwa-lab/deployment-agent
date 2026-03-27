@@ -1,4 +1,4 @@
-# Release Agent — Implementation Plan
+# Deployment Agent — Implementation Plan
 
 **Last Updated**: 2026-03-24
 **Branch**: `develop-leo`
@@ -55,7 +55,7 @@ The following capability areas are treated as the implemented baseline for plann
 
 The following rules are already fixed by the current design baseline and should not be reopened unless upstream docs change:
 
-1. Team Book authenticates enterprise identity; Release Agent authorizes product access.
+1. Team Book authenticates enterprise identity; Deployment Agent authorizes product access.
 2. Product authorization in Phase 1 is based on local **Access Grants** plus `Application + SNOW Group` scope grants.
 3. Product entry becomes **deny-by-default** once Access Management is introduced.
 4. Archive / restore / purge is a rundown lifecycle capability, not part of Access Management.

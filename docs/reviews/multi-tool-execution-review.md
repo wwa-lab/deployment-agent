@@ -11,7 +11,7 @@
 
 ### Document Summary
 - **Document type:** Design (Phase 4)
-- **Scope summary:** Extends Release Agent's AUTO execution model from fire-and-forget submission into multi-tool routing (Jenkins + Ansible), polling-based status synchronization, and normalized external execution context in the Task Result and Activity UI. Covers 6 internal modules, API changes, data model extensions, and UX requirements.
+- **Scope summary:** Extends Deployment Agent's AUTO execution model from fire-and-forget submission into multi-tool routing (Jenkins + Ansible), polling-based status synchronization, and normalized external execution context in the Task Result and Activity UI. Covers 6 internal modules, API changes, data model extensions, and UX requirements.
 - **Intended next stage:** Task implementation (EXE-001 through EXE-016)
 
 ### Overall Assessment
@@ -21,7 +21,7 @@
 
 ### Strengths
 - **Module decomposition is clear and non-overlapping.** Each of the 6 modules (Resolution, Submission Orchestrator, Status Sync, Adapter Capability, Result/Activity Presentation, Audit/Observability) has distinct responsibilities with no ambiguous overlap.
-- **Normalized external status table is production-quality.** All 8 statuses are defined with terminal/non-terminal designation, meaning, and the exact Release Agent effect. This is the kind of precise contract that prevents adapter drift.
+- **Normalized external status table is production-quality.** All 8 statuses are defined with terminal/non-terminal designation, meaning, and the exact Deployment Agent effect. This is the kind of precise contract that prevents adapter drift.
 - **Resolution precedence table covers all routing cases.** Explicit override, URL inference, legacy fallback, and mismatch error are all defined with examples.
 - **State machine transitions are fully enumerated.** The four AUTO-task transitions are explicit; the review gate preservation after external success is stated as a rule, not an afterthought.
 - **Assumptions are labeled and resolved/unresolved status is explicit.** The `[Resolved]` / `[Assumption]` distinction is useful for downstream reviewers.

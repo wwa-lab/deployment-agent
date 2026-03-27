@@ -1,4 +1,4 @@
-# Data Model: Release Agent
+# Data Model: Deployment Agent
 
 **Date:** 2026-03-24
 **Status:** Implemented (current MVP + partial Phase 1 access governance)
@@ -10,7 +10,7 @@
 
 ## Overview
 
-The Release Agent currently persists seven implemented entity types in Oracle. The current workspace already includes an `Access Grant` entity with scope grants so the system can enforce deny-by-default product entry and scoped visibility, alongside the existing hierarchical workflow model (Release Flow → Request → Task → Execution History), append-only audit logging, and runtime configuration management. Existing structured attributes use converter-backed `CLOB` storage; `assigned_roles` and `scope_grants` on `DA_ACCESS_GRANT` are stored as JSON arrays via attribute converters.
+The Deployment Agent currently persists seven implemented entity types in Oracle. The current workspace already includes an `Access Grant` entity with scope grants so the system can enforce deny-by-default product entry and scoped visibility, alongside the existing hierarchical workflow model (Release Flow → Request → Task → Execution History), append-only audit logging, and runtime configuration management. Existing structured attributes use converter-backed `CLOB` storage; `assigned_roles` and `scope_grants` on `DA_ACCESS_GRANT` are stored as JSON arrays via attribute converters.
 
 ---
 
@@ -229,14 +229,14 @@ Immutable, append-only record of operator actions. Uses soft references (nullabl
 
 ### DA_ACCESS_GRANT
 
-Product-level authorization record for one enterprise employee within Release Agent. This entity controls whether an authenticated employee may enter the product, what roles are assigned, and which `Application + SNOW Group` records are visible/manageable.
+Product-level authorization record for one enterprise employee within Deployment Agent. This entity controls whether an authenticated employee may enter the product, what roles are assigned, and which `Application + SNOW Group` records are visible/manageable.
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
 | `employee_id` | VARCHAR(255) | No (PK) | Enterprise employee identifier |
 | `display_name_snapshot` | VARCHAR(255) | No | Last captured display name from identity source |
 | `grant_status` | VARCHAR(30) | No | Enum: `ACTIVE`, `SUSPENDED` |
-| `assigned_roles` | CLOB / JSON array | No | One or more Release Agent roles |
+| `assigned_roles` | CLOB / JSON array | No | One or more Deployment Agent roles |
 | `scope_grants` | CLOB / JSON array | Yes | Zero or more `Application + SNOW Group` visibility grants |
 | `note` | VARCHAR(1000) | Yes | Admin note / rationale |
 | `last_login_at` | TIMESTAMP | Yes | Last successful product entry time |

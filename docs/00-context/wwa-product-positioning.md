@@ -26,16 +26,16 @@ This is not a temporary arrangement. It is the foundational operating model for 
 | **FinBlock** | The upstream business system. Provides one stable entry link to WWA. Does not own agent logic, navigation, or permissions. |
 | **WWA Agent Workspace Hub (`WWA`)** | The unified DevOps hub above all agent workspaces. Owns authentication, top-level navigation, platform access governance, platform-level audit, and shared platform capabilities. |
 | **Agent Workspace** | An independently deployable microservice workspace for a specific agent domain. Presented consistently under the WWA Agent Workspace Hub. |
-| **Release Agent** | The first mature workspace under WWA. Owns deployment workflow, release flow logic, and execution integrations (Jenkins, Ansible). |
-| **Testing Agent** | The planned second workspace. Follows the same integration standard as Release Agent. |
+| **Deployment Agent** | The first mature workspace under WWA. Owns deployment workflow, release flow logic, and execution integrations (Jenkins, Ansible). |
+| **Testing Agent** | The planned second workspace. Follows the same integration standard as Deployment Agent. |
 
 ---
 
 ## Naming Rationale
 
-The workspace should now be called `Release Agent`, not `Deployment Agent`.
+The workspace should now be called `Deployment Agent`, not `Deployment Agent`.
 
-**Reason:** the current scope is broader than deployment execution alone. The workspace already owns release-flow lifecycle management, human review and progression control, execution coordination across tools, scoped visibility, and access-governance behaviors. `Release Agent` better matches that end-to-end operating boundary while still fitting the WWA `Agent Workspace` naming model.
+**Reason:** the current scope is broader than deployment execution alone. The workspace already owns release-flow lifecycle management, human review and progression control, execution coordination across tools, scoped visibility, and access-governance behaviors. `Deployment Agent` better matches that end-to-end operating boundary while still fitting the WWA `Agent Workspace` naming model.
 
 **Transition rule:** this naming update is currently a documentation and product-language change. Existing technical identifiers remain stable until a separate migration is approved. That includes the repository name, package namespace, route slug `/wwa/deployment-agent`, and API prefix `/api/deployment-agent`.
 
@@ -50,7 +50,7 @@ The platform layer should now be described as `WWA Agent Workspace Hub`.
 1. `FinBlock` provides **one** stable entry link pointing to the WWA home page, not to a specific agent.
 2. `WWA Agent Workspace Hub` is the platform entry point. Users authenticate in WWA, not inside an agent.
 3. Users land on the **WWA Agent Workspace Hub home page** after login. They choose their destination from there.
-4. `Release Agent` is **the first workspace**, not the implicit product shell or the default landing page.
+4. `Deployment Agent` is **the first workspace**, not the implicit product shell or the default landing page.
 5. Shared capabilities (Access Management, Audit Log) are **platform-owned**, not Release-Agent-owned.
 6. Template Management stays **Release-Agent-scoped** until a second agent proves that a shared template framework is needed. See section below.
 
@@ -70,7 +70,7 @@ Template workflows remain Release-Agent-owned for the current phase.
 
 ## Configuration Scope Decision
 
-All current configuration keys (`jenkins_url`, `jenkins_user`, `jenkins_api_token`, `ansible_url`, `ansible_user`, `ansible_api_token`, `execution_callback_endpoint`) are **agent-private** to Release Agent.
+All current configuration keys (`jenkins_url`, `jenkins_user`, `jenkins_api_token`, `ansible_url`, `ansible_user`, `ansible_api_token`, `execution_callback_endpoint`) are **agent-private** to Deployment Agent.
 
 No platform-shared configuration keys exist yet. Any new platform-level configuration (e.g., agent registry metadata, notification settings) should be introduced as a distinct category and not mixed with existing agent-private keys.
 
@@ -80,6 +80,6 @@ No platform-shared configuration keys exist yet. Any new platform-level configur
 
 This document is the authority for any naming, routing, or permission question during the platform transition. When in doubt:
 
-- The word "WWA" refers to the `WWA Agent Workspace Hub`, not to Release Agent.
-- The term "Release Agent" refers to the first agent workspace, never to the platform as a whole.
+- The word "WWA" refers to the `WWA Agent Workspace Hub`, not to Deployment Agent.
+- The term "Deployment Agent" refers to the first agent workspace, never to the platform as a whole.
 - Shared pages belong to WWA. Agent-specific pages belong to the owning agent.

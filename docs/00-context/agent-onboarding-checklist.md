@@ -97,19 +97,19 @@ Work through this checklist before raising a shell integration request.
 
 - [ ] Agent entry flow tested: `FinBlock link → WWA Home → Agent card → Agent workspace`
 - [ ] Return flow tested: `Agent workspace → WWA Home → FinBlock link`
-- [ ] Existing Release Agent workflows are unaffected (run `mvn test` — all 167+ tests pass)
+- [ ] Existing Deployment Agent workflows are unaffected (run `mvn test` — all 167+ tests pass)
 - [ ] Frontend typecheck passes: `cd frontend && npx vue-tsc --noEmit`
 - [ ] No structural changes to `WorkspaceLayout.vue` were required (if changes were needed, treat as shell defects)
 
 ---
 
-## Release Agent Reference (completed checklist)
+## Deployment Agent Reference (completed checklist)
 
-The following shows the completed state for Release Agent as the reference implementation.
+The following shows the completed state for Deployment Agent as the reference implementation.
 
 | Item | Status |
 |------|--------|
-| Agent name confirmed | ✓ Release Agent |
+| Agent name confirmed | ✓ Deployment Agent |
 | Shell registration | ✓ `agentRegistry.ts`, key `deployment-agent` |
 | Route registered | ✓ `/wwa/deployment-agent` in `router/index.ts` |
 | WWA Home card | ✓ Rendered via agentRegistry |

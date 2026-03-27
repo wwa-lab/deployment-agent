@@ -29,7 +29,7 @@
 | Default entry | `/` and `/wwa` both redirect to `/wwa/deployment-agent`; there is no WWA home page |
 | Shell semantics | `WorkspaceLayout.vue` contains a bug: `isWwaExpanded` is referenced (lines 183, 204) but never declared; the chevron direction is always stale |
 | Authenticated redirect | `router.beforeEach` sends authenticated users to `wwa-deployment-agent`, not a WWA home |
-| Navigation wording | Flyout nav lists "Release Agent" as the first item with no visual distinction from platform capabilities |
+| Navigation wording | Flyout nav lists "Deployment Agent" as the first item with no visual distinction from platform capabilities |
 | Sidebar identity | Logo reads "Workspace Hub / Application Navigation", not "WWA" |
 
 ### What is missing
@@ -57,7 +57,7 @@
 |--------|------|
 | Write product positioning decision record | `docs/00-context/wwa-product-positioning.md` (create) |
 
-**Change description:** Lock the naming hierarchy (`FinBlock → WWA → Agent Workspace → Release Agent`) and confirm it as the foundation for all subsequent route, permission, and documentation work. This document gates all other tasks.
+**Change description:** Lock the naming hierarchy (`FinBlock → WWA → Agent Workspace → Deployment Agent`) and confirm it as the foundation for all subsequent route, permission, and documentation work. This document gates all other tasks.
 
 ---
 
@@ -71,7 +71,7 @@
 | Add route | `frontend/src/router/index.ts` — add `/wwa/home` route with `name: 'wwa-home'` and `sectionTitle: 'Home'` meta |
 | Expose home in nav | `frontend/src/views/WorkspaceLayout.vue` — add `wwa-home` entry at top of `navItems` computed |
 
-**Change description:** `WwaHomeView.vue` should display: platform identity, current user, agent cards driven by the agent registry (WWA-004), recent visits placeholder, and a return-to-FinBlock affordance. Do not hard-code Release Agent as the only card.
+**Change description:** `WwaHomeView.vue` should display: platform identity, current user, agent cards driven by the agent registry (WWA-004), recent visits placeholder, and a return-to-FinBlock affordance. Do not hard-code Deployment Agent as the only card.
 
 ---
 
@@ -86,7 +86,7 @@
 | Change authenticated redirect | `frontend/src/router/index.ts` line 107: `return { name: 'wwa-home' }` |
 | Add `/release-flows` legacy redirect | `frontend/src/router/index.ts` line 18-19: keep redirecting to `/wwa/deployment-agent` (legacy bookmark support) |
 
-**Change description:** Ensure users who navigate to `/`, `/wwa`, or are redirected after login all land on the new WWA home page, not directly in Release Agent.
+**Change description:** Ensure users who navigate to `/`, `/wwa`, or are redirected after login all land on the new WWA home page, not directly in Deployment Agent.
 
 ---
 
@@ -98,7 +98,7 @@
 |--------|------|
 | Create agent registry config | `frontend/src/config/agentRegistry.ts` (create) |
 | Define `AgentDescriptor` type | `frontend/src/config/agentRegistry.ts` — fields: `key`, `name`, `description`, `route`, `icon`, `enabled`, `category` |
-| Register Release Agent | `frontend/src/config/agentRegistry.ts` — first entry |
+| Register Deployment Agent | `frontend/src/config/agentRegistry.ts` — first entry |
 | Consume in shell nav | `frontend/src/views/WorkspaceLayout.vue` — replace hardcoded `navItems` with registry-driven list for agent-category items |
 | Consume in WWA home | `frontend/src/views/WwaHomeView.vue` — iterate registry to render agent cards |
 
@@ -115,10 +115,10 @@
 | Fix `isWwaExpanded` bug | `frontend/src/views/WorkspaceLayout.vue` — declare `const isWwaExpanded = computed(() => isWwaFlyoutOpen.value)` or replace references with `isWwaFlyoutOpen` |
 | Separate platform and agent nav groups | `frontend/src/views/WorkspaceLayout.vue` — split `navItems` into `platformNavItems` (Audit Log, Access Management) and `agentNavItems` (from registry) |
 | Update sidebar logo | `frontend/src/views/WorkspaceLayout.vue` — change `logo-text` to "WWA Platform" and `logo-subtitle` to "Agent Workspace Hub" |
-| Add breadcrumb context | `frontend/src/views/WorkspaceLayout.vue` — add a visual breadcrumb row beneath topbar: `WWA > Release Agent` when inside an agent |
+| Add breadcrumb context | `frontend/src/views/WorkspaceLayout.vue` — add a visual breadcrumb row beneath topbar: `WWA > Deployment Agent` when inside an agent |
 | Update `openWwaWorkspace()` | `frontend/src/views/WorkspaceLayout.vue` line 88: push to `/wwa/home` instead of `/wwa/deployment-agent` |
 
-**Change description:** Users should always know they are in WWA, which agent they are viewing, and how to return to the platform home. The shell must not say or imply "Release Agent" is the default product.
+**Change description:** Users should always know they are in WWA, which agent they are viewing, and how to return to the platform home. The shell must not say or imply "Deployment Agent" is the default product.
 
 ---
 
@@ -156,7 +156,7 @@
 
 | Action | File |
 |--------|------|
-| Update page header wording | `frontend/src/views/AccessManagementView.vue` — change page title from "Access Management" (Release Agent implied) to "WWA Access Management" with subtitle "Controls platform entry and agent workspace visibility" |
+| Update page header wording | `frontend/src/views/AccessManagementView.vue` — change page title from "Access Management" (Deployment Agent implied) to "WWA Access Management" with subtitle "Controls platform entry and agent workspace visibility" |
 | Add scope concept to UI | `frontend/src/views/AccessManagementView.vue` — add column or badge showing which access grants are platform-wide versus agent-scoped |
 | Update Javadoc | `src/main/java/.../domain/auth/AccessGrant.java` — add class-level Javadoc clarifying the `scopeGrants` field and its intended multi-agent evolution |
 | Update API endpoint path | `src/main/java/.../web/controller/AccessGrantController.java` — consider moving from `/api/deployment-agent/access-grants` to `/api/wwa/access-grants` (coordinate with WWA-013 API prefix work) |
@@ -201,8 +201,8 @@
 
 | Action | File |
 |--------|------|
-| Add config scope annotation | `src/main/java/.../contracts/enums/ConfigKey.java` — rename enum to add comments: `// Agent-private: Release Agent execution` above Jenkins/Ansible keys; add `// Platform-shared: reserved for future use` section |
-| Update config UI wording | `frontend/src/views/ConfigAdminView.vue` — add section header "Release Agent Configuration" above the Jenkins/Ansible settings |
+| Add config scope annotation | `src/main/java/.../contracts/enums/ConfigKey.java` — rename enum to add comments: `// Agent-private: Deployment Agent execution` above Jenkins/Ansible keys; add `// Platform-shared: reserved for future use` section |
+| Update config UI wording | `frontend/src/views/ConfigAdminView.vue` — add section header "Deployment Agent Configuration" above the Jenkins/Ansible settings |
 
 **Change description:** All 7 current `ConfigKey` values (`jenkins_url`, `jenkins_user`, `jenkins_api_token`, `ansible_url`, `ansible_user`, `ansible_api_token`, `execution_callback_endpoint`) are agent-private. No config key belongs to the platform layer yet. Document this as an explicit decision.
 
@@ -221,19 +221,19 @@
 
 ---
 
-### WWA-013 — Normalize Release Agent as the First Workspace
+### WWA-013 — Normalize Deployment Agent as the First Workspace
 
 **Effort:** M
 
 | Action | File |
 |--------|------|
-| Update route sectionTitle | `frontend/src/router/index.ts` — keep `sectionTitle: 'Release Agent'` but add `workspaceLabel: 'Release Agent'` meta for breadcrumb use |
-| Update view page headers | `frontend/src/views/ReleaseFlowSummaryView.vue` — change any "Welcome to Release Agent" or similar copy to use "Release Agent" as a workspace name, not a product title |
+| Update route sectionTitle | `frontend/src/router/index.ts` — keep `sectionTitle: 'Deployment Agent'` but add `workspaceLabel: 'Deployment Agent'` meta for breadcrumb use |
+| Update view page headers | `frontend/src/views/ReleaseFlowSummaryView.vue` — change any "Welcome to Deployment Agent" or similar copy to use "Deployment Agent" as a workspace name, not a product title |
 | Update view page headers | `frontend/src/views/ReleaseFlowDetailView.vue` — same framing update |
 | Update shell nav label ordering | `frontend/src/views/WorkspaceLayout.vue` — in flyout, place a "Workspaces" sub-header above agent items and "Platform" sub-header above shared capability items |
 | Remove DA-centric sidebar assumption | `frontend/src/views/WorkspaceLayout.vue` line 88: `openWwaWorkspace()` should go to `/wwa/home`, not `/wwa/deployment-agent` (same fix as WWA-005) |
 
-**Change description:** Do not rename or restructure the Release Agent domain logic. The change is purely at the shell framing level. Preserve all existing `/wwa/deployment-agent` routes and all controller mappings.
+**Change description:** Do not rename or restructure the Deployment Agent domain logic. The change is purely at the shell framing level. Preserve all existing `/wwa/deployment-agent` routes and all controller mappings.
 
 ---
 
@@ -243,10 +243,10 @@
 
 | Action | File |
 |--------|------|
-| Update architecture overview section | `docs/04-architecture/architecture.md` — replace "Release Agent is a controlled deployment workflow system" opening with "Release Agent is the first workspace within the WWA Agent Workspace Hub" framing |
+| Update architecture overview section | `docs/04-architecture/architecture.md` — replace "Deployment Agent is a controlled deployment workflow system" opening with "Deployment Agent is the first workspace within the WWA Agent Workspace Hub" framing |
 | Update design doc | `docs/05-design/design.md` — add "Platform Context" section describing WWA shell relationship |
 | Update IMPLEMENTATION_PLAN.md | `docs/IMPLEMENTATION_PLAN.md` — annotate completed phases; add note that WWA Agent Workspace Hub transition tasks are tracked separately |
-| Cross-document consistency check | Verify that architecture.md and design.md consistently use "WWA" as the platform name and "Release Agent" as the first workspace |
+| Cross-document consistency check | Verify that architecture.md and design.md consistently use "WWA" as the platform name and "Deployment Agent" as the first workspace |
 
 **Change description:** No code changes. Documentation only. Must be completed before Batch 5 tasks reference it.
 
@@ -280,7 +280,7 @@
 
 ---
 
-### WWA-017 — Validate Release Agent Regression Baseline
+### WWA-017 — Validate Deployment Agent Regression Baseline
 
 **Effort:** S
 
@@ -478,13 +478,13 @@ cd frontend && npx vue-tsc --noEmit
 
 Manual checks:
 - [ ] `/` redirects to `/wwa/home` (not `/wwa/deployment-agent`)
-- [ ] WWA home page shows at least one agent card (Release Agent)
-- [ ] Topbar breadcrumb shows `WWA > Release Agent` when inside DA
+- [ ] WWA home page shows at least one agent card (Deployment Agent)
+- [ ] Topbar breadcrumb shows `WWA > Deployment Agent` when inside DA
 - [ ] Sidebar logo reads "WWA Platform" (not "Workspace Hub")
 - [ ] `isWwaExpanded` bug is fixed — chevron reflects actual flyout state
 - [ ] Flyout nav shows "Workspaces" and "Platform" section headers
 - [ ] FinBlock return link is visible in the topbar
-- [ ] Release Agent release flow summary, detail, upload, decision flows all work
+- [ ] Deployment Agent release flow summary, detail, upload, decision flows all work
 
 ---
 
@@ -506,7 +506,7 @@ Manual checks:
 - [ ] `AuditLogEntry` has `agentName`, `targetType`, `targetId`, `sourceSystem` columns
 - [ ] H2 test schema includes the new audit columns
 - [ ] `AuditLogView.vue` has "Platform Events" and "Agent Activity" tabs
-- [ ] `ConfigAdminView.vue` shows "Release Agent Configuration" section header
+- [ ] `ConfigAdminView.vue` shows "Deployment Agent Configuration" section header
 - [ ] `AccessManagementView.vue` title reads "WWA Access Management"
 - [ ] `docs/00-context/agent-onboarding-checklist.md` exists and covers all 12 checklist items from the integration standard
 
@@ -529,7 +529,7 @@ Manual checks:
 - [ ] Testing Agent appears as a card on WWA home page
 - [ ] Testing Agent appears in the shell flyout nav under "Workspaces"
 - [ ] Navigating to Testing Agent does not require any changes to `WorkspaceLayout.vue` beyond what was already done
-- [ ] Release Agent workflows are fully functional (regression check)
+- [ ] Deployment Agent workflows are fully functional (regression check)
 - [ ] `multi-agent-integration-standard.md` is updated to v1.0
 
 ---
@@ -582,7 +582,7 @@ Files touched by the most tasks across all batches:
 | WWA-010 | Split platform audit from agent activity | 2 | 4 | M |
 | WWA-011 | Config classification | 2 | 3 | S |
 | WWA-012 | Template scope decision | 2 | 3 | S |
-| WWA-013 | Normalize Release Agent as first workspace | 1 | 5 | M |
+| WWA-013 | Normalize Deployment Agent as first workspace | 1 | 5 | M |
 | WWA-014 | Update supporting documentation | 1 | 2 | M |
 | WWA-015 | New-agent onboarding checklist | 2 | 5 | S |
 | WWA-016 | Acceptance tests for shell behavior | 3 | 6 | M |

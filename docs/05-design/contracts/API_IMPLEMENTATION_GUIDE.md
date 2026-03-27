@@ -1,7 +1,7 @@
-# Release Agent — API Implementation Guide
+# Deployment Agent — API Implementation Guide
 
-**Date:** 2026-03-24
-**Version:** 1.2 (current MVP + partial Phase 1 Access Management implementation)
+**Date:** 2026-03-27
+**Version:** 1.3 (current MVP + partial Phase 1 Access Management + template-based rundown creation)
 **Base Path:** `/api/deployment-agent`
 **Backend:** Java 21 / Spring Boot 3.2.4 / Spring MVC
 **Auth:** Session-based Team Book login with local Access Grant resolution and effective permissions
@@ -10,7 +10,7 @@
 
 ## Overview
 
-This guide describes the backend API surface for Release Agent. It covers the current MVP workflow APIs plus the currently implemented auth/access-management surface used for deny-by-default product entry and scoped visibility.
+This guide describes the backend API surface for Deployment Agent. It covers the current MVP workflow APIs plus the currently implemented auth/access-management surface used for deny-by-default product entry and scoped visibility.
 
 **Interpretation rule**
 - Implemented auth/access-management endpoints are described as current behavior.
@@ -129,6 +129,7 @@ All errors should return a consistent JSON body:
 |-----------|--------|----------|------|
 | List Release Flows | GET | `/release-flows` | Any authenticated within scoped visibility |
 | Get Release Flow detail | GET | `/release-flows/{id}` | Any authenticated within scoped visibility |
+| Create rundown from template | POST | `/release-flows/from-template` | DEVELOPER, TL, DEVOPS_ADMIN |
 | Update stage rundown | PATCH | `/release-flows/{flowId}/requests/{requestId}/rundown` | DEVELOPER, TL, DEVOPS_ADMIN |
 | Archive stage rundown | POST | `/release-flows/{flowId}/requests/{requestId}/archive` | DEVELOPER, TL, DEVOPS_ADMIN |
 | Restore archived stage rundown | POST | `/release-flows/{flowId}/requests/{requestId}/restore` | DEVOPS_ADMIN |
@@ -245,7 +246,7 @@ Invalidates the current session.
 
 ### GET /access-grants
 
-Lists product Access Grants for Release Agent administration.
+Lists product Access Grants for Deployment Agent administration.
 
 **Query Parameters**
 
@@ -355,7 +356,7 @@ Parses an Excel file (`AMH_HCC_task`) and creates or updates a Release Flow for 
   "taskCount": 12,
   "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
   "application": "AMH HCC",
-  "agent": "Release Agent"
+  "agent": "Deployment Agent"
 }
 ```
 
@@ -415,7 +416,7 @@ Returns a paginated list of Release Flows.
       "reviewStatus": "Pending_Review",
       "application": "AMH HCC",
       "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
-      "agent": "Release Agent",
+      "agent": "Deployment Agent",
       "owner": "alice"
     }
   ],
@@ -434,6 +435,95 @@ Returns Release Flow detail, nested stage requests, and tasks.
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `includeArchived` | Boolean | `false` | Admin-only archived visibility |
+
+### POST /release-flows/from-template
+
+Creates a new Release Flow request (rundown) from a saved template record, bypassing Excel upload.
+
+**Auth:** DEVELOPER, TL, or DEVOPS_ADMIN
+
+**Request Body**
+
+```json
+{
+  "templateId": "uuid",
+  "templateName": "AMH HCC Standard Deploy",
+  "projectId": "AMH-HCC",
+  "projectName": "AMH HCC",
+  "stage": "SIT",
+  "releaseId": "amh-hcc-sit-01",
+  "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+  "application": "AMH HCC",
+  "agent": "Deployment Agent",
+  "site": "HK",
+  "owner": "alice",
+  "estimatedRemainingMinutes": 120,
+  "tasks": [
+    {
+      "category": "Infrastructure",
+      "taskName": "Deploy DB Schema",
+      "step": 1,
+      "stepName": "Run Flyway migration",
+      "type": "MANUAL",
+      "critical": true,
+      "owner": "alice",
+      "estDurationMinutes": 30,
+      "dependencies": null
+    }
+  ]
+}
+```
+
+**Field Notes**
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `templateId` | No | Informational reference; not used for lookup |
+| `templateName` | No | Captured in audit context |
+| `projectId` | No | Derived from `projectName` if omitted |
+| `projectName` | Yes | Used as the Release Flow display name |
+| `stage` | Yes | `SIT`, `UAT`, or `PROD` |
+| `releaseId` | Yes | Must match pattern `xxx-{stage}-NN` (e.g. `amh-hcc-sit-01`) and the stage segment must match the `stage` field |
+| `tasks[].step` | Yes | Must be ≥ 1; tasks are sorted by step before creation |
+| `tasks[].taskName` | Yes | Maps to `task_group_name` |
+| `tasks[].stepName` | Yes | Maps to `task_name` |
+| `tasks[].type` | Yes | `MANUAL` or `AUTO` |
+| `estimatedRemainingMinutes` | No | Calculated from task durations if omitted |
+
+**Response** `200 OK`
+
+```json
+{
+  "releaseFlowId": "uuid-string",
+  "releaseId": "amh-hcc-sit-01",
+  "stage": "SIT",
+  "taskCount": 8,
+  "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+  "application": "AMH HCC",
+  "agent": "Deployment Agent"
+}
+```
+
+**Validation**
+- `projectName`, `stage`, `releaseId`, and at least one task are required
+- Release identifier must conform to `{prefix}-{stage}-{sequence}` pattern
+- Stage segment of release identifier must match the `stage` field
+- Task `step` must be ≥ 1; `taskName` and `stepName` must be non-blank; `type` must be valid
+- Archived release identifiers cannot be reused
+
+**Errors**
+
+| Status | Code | When |
+|--------|------|------|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 403 | `FORBIDDEN` | Caller lacks rundown edit permission |
+
+**Side effects**
+- Creates or reuses a Release Flow for the derived project + release identifier
+- Creates a new Request and Tasks for the selected stage
+- Records upload audit entry with `source: "template"`
+
+---
 
 ### PATCH /release-flows/{flowId}/requests/{requestId}/rundown
 
@@ -624,7 +714,7 @@ Applies a human decision to a task and triggers progression logic.
 
 ### GET /config
 
-Returns configuration items for Release Agent integrations.
+Returns configuration items for Deployment Agent integrations.
 
 ### POST /config
 
