@@ -27,6 +27,15 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
       </div>
     </div>
 
+    <section class="wwa-intro-card" aria-labelledby="wwa-home-intro-title">
+      <div class="wwa-intro-kicker">What WWA Means</div>
+      <h2 id="wwa-home-intro-title" class="wwa-intro-title">WWA = Work With Agent</h2>
+      <p class="wwa-intro-text">
+        WWA is the internal workspace shell for agent-supported IT operations. Use this hub
+        to enter agent workspaces and shared platform capabilities.
+      </p>
+    </section>
+
     <section class="agent-section">
       <h2 class="section-heading">Agent Workspaces</h2>
       <div class="agent-grid">

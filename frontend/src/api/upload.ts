@@ -1,7 +1,8 @@
 import apiClient from './client'
 import type { Stage, UploadResponse } from '../types'
 
-export interface UploadScopeInput {
+export interface UploadOptions {
+  releaseId?: string
   snowGroup?: string
   application?: string
   agent?: string
@@ -10,14 +11,15 @@ export interface UploadScopeInput {
 export async function uploadFile(
   file: File,
   stage: Stage,
-  scope: UploadScopeInput = {},
+  options: UploadOptions = {},
 ): Promise<UploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('stage', stage)
-  if (scope.snowGroup) formData.append('snowGroup', scope.snowGroup)
-  if (scope.application) formData.append('application', scope.application)
-  if (scope.agent) formData.append('agent', scope.agent)
+  if (options.releaseId) formData.append('releaseId', options.releaseId)
+  if (options.snowGroup) formData.append('snowGroup', options.snowGroup)
+  if (options.application) formData.append('application', options.application)
+  if (options.agent) formData.append('agent', options.agent)
 
   const response = await apiClient.post('/upload', formData, {
     headers: {

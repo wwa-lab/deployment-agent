@@ -30,6 +30,7 @@ const primaryNavItems: PrimaryNavItem[] = [
 
 const activeSectionTitle = computed(() => (route.meta.sectionTitle as string) ?? 'WWA')
 const isWwaWorkspace = computed(() => route.path.startsWith('/wwa'))
+const isWwaHomeRoute = computed(() => route.name === 'wwa-home')
 
 // Breadcrumb: show agent name when inside an agent workspace (not on home)
 const activeWorkspaceLabel = computed(() => {
@@ -38,6 +39,9 @@ const activeWorkspaceLabel = computed(() => {
   const agent = agentRegistry.find((a) => a.key === section)
   return agent?.name ?? null
 })
+const shouldShowWorkspaceBreadcrumb = computed(
+  () => !!activeWorkspaceLabel.value && activeWorkspaceLabel.value !== activeSectionTitle.value,
+)
 
 function openWwaHome() {
   router.push({ name: 'wwa-home' })
@@ -221,12 +225,19 @@ watch(
         <div class="topbar-branding">
           <div class="topbar-kicker">WWA</div>
           <div class="topbar-title">
-            <span v-if="activeWorkspaceLabel" class="breadcrumb-workspace">{{ activeWorkspaceLabel }}</span>
-            <span v-if="activeWorkspaceLabel" class="breadcrumb-sep" aria-hidden="true"> › </span>
+            <span v-if="shouldShowWorkspaceBreadcrumb" class="breadcrumb-workspace">{{ activeWorkspaceLabel }}</span>
+            <span v-if="shouldShowWorkspaceBreadcrumb" class="breadcrumb-sep" aria-hidden="true"> › </span>
             {{ activeSectionTitle }}
           </div>
         </div>
         <div class="topbar-user">
+          <router-link
+            to="/wwa/home"
+            class="workspace-topbar-link wwa-home-topbar-link"
+            :aria-current="isWwaHomeRoute ? 'page' : undefined"
+          >
+            ← WWA Home
+          </router-link>
           <a :href="FINBLOCK_URL" class="finblock-topbar-link" title="Return to FinBlock">← FinBlock</a>
           <span class="user-name">{{ userStore.displayName || userStore.userId }}</span>
           <span class="badge badge-role">{{ userStore.role }}</span>
@@ -514,6 +525,35 @@ watch(
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.workspace-topbar-link {
+  font-size: 12px;
+  text-decoration: none;
+  border: 1px solid #e2e8f0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.wwa-home-topbar-link {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.wwa-home-topbar-link:hover {
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.wwa-home-topbar-link[aria-current='page'] {
+  color: #1e3a8a;
+  border-color: #93c5fd;
+  background: #dbeafe;
 }
 
 .finblock-topbar-link {

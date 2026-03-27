@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a recommended upload-time `Release Identifier` field so users can explicitly group repeated SIT/UAT/PROD uploads into the intended rundown, while duplicate same-stage uploads under the same identifier are now blocked with a clear validation error.
+- Fixed upload import so re-uploading the same project/stage creates a new release rundown instead of overwriting the existing active one; later-stage uploads now attach to the newest eligible release flow that does not already contain that stage.
+- Fixed the logged-in WWA top-bar title so agent workspace pages no longer repeat the same label as `Workspace › Page` when both values are identical.
+- Added a persistent `WWA Home` return action in the logged-in workspace top bar, so users can jump back to the WWA home page without reopening the left-side flyout.
+- Added a first-screen explanation that expands WWA to "Work With Agent" on the login page, the WWA home page, and the default Deployment Agent landing page.
 - Removed placeholder application entries from the WWA sidebar so the shell only shows real workspace navigation.
 - Added working Excel template download support in the upload dialog.
 - Restored local-profile authentication filters so session-backed user context is available during frontend testing.

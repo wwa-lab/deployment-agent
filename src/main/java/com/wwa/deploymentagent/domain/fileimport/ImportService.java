@@ -14,6 +14,7 @@ import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.ImportValidationException;
+import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,9 +31,9 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li>Delegates parsing and validation to {@link ExcelParserService}</li>
  *   <li>Groups parsed rows by project_id</li>
- *   <li>Finds or creates a Release Flow per project</li>
+ *   <li>Finds or creates a Release Flow per project/stage upload</li>
  *   <li>Finds or creates a Request for the upload stage</li>
- *   <li>Upserts tasks (preserving execution state on re-upload)</li>
+ *   <li>Creates tasks for the selected rundown</li>
  *   <li>Audits the upload event</li>
  * </ol>
  *
@@ -51,7 +52,7 @@ public class ImportService {
 
     @Transactional
     public ImportResult importFile(byte[] fileBytes, Stage stage, UserContext user) throws IOException {
-        return importFile(fileBytes, stage, user, null, null, null);
+        return importFile(fileBytes, stage, user, null, null, null, null);
     }
 
     @Transactional
@@ -59,6 +60,18 @@ public class ImportService {
             byte[] fileBytes,
             Stage stage,
             UserContext user,
+            String snowGroup,
+            String application,
+            String agent) throws IOException {
+        return importFile(fileBytes, stage, user, null, snowGroup, application, agent);
+    }
+
+    @Transactional
+    public ImportResult importFile(
+            byte[] fileBytes,
+            Stage stage,
+            UserContext user,
+            String requestedReleaseId,
             String snowGroup,
             String application,
             String agent) throws IOException {
@@ -85,7 +98,7 @@ public class ImportService {
             String projectName = rows.get(0).projectName();
             String requestOwner = inferRequestOwner(rows, user);
 
-            ReleaseFlow rf = findOrCreateReleaseFlow(projectId, projectName, stage);
+            ReleaseFlow rf = findOrCreateReleaseFlow(projectId, projectName, stage, requestedReleaseId);
 
             Request request = findOrCreateRequest(rf, stage, user, snowGroup, application, agent, requestOwner);
 
@@ -118,17 +131,70 @@ public class ImportService {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private ReleaseFlow findOrCreateReleaseFlow(String projectId, String projectName, Stage stage) {
-        Optional<ReleaseFlow> existing =
-                releaseFlowRepository.findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId);
+    private ReleaseFlow findOrCreateReleaseFlow(
+            String projectId,
+            String projectName,
+            Stage stage,
+            String requestedReleaseId) {
+        String explicitReleaseId = normalizeBlank(requestedReleaseId);
+        if (explicitReleaseId != null) {
+            return findOrCreateReleaseFlowByIdentifier(projectId, projectName, stage, explicitReleaseId);
+        }
+
+        Optional<ReleaseFlow> existing = releaseFlowRepository
+                .findActiveByProjectIdWithoutStageOrderByCreatedAtDesc(projectId, stage)
+                .stream()
+                .findFirst();
         if (existing.isPresent()) {
             return existing.get();
         }
+        return createReleaseFlow(projectId, projectName, stage);
+    }
+
+    private ReleaseFlow findOrCreateReleaseFlowByIdentifier(
+            String projectId,
+            String projectName,
+            Stage stage,
+            String explicitReleaseId) {
+        String normalizedReleaseId = normalizeReleaseIdentifier(explicitReleaseId);
+        Optional<ReleaseFlow> existing = findExistingReleaseFlowByIdentifier(
+                projectId,
+                explicitReleaseId,
+                normalizedReleaseId);
+
+        if (existing.isPresent()) {
+            ReleaseFlow releaseFlow = existing.get();
+            if (releaseFlow.getArchivedAt() != null) {
+                throw new ValidationAppException(
+                        "Release identifier '" + explicitReleaseId + "' is already archived for project '"
+                                + projectId + "'. Restore that rundown or use a new release identifier.");
+            }
+            if (requestRepository.findByReleaseFlowIdAndStageAndArchivedAtIsNull(releaseFlow.getId(), stage)
+                    .isPresent()) {
+                throw new ValidationAppException(
+                        "Release identifier '" + explicitReleaseId + "' already contains stage "
+                                + stage.name()
+                                + ". Use a new release identifier for a new "
+                                + stage.name()
+                                + " rundown.");
+            }
+            return releaseFlow;
+        }
+
+        return releaseFlowService.create(projectId, projectName, explicitReleaseId, normalizedReleaseId, stage);
+    }
+
+    private ReleaseFlow createReleaseFlow(String projectId, String projectName, Stage stage) {
         String normalized    = normalizeId(projectId);
         long count           = releaseFlowRepository.countByProjectId(projectId);
         String genReleaseId  = stage.name().toLowerCase() + "-" + normalized
                 + "-" + String.format("%04d", count + 1);
-        return releaseFlowService.create(projectId, projectName, genReleaseId, genReleaseId, stage);
+        return releaseFlowService.create(
+                projectId,
+                projectName,
+                genReleaseId,
+                normalizeReleaseIdentifier(genReleaseId),
+                stage);
     }
 
     private Request findOrCreateRequest(
@@ -161,16 +227,11 @@ public class ImportService {
     }
 
     private void upsertTask(Request request, ParsedTaskRow row) {
-        Task task = taskRepository
-                .findByRequestIdAndTaskGroupIdAndStepSeq(request.getId(), row.taskGroupId(), row.stepSeq())
-                .orElseGet(Task::new);
+        Task task = new Task();
+        task.setRequest(request);
+        task.setTaskStatus(TaskStatus.Pending);
 
-        boolean isNew = task.getId() == null;
-        if (isNew) {
-            task.setRequest(request);
-            task.setTaskStatus(TaskStatus.Pending);
-        }
-        // Update all template-derived fields; preserve execution state on re-upload
+        // Apply all template-derived fields for this newly created rundown task.
         task.setTaskGroupId(row.taskGroupId());
         task.setTaskGroupName(row.taskGroupName());
         task.setStepSeq(row.stepSeq());
@@ -189,6 +250,35 @@ public class ImportService {
 
     private static String normalizeId(String id) {
         return id.toLowerCase().replaceAll("[^a-z0-9]", "");
+    }
+
+    private String normalizeReleaseIdentifier(String releaseIdentifier) {
+        String normalizedReleaseIdentifier = normalizeId(releaseIdentifier);
+        if (normalizedReleaseIdentifier.isBlank()) {
+            throw new ValidationAppException("Release identifier must contain at least one letter or number.");
+        }
+        if (releaseIdentifier.length() > 255) {
+            throw new ValidationAppException("Release identifier cannot exceed 255 characters.");
+        }
+        return normalizedReleaseIdentifier;
+    }
+
+    private Optional<ReleaseFlow> findExistingReleaseFlowByIdentifier(
+            String projectId,
+            String explicitReleaseId,
+            String normalizedReleaseId) {
+        Optional<ReleaseFlow> existing = releaseFlowRepository
+                .findByProjectIdAndNormalizedReleaseId(projectId, normalizedReleaseId);
+        if (existing.isPresent()) {
+            return existing;
+        }
+
+        String legacyNormalizedReleaseId = explicitReleaseId.trim().toLowerCase();
+        if (legacyNormalizedReleaseId.equals(normalizedReleaseId)) {
+            return Optional.empty();
+        }
+
+        return releaseFlowRepository.findByProjectIdAndNormalizedReleaseId(projectId, legacyNormalizedReleaseId);
     }
 
     private String inferRequestOwner(List<ParsedTaskRow> rows, UserContext user) {

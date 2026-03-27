@@ -22,7 +22,7 @@ import java.io.IOException;
  * Upload controller – accepts an XLSX file + stage, runs the full import.
  *
  * <pre>
- *   POST /api/deployment-agent/upload   (multipart: file + stage)
+ *   POST /api/deployment-agent/upload   (multipart: file + stage + optional releaseId)
  * </pre>
  *
  * <p>Authorization: DEVELOPER, TL, or DEVOPS_ADMIN role.
@@ -51,6 +51,7 @@ public class UploadController {
     public ResponseEntity<UploadResponseDto> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam("stage") String stageParam,
+            @RequestParam(value = "releaseId", required = false) String releaseId,
             @RequestParam(value = "snowGroup", required = false) String snowGroup,
             @RequestParam(value = "application", required = false) String application,
             @RequestParam(value = "agent", required = false) String agent,
@@ -70,7 +71,14 @@ public class UploadController {
             throw new ValidationAppException("Uploaded file is empty");
         }
 
-        ImportResult result = importService.importFile(file.getBytes(), stage, user, snowGroup, application, agent);
+        ImportResult result = importService.importFile(
+                file.getBytes(),
+                stage,
+                user,
+                releaseId,
+                snowGroup,
+                application,
+                agent);
         return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 

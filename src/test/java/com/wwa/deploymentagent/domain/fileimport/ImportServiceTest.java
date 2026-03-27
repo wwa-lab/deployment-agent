@@ -4,8 +4,10 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
 import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.ImportValidationException;
+import com.wwa.deploymentagent.errors.ValidationAppException;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +32,7 @@ class ImportServiceTest {
 
     @Autowired private ImportService importService;
     @Autowired private ReleaseFlowRepository releaseFlowRepository;
+    @Autowired private ReleaseFlowService releaseFlowService;
     @Autowired private RequestRepository requestRepository;
     @Autowired private TaskRepository taskRepository;
 
@@ -81,28 +84,159 @@ class ImportServiceTest {
     }
 
     @Test
-    @DisplayName("re-upload same project + stage updates tasks without duplicating them")
-    void importFile_reUpload_upsertsTasks() throws IOException {
+    @DisplayName("same project + same stage upload creates a new release flow instead of overwriting the existing rundown")
+    void importFile_sameStageUpload_createsNewReleaseFlow() throws IOException {
         byte[] first = buildXlsx("PROJ-B", "Project B", "TG-01", "Task B", 1, "original-step", "MANUAL");
         ImportResult firstResult = importService.importFile(first, Stage.SIT, developer);
 
-        long taskCountBefore = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(
-                requestRepository.findByReleaseFlowId(firstResult.releaseFlowId()).get(0).getId()
-        ).size();
-
         byte[] second = buildXlsx("PROJ-B", "Project B", "TG-01", "Task B", 1, "updated-step", "MANUAL");
-        importService.importFile(second, Stage.SIT, developer);
+        ImportResult secondResult = importService.importFile(second, Stage.SIT, developer);
 
-        long taskCountAfter = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(
-                requestRepository.findByReleaseFlowId(firstResult.releaseFlowId()).get(0).getId()
-        ).size();
+        assertThat(secondResult.releaseFlowId()).isNotEqualTo(firstResult.releaseFlowId());
+        assertThat(secondResult.releaseId()).isNotEqualTo(firstResult.releaseId());
 
-        assertThat(taskCountAfter).isEqualTo(taskCountBefore); // no duplicates
+        var firstRequests = requestRepository.findByReleaseFlowId(firstResult.releaseFlowId());
+        var secondRequests = requestRepository.findByReleaseFlowId(secondResult.releaseFlowId());
 
-        // Verify task name was updated
-        var tasks = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(
-                requestRepository.findByReleaseFlowId(firstResult.releaseFlowId()).get(0).getId());
-        assertThat(tasks.get(0).getTaskName()).isEqualTo("updated-step");
+        assertThat(firstRequests).hasSize(1);
+        assertThat(secondRequests).hasSize(1);
+
+        var firstTasks = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(firstRequests.get(0).getId());
+        var secondTasks = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(secondRequests.get(0).getId());
+
+        assertThat(firstTasks).hasSize(1);
+        assertThat(secondTasks).hasSize(1);
+        assertThat(firstTasks.get(0).getTaskName()).isEqualTo("original-step");
+        assertThat(secondTasks.get(0).getTaskName()).isEqualTo("updated-step");
+    }
+
+    @Test
+    @DisplayName("later-stage upload attaches to the newest release flow that does not already have that stage")
+    void importFile_laterStageUpload_usesNewestEligibleReleaseFlow() throws IOException {
+        ImportResult firstSit = importService.importFile(
+                buildXlsx("PROJ-D", "Project D", "TG-01", "Task D", 1, "sit-step-1", "MANUAL"),
+                Stage.SIT,
+                developer);
+        ImportResult secondSit = importService.importFile(
+                buildXlsx("PROJ-D", "Project D", "TG-01", "Task D", 1, "sit-step-2", "MANUAL"),
+                Stage.SIT,
+                developer);
+
+        ImportResult uatResult = importService.importFile(
+                buildXlsx("PROJ-D", "Project D", "TG-01", "Task D", 1, "uat-step", "MANUAL"),
+                Stage.UAT,
+                developer);
+
+        assertThat(uatResult.releaseFlowId()).isEqualTo(secondSit.releaseFlowId());
+        assertThat(uatResult.releaseFlowId()).isNotEqualTo(firstSit.releaseFlowId());
+
+        assertThat(requestRepository.findByReleaseFlowId(secondSit.releaseFlowId()))
+                .extracting(request -> request.getStage().name())
+                .containsExactlyInAnyOrder("SIT", "UAT");
+        assertThat(requestRepository.findByReleaseFlowId(firstSit.releaseFlowId()))
+                .extracting(request -> request.getStage().name())
+                .containsExactly("SIT");
+    }
+
+    @Test
+    @DisplayName("explicit release identifier keeps later-stage uploads on the same release flow")
+    void importFile_explicitReleaseIdentifier_reusesMatchingReleaseFlow() throws IOException {
+        String releaseIdentifier = "Workflow-Release-20260327-01";
+
+        ImportResult sitResult = importService.importFile(
+                buildXlsx("PROJ-E", "Project E", "TG-01", "Task E", 1, "sit-step", "MANUAL"),
+                Stage.SIT,
+                developer,
+                releaseIdentifier,
+                null,
+                null,
+                null);
+        ImportResult uatResult = importService.importFile(
+                buildXlsx("PROJ-E", "Project E", "TG-01", "Task E", 1, "uat-step", "MANUAL"),
+                Stage.UAT,
+                developer,
+                releaseIdentifier,
+                null,
+                null,
+                null);
+
+        assertThat(sitResult.releaseId()).isEqualTo(releaseIdentifier);
+        assertThat(uatResult.releaseId()).isEqualTo(releaseIdentifier);
+        assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
+        assertThat(requestRepository.findByReleaseFlowId(sitResult.releaseFlowId()))
+                .extracting(request -> request.getStage().name())
+                .containsExactlyInAnyOrder("SIT", "UAT");
+    }
+
+    @Test
+    @DisplayName("explicit release identifier rejects a duplicate upload for the same stage")
+    void importFile_explicitReleaseIdentifier_rejectsDuplicateStage() throws IOException {
+        String releaseIdentifier = "Workflow-Release-20260327-02";
+
+        importService.importFile(
+                buildXlsx("PROJ-F", "Project F", "TG-01", "Task F", 1, "sit-step", "MANUAL"),
+                Stage.SIT,
+                developer,
+                releaseIdentifier,
+                null,
+                null,
+                null);
+
+        assertThatThrownBy(() -> importService.importFile(
+                buildXlsx("PROJ-F", "Project F", "TG-01", "Task F", 1, "sit-step-2", "MANUAL"),
+                Stage.SIT,
+                developer,
+                releaseIdentifier,
+                null,
+                null,
+                null))
+                .isInstanceOf(ValidationAppException.class)
+                .hasMessageContaining("already contains stage SIT");
+    }
+
+    @Test
+    @DisplayName("system-generated release id can be reused as an explicit identifier for later stages")
+    void importFile_generatedReleaseId_canBeReusedExplicitly() throws IOException {
+        ImportResult sitResult = importService.importFile(
+                buildXlsx("PROJ-G", "Project G", "TG-01", "Task G", 1, "sit-step", "MANUAL"),
+                Stage.SIT,
+                developer);
+
+        ImportResult uatResult = importService.importFile(
+                buildXlsx("PROJ-G", "Project G", "TG-01", "Task G", 1, "uat-step", "MANUAL"),
+                Stage.UAT,
+                developer,
+                sitResult.releaseId(),
+                null,
+                null,
+                null);
+
+        assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
+        assertThat(uatResult.releaseId()).isEqualTo(sitResult.releaseId());
+    }
+
+    @Test
+    @DisplayName("explicit release identifier still matches legacy flows stored with the older normalized id format")
+    void importFile_explicitReleaseIdentifier_matchesLegacyNormalizedReleaseFlow() throws IOException {
+        String legacyReleaseId = "sit-projh-0007";
+        var legacyFlow = releaseFlowService.create(
+                "PROJ-H",
+                "Project H",
+                legacyReleaseId,
+                legacyReleaseId.toLowerCase(),
+                Stage.SIT);
+
+        ImportResult uatResult = importService.importFile(
+                buildXlsx("PROJ-H", "Project H", "TG-01", "Task H", 1, "uat-step", "MANUAL"),
+                Stage.UAT,
+                developer,
+                legacyReleaseId,
+                null,
+                null,
+                null);
+
+        assertThat(uatResult.releaseFlowId()).isEqualTo(legacyFlow.getId());
+        assertThat(uatResult.releaseId()).isEqualTo(legacyReleaseId);
     }
 
     @Test

@@ -50,6 +50,14 @@ async function handleLogin() {
         <p class="login-subtitle">Sign in with your team book credentials</p>
       </div>
 
+      <section class="wwa-intro-card login-wwa-explainer" aria-labelledby="login-wwa-intro-title">
+        <div class="wwa-intro-kicker">What WWA Means</div>
+        <h2 id="login-wwa-intro-title" class="wwa-intro-title">WWA = Work With Agent</h2>
+        <p class="wwa-intro-text">
+          WWA is the internal workspace shell for agent-supported IT operations.
+        </p>
+      </section>
+
       <form class="login-form" @submit.prevent="handleLogin">
         <div v-if="error" class="login-error">{{ error }}</div>
 
@@ -129,6 +137,14 @@ async function handleLogin() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.login-wwa-explainer {
+  margin-bottom: 20px;
+}
+
+.login-wwa-explainer :deep(.wwa-intro-title) {
+  font-size: 16px;
 }
 
 .form-group {

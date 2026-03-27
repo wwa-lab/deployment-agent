@@ -20,6 +20,7 @@ const userStore = useUserStore()
 
 const stage = ref<Stage | ''>('')
 const file = ref<File | null>(null)
+const releaseIdentifier = ref('')
 const uploading = ref(false)
 const downloadingTemplate = ref(false)
 const error = ref('')
@@ -47,6 +48,7 @@ async function submit() {
   error.value = ''
   try {
     successResult.value = await uploadFile(file.value, stage.value as Stage, {
+      releaseId: releaseIdentifier.value.trim() || undefined,
       application: scopeForm.application.trim() || undefined,
       snowGroup: scopeForm.snowGroup.trim() || undefined,
       agent: scopeForm.agent.trim() || undefined,
@@ -124,6 +126,22 @@ function close() {
               <option value="UAT">UAT</option>
               <option value="PROD">PROD</option>
             </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Release Identifier</label>
+            <input
+              v-model="releaseIdentifier"
+              type="text"
+              class="form-control"
+              placeholder="e.g. WFPROJ-20260327-01"
+              :disabled="!canUseUpload"
+            />
+            <div class="field-hint">
+              Recommended for repeated uploads. Reuse the same identifier for later UAT/PROD
+              stages in the same release, and use a new identifier for a new SIT rundown. If left
+              blank, WWA falls back to project + stage matching.
+            </div>
           </div>
 
           <div class="form-group">
@@ -215,5 +233,11 @@ function close() {
 
 .template-link {
   margin-top: 4px;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
 }
 </style>

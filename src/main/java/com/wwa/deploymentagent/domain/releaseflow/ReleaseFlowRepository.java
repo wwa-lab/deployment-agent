@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String> {
@@ -19,6 +20,9 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
      * Used during import to determine whether to create a new RF or attach to existing one.
      */
     Optional<ReleaseFlow> findByProjectIdAndNormalizedReleaseIdAndArchivedAtIsNull(
+            String projectId, String normalizedReleaseId);
+
+    Optional<ReleaseFlow> findByProjectIdAndNormalizedReleaseId(
             String projectId, String normalizedReleaseId);
 
     @Query("""
@@ -36,6 +40,21 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
 
     /** Look up the first (active) Release Flow for a given projectId – used during import. */
     Optional<ReleaseFlow> findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(String projectId);
+
+    @Query("""
+            SELECT rf FROM ReleaseFlow rf
+            WHERE rf.projectId = :projectId
+              AND rf.archivedAt IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM Request r
+                  WHERE r.releaseFlow = rf
+                    AND r.stage = :stage
+                    AND r.archivedAt IS NULL
+              )
+            ORDER BY rf.createdAt DESC
+            """)
+    List<ReleaseFlow> findActiveByProjectIdWithoutStageOrderByCreatedAtDesc(@Param("projectId") String projectId,
+                                                                             @Param("stage") Stage stage);
 
     default Optional<ReleaseFlow> findFirstByProjectId(String projectId) {
         return findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId);

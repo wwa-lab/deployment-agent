@@ -144,6 +144,16 @@ function toggleArchivedVisibility() {
       </div>
     </div>
 
+    <section class="wwa-intro-card" aria-labelledby="wwa-deployment-intro-title">
+      <div class="wwa-intro-kicker">What WWA Means</div>
+      <h2 id="wwa-deployment-intro-title" class="wwa-intro-title">WWA = Work With Agent</h2>
+      <p class="wwa-intro-text">
+        WWA is the internal workspace shell for agent-supported IT operations. Deployment Agent
+        is the release-execution workspace for tracking and progressing rundowns across SIT, UAT,
+        and PROD.
+      </p>
+    </section>
+
     <!-- Filter bar -->
     <div class="filter-bar card">
       <div class="filter-group">
