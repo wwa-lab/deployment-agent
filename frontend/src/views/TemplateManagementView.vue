@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useUserStore } from '../stores/user'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
@@ -531,6 +531,14 @@ function toggleMoreMenu(templateId: string) {
   activeMoreMenuId.value = activeMoreMenuId.value === templateId ? '' : templateId
 }
 
+function closeAll() {
+  activeMoreMenuId.value = ''
+  selectedTemplateId.value = ''
+}
+
+onMounted(() => document.addEventListener('click', closeAll))
+onUnmounted(() => document.removeEventListener('click', closeAll))
+
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
@@ -944,7 +952,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
           </div>
         </section>
 
-        <section class="card table-card">
+        <section class="card table-card" @click.stop>
           <div class="table-head">
             <h2 class="panel-title">Available Templates ({{ filteredTemplates.length }})</h2>
             <p v-if="actionFeedback" class="table-feedback">{{ actionFeedback }}</p>
@@ -1002,7 +1010,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
                         class="btn btn-secondary btn-sm"
                         type="button"
                         :aria-expanded="activeMoreMenuId === template.id"
-                        @click="toggleMoreMenu(template.id)"
+                        @click.stop="toggleMoreMenu(template.id)"
                       >
                         More
                       </button>
@@ -1038,7 +1046,7 @@ function submitTemplate(draft: CreateTemplateDraft) {
           </table>
         </section>
 
-        <section v-if="selectedTemplate" class="card details-card">
+        <section v-if="selectedTemplate" class="card details-card" @click.stop>
           <div class="details-head">
             <h2 class="panel-title">Template Details</h2>
             <div class="details-head-actions">
