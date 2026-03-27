@@ -94,9 +94,10 @@ const appliedFilters = reactive({
   configItem: 'All',
 })
 
-const editingComponentInstanceId = ref<string | null>(null)
+const editingComponent = ref<ConfigComponentRow | null>(null)
 const creatingComponent = ref(false)
 const componentSaving = ref(false)
+const deletingComponentId = ref<string | null>(null)
 const componentError = ref('')
 
 const editingRowId = ref<string | null>(null)
@@ -235,11 +236,6 @@ const filteredRawRows = computed(() => {
   })
 })
 
-const editingComponent = computed(() => {
-  if (!editingComponentInstanceId.value) return null
-  return componentRows.value.find((row) => row.id === editingComponentInstanceId.value) ?? null
-})
-
 const componentDialogOptions = computed(() =>
   COMPONENT_DEFINITIONS.map((definition) => ({
     componentId: definition.id,
@@ -277,19 +273,19 @@ function selectView(view: 'component' | 'raw') {
 function openCreateComponent() {
   if (!canEdit.value) return
   creatingComponent.value = true
-  editingComponentInstanceId.value = null
+  editingComponent.value = null
   componentError.value = ''
 }
 
 function openComponentEditor(component: ConfigComponentRow) {
   if (!canEdit.value) return
   creatingComponent.value = false
-  editingComponentInstanceId.value = component.id
+  editingComponent.value = component
   componentError.value = ''
 }
 
 function closeComponentEditor() {
-  editingComponentInstanceId.value = null
+  editingComponent.value = null
   creatingComponent.value = false
   componentSaving.value = false
   componentError.value = ''
@@ -321,6 +317,53 @@ async function saveComponent(draft: ConfigComponentDraft) {
       error instanceof Error ? error.message : 'Failed to save component configuration'
   } finally {
     componentSaving.value = false
+  }
+}
+
+function describeComponentScope(component: ConfigComponentRow) {
+  if (component.agent?.trim()) {
+    return `Agent Override (${component.application} / ${component.owningGroup} / ${component.agent})`
+  }
+  if (component.owningGroup?.trim()) {
+    return `SNOW Group Default (${component.application} / ${component.owningGroup})`
+  }
+  if (component.application?.trim()) {
+    return `Application Default (${component.application})`
+  }
+  return 'Platform Default'
+}
+
+function deleteTitle(component: ConfigComponentRow) {
+  if (!canEdit.value) {
+    return 'DEVOPS_ADMIN can delete configuration.'
+  }
+  if (!component.id) {
+    return 'This built-in platform default has not been saved yet, so there is nothing to delete.'
+  }
+  return ''
+}
+
+async function deleteComponent(component: ConfigComponentRow) {
+  if (!canEdit.value || !component.id) return
+
+  const confirmed = window.confirm(
+    `Delete component "${component.label}" for ${describeComponentScope(component)}?`,
+  )
+  if (!confirmed) return
+
+  deletingComponentId.value = component.id
+  componentError.value = ''
+
+  try {
+    await store.removeComponent(component.id)
+    if (editingComponent.value?.id === component.id) {
+      closeComponentEditor()
+    }
+  } catch (error: unknown) {
+    componentError.value =
+      error instanceof Error ? error.message : 'Failed to delete component configuration'
+  } finally {
+    deletingComponentId.value = null
   }
 }
 
@@ -358,7 +401,6 @@ async function saveEdit(row: ConfigCatalogRow) {
       value: editForm.value,
       description: editForm.description,
     })
-    await store.fetchConfig()
     rowSuccess.value = { ...rowSuccess.value, [row.rowId]: true }
     editingRowId.value = null
     setTimeout(() => {
@@ -578,15 +620,26 @@ function displayValue(value?: string) {
                   <td>{{ component.updatedBy ?? '—' }}</td>
                   <td class="timestamp">{{ formatDate(component.updatedAt) }}</td>
                   <td>
-                    <button
-                      class="btn btn-secondary btn-sm"
-                      type="button"
-                      :disabled="!canEdit"
-                      :title="canEdit ? '' : 'DEVOPS_ADMIN can edit configuration.'"
-                      @click="openComponentEditor(component)"
-                    >
-                      Edit
-                    </button>
+                    <div class="action-btns">
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        type="button"
+                        :disabled="!canEdit"
+                        :title="canEdit ? '' : 'DEVOPS_ADMIN can edit configuration.'"
+                        @click="openComponentEditor(component)"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        class="btn btn-danger btn-sm"
+                        type="button"
+                        :disabled="!canEdit || !component.id || deletingComponentId === component.id"
+                        :title="deleteTitle(component)"
+                        @click="deleteComponent(component)"
+                      >
+                        {{ deletingComponentId === component.id ? 'Deleting...' : 'Delete' }}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -765,7 +818,7 @@ function displayValue(value?: string) {
 
     <ConfigComponentDialog
       v-if="editingComponent || creatingComponent"
-      :key="editingComponent?.id ?? 'new-component'"
+      :key="editingComponent?.id ?? editingComponent?.componentId ?? 'new-component'"
       :component="editingComponent"
       :mode="creatingComponent ? 'create' : 'edit'"
       :component-options="componentDialogOptions"

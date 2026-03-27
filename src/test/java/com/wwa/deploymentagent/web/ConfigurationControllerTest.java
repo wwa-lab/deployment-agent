@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -26,6 +29,9 @@ class ConfigurationControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     // ─── listAll ──────────────────────────────────────────────────────────────
 
@@ -80,5 +86,53 @@ class ConfigurationControllerTest {
                         .header("X-User-Role", "DEVELOPER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.configKey=='jenkins_api_token')].configValue").value(hasItem("••••••••")));
+    }
+
+    @Test
+    @DisplayName("deleteComponent_devopsAdmin_succeeds - DELETE /config/components/{id} returns 204")
+    void deleteComponent_devopsAdmin_succeeds() throws Exception {
+        String createResponse = mockMvc.perform(post(BASE + "/components")
+                        .header("X-User-Id", "admin-user")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "componentId": "jenkins",
+                                  "displayName": "Scoped Jenkins",
+                                  "area": "CI/CD",
+                                  "application": "AMH HCC",
+                                  "serviceEndpoint": "http://jenkins.example.com",
+                                  "serviceUser": "svc-user",
+                                  "credentialValue": "svc-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String componentInstanceId = objectMapper.readTree(createResponse)
+                .path("componentInstanceId")
+                .asText();
+
+        mockMvc.perform(delete(BASE + "/components/{componentInstanceId}", componentInstanceId)
+                        .header("X-User-Id", "admin-user")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get(BASE + "/components")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].componentInstanceId", not(hasItem(componentInstanceId))));
+    }
+
+    @Test
+    @DisplayName("deleteComponent_nonAdmin_returns403 - DELETE /config/components/{id} with DEVELOPER returns 403")
+    void deleteComponent_nonAdmin_returns403() throws Exception {
+        mockMvc.perform(delete(BASE + "/components/{componentInstanceId}", "missing-id")
+                        .header("X-User-Id", "dev-user")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isForbidden());
     }
 }

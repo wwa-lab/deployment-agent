@@ -89,6 +89,28 @@ public class ConfigurationComponentService {
         return saved;
     }
 
+    @Transactional
+    public void deleteComponent(String componentInstanceId, UserContext user) {
+        String normalizedId = trimToNull(componentInstanceId);
+        if (normalizedId == null) {
+            throw new ValidationAppException("Configuration component instance id is required");
+        }
+
+        ConfigurationComponent component = componentRepository.findById(normalizedId)
+                .orElseThrow(() -> new ValidationAppException(
+                        "Unknown configuration component instance: '" + normalizedId + "'"));
+
+        BuiltInComponentDefinition definition = BuiltInComponentDefinition.require(component.getComponentId());
+        ConfigurationScope scope = scopeOf(component);
+
+        Map<String, Object> auditContext = baseAuditContext(component, definition, scope);
+        auditContext.put("componentInstanceId", component.getId());
+        auditContext.put("scopeSource", scope.scopeSource());
+
+        componentRepository.delete(component);
+        auditLogger.log(user, AuditActionType.config_delete, auditContext);
+    }
+
     @Transactional(readOnly = true)
     public List<ConfigurationItemDto> listDerivedConfigItems() {
         return listComponents().stream()

@@ -64,4 +64,16 @@ public class ConfigurationController {
         return ResponseEntity.ok(
                 ConfigurationComponentDto.from(configurationComponentService.upsertComponent(body, user)));
     }
+
+    @DeleteMapping("/components/{componentInstanceId}")
+    public ResponseEntity<Void> deleteComponent(
+            @PathVariable String componentInstanceId,
+            @AuthenticationPrincipal UserContext user) {
+        if (!user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException("config:update");
+        }
+
+        configurationComponentService.deleteComponent(componentInstanceId, user);
+        return ResponseEntity.noContent().build();
+    }
 }

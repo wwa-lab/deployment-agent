@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed Configuration Management component actions so built-in platform-default rows can now be opened in the edit dialog even before they are first persisted, added visible `Delete` actions for component rows, and backed scoped component deletion with a new admin API while keeping unsaved built-in defaults protected from deletion.
 - Polished frontend UI copy across Configuration Management, Login, Release Summary, and Access Management by clarifying status-filter wording, fixing capitalization and phrasing (`Team Book`, `Human-in-the-Loop`, `SNOW Group`), and expanding abbreviated role labels for clearer page text.
 - Changed Configuration Management so entering the page now lands on the `Component` tab by default instead of opening the derived `Configuration` tab first.
 - Refreshed the WWA frontend background treatment with a lighter gradient-driven shell, upgraded glassy surface tokens, and more atmospheric login/home page styling so the workspace feels less flat while keeping dense business pages readable.

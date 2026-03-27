@@ -103,6 +103,23 @@ class ConfigurationComponentServiceTest {
         assertThat(configurationComponentRepository.count()).isZero();
     }
 
+    @Test
+    @DisplayName("deleteComponent removes the persisted scoped row and keeps built-in defaults available")
+    void deleteComponent_removesPersistedScopedRow() {
+        upsertJenkins("AMH HCC", null, null, "http://app-jenkins:8080", "app-user", "app-token");
+
+        ConfigurationComponent persisted = configurationComponentRepository.findAll().stream()
+                .findFirst()
+                .orElseThrow();
+
+        configurationComponentService.deleteComponent(persisted.getId(), adminUser);
+
+        assertThat(configurationComponentRepository.findById(persisted.getId())).isEmpty();
+        assertThat(configurationComponentService.listComponents())
+                .extracting(ConfigurationComponent::getComponentId)
+                .containsExactly("jenkins", "ansible", "callback");
+    }
+
     private void upsertJenkins(
             String application,
             String snowGroup,

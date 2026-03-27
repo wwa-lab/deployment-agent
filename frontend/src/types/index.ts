@@ -176,7 +176,7 @@ export interface ConfigItem {
 }
 
 export interface ConfigComponent {
-  componentInstanceId: string
+  componentInstanceId?: string
   componentId: ConfigIntegrationId
   systemType: string
   displayName: string
@@ -196,7 +196,7 @@ export interface ConfigComponent {
 }
 
 export interface ConfigComponentRow {
-  id: string
+  id?: string
   componentId: ConfigIntegrationId
   label: string
   category: string

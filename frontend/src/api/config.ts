@@ -20,7 +20,7 @@ interface ConfigApiItem {
 }
 
 interface ConfigApiComponent {
-  componentInstanceId: string
+  componentInstanceId?: string
   componentId: ConfigComponent['componentId']
   systemType: string
   displayName: string
@@ -121,4 +121,8 @@ export async function updateConfigComponent(component: {
 }): Promise<ConfigComponent> {
   const response = await apiClient.post('/config/components', component)
   return mapConfigComponent(response.data as ConfigApiComponent)
+}
+
+export async function deleteConfigComponent(componentInstanceId: string): Promise<void> {
+  await apiClient.delete(`/config/components/${componentInstanceId}`)
 }

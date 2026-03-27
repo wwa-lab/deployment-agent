@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { listConfig, listConfigComponents, updateConfig, updateConfigComponent } from '../api/config'
+import {
+  deleteConfigComponent,
+  listConfig,
+  listConfigComponents,
+  updateConfig,
+  updateConfigComponent,
+} from '../api/config'
 import type { ConfigComponent, ConfigItem } from '../types'
 
 export const useConfigStore = defineStore('config', () => {
@@ -33,14 +39,7 @@ export const useConfigStore = defineStore('config', () => {
     error.value = ''
     try {
       const updated = await updateConfig(item)
-      const idx = items.value.findIndex((i) => i.key === updated.key)
-      if (idx !== -1) {
-        items.value[idx] = updated
-      } else {
-        items.value.push(updated)
-      }
-      const componentResult = await listConfigComponents()
-      components.value = componentResult.data
+      await fetchConfig()
       return updated
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Failed to save configuration'
@@ -64,17 +63,21 @@ export const useConfigStore = defineStore('config', () => {
     error.value = ''
     try {
       const updated = await updateConfigComponent(component)
-      const idx = components.value.findIndex((item) => item.componentId === updated.componentId)
-      if (idx !== -1) {
-        components.value[idx] = updated
-      } else {
-        components.value.push(updated)
-      }
-      const result = await listConfig()
-      items.value = result.data
+      await fetchConfig()
       return updated
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Failed to save component configuration'
+      throw e
+    }
+  }
+
+  async function removeComponent(componentInstanceId: string) {
+    error.value = ''
+    try {
+      await deleteConfigComponent(componentInstanceId)
+      await fetchConfig()
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : 'Failed to delete component configuration'
       throw e
     }
   }
@@ -87,5 +90,6 @@ export const useConfigStore = defineStore('config', () => {
     fetchConfig,
     saveConfig,
     saveComponent,
+    removeComponent,
   }
 })
