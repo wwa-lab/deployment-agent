@@ -127,6 +127,39 @@ class AccessGrantControllerTest {
     }
 
     @Test
+    @DisplayName("POST /access-grants supports manual employee creation with staff ID + display name")
+    void create_manualEmployee_succeeds() throws Exception {
+        mockMvc.perform(post(BASE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "employeeId": "43910156",
+                                  "displayName": "Leo L Zhang",
+                                  "grantStatus": "ACTIVE",
+                                  "assignedRoles": ["DEVELOPER"],
+                                  "scopeGrants": [
+                                    {
+                                      "application": "AMH HCC",
+                                      "snowGroup": "HTSA-CSI-HCC-AMH-PRJ"
+                                    }
+                                  ],
+                                  "note": "Manual bootstrap"
+                                }
+                                """)
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.employeeId").value("43910156"))
+                .andExpect(jsonPath("$.displayName").value("Leo L Zhang"))
+                .andExpect(jsonPath("$.grantStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.assignedRoles.length()").value(1))
+                .andExpect(jsonPath("$.assignedRoles[0]").value("DEVELOPER"));
+
+        AccessGrant saved = accessGrantRepository.findById("43910156").orElseThrow();
+        assertThat(saved.getDisplayNameSnapshot()).isEqualTo("Leo L Zhang");
+    }
+
+    @Test
     @DisplayName("PATCH /access-grants/{employeeId} updates roles and note and writes audit")
     void update_updatesGrant_andAudits() throws Exception {
         mockMvc.perform(patch(BASE + "/emp-004")

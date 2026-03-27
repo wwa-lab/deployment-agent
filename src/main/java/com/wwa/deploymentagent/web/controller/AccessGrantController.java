@@ -76,6 +76,7 @@ public class AccessGrantController {
         return ResponseEntity.ok(AccessGrantDto.from(
                 accessGrantService.createGrant(
                         body.employeeId(),
+                        body.displayName(),
                         body.grantStatus(),
                         body.assignedRoles(),
                         body.scopeGrants(),

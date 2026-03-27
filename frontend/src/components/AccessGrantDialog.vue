@@ -22,6 +22,7 @@ const emit = defineEmits<{
   close: []
   save: [payload: {
     employeeId: string
+    displayName?: string
     grantStatus: AccessGrantStatus
     assignedRoles: UserRole[]
     scopeGrants: AccessScope[]
@@ -31,12 +32,14 @@ const emit = defineEmits<{
 
 const form = reactive<{
   employeeId: string
+  displayName: string
   grantStatus: AccessGrantStatus
   assignedRoles: UserRole[]
   scopeGrants: AccessScope[]
   note: string
 }>({
   employeeId: '',
+  displayName: '',
   grantStatus: 'ACTIVE',
   assignedRoles: [],
   scopeGrants: [],
@@ -72,6 +75,7 @@ watch(
   () => [props.mode, props.grant] as const,
   () => {
     form.employeeId = props.grant?.employeeId ?? ''
+    form.displayName = props.grant?.displayName ?? ''
     form.grantStatus = props.mode === 'reactivate'
       ? 'ACTIVE'
       : props.grant?.grantStatus ?? 'ACTIVE'
@@ -101,13 +105,16 @@ watch(
       return
     }
 
-    const matchedCandidate = directoryResults.value.find((candidate) => candidate.employeeId === trimmedEmployeeId)
+    const normalizedEmployeeId = trimmedEmployeeId.toLowerCase()
+    const matchedCandidate = directoryResults.value.find(
+      (candidate) => candidate.employeeId.trim().toLowerCase() === normalizedEmployeeId,
+    )
     if (matchedCandidate) {
       selectedCandidate.value = matchedCandidate
       return
     }
 
-    if (selectedCandidate.value?.employeeId !== trimmedEmployeeId) {
+    if (selectedCandidate.value?.employeeId.trim().toLowerCase() !== normalizedEmployeeId) {
       selectedCandidate.value = null
     }
   },
@@ -160,6 +167,7 @@ function selectCandidateFromDirectory(candidate: AccessGrantDirectoryCandidate) 
   }
 
   form.employeeId = candidate.employeeId
+  form.displayName = candidate.displayName
   selectedCandidate.value = candidate
   localError.value = ''
 }
@@ -167,9 +175,18 @@ function selectCandidateFromDirectory(candidate: AccessGrantDirectoryCandidate) 
 function submit() {
   localError.value = ''
 
-  if (!form.employeeId.trim()) {
+  const normalizedEmployeeId = form.employeeId.trim()
+  if (!normalizedEmployeeId) {
     localError.value = 'Employee ID is required.'
     return
+  }
+
+  if (props.mode === 'create') {
+    const normalizedDisplayName = form.displayName.trim()
+    if (!normalizedDisplayName) {
+      localError.value = 'Employee Name is required for manual access grant creation.'
+      return
+    }
   }
 
   if (requiresRoles.value && form.assignedRoles.length === 0) {
@@ -198,7 +215,8 @@ function submit() {
   }
 
   emit('save', {
-    employeeId: form.employeeId.trim(),
+    employeeId: normalizedEmployeeId,
+    displayName: props.mode === 'create' ? form.displayName.trim() : undefined,
     grantStatus: props.mode === 'reactivate' ? 'ACTIVE' : form.grantStatus,
     assignedRoles: form.assignedRoles,
     scopeGrants: normalizedScopes,
@@ -240,8 +258,8 @@ function submit() {
             @keyup.enter="runDirectorySearch"
           />
           <p class="field-hint">
-            Search Team Book to find a first-time user, then select them to prefill the access grant.
-            Existing grants stay read-only here and should be managed from the main list.
+            Search Team Book to prefill staff ID and name, or skip search and enter `Staff ID + Name`
+            manually for self-maintained access records.
           </p>
 
           <div v-if="directoryError" class="directory-feedback directory-feedback-error">
@@ -287,16 +305,28 @@ function submit() {
             v-model="form.employeeId"
             class="form-control"
             type="text"
-            placeholder="e.g. emp-006"
+            :placeholder="props.mode === 'create' ? 'e.g. 43910156 or emp-006' : 'e.g. emp-006'"
             :disabled="employeeIdDisabled"
           />
           <p class="field-hint">
-            Team Book remains the identity source of truth. This dialog creates a WWA access grant for
-            the selected employee.
+            This dialog creates a WWA access grant by Staff ID. Team Book search is optional in create mode.
           </p>
           <div v-if="selectedCandidate" class="directory-selected">
             Selected employee: <strong>{{ selectedCandidate.displayName }}</strong>
           </div>
+        </div>
+
+        <div v-if="props.mode === 'create'" class="form-group">
+          <label class="form-label">Employee Name <span class="required">*</span></label>
+          <input
+            v-model="form.displayName"
+            class="form-control"
+            type="text"
+            placeholder="e.g. Leo L Zhang"
+          />
+          <p class="field-hint">
+            If Team Book is unavailable, enter the display name manually for access records.
+          </p>
         </div>
 
         <div class="form-group">

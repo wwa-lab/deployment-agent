@@ -2,9 +2,12 @@
 
 ## Unreleased
 
+- Fixed stitched release-family grouping for infix stage release identifiers (`<name>-sit-01`, `<name>-sit-02`, `<name>-uat-01`, `<name>-prod-01`), so repeated SIT uploads and later UAT/PROD uploads are now connected in one rollout chain instead of appearing as separate families.
 - Fixed `Run Task` dialog behavior so manual tasks can proceed with pre-filled script/parameters from Excel without forcing users to edit fields first; in run mode the primary action now allows direct run with unchanged inputs.
 - Fixed `Create New Template` dropdown defaults so Category / Agent / SNOW Group / Application / Site now auto-select a valid option when the dialog opens and re-align automatically if option lists refresh later, preventing blank-looking required selects.
 - Fixed Template Management option sources so deleting all available templates no longer empties the Create Template dropdown lists; stable baseline options now remain available for Category / Agent / SNOW Group / Application / Site.
+- Fixed Access Management `Add User` failures where Team Book search could find an employee but create still returned `Unknown employee ID`: backend create now falls back to directory exact-match lookup when direct ID lookup is unavailable, and grant creation now also supports manual `Staff ID + Name` entry when Team Book cannot resolve the employee.
+- Fixed Access Management `Edit/Reactivate` save behavior so updated scoped visibility (`scopeGrants`) is now correctly sent to the API instead of being dropped client-side.
 - Fixed Template Management row `More` dropdown behavior so action items are no longer clipped at the bottom of the table card, and the menu now dismisses when users click outside or press `Esc`.
 - Allowed repeated uploads for the same stage under the same release identifier by creating incremented stage attempts (`attempt #`), exposed attempt numbers in release-flow detail responses, and added summary attempt-view modes (`latest` vs `history`) so rollout overviews can focus on current progress or include historical outcomes.
 - Stitched release-family summary/detail views now keep stage-prefixed uploads such as `sit-01 / uat-01 / prod-01` connected in one overview, add an explicit `Current Stage` indicator plus missing-stage placeholders on the summary page, and teach upload-time release matching to treat those stage-prefixed identifiers as the same rollout family.

@@ -29,6 +29,7 @@ export async function searchAccessGrantDirectory(query: string, limit = 8): Prom
 
 export async function createAccessGrant(input: {
   employeeId: string
+  displayName?: string
   grantStatus: AccessGrantStatus
   assignedRoles: UserRole[]
   scopeGrants: AccessScope[]

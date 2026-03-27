@@ -35,6 +35,17 @@ function formatTimestamp(ts?: string): string {
   }
 }
 
+function formatDialogError(error: unknown, mode: 'create' | 'edit' | 'reactivate'): string {
+  const message = error instanceof Error ? error.message : 'Failed to save access grant'
+  if (mode === 'create' && message.includes('Unknown employee ID')) {
+    return `${message}. Provide Staff ID and Name manually, or search Team Book to prefill.`
+  }
+  if (mode === 'create' && message.includes('Display name is required')) {
+    return 'Employee Name is required when Team Book cannot resolve this Staff ID.'
+  }
+  return message
+}
+
 function openCreateDialog() {
   dialogMode.value = 'create'
   dialogGrant.value = null
@@ -63,6 +74,7 @@ function closeDialog() {
 
 async function submitDialog(payload: {
   employeeId: string
+  displayName?: string
   grantStatus: AccessGrantStatus
   assignedRoles: AccessGrant['assignedRoles']
   scopeGrants: AccessGrant['scopeGrants']
@@ -79,6 +91,7 @@ async function submitDialog(payload: {
       await store.reactivateGrant({
         employeeId: payload.employeeId,
         assignedRoles: payload.assignedRoles,
+        scopeGrants: payload.scopeGrants,
         note: payload.note,
       })
       successMessage.value = `Access reactivated for ${payload.employeeId}.`
@@ -86,13 +99,14 @@ async function submitDialog(payload: {
       await store.editGrant({
         employeeId: payload.employeeId,
         assignedRoles: payload.assignedRoles,
+        scopeGrants: payload.scopeGrants,
         note: payload.note,
       })
       successMessage.value = `Access grant updated for ${payload.employeeId}.`
     }
     closeDialog()
   } catch (e: unknown) {
-    dialogError.value = e instanceof Error ? e.message : 'Failed to save access grant'
+    dialogError.value = formatDialogError(e, dialogMode.value)
   } finally {
     dialogSaving.value = false
   }
@@ -169,8 +183,8 @@ function statusClass(status: AccessGrantStatus) {
       <template v-if="canManageAccess">
         Access grants control product entry, while scope grants control which `Application + SNOW
         Group` data the employee can view or administer. Use `Add User` to search Team Book for a
-        first-time employee, then create or update grants here without changing Team Book identity
-        records.
+        first-time employee or manually enter `Staff ID + Name` when your team manages identities
+        locally.
       </template>
       <template v-else>
         Access Management is restricted to `DEVOPS_ADMIN`. The menu remains visible so teammates can

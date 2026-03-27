@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -138,6 +139,7 @@ public class AccessGrantService {
 
     @Transactional
     public AccessGrant createGrant(String employeeId,
+                                   String displayName,
                                    AccessGrantStatus grantStatus,
                                    Collection<String> assignedRoles,
                                    Collection<AccessScope> scopeGrants,
@@ -148,8 +150,11 @@ public class AccessGrantService {
             throw new ConflictAppException("Access grant already exists for employee: " + normalizedEmployeeId);
         }
 
-        TeamBookEmployee employee = authProvider.findByEmployeeId(normalizedEmployeeId)
-                .orElseThrow(() -> new ValidationAppException("Unknown employee ID: " + normalizedEmployeeId));
+        Optional<TeamBookEmployee> employee = resolveTeamBookEmployeeForGrantCreation(normalizedEmployeeId);
+        String resolvedDisplayName = employee
+                .map(TeamBookEmployee::displayName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElseGet(() -> normalizeManualDisplayName(displayName));
 
         List<String> normalizedRoles = normalizeRolesForMutation(assignedRoles);
         List<AccessScope> normalizedScopes = normalizeScopesForMutation(scopeGrants);
@@ -158,7 +163,7 @@ public class AccessGrantService {
 
         AccessGrant grant = new AccessGrant();
         grant.setEmployeeId(normalizedEmployeeId);
-        grant.setDisplayNameSnapshot(employee.displayName());
+        grant.setDisplayNameSnapshot(resolvedDisplayName);
         grant.setGrantStatus(grantStatus);
         grant.setAssignedRoles(normalizedRoles);
         grant.setScopeGrants(normalizedScopes);
@@ -323,6 +328,23 @@ public class AccessGrantService {
             throw new ValidationAppException("Employee ID is required.");
         }
         return employeeId.trim();
+    }
+
+    private Optional<TeamBookEmployee> resolveTeamBookEmployeeForGrantCreation(String normalizedEmployeeId) {
+        return authProvider.findByEmployeeId(normalizedEmployeeId)
+                .or(() -> authProvider.searchEmployees(normalizedEmployeeId, 20).stream()
+                        .filter(candidate -> candidate.employeeId() != null
+                                && normalizedEmployeeId.equalsIgnoreCase(candidate.employeeId().trim()))
+                        .findFirst());
+    }
+
+    private String normalizeManualDisplayName(String displayName) {
+        String normalizedDisplayName = normalizeBlank(displayName);
+        if (normalizedDisplayName == null) {
+            throw new ValidationAppException(
+                    "Display name is required when employee ID cannot be resolved from Team Book.");
+        }
+        return normalizedDisplayName;
     }
 
     private String normalizeSearchQuery(String query) {
