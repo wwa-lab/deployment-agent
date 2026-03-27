@@ -4,6 +4,7 @@ import { useUserStore } from '../stores/user'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
 import TemplateTaskDialog from '../components/TemplateTaskDialog.vue'
+import { agentRegistry } from '../config/agentRegistry'
 import type { CreateTemplateDraft, TemplateRecord, TemplateTask, TemplateTaskDraft } from '../types'
 
 const userStore = useUserStore()
@@ -289,24 +290,60 @@ const defaultActivityCategories = [
   'post-release',
 ]
 
+const defaultTemplateCategories = ['development', 'release', 'production']
+const defaultTemplateApplications = ['AMH HCC']
+const defaultTemplateSnowGroups = ['HTSA-CSI-HCC-AMH-PRJ']
+const defaultTemplateSites = ['HK', 'SG']
+const defaultTemplateAgents = [
+  ...new Set(agentRegistry.filter((agent) => agent.enabled).map((agent) => agent.name)),
+]
+
+function mergeOptionLists(...sources: string[][]): string[] {
+  return Array.from(
+    new Set(
+      sources
+        .flat()
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b))
+}
+
 const categories = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.category))).sort(),
+  mergeOptionLists(
+    defaultTemplateCategories,
+    templates.value.map((template) => template.category),
+  ),
 )
 
 const agents = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.agent))).sort(),
+  mergeOptionLists(
+    defaultTemplateAgents.length > 0 ? defaultTemplateAgents : ['Deployment Agent'],
+    templates.value.map((template) => template.agent),
+  ),
 )
 
 const snowGroups = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.snowGroup))).sort(),
+  mergeOptionLists(
+    defaultTemplateSnowGroups,
+    userStore.scopes.map((scope) => scope.snowGroup),
+    templates.value.map((template) => template.snowGroup),
+  ),
 )
 
 const applications = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.application))).sort(),
+  mergeOptionLists(
+    defaultTemplateApplications,
+    userStore.scopes.map((scope) => scope.application),
+    templates.value.map((template) => template.application),
+  ),
 )
 
 const sites = computed(() =>
-  Array.from(new Set(templates.value.map((template) => template.site))).sort(),
+  mergeOptionLists(
+    defaultTemplateSites,
+    templates.value.map((template) => template.site),
+  ),
 )
 
 const activeScopeFilters = computed(() => ({

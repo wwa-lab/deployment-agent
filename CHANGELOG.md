@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed `Create New Template` dropdown defaults so Category / Agent / SNOW Group / Application / Site now auto-select a valid option when the dialog opens and re-align automatically if option lists refresh later, preventing blank-looking required selects.
+- Fixed Template Management option sources so deleting all available templates no longer empties the Create Template dropdown lists; stable baseline options now remain available for Category / Agent / SNOW Group / Application / Site.
 - Fixed Template Management row `More` dropdown behavior so action items are no longer clipped at the bottom of the table card, and the menu now dismisses when users click outside or press `Esc`.
 - Allowed repeated uploads for the same stage under the same release identifier by creating incremented stage attempts (`attempt #`), exposed attempt numbers in release-flow detail responses, and added summary attempt-view modes (`latest` vs `history`) so rollout overviews can focus on current progress or include historical outcomes.
 - Stitched release-family summary/detail views now keep stage-prefixed uploads such as `sit-01 / uat-01 / prod-01` connected in one overview, add an explicit `Current Stage` indicator plus missing-stage placeholders on the summary page, and teach upload-time release matching to treat those stage-prefixed identifiers as the same rollout family.

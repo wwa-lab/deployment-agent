@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useUserStore } from '../stores/user'
 import { downloadTemplate } from '../api/upload'
 import type { CreateTemplateDraft } from '../types'
@@ -29,17 +29,65 @@ const downloadingTemplate = ref(false)
 const error = ref('')
 const uploadFile = ref<File | null>(null)
 
+function resolveSelectValue(options: string[], preferred?: string, fallback = ''): string {
+  if (preferred && options.includes(preferred)) return preferred
+  if (options.length > 0) return options[0]
+  return preferred ?? fallback
+}
+
 const manualForm = ref({
   name: props.initialDraft?.name ?? '',
   version: props.initialDraft?.version ?? '1.0',
-  agent: props.initialDraft?.agent ?? props.agents[0] ?? 'Deployment Agent',
-  category: props.initialDraft?.category ?? props.categories[0] ?? 'development',
-  snowGroup: props.initialDraft?.snowGroup ?? props.snowGroups[0] ?? '',
-  application: props.initialDraft?.application ?? props.applications[0] ?? '',
-  site: props.initialDraft?.site ?? props.sites[0] ?? '',
+  agent: resolveSelectValue(props.agents, props.initialDraft?.agent, 'Deployment Agent'),
+  category: resolveSelectValue(props.categories, props.initialDraft?.category, 'development'),
+  snowGroup: resolveSelectValue(props.snowGroups, props.initialDraft?.snowGroup, ''),
+  application: resolveSelectValue(props.applications, props.initialDraft?.application, ''),
+  site: resolveSelectValue(props.sites, props.initialDraft?.site, ''),
   estDurationMinutes: props.initialDraft?.estDurationMinutes ?? 60,
   description: props.initialDraft?.description ?? '',
 })
+
+function syncManualSelectDefaults() {
+  manualForm.value.category = resolveSelectValue(
+    props.categories,
+    manualForm.value.category || props.initialDraft?.category,
+    'development',
+  )
+  manualForm.value.agent = resolveSelectValue(
+    props.agents,
+    manualForm.value.agent || props.initialDraft?.agent,
+    'Deployment Agent',
+  )
+  manualForm.value.snowGroup = resolveSelectValue(
+    props.snowGroups,
+    manualForm.value.snowGroup || props.initialDraft?.snowGroup,
+    '',
+  )
+  manualForm.value.application = resolveSelectValue(
+    props.applications,
+    manualForm.value.application || props.initialDraft?.application,
+    '',
+  )
+  manualForm.value.site = resolveSelectValue(
+    props.sites,
+    manualForm.value.site || props.initialDraft?.site,
+    '',
+  )
+}
+
+watch(
+  () => ({
+    categories: props.categories,
+    agents: props.agents,
+    snowGroups: props.snowGroups,
+    applications: props.applications,
+    sites: props.sites,
+  }),
+  () => {
+    syncManualSelectDefaults()
+  },
+  { deep: true, immediate: true },
+)
 
 const canCreateManual = computed(() =>
   manualForm.value.name.trim().length > 0 &&
@@ -146,11 +194,11 @@ async function createUploadTemplate() {
     emit('submit', {
       name: inferredName,
       version: '1.0',
-      agent: props.initialDraft?.agent ?? props.agents[0] ?? 'Deployment Agent',
-      category: props.initialDraft?.category ?? props.categories[0] ?? 'development',
-      snowGroup: props.initialDraft?.snowGroup ?? props.snowGroups[0] ?? '',
-      application: props.initialDraft?.application ?? props.applications[0] ?? '',
-      site: props.initialDraft?.site ?? props.sites[0] ?? '',
+      agent: resolveSelectValue(props.agents, props.initialDraft?.agent, 'Deployment Agent'),
+      category: resolveSelectValue(props.categories, props.initialDraft?.category, 'development'),
+      snowGroup: resolveSelectValue(props.snowGroups, props.initialDraft?.snowGroup, ''),
+      application: resolveSelectValue(props.applications, props.initialDraft?.application, ''),
+      site: resolveSelectValue(props.sites, props.initialDraft?.site, ''),
       estDurationMinutes: 60,
       description: `Imported locally from ${uploadFile.value.name}. Task parsing will be connected once template import API is ready.`,
       source: 'upload',
