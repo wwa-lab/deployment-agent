@@ -23,9 +23,13 @@ public enum ConfigKey {
     ansible_url,
     ansible_user,
     ansible_api_token,
-    execution_callback_endpoint
+    execution_callback_endpoint;
 
     // --- Platform-shared: (none yet) ---
     // Add platform-level config keys here when a genuine shared concern arises.
     // Do not add agent-specific settings to this section.
+
+    public boolean isSensitive() {
+        return this == jenkins_api_token || this == ansible_api_token;
+    }
 }

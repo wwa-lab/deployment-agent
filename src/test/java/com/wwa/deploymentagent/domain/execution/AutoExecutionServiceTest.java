@@ -2,6 +2,7 @@ package com.wwa.deploymentagent.domain.execution;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
+import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
@@ -21,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -64,35 +66,22 @@ class AutoExecutionServiceTest {
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        ownerUser = new UserContext("emp-001", "DEVELOPER");
-        adminUser = new UserContext("emp-003", "DEVOPS_ADMIN");
+        ownerUser  = new UserContext("emp-001", "DEVELOPER");
+        adminUser  = new UserContext("emp-003", "DEVOPS_ADMIN");
         nonOwnerUser = new UserContext("dev-user", "DEVELOPER");
 
-        // Reset mock for each test
         reset(restTemplate);
     }
 
-    // ─── Success path ─────────────────────────────────────────────────────────
+    // ─── Success path (Jenkins) ───────────────────────────────────────────────
 
     @Test
-    @DisplayName("AUTO + Ready_For_Execution → task becomes Executing on successful submission")
-    void submitAuto_success_transitionsToExecuting() {
-        Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
-
-        // Mock Jenkins response - the adapter will fail since no config is set,
-        // which is expected. We test the guard logic and state transitions.
-        // For a true success test, we'd need to seed config values too.
-
-        // Seed Jenkins config
+    @DisplayName("AUTO + Ready_For_Execution → task becomes Executing on successful Jenkins submission")
+    void submitAuto_jenkins_success_transitionsToExecuting() {
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
         seedJenkinsConfig();
 
-        // Mock the RestTemplate to simulate successful Jenkins call
-        org.springframework.http.ResponseEntity<String> mockResponse =
-                org.springframework.http.ResponseEntity.status(201)
-                        .header("Location", "http://jenkins/queue/item/42/")
-                        .body("");
-        when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
-                .thenReturn(mockResponse);
+        mockJenkinsSuccess();
 
         Task result = autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
 
@@ -101,17 +90,11 @@ class AutoExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("execution history is created with external metadata on success")
+    @DisplayName("execution history is created with external metadata and QUEUED status on success")
     void submitAuto_success_createsExecutionHistoryWithExternalMetadata() {
-        Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
         seedJenkinsConfig();
-
-        org.springframework.http.ResponseEntity<String> mockResponse =
-                org.springframework.http.ResponseEntity.status(201)
-                        .header("Location", "http://jenkins/queue/item/42/")
-                        .body("");
-        when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
-                .thenReturn(mockResponse);
+        mockJenkinsSuccess();
 
         autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
 
@@ -124,20 +107,31 @@ class AutoExecutionServiceTest {
         assertThat(h.getSubmissionStatus()).isEqualTo("SUBMITTED");
         assertThat(h.getExternalJobUrl()).contains("jenkins");
         assertThat(h.getSubmittedAt()).isNotNull();
+        assertThat(h.getExternalStatus()).isEqualTo(ExternalStatus.QUEUED);
+        assertThat(h.getExternalStatusMessage()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("AUTO task with Jenkins URL in script → resolves via URL inference")
+    void submitAuto_jenkinsUrl_resolvedByUrlInference() {
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "http://jenkins:8080/job/my-pipeline/");
+        seedJenkinsConfig();
+        mockJenkinsSuccess();
+
+        Task result = autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Executing);
+        List<TaskExecutionHistory> history = executionHistoryRepository
+                .findByTaskIdOrderByAttemptNumberAsc(task.getId());
+        assertThat(history.get(0).getExternalSystemType()).isEqualTo("JENKINS");
     }
 
     @Test
     @DisplayName("DEVOPS_ADMIN can submit an AUTO task")
     void submitAuto_adminUser_succeeds() {
-        Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
         seedJenkinsConfig();
-
-        org.springframework.http.ResponseEntity<String> mockResponse =
-                org.springframework.http.ResponseEntity.status(201)
-                        .header("Location", "http://jenkins/queue/item/42/")
-                        .body("");
-        when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
-                .thenReturn(mockResponse);
+        mockJenkinsSuccess();
 
         Task result = autoExecutionService.submitAutoExecution(task.getId(), adminUser);
 
@@ -145,12 +139,11 @@ class AutoExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("adapter failure → task becomes Failed")
+    @DisplayName("adapter failure → task becomes Failed, execution history shows FAILED submission")
     void submitAuto_adapterFailure_transitionsToFailed() {
-        Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
         seedJenkinsConfig();
 
-        // Make RestTemplate throw an exception
         when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
                 .thenThrow(new org.springframework.web.client.ResourceAccessException("Connection refused"));
 
@@ -163,6 +156,7 @@ class AutoExecutionServiceTest {
         assertThat(history).hasSize(1);
         assertThat(history.get(0).getSubmissionStatus()).isEqualTo("FAILED");
         assertThat(history.get(0).getSubmissionMessage()).contains("Connection refused");
+        assertThat(history.get(0).getExternalStatus()).isEqualTo(ExternalStatus.FAILED);
     }
 
     // ─── Guard violations ─────────────────────────────────────────────────────
@@ -181,7 +175,7 @@ class AutoExecutionServiceTest {
     @Test
     @DisplayName("wrong state (Pending) → throws ConflictAppException")
     void submitAuto_wrongState_throwsConflict() {
-        Task task = seedAutoTask(TaskStatus.Pending);
+        Task task = seedAutoTask(TaskStatus.Pending, "deploy-job");
 
         assertThatThrownBy(() ->
                 autoExecutionService.submitAutoExecution(task.getId(), ownerUser))
@@ -192,7 +186,7 @@ class AutoExecutionServiceTest {
     @Test
     @DisplayName("non-owner developer → throws ForbiddenAppException")
     void submitAuto_nonOwner_throwsForbidden() {
-        Task task = seedAutoTask(TaskStatus.Ready_For_Execution);
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
 
         assertThatThrownBy(() ->
                 autoExecutionService.submitAutoExecution(task.getId(), nonOwnerUser))
@@ -212,7 +206,7 @@ class AutoExecutionServiceTest {
     @Autowired
     private com.wwa.deploymentagent.domain.configuration.ConfigurationRepository configRepository;
 
-    private Task seedAutoTask(TaskStatus status) {
+    private Task seedAutoTask(TaskStatus status, String script) {
         Task task = new Task();
         task.setRequest(request);
         task.setTaskGroupId("TG-AUTO");
@@ -221,7 +215,7 @@ class AutoExecutionServiceTest {
         task.setTaskName("auto-deploy");
         task.setExecutionType(ExecutionType.AUTO);
         task.setTaskStatus(status);
-        task.setInputParameters(Map.of("script", "deploy-job", "parameters", "--env sit"));
+        task.setInputParameters(Map.of("script", script, "parameters", "--env sit"));
         task.setOwner("alice");
         return taskRepository.save(task);
     }
@@ -255,5 +249,13 @@ class AutoExecutionServiceTest {
         item.setConfigValue(value);
         item.setUpdatedBy("test");
         return item;
+    }
+
+    private void mockJenkinsSuccess() {
+        ResponseEntity<String> mockResponse = ResponseEntity.status(201)
+                .header("Location", "http://jenkins:8080/queue/item/42/")
+                .body("");
+        when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
+                .thenReturn(mockResponse);
     }
 }

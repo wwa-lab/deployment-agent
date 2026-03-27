@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document breaks the updated Deployment Agent design into implementation-ready tasks for the next delivery phase. The focus is no longer “build the MVP from zero”; it is to align the current MVP with the implemented Access Management, scoped-visibility, multi-scope runtime, and rundown-owner direction already present in the workspace, and make the remaining gaps explicit.
+This document breaks the updated Release Agent design into implementation-ready tasks for the next delivery phase. The focus is no longer “build the MVP from zero”; it is to align the current MVP with the implemented Access Management, scoped-visibility, multi-scope runtime, and rundown-owner direction already present in the workspace, and make the remaining gaps explicit.
 
 **Delivery objective**
 - Preserve the current deployment workflow baseline
@@ -41,7 +41,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 
 ## Source Design
 
-**System name:** Deployment Agent
+**System name:** Release Agent
 
 **Design scope summary**
 - The updated design keeps Team Book as the enterprise identity source, adds local Access Grants for product entry plus `Application + SNOW Group` scoped visibility, and preserves the current workflow model for uploads, task execution, review decisions, and rundown lifecycle.
@@ -263,7 +263,7 @@ This document breaks the updated Deployment Agent design into implementation-rea
 - **Dependencies**: None
 - **Owner type**: backend
 - **Priority**: Could
-- **Notes**: Not part of the critical path for Access Management delivery.
+- **Notes**: Not part of the critical path for Access Management delivery. Detailed follow-up artifacts now live in `docs/05-design/multi-tool-execution-design.md` and `docs/06-tasks/multi-tool-execution-tasks.md`.
 
 ---
 

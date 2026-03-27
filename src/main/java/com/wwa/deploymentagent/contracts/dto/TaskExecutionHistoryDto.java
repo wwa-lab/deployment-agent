@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.contracts.dto;
 
 import com.wwa.deploymentagent.contracts.enums.ExecutionStatus;
+import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistory;
 
 import java.time.Instant;
@@ -16,12 +17,19 @@ public record TaskExecutionHistoryDto(
         String resultLogs,
         Instant startTime,
         Instant endTime,
+        // Submit-time external metadata
         String externalSystemType,
         String externalExecutionId,
         String externalJobUrl,
         Instant submittedAt,
         String submissionStatus,
-        String submissionMessage
+        String submissionMessage,
+        // Polling-time external metadata
+        ExternalStatus externalStatus,
+        String externalStatusMessage,
+        String externalLogUrl,
+        String externalApprovalUrl,
+        Instant lastSyncedAt
 ) {
     public static TaskExecutionHistoryDto from(TaskExecutionHistory h) {
         return new TaskExecutionHistoryDto(
@@ -39,7 +47,12 @@ public record TaskExecutionHistoryDto(
                 h.getExternalJobUrl(),
                 h.getSubmittedAt(),
                 h.getSubmissionStatus(),
-                h.getSubmissionMessage()
+                h.getSubmissionMessage(),
+                h.getExternalStatus(),
+                h.getExternalStatusMessage(),
+                h.getExternalLogUrl(),
+                h.getExternalApprovalUrl(),
+                h.getLastSyncedAt()
         );
     }
 }

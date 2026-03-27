@@ -1,7 +1,8 @@
 package com.wwa.deploymentagent.domain.execution;
 
-import com.wwa.deploymentagent.contracts.enums.ConfigKey;
-import com.wwa.deploymentagent.domain.configuration.ConfigurationService;
+import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
+import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
+import com.wwa.deploymentagent.domain.task.TaskExecutionHistory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -15,29 +16,27 @@ import java.util.Base64;
 import java.util.Map;
 
 /**
- * Submits AUTO tasks to Jenkins via its Remote Access API.
+ * Submits and polls AUTO tasks via the Jenkins Remote Access API.
  *
- * <p>Reads Jenkins URL, user, and API token from the configuration store.
- * Triggers a parameterized build and extracts the queue location from the response.
+ * <h3>Submit</h3>
+ * <p>Triggers a parameterized build using the job path from {@link ExecutionTarget#normalizedTarget()}.
+ * Stores the queue-item URL as the initial external job URL.
  *
- * <h3>Input parameter mapping</h3>
- * <p>The task's {@code inputParameters} map is mapped to Jenkins as follows:
+ * <h3>Poll</h3>
+ * <p>Polling is a two-phase process:
+ * <ol>
+ *   <li>If the stored URL is a queue URL ({@code /queue/item/…}), resolve it to a build URL.</li>
+ *   <li>Once a build URL is known, poll the build JSON for status and derive log/console URLs.</li>
+ * </ol>
+ *
+ * <h3>State mapping</h3>
  * <ul>
- *   <li>{@code script} → Jenkins job name (the path segment in {@code /job/{name}/buildWithParameters})</li>
- *   <li>{@code parameters} → if it is a Map, each entry becomes a named Jenkins build parameter.
- *       If it is a plain String, it is sent as a single parameter named {@code PARAMETERS}.
- *       This supports both structured parameters (from the config/edit UI) and freeform strings
- *       (from Excel import).</li>
- *   <li>All other keys in {@code inputParameters} (except {@code script}, {@code system},
- *       {@code parameters}) are also forwarded as named Jenkins parameters, enabling direct
- *       pass-through from the Excel "Parameters" column when it is parsed as key=value pairs.</li>
+ *   <li>Queue item not yet executable → {@link ExternalStatus#QUEUED}</li>
+ *   <li>Build {@code building=true} → {@link ExternalStatus#RUNNING}</li>
+ *   <li>Build result {@code SUCCESS} → {@link ExternalStatus#SUCCEEDED}</li>
+ *   <li>Build result {@code FAILURE} or {@code UNSTABLE} → {@link ExternalStatus#FAILED}</li>
+ *   <li>Build result {@code ABORTED} → {@link ExternalStatus#ABORTED}</li>
  * </ul>
- *
- * <h3>External job URL</h3>
- * <p>Jenkins returns a {@code Location} header pointing to the queue item
- * (e.g. {@code http://jenkins:8080/queue/item/42/}). This is stored as the external job URL.
- * The queue item page in the Jenkins UI shows the build link once the job starts executing,
- * so the user can navigate from queue → build from one click.
  */
 @Slf4j
 @Component
@@ -47,7 +46,7 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
     private static final java.util.Set<String> RESERVED_KEYS =
             java.util.Set.of("script", "system");
 
-    private final ConfigurationService configurationService;
+    private final ConfigurationComponentService configurationComponentService;
     private final RestTemplate restTemplate;
 
     @Override
@@ -55,21 +54,22 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
         return "JENKINS";
     }
 
-    @Override
-    public AutoSubmissionResult submit(Map<String, Object> inputParameters) {
-        try {
-            String baseUrl = getConfig(ConfigKey.jenkins_url);
-            String user = getConfig(ConfigKey.jenkins_user);
-            String token = getConfig(ConfigKey.jenkins_api_token);
+    // ─── Submit ───────────────────────────────────────────────────────────────
 
-            String jobName = (String) inputParameters.getOrDefault("script", "default-job");
-            String buildUrl = baseUrl + "/job/" + jobName + "/buildWithParameters";
+    @Override
+    public AutoSubmissionResult submit(ExecutionTarget target, Map<String, Object> inputParameters) {
+        try {
+            var config = configurationComponentService.resolveForSystem(systemType());
+            String baseUrl = config.endpoint();
+            String user    = config.serviceUser();
+            String token   = config.credential();
+
+            String jobPath = target.normalizedTarget();
+            String buildUrl = baseUrl + "/job/" + jobPath + "/buildWithParameters";
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            String auth = Base64.getEncoder()
-                    .encodeToString((user + ":" + token).getBytes(StandardCharsets.UTF_8));
-            headers.set(HttpHeaders.AUTHORIZATION, "Basic " + auth);
+            headers.set(HttpHeaders.AUTHORIZATION, basicAuth(user, token));
 
             MultiValueMap<String, String> formParams = buildFormParameters(inputParameters);
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formParams, headers);
@@ -79,8 +79,9 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
             if (response.getStatusCode().is2xxSuccessful()) {
                 String queueUrl = response.getHeaders().getFirst("Location");
                 String executionId = queueUrl != null ? extractQueueId(queueUrl) : "unknown";
-                String jobUrl = queueUrl != null ? queueUrl : (baseUrl + "/job/" + jobName);
-                return AutoSubmissionResult.ok(executionId, jobUrl);
+                String jobUrl = queueUrl != null ? queueUrl : (baseUrl + "/job/" + jobPath);
+                String logUrl = baseUrl + "/job/" + jobPath + "/lastBuild/consoleText";
+                return AutoSubmissionResult.ok(executionId, jobUrl, logUrl, null);
             } else {
                 return AutoSubmissionResult.failure(
                         "Jenkins returned HTTP " + response.getStatusCode().value());
@@ -91,55 +92,140 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
         }
     }
 
-    /**
-     * Builds form parameters for the Jenkins buildWithParameters endpoint.
-     *
-     * <p>Strategy:
-     * <ol>
-     *   <li>If {@code parameters} is a Map → each entry becomes a named form parameter</li>
-     *   <li>If {@code parameters} is a String → sent as a single form parameter named PARAMETERS</li>
-     *   <li>All other non-reserved keys from inputParameters are also added as named parameters</li>
-     * </ol>
-     */
+    // ─── Poll ─────────────────────────────────────────────────────────────────
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public AutoPollResult pollStatus(TaskExecutionHistory executionHistory) {
+        try {
+            var config = configurationComponentService.resolveForSystem(systemType());
+            String baseUrl = config.endpoint();
+            String user    = config.serviceUser();
+            String token   = config.credential();
+            String auth    = basicAuth(user, token);
+
+            String jobUrl = executionHistory.getExternalJobUrl();
+            if (jobUrl == null) {
+                return AutoPollResult.unknown("No external job URL recorded; cannot poll");
+            }
+
+            // Phase 1: Resolve queue item to build URL
+            if (jobUrl.contains("/queue/item/")) {
+                String queueApiUrl = trimTrailingSlash(jobUrl) + "/api/json";
+                ResponseEntity<Map> queueResponse = getJson(queueApiUrl, auth, Map.class);
+                if (queueResponse.getStatusCode().is2xxSuccessful() && queueResponse.getBody() != null) {
+                    Map<String, Object> body = queueResponse.getBody();
+                    Object executable = body.get("executable");
+                    if (executable instanceof Map) {
+                        String buildUrl = (String) ((Map<?, ?>) executable).get("url");
+                        if (buildUrl != null) {
+                            // Update jobUrl to the build URL for subsequent polls
+                            jobUrl = buildUrl;
+                        } else {
+                            return AutoPollResult.running(ExternalStatus.QUEUED, "Waiting in Jenkins queue", jobUrl, null);
+                        }
+                    } else {
+                        // Item cancelled or not yet assigned
+                        Object cancelled = body.get("cancelled");
+                        if (Boolean.TRUE.equals(cancelled)) {
+                            return AutoPollResult.failed(ExternalStatus.ABORTED,
+                                    "Jenkins queue item was cancelled", jobUrl, null);
+                        }
+                        return AutoPollResult.running(ExternalStatus.QUEUED, "Waiting in Jenkins queue", jobUrl, null);
+                    }
+                } else {
+                    return AutoPollResult.unknown("Could not poll Jenkins queue item; HTTP "
+                            + queueResponse.getStatusCode().value());
+                }
+            }
+
+            // Phase 2: Poll build status
+            String buildApiUrl = trimTrailingSlash(jobUrl) + "/api/json";
+            String logUrl = trimTrailingSlash(jobUrl) + "/consoleText";
+
+            ResponseEntity<Map> buildResponse = getJson(buildApiUrl, auth, Map.class);
+            if (!buildResponse.getStatusCode().is2xxSuccessful() || buildResponse.getBody() == null) {
+                return AutoPollResult.unknown("Could not poll Jenkins build; HTTP "
+                        + buildResponse.getStatusCode().value());
+            }
+
+            Map<String, Object> build = buildResponse.getBody();
+            Boolean building = (Boolean) build.get("building");
+            String result = (String) build.get("result");
+
+            if (Boolean.TRUE.equals(building)) {
+                return AutoPollResult.running(ExternalStatus.RUNNING, "Build is running", jobUrl, logUrl);
+            }
+
+            return mapJenkinsResult(result, jobUrl, logUrl);
+
+        } catch (Exception e) {
+            log.warn("Jenkins poll error for execution {}: {}", executionHistory.getId(), e.getMessage());
+            return AutoPollResult.unknown("Jenkins poll error: " + e.getMessage());
+        }
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private AutoPollResult mapJenkinsResult(String result, String jobUrl, String logUrl) {
+        if (result == null) {
+            return AutoPollResult.running(ExternalStatus.RUNNING, "Build in progress", jobUrl, logUrl);
+        }
+        return switch (result.toUpperCase()) {
+            case "SUCCESS" -> AutoPollResult.succeeded("Build succeeded", jobUrl, logUrl, null, null);
+            case "FAILURE", "UNSTABLE" ->
+                    AutoPollResult.failed(ExternalStatus.FAILED, "Build failed: " + result, jobUrl, logUrl);
+            case "ABORTED" ->
+                    AutoPollResult.failed(ExternalStatus.ABORTED, "Build was aborted", jobUrl, logUrl);
+            default ->
+                    AutoPollResult.unknown("Unknown Jenkins build result: " + result);
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ResponseEntity<T> getJson(String url, String auth, Class<T> type) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.AUTHORIZATION, auth);
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+        return (ResponseEntity<T>) restTemplate.exchange(url, HttpMethod.GET, request, type);
+    }
+
     @SuppressWarnings("unchecked")
     private MultiValueMap<String, String> buildFormParameters(Map<String, Object> inputParameters) {
         MultiValueMap<String, String> formParams = new LinkedMultiValueMap<>();
 
         Object params = inputParameters.get("parameters");
         if (params instanceof Map) {
-            // Structured parameters: each key-value becomes a named Jenkins parameter
             Map<String, Object> paramMap = (Map<String, Object>) params;
             paramMap.forEach((k, v) -> formParams.add(k, v != null ? v.toString() : ""));
         } else if (params != null) {
-            // Freeform string: send as a single PARAMETERS field
             formParams.add("PARAMETERS", params.toString());
         }
 
-        // Forward any additional top-level keys as named parameters
-        // (supports Excel columns that map directly to Jenkins parameter names)
         for (Map.Entry<String, Object> entry : inputParameters.entrySet()) {
             String key = entry.getKey();
             if (!RESERVED_KEYS.contains(key) && !"parameters".equals(key) && entry.getValue() != null) {
                 formParams.add(key, entry.getValue().toString());
             }
         }
-
         return formParams;
     }
 
-    private String getConfig(ConfigKey key) {
-        return configurationService.getByKey(key)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Configuration missing: " + key.name()))
-                .getConfigValue();
+    private static String basicAuth(String user, String token) {
+        return "Basic " + Base64.getEncoder()
+                .encodeToString((user + ":" + token).getBytes(StandardCharsets.UTF_8));
     }
 
-    private String extractQueueId(String queueUrl) {
-        // Jenkins queue URLs: .../queue/item/123/
+    private static String extractQueueId(String queueUrl) {
         String[] parts = queueUrl.split("/");
         for (int i = parts.length - 1; i >= 0; i--) {
             if (!parts[i].isBlank()) return parts[i];
         }
         return queueUrl;
+    }
+
+    private static String trimTrailingSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 }

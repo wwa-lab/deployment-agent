@@ -10,6 +10,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -62,5 +63,22 @@ class ConfigurationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"key\": \"jenkins_url\", \"value\": \"http://jenkins.example.com\", \"description\": \"test\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("listAll masks sensitive values in raw configuration responses")
+    void listAll_masksSensitiveValues() throws Exception {
+        mockMvc.perform(post(BASE)
+                        .header("X-User-Id", "admin-user")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"componentId\":\"jenkins\",\"key\":\"jenkins_api_token\",\"value\":\"super-secret\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get(BASE)
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.configKey=='jenkins_api_token')].configValue").value(hasItem("••••••••")));
     }
 }

@@ -14,22 +14,52 @@ const emit = defineEmits<{
 }>()
 
 const form = reactive({
+  displayName: props.component.label,
+  area: props.component.category,
+  application: props.component.application ?? '',
+  snowGroup: props.component.owningGroup ?? '',
+  agent: props.component.agent ?? '',
   endpoint: props.component.endpoint,
   serviceUser: props.component.serviceUser ?? '',
-  secretValue: props.component.secretValue ?? '',
+  credentialValue: '',
   description: props.component.description ?? '',
 })
 
 const localError = ref('')
 
-const requiresUser = computed(() => Boolean(props.component.userKey))
-const requiresSecret = computed(() => Boolean(props.component.secretKey))
+const requiresUser = computed(() => props.component.trackServiceUser)
+const requiresSecret = computed(() => props.component.trackCredential)
 const endpointLabel = computed(() =>
   props.component.id === 'callback' ? 'Callback Endpoint' : 'Service Endpoint',
 )
 
 function submit() {
   localError.value = ''
+
+  if (!form.displayName.trim()) {
+    localError.value = 'Component name is required.'
+    return
+  }
+
+  if (!form.area.trim()) {
+    localError.value = 'Area is required.'
+    return
+  }
+
+  if (!form.application.trim()) {
+    localError.value = 'Application is required.'
+    return
+  }
+
+  if (!form.snowGroup.trim()) {
+    localError.value = 'SNOW group is required.'
+    return
+  }
+
+  if (!form.agent.trim()) {
+    localError.value = 'Agent is required.'
+    return
+  }
 
   if (!form.endpoint.trim()) {
     localError.value = `${endpointLabel.value} is required.`
@@ -41,15 +71,23 @@ function submit() {
     return
   }
 
-  if (requiresSecret.value && !form.secretValue.trim()) {
+  if (requiresSecret.value && !props.component.credentialConfigured && !form.credentialValue.trim()) {
     localError.value = 'Credential is required.'
     return
   }
 
   emit('save', {
+    displayName: form.displayName.trim(),
+    area: form.area.trim(),
+    application: form.application.trim(),
+    snowGroup: form.snowGroup.trim(),
+    agent: form.agent.trim(),
     endpoint: form.endpoint.trim(),
     serviceUser: requiresUser.value ? form.serviceUser.trim() : undefined,
-    secretValue: requiresSecret.value ? form.secretValue.trim() : undefined,
+    credentialValue:
+      requiresSecret.value && form.credentialValue.trim().length > 0
+        ? form.credentialValue.trim()
+        : undefined,
     description: form.description.trim() || undefined,
   })
 }
@@ -84,6 +122,60 @@ function submit() {
         </div>
 
         <div class="form-group">
+          <label class="form-label">Component Name <span class="required">*</span></label>
+          <input
+            v-model="form.displayName"
+            class="form-control"
+            type="text"
+            placeholder="Enter component name"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Area <span class="required">*</span></label>
+            <input
+              v-model="form.area"
+              class="form-control"
+              type="text"
+              placeholder="CI/CD"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Application <span class="required">*</span></label>
+            <input
+              v-model="form.application"
+              class="form-control"
+              type="text"
+              placeholder="Enter application"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">SNOW Group <span class="required">*</span></label>
+            <input
+              v-model="form.snowGroup"
+              class="form-control"
+              type="text"
+              placeholder="Enter SNOW group"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Agent <span class="required">*</span></label>
+            <input
+              v-model="form.agent"
+              class="form-control"
+              type="text"
+              placeholder="Deployment Agent"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
           <label class="form-label">{{ endpointLabel }} <span class="required">*</span></label>
           <input
             v-model="form.endpoint"
@@ -106,13 +198,17 @@ function submit() {
         <div v-if="requiresSecret" class="form-group">
           <label class="form-label">Credential <span class="required">*</span></label>
           <input
-            v-model="form.secretValue"
+            v-model="form.credentialValue"
             class="form-control"
             type="password"
-            placeholder="Enter token or password"
+            :placeholder="component.credentialConfigured ? 'Enter a new token or password to replace the current one' : 'Enter token or password'"
           />
           <p class="field-hint">
-            Leave the current value in place if you are only updating the endpoint or service user.
+            {{
+              component.credentialConfigured
+                ? 'Leave blank to keep the current stored credential.'
+                : 'This credential will be encrypted before it is stored.'
+            }}
           </p>
         </div>
 
@@ -179,8 +275,18 @@ function submit() {
   color: #64748b;
 }
 
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 @media (max-width: 720px) {
   .component-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
     grid-template-columns: 1fr;
   }
 }

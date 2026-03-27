@@ -147,8 +147,35 @@ export interface ReleaseFlowDetail {
 
 // ConfigItem
 export interface ConfigItem {
+  componentId?: ConfigIntegrationId
   key: ConfigKey
   value: string
+  description?: string
+  updatedBy?: string
+  updatedAt?: string
+  application?: string
+  snowGroup?: string
+  agent?: string
+  area?: string
+  integration?: string
+  scopeSource?: string
+  sensitive?: boolean
+  configured?: boolean
+}
+
+export interface ConfigComponent {
+  componentId: ConfigIntegrationId
+  systemType: string
+  displayName: string
+  area: string
+  application: string
+  snowGroup: string
+  agent: string
+  trackServiceUser: boolean
+  trackCredential: boolean
+  serviceEndpoint: string
+  serviceUser?: string
+  credentialConfigured: boolean
   description?: string
   updatedBy?: string
   updatedAt?: string
@@ -165,9 +192,11 @@ export interface ConfigComponentRow {
   endpointKey?: ConfigKey
   userKey?: ConfigKey
   secretKey?: ConfigKey
+  trackServiceUser: boolean
+  trackCredential: boolean
   endpoint: string
   serviceUser?: string
-  secretValue?: string
+  credentialConfigured: boolean
   secretState: 'Configured' | 'Missing' | 'Not required'
   description?: string
   updatedBy?: string
@@ -176,9 +205,14 @@ export interface ConfigComponentRow {
 }
 
 export interface ConfigComponentDraft {
+  displayName: string
+  area: string
+  application: string
+  snowGroup: string
+  agent: string
   endpoint: string
   serviceUser?: string
-  secretValue?: string
+  credentialValue?: string
   description?: string
 }
 

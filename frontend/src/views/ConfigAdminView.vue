@@ -3,23 +3,21 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import ConfigComponentDialog from '../components/ConfigComponentDialog.vue'
 import { useConfigStore } from '../stores/config'
 import { useUserStore } from '../stores/user'
-import type {
-  ConfigComponentDraft,
-  ConfigComponentRow,
-  ConfigIntegrationId,
-  ConfigItem,
-  ConfigKey,
-} from '../types'
+import type { ConfigComponentDraft, ConfigComponentRow, ConfigIntegrationId, ConfigKey } from '../types'
 
 type ConfigCatalogRow = {
+  componentId?: ConfigIntegrationId
   key: ConfigKey
   label: string
   application: string
   owningGroup: string
   agent: string
-  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
+  scopeSource: 'Platform Default'
   integration: string
+  area: string
   value: string
+  configured: boolean
+  sensitive: boolean
   description?: string
   updatedBy?: string
   updatedAt?: string
@@ -29,11 +27,7 @@ const COMPONENT_DEFINITIONS: Array<{
   id: ConfigIntegrationId
   label: string
   category: string
-  application: string
-  owningGroup: string
-  agent: string
-  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
-  endpointKey?: ConfigKey
+  endpointKey: ConfigKey
   userKey?: ConfigKey
   secretKey?: ConfigKey
   defaultDescription: string
@@ -42,10 +36,6 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'jenkins',
     label: 'Jenkins Pipeline',
     category: 'CI/CD',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
     endpointKey: 'jenkins_url',
     userKey: 'jenkins_user',
     secretKey: 'jenkins_api_token',
@@ -55,10 +45,6 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'ansible',
     label: 'Ansible Automation',
     category: 'Execution',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
     endpointKey: 'ansible_url',
     userKey: 'ansible_user',
     secretKey: 'ansible_api_token',
@@ -68,10 +54,6 @@ const COMPONENT_DEFINITIONS: Array<{
     id: 'callback',
     label: 'Execution Callback',
     category: 'Integration',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
     endpointKey: 'execution_callback_endpoint',
     defaultDescription: 'HTTPS callback endpoint used by external tools to post execution updates.',
   },
@@ -80,75 +62,15 @@ const COMPONENT_DEFINITIONS: Array<{
 const CONFIG_CATALOG: Array<{
   key: ConfigKey
   label: string
-  application: string
-  owningGroup: string
-  agent: string
-  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
-  integration: string
+  integrationId: ConfigIntegrationId
 }> = [
-  {
-    key: 'jenkins_url',
-    label: 'JENKINS_URL',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Jenkins Pipeline',
-  },
-  {
-    key: 'jenkins_user',
-    label: 'JENKINS_USER',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Jenkins Pipeline',
-  },
-  {
-    key: 'jenkins_api_token',
-    label: 'JENKINS_API_TOKEN',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Jenkins Pipeline',
-  },
-  {
-    key: 'ansible_url',
-    label: 'ANSIBLE_URL',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Ansible Automation',
-  },
-  {
-    key: 'ansible_user',
-    label: 'ANSIBLE_USER',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Ansible Automation',
-  },
-  {
-    key: 'ansible_api_token',
-    label: 'ANSIBLE_API_TOKEN',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Ansible Automation',
-  },
-  {
-    key: 'execution_callback_endpoint',
-    label: 'EXECUTION_CALLBACK_ENDPOINT',
-    application: 'Deployment Agent',
-    owningGroup: 'WWA Platform',
-    agent: 'Deployment Agent',
-    scopeSource: 'Platform Default',
-    integration: 'Execution Callback',
-  },
+  { key: 'jenkins_url', label: 'JENKINS_URL', integrationId: 'jenkins' },
+  { key: 'jenkins_user', label: 'JENKINS_USER', integrationId: 'jenkins' },
+  { key: 'jenkins_api_token', label: 'JENKINS_API_TOKEN', integrationId: 'jenkins' },
+  { key: 'ansible_url', label: 'ANSIBLE_URL', integrationId: 'ansible' },
+  { key: 'ansible_user', label: 'ANSIBLE_USER', integrationId: 'ansible' },
+  { key: 'ansible_api_token', label: 'ANSIBLE_API_TOKEN', integrationId: 'ansible' },
+  { key: 'execution_callback_endpoint', label: 'EXECUTION_CALLBACK_ENDPOINT', integrationId: 'callback' },
 ]
 
 const SECRET_KEYS: ConfigKey[] = ['jenkins_api_token', 'ansible_api_token']
@@ -190,69 +112,64 @@ const rowError = ref<Record<string, string>>({})
 const rowSuccess = ref<Record<string, boolean>>({})
 
 onMounted(() => {
-  store.fetchConfig()
+  void store.fetchConfig()
 })
 
 const configItemsByKey = computed(() => {
   return new Map(store.items.map((item) => [item.key, item]))
 })
 
+const componentsById = computed(() => {
+  return new Map(store.components.map((component) => [component.componentId, component]))
+})
+
 const componentRows = computed<ConfigComponentRow[]>(() => {
   return COMPONENT_DEFINITIONS.map((definition) => {
-    const endpointItem = definition.endpointKey
-      ? configItemsByKey.value.get(definition.endpointKey)
-      : undefined
+    const component = componentsById.value.get(definition.id)
+    const endpointItem = configItemsByKey.value.get(definition.endpointKey)
     const userItem = definition.userKey ? configItemsByKey.value.get(definition.userKey) : undefined
-    const secretItem = definition.secretKey
-      ? configItemsByKey.value.get(definition.secretKey)
-      : undefined
+    const secretItem = definition.secretKey ? configItemsByKey.value.get(definition.secretKey) : undefined
 
-    const existingItems = [endpointItem, userItem, secretItem].filter(
-      (item): item is ConfigItem => Boolean(item),
-    )
-    const configuredRequiredCount = [endpointItem, userItem, secretItem].filter(
-      (item) => item && item.value.trim().length > 0,
-    ).length
-    const requiredCount = [definition.endpointKey, definition.userKey, definition.secretKey].filter(Boolean)
-      .length
+    const trackServiceUser = component?.trackServiceUser ?? Boolean(definition.userKey)
+    const trackCredential = component?.trackCredential ?? Boolean(definition.secretKey)
+    const requiredCount = 1 + (trackServiceUser ? 1 : 0) + (trackCredential ? 1 : 0)
+    const configuredRequiredCount =
+      (component?.serviceEndpoint?.trim() ? 1 : 0) +
+      (trackServiceUser && component?.serviceUser?.trim() ? 1 : 0) +
+      (trackCredential && component?.credentialConfigured ? 1 : 0)
 
     let status: ConfigComponentRow['status'] = 'Needs Setup'
-    if (requiredCount > 0 && configuredRequiredCount === requiredCount) {
+    if (configuredRequiredCount === requiredCount && requiredCount > 0) {
       status = 'Ready'
     } else if (configuredRequiredCount > 0) {
       status = 'Partial'
     }
 
-    const latestItem = [...existingItems]
-      .sort((left, right) => {
-        const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0
-        const rightTime = right.updatedAt ? new Date(right.updatedAt).getTime() : 0
-        return rightTime - leftTime
-      })[0]
-
     return {
       id: definition.id,
-      label: definition.label,
-      category: definition.category,
-      application: definition.application,
-      owningGroup: definition.owningGroup,
-      agent: definition.agent,
-      scopeSource: definition.scopeSource,
+      label: component?.displayName ?? definition.label,
+      category: component?.area ?? definition.category,
+      application: component?.application ?? '',
+      owningGroup: component?.snowGroup ?? '',
+      agent: component?.agent ?? '',
+      scopeSource: 'Platform Default',
       endpointKey: definition.endpointKey,
       userKey: definition.userKey,
       secretKey: definition.secretKey,
-      endpoint: endpointItem?.value ?? '',
-      serviceUser: userItem?.value,
-      secretValue: secretItem?.value,
-      secretState: definition.secretKey
-        ? secretItem?.value
+      trackServiceUser,
+      trackCredential,
+      endpoint: component?.serviceEndpoint ?? '',
+      serviceUser: component?.serviceUser ?? '',
+      secretState: trackCredential
+        ? component?.credentialConfigured
           ? 'Configured'
           : 'Missing'
         : 'Not required',
-      description: endpointItem?.description || definition.defaultDescription,
-      updatedBy: latestItem?.updatedBy,
-      updatedAt: latestItem?.updatedAt,
+      description: component?.description ?? endpointItem?.description ?? definition.defaultDescription,
+      updatedBy: component?.updatedBy ?? endpointItem?.updatedBy ?? userItem?.updatedBy ?? secretItem?.updatedBy,
+      updatedAt: component?.updatedAt ?? endpointItem?.updatedAt ?? userItem?.updatedAt ?? secretItem?.updatedAt,
       status,
+      credentialConfigured: component?.credentialConfigured ?? Boolean(secretItem?.configured),
     }
   })
 })
@@ -295,19 +212,32 @@ const filteredComponentRows = computed(() => {
 const rawRows = computed<ConfigCatalogRow[]>(() => {
   return CONFIG_CATALOG.map((entry) => {
     const item = configItemsByKey.value.get(entry.key)
+    const component = componentsById.value.get(entry.integrationId)
+    const definition = COMPONENT_DEFINITIONS.find((value) => value.id === entry.integrationId)
+
     return {
-      ...entry,
+      componentId: item?.componentId ?? entry.integrationId,
+      key: entry.key,
+      label: entry.label,
+      application: item?.application ?? component?.application ?? '',
+      owningGroup: item?.snowGroup ?? component?.snowGroup ?? '',
+      agent: item?.agent ?? component?.agent ?? '',
+      scopeSource: 'Platform Default',
+      integration: item?.integration ?? component?.displayName ?? definition?.label ?? '',
+      area: item?.area ?? component?.area ?? definition?.category ?? '',
       value: item?.value ?? '',
+      configured: item?.configured ?? Boolean(item?.value),
+      sensitive: item?.sensitive ?? SECRET_KEYS.includes(entry.key),
       description: item?.description,
-      updatedBy: item?.updatedBy,
-      updatedAt: item?.updatedAt,
+      updatedBy: item?.updatedBy ?? component?.updatedBy,
+      updatedAt: item?.updatedAt ?? component?.updatedAt,
     }
   })
 })
 
-const owningGroupOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.owningGroup))])
-const applicationOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.application))])
-const agentOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.agent))])
+const owningGroupOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.owningGroup).filter(Boolean))])
+const applicationOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.application).filter(Boolean))])
+const agentOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.agent).filter(Boolean))])
 const configItemOptions = computed(() => ['All', ...rawRows.value.map((row) => row.label)])
 
 const filteredRawRows = computed(() => {
@@ -329,8 +259,8 @@ const editingComponent = computed(() => {
   return componentRows.value.find((row) => row.id === editingComponentId.value) ?? null
 })
 
-function refreshConfig() {
-  store.fetchConfig()
+async function refreshConfig() {
+  await store.fetchConfig()
 }
 
 function applyRawFilters() {
@@ -371,34 +301,18 @@ async function saveComponent(draft: ConfigComponentDraft) {
   componentError.value = ''
 
   try {
-    const updates: Array<{ key: ConfigKey; value: string; description?: string }> = []
-
-    if (editingComponent.value.endpointKey) {
-      updates.push({
-        key: editingComponent.value.endpointKey,
-        value: draft.endpoint,
-        description: draft.description ?? '',
-      })
-    }
-
-    if (editingComponent.value.userKey && draft.serviceUser) {
-      updates.push({
-        key: editingComponent.value.userKey,
-        value: draft.serviceUser,
-      })
-    }
-
-    if (editingComponent.value.secretKey && draft.secretValue) {
-      updates.push({
-        key: editingComponent.value.secretKey,
-        value: draft.secretValue,
-      })
-    }
-
-    for (const update of updates) {
-      await store.saveConfig(update)
-    }
-
+    await store.saveComponent({
+      componentId: editingComponent.value.id,
+      displayName: draft.displayName,
+      area: draft.area,
+      application: draft.application,
+      snowGroup: draft.snowGroup,
+      agent: draft.agent,
+      serviceEndpoint: draft.endpoint,
+      serviceUser: draft.serviceUser,
+      credentialValue: draft.credentialValue,
+      description: draft.description,
+    })
     closeComponentEditor()
   } catch (error: unknown) {
     componentError.value =
@@ -410,7 +324,7 @@ async function saveComponent(draft: ConfigComponentDraft) {
 
 function startEdit(row: ConfigCatalogRow) {
   editingKey.value = row.key
-  editForm.value = row.value
+  editForm.value = row.sensitive ? '' : row.value
   editForm.description = row.description ?? ''
   rowError.value = { ...rowError.value, [row.key]: '' }
   rowSuccess.value = { ...rowSuccess.value, [row.key]: false }
@@ -425,12 +339,23 @@ async function saveEdit(row: ConfigCatalogRow) {
   savingKey.value = row.key
   rowError.value = { ...rowError.value, [row.key]: '' }
 
+  if (!editForm.value.trim()) {
+    rowError.value = {
+      ...rowError.value,
+      [row.key]: row.sensitive ? 'Enter a new credential value.' : 'Value must not be blank.',
+    }
+    savingKey.value = null
+    return
+  }
+
   try {
     await store.saveConfig({
+      componentId: row.componentId,
       key: row.key,
       value: editForm.value,
       description: editForm.description,
     })
+    await store.fetchConfig()
     rowSuccess.value = { ...rowSuccess.value, [row.key]: true }
     editingKey.value = null
     setTimeout(() => {
@@ -450,10 +375,12 @@ function isSecretKey(key: ConfigKey) {
   return SECRET_KEYS.includes(key)
 }
 
-function formatValue(item: { key: ConfigKey; value: string }) {
+function formatValue(item: Pick<ConfigCatalogRow, 'sensitive' | 'configured' | 'value'>) {
+  if (item.sensitive) {
+    return item.configured ? '••••••••' : '—'
+  }
   if (!item.value) return '—'
-  if (!isSecretKey(item.key)) return item.value
-  return '••••••••'
+  return item.value
 }
 
 function formatDate(value?: string) {
