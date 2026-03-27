@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Enabled Template Management `Create Rundown` so eligible users can now launch a real release rundown from a template, review/edit the default scope in a create dialog, and land directly in the newly created rundown instead of seeing a permanently disabled placeholder button; the dialog now requires a release identifier in `xxx-sit-01 / xxx-uat-01 / xxx-prod-01` format and enforces stage alignment in both frontend and backend validation.
 - Fixed Configuration Management component actions so built-in platform-default rows can now be opened in the edit dialog even before they are first persisted, added visible `Delete` actions for component rows, and backed scoped component deletion with a new admin API while keeping unsaved built-in defaults protected from deletion.
 - Polished frontend UI copy across Configuration Management, Login, Release Summary, and Access Management by clarifying status-filter wording, fixing capitalization and phrasing (`Team Book`, `Human-in-the-Loop`, `SNOW Group`), and expanding abbreviated role labels for clearer page text.
 - Changed Configuration Management so entering the page now lands on the `Component` tab by default instead of opening the derived `Configuration` tab first.

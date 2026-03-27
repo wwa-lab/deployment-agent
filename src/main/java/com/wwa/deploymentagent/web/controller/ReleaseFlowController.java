@@ -6,7 +6,9 @@ import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.releaseflow.TemplateRundownCreationService;
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ import java.util.Map;
 public class ReleaseFlowController {
 
     private final ReleaseFlowService releaseFlowService;
+    private final TemplateRundownCreationService templateRundownCreationService;
 
     @GetMapping
     public ResponseEntity<PaginatedResponseDto<ReleaseFlowListItemDto>> list(
@@ -123,6 +126,15 @@ public class ReleaseFlowController {
                 1,
                 List.of(rf.getReleaseId()),
                 requestDtos));
+    }
+
+    @PostMapping("/from-template")
+    public ResponseEntity<UploadResponseDto> createFromTemplate(
+            @RequestBody CreateRundownFromTemplateDto body,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        ImportResult result = templateRundownCreationService.createRundown(body, user);
+        return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 
     @PatchMapping("/{flowId}/requests/{requestId}/rundown")

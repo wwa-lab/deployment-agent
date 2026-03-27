@@ -1,11 +1,13 @@
 import apiClient from './client'
 import type {
+  CreateRundownFromTemplateInput,
   PaginatedResponse,
   ReleaseFlowDetail,
   ReleaseFlowListItem,
   Request,
   RequestArchiveResult,
   RequestPurgeResult,
+  UploadResponse,
 } from '../types'
 
 export interface ListReleaseFlowsParams {
@@ -34,6 +36,13 @@ export async function getReleaseFlow(
   params?: { includeArchived?: boolean; linked?: string }
 ): Promise<ReleaseFlowDetail> {
   const response = await apiClient.get(`/release-flows/${id}`, { params })
+  return response.data
+}
+
+export async function createRundownFromTemplate(
+  input: CreateRundownFromTemplateInput
+): Promise<UploadResponse> {
+  const response = await apiClient.post('/release-flows/from-template', input)
   return response.data
 }
 

@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import CreateRundownDialog from '../components/CreateRundownDialog.vue'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
 import TemplateTaskDialog from '../components/TemplateTaskDialog.vue'
 import { agentRegistry } from '../config/agentRegistry'
-import type { CreateTemplateDraft, TemplateRecord, TemplateTask, TemplateTaskDraft } from '../types'
+import type {
+  CreateTemplateDraft,
+  TemplateRecord,
+  TemplateTask,
+  TemplateTaskDraft,
+  UploadResponse,
+} from '../types'
 
+const router = useRouter()
 const userStore = useUserStore()
 
 const templates = ref<TemplateRecord[]>([
@@ -277,6 +286,7 @@ const selectedSite = ref('All')
 const selectedTemplateId = ref('')
 const activeMoreMenuId = ref('')
 const actionFeedback = ref('')
+const creatingRundownTemplateId = ref('')
 const showCreateTemplateDialog = ref(false)
 const editingTemplateId = ref('')
 const deletingTemplateId = ref('')
@@ -408,6 +418,10 @@ const editingTemplate = computed(() =>
 
 const deletingTemplate = computed(() =>
   templates.value.find((template) => template.id === deletingTemplateId.value) ?? null,
+)
+
+const creatingRundownTemplate = computed(() =>
+  templates.value.find((template) => template.id === creatingRundownTemplateId.value) ?? null,
 )
 
 const editingTask = computed(() =>
@@ -691,9 +705,38 @@ function openCreateTemplateDialog() {
   actionFeedback.value = ''
 }
 
+function createRundownDisabledReason(template: TemplateRecord): string {
+  if (!userStore.canUploadRelease) {
+    return 'Create rundown is available to DEVELOPER, TL, and DEVOPS_ADMIN users.'
+  }
+  if (template.tasks.length === 0) {
+    return 'Add at least one task before creating a rundown from this template.'
+  }
+  return ''
+}
+
+function openCreateRundownDialog(template: TemplateRecord) {
+  if (createRundownDisabledReason(template)) return
+  selectedTemplateId.value = template.id
+  creatingRundownTemplateId.value = template.id
+  activeMoreMenuId.value = ''
+  actionFeedback.value = ''
+}
+
 function closeCreateTemplateDialog() {
   showCreateTemplateDialog.value = false
   editingTemplateId.value = ''
+}
+
+function closeCreateRundownDialog() {
+  creatingRundownTemplateId.value = ''
+}
+
+function handleRundownCreated(result: UploadResponse) {
+  const templateName = creatingRundownTemplate.value?.name ?? 'template'
+  creatingRundownTemplateId.value = ''
+  actionFeedback.value = `Created release rundown from "${templateName}" as ${result.releaseId}.`
+  void router.push(`/wwa/deployment-agent/release-flows/${result.releaseFlowId}`)
 }
 
 function closeDeleteTemplateDialog() {
@@ -1060,7 +1103,13 @@ onBeforeUnmount(() => {
                 <td class="description-cell">{{ template.description }}</td>
                 <td>
                   <div class="action-btns" @click.stop>
-                    <button class="btn btn-primary btn-sm" type="button" disabled>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      type="button"
+                      :disabled="!!createRundownDisabledReason(template)"
+                      :title="createRundownDisabledReason(template)"
+                      @click="openCreateRundownDialog(template)"
+                    >
                       Create Rundown
                     </button>
                     <div class="more-menu-wrap">
@@ -1359,6 +1408,13 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </div>
+
+    <CreateRundownDialog
+      v-if="creatingRundownTemplate"
+      :template="creatingRundownTemplate"
+      @close="closeCreateRundownDialog"
+      @created="handleRundownCreated"
+    />
 
     <CreateTemplateDialog
       v-if="showCreateTemplateDialog"

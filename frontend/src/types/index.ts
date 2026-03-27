@@ -304,6 +304,34 @@ export interface UploadResponse {
   agent?: string
 }
 
+export interface CreateRundownFromTemplateTaskInput {
+  category?: string
+  taskName: string
+  step: number
+  stepName: string
+  type: ExecutionType
+  critical: boolean
+  owner?: string
+  estDurationMinutes?: number
+  dependencies?: string
+}
+
+export interface CreateRundownFromTemplateInput {
+  templateId: string
+  templateName: string
+  projectId?: string
+  projectName: string
+  stage: Stage
+  releaseId?: string
+  snowGroup?: string
+  application?: string
+  agent?: string
+  site?: string
+  owner?: string
+  estimatedRemainingMinutes?: number
+  tasks: CreateRundownFromTemplateTaskInput[]
+}
+
 export interface RequestArchiveResult {
   releaseFlowId: string
   requestId: string
