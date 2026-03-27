@@ -75,7 +75,7 @@ Top-level deployment journey across stages. One Release Flow per project, identi
 | `current_stage` | VARCHAR(10) | No | Enum: `SIT`, `UAT`, `PROD` |
 | `flow_status` | VARCHAR(30) | No | Enum: `Pending`, `Running`, `Completed`, `Failed`, `Rejected` |
 | `review_status` | VARCHAR(30) | No | Enum: `Pending_Review`, `Approved`, `Rejected` |
-| `review_owner` | VARCHAR(255) | Yes | User ID of review owner |
+| `review_owner` | VARCHAR(255) | Yes | Legacy release-level review-owner field retained in schema; not the primary authority for current task/rundown mutation rules |
 | `created_at` | TIMESTAMP | No | Auto-populated, immutable |
 | `updated_at` | TIMESTAMP | No | Auto-updated |
 | `version` | BIGINT | No | Optimistic locking counter |

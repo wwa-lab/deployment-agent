@@ -223,7 +223,7 @@ so that I can monitor release status at a glance.
 View selected Release Flow details
 
 **Story**
-As a TL or DevOps Admin,
+As a signed-in user with Release Flow visibility,
 I want to view the details of a selected Release Flow,
 so that I can understand its current stage and review context before taking action.
 
@@ -235,7 +235,7 @@ so that I can understand its current stage and review context before taking acti
 
 2. Given the Selected Release Flow Details section is displayed,
    When the user views the details,
-   Then the section shows Project, Release ID, Current Stage, Current Request ID, Review Status, and Review Owner.
+   Then the section shows Project, Release ID, Current Stage, Current Request ID, Review Status, active rundown scope, and Rundown Owner.
 
 3. Given the selected Release Flow changes,
    When the user selects another Release Flow,
@@ -255,8 +255,7 @@ so that I can understand its current stage and review context before taking acti
 
 **Open Questions**
 
-- Should Review Owner always be a single user, or can it be a group?
-- How should empty or unassigned review fields be displayed?
+- How should empty or unassigned owner fields be displayed?
 
 ---
 
@@ -266,7 +265,7 @@ so that I can understand its current stage and review context before taking acti
 View task-level details and execution results
 
 **Story**
-As a TL,
+As a signed-in user with Release Flow visibility,
 I want to view task-level details including status, result summary, and timestamps,
 so that I can understand execution outcomes before making a decision.
 
@@ -318,22 +317,22 @@ so that I can understand execution outcomes before making a decision.
 Edit task input parameters before execution
 
 **Story**
-As a TL,
+As a task owner or DevOps Admin,
 I want to edit task input parameters before execution,
 so that I can correct or refine execution input without restarting the whole Release Flow.
 
 **Acceptance Criteria**
 
-1. Given a task is in an editable status,
-   When the TL clicks the "Edit" action,
+1. Given a task is in an editable status and the current user is the task owner or a DevOps Admin,
+   When the user clicks the "Edit" action,
    Then the system displays editable task input parameters.
 
 2. Given the edit view is displayed,
-   When the TL updates one or more input values and saves,
+   When the authorized user updates one or more input values and saves,
    Then the system validates and persists the updated input.
 
 3. Given the updated input is invalid,
-   When the TL attempts to save,
+   When the authorized user attempts to save,
    Then the system rejects the change and displays validation errors.
 
 4. Given task input is updated successfully,
@@ -372,29 +371,29 @@ so that I can correct or refine execution input without restarting the whole Rel
 Execute task-level decisions to control Release Flow progression
 
 **Story**
-As a TL,
+As a task owner or DevOps Admin,
 I want to make explicit task-level decisions after reviewing execution results,
 so that the Release Flow progresses in a controlled and traceable way.
 
 **Acceptance Criteria**
 
-1. Given a task has completed execution and is waiting for review,
-   When the TL opens the Decision action,
+1. Given a task has completed execution and is waiting for review, and the current user is the task owner or a DevOps Admin,
+   When the user opens the Decision action,
    Then the system displays the supported decision options: Approve, Reject, Rerun, and Skip.
 
-2. Given the TL selects Approve,
+2. Given the authorized user selects Approve,
    When the decision is confirmed,
    Then the current task is marked accordingly and the Release Flow continues to the next available step.
 
-3. Given the TL selects Reject,
+3. Given the authorized user selects Reject,
    When the decision is confirmed,
    Then the current Release Flow is stopped and no further steps are executed.
 
-4. Given the TL selects Rerun,
+4. Given the authorized user selects Rerun,
    When the decision is confirmed,
-   Then the system re-executes the current step.
+   Then the system returns the task to `Ready_For_Execution` and requires an explicit subsequent run.
 
-5. Given the TL selects Skip,
+5. Given the authorized user selects Skip,
    When the decision is confirmed,
    Then the current step is skipped and the Release Flow continues to the next available step.
 
@@ -575,7 +574,7 @@ so that I can review deployment-related operations for compliance and accountabi
 Manage deployment templates with full CRUD lifecycle
 
 **Story**
-As a TL or DevOps Admin,
+As a signed-in user with Template Management visibility,
 I want to create, view, edit, clone, and delete deployment templates,
 so that I can define reusable multi-task deployment blueprints for future release flows.
 
@@ -629,7 +628,7 @@ so that I can define reusable multi-task deployment blueprints for future releas
 Author and maintain tasks within a deployment template
 
 **Story**
-As a TL or DevOps Admin,
+As a signed-in user with Template Management visibility,
 I want to add, edit, and delete tasks within a template, including dependency maintenance,
 so that each template defines the exact task sequence and gate structure for a deployment.
 
@@ -719,7 +718,7 @@ so that I can access Deployment Agent, Template Management, Configuration Manage
 View task activity history for traceability
 
 **Story**
-As a TL or DevOps Admin,
+As a signed-in user with Release Flow visibility,
 I want to view task-level activity history showing who did what, when it happened, and the related input/output,
 so that I can trace all actions taken on a task from audit and execution records.
 
@@ -750,7 +749,7 @@ so that I can trace all actions taken on a task from audit and execution records
 Manage stage-level rundown information for deployment requests
 
 **Story**
-As a TL or DevOps Admin,
+As a Developer, TL, or DevOps Admin,
 I want to view and edit stage-level rundown fields such as SNOW group, application, site, and estimated remaining time,
 so that the deployment context is captured per request for operational coordination.
 
@@ -784,7 +783,7 @@ so that the deployment context is captured per request for operational coordinat
 Gate workflow progression on critical task review
 
 **Story**
-As a TL,
+As a task owner or DevOps Admin,
 I want tasks marked as Critical to block the next pending task from being released until the critical task is reviewed,
 so that review-blocking steps enforce governance before the workflow progresses.
 
@@ -798,7 +797,7 @@ so that review-blocking steps enforce governance before the workflow progresses.
    When the system evaluates task progression,
    Then the next pending task is not released until the critical task receives a decision.
 
-3. Given the critical task is approved or skipped,
+3. Given the critical task is approved or skipped by an authorized user,
    When the decision is recorded,
    Then the workflow gate is lifted and the next task becomes available.
 
@@ -824,7 +823,7 @@ so that review-blocking steps enforce governance before the workflow progresses.
 Control task action permissions by ownership and role
 
 **Story**
-As a TL or DevOps Admin,
+As a task owner or DevOps Admin,
 I want task-level actions (edit input, record results, submit auto execution, apply decisions) to be restricted to the task owner or DEVOPS_ADMIN,
 so that only authorized users can modify task execution state.
 
@@ -832,15 +831,15 @@ so that only authorized users can modify task execution state.
 
 1. Given a task row is displayed,
    When the user views available actions,
-   Then Edit, View Result, and Decision dropdown are always shown, with state-based disabling.
+   Then the task row surfaces the current action set such as Edit, Activity, View Result, Run, Rerun, and Review Decision, with state-based disabling where applicable.
 
 2. Given the current user is neither the task owner nor a DEVOPS_ADMIN,
    When the user hovers over a disabled action,
    Then a tooltip explains whether the action is blocked by role or task status.
 
 3. Given a MANUAL task needs result submission,
-   When the user opens the Edit dialog,
-   Then the result can be recorded from within the Edit dialog (not a separate action).
+   When the task is in a runnable or executing state,
+   Then the UI provides a dedicated Record Result action instead of requiring result entry through the Edit dialog.
 
 **Dependencies**
 
@@ -855,7 +854,7 @@ so that only authorized users can modify task execution state.
 View execution mix and task category in release detail
 
 **Story**
-As a TL or DevOps Admin,
+As a signed-in user with Release Flow visibility,
 I want to see the execution mix (manual vs auto task counts and percentages) and task category in the release detail view,
 so that I can understand the composition and automation coverage of each deployment.
 
@@ -913,7 +912,7 @@ so that product access can be managed without building a separate user account s
 
 **Acceptance Criteria**
 
-1. Given an employee has a valid enterprise identity but does not yet have Deployment Agent access,
+1. Given an employee has a valid authenticated identity from the configured login provider but does not yet have Deployment Agent access,
    When the DevOps Admin creates an access grant,
    Then the system stores the employee ID, display name snapshot, status, assigned roles, scope grants, and note.
 
@@ -927,14 +926,14 @@ so that product access can be managed without building a separate user account s
 
 **Notes / Assumptions**
 
-- Authentication continues to come from Team Book or enterprise SSO.
+- Authentication comes from Deployment Agent's configured login provider; real Team Book or enterprise SSO integration remains a future option.
 - Phase 1 manages product entry plus scoped visibility through `Application + SNOW Group` grants.
 - `Agent` remains a runtime dimension and is not the primary authorization boundary.
 
 **Dependencies**
 
-- Enterprise identity source returns employee ID and display name.
-- A local access grant data model and service are added to Deployment Agent.
+- The configured identity provider can supply employee ID / display name, or admins can enter a manual display name when lookup is unavailable.
+- Deployment Agent maintains its own Access Grant data model and service for product authorization.
 
 **Out of Scope**
 
@@ -960,7 +959,7 @@ so that platform access is controlled and auditable.
 
 **Acceptance Criteria**
 
-1. Given an employee is successfully authenticated by Team Book but has no Deployment Agent access grant,
+1. Given an employee is successfully authenticated by the configured login provider but has no Deployment Agent access grant,
    When the employee logs in,
    Then the system denies entry and displays an "Access not granted" message.
 
@@ -1012,7 +1011,7 @@ so that I can operate authorization without changing code or stub data.
 
 2. Given the DevOps Admin searches for an employee,
    When an employee ID or name keyword is entered,
-   Then matching employees are shown and the admin can grant access, edit roles, update scope grants, suspend access, or reactivate access.
+   Then matching existing grants and provider-backed directory candidates are shown and the admin can grant access, edit roles, update scope grants, suspend access, or reactivate access.
 
 3. Given a non-admin user attempts to access the Access Management page,
    When the user navigates from the menu or enters the URL directly,
@@ -1035,7 +1034,7 @@ so that I can operate authorization without changing code or stub data.
 
 **Open Questions**
 
-- Should the page search only existing grants or also allow search of non-granted enterprise users?
+- How should the UI distinguish employees found through provider-backed directory search from employees who already have an Access Grant?
 - Should the UI show the reason for the most recent authorization change?
 
 ---

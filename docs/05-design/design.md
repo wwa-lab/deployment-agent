@@ -1,6 +1,6 @@
 # Detailed Design: Deployment Agent
 
-**Date:** 2026-03-27
+**Date:** 2026-03-28
 **Status:** Implemented (current MVP + partial Phase 1 access governance + template-based rundown creation)
 **Source:** `docs/04-architecture/architecture.md`, `docs/03-spec/spec.md`, repository validation
 
@@ -15,7 +15,7 @@ This document translates the current Deployment Agent architecture into implemen
 
 ```mermaid
 flowchart LR
-    User[Enterprise User] --> Login[Team Book Login]
+    User[Workspace User] --> Login[Configured Login Provider]
     Login --> Authz[Access Grant Resolution]
     Authz -->|Authorized| UI[Vue Workspace]
     Authz -->|Denied| Denied[Access Denied State]
@@ -104,7 +104,7 @@ flowchart LR
 
 - Agent-scoped authorization and finer-grained environment-scoped authorization
 - Self-service access requests or approval workflows
-- Real Team Book directory-backed search, unless confirmed later
+- Enterprise directory sync beyond the current provider-backed search abstraction
 - Callback-based AUTO completion ingestion
 - Dynamic import schemas or schema-level Excel template customization
 - Parallel or DAG-based execution control from dependencies
@@ -113,7 +113,7 @@ flowchart LR
 
 - Frontend communicates with backend via REST/JSON and session cookies
 - Backend owns workflow state, authorization resolution, and audit persistence
-- Team Book authenticates enterprise identity only; Deployment Agent owns product authorization
+- The configured authentication provider validates login identity; Deployment Agent owns product authorization through local Access Grants
 - Jenkins and Ansible are synchronous submission integrations with externally hosted execution detail
 
 ---
@@ -123,14 +123,14 @@ flowchart LR
 ### 1. Identity and Session Module
 
 **Responsibilities**
-- Authenticate users through `TeamBookAuthenticationProvider`
+- Authenticate users through the configured provider abstraction (`TeamBookAuthenticationProvider` in code)
 - Create and restore authenticated session state
 - Populate request-scoped security context from session data
 - Distinguish enterprise identity from product authorization
 
 **Key Interactions**
 - `AuthController` accepts login / logout / current-user requests
-- `AuthService` validates credentials via Team Book provider
+- `AuthService` validates credentials via the configured authentication provider
 - `SessionAuthFilter` reconstructs authenticated user context on each request
 - `HeaderAuthFilter` remains a controlled fallback for tests
 
@@ -149,7 +149,7 @@ flowchart LR
 - Resolve which `Application + SNOW Group` records are visible/manageable for the authenticated user
 
 **Key Interactions**
-- Runs immediately after Team Book authentication succeeds
+- Runs immediately after authentication-provider validation succeeds
 - Reads Access Grant data from Oracle
 - Returns authorization profile to session creation and `auth/me`
 
@@ -353,7 +353,7 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 ### Authentication Interfaces
 
 **Purpose**
-- Authenticate enterprise identity
+- Authenticate login identity
 - Resolve local product access
 - Return current authenticated context
 
@@ -364,8 +364,8 @@ This section describes logical API behavior. Endpoint-level payload examples liv
 
 **Validation Expectations**
 - `employeeId` and password required on login
-- Invalid enterprise credentials return `401`
-- Valid enterprise credentials without active product access return `403`
+- Invalid login credentials return `401`
+- Valid authenticated identity without active product access return `403`
 
 **Error Behavior**
 - `401 Unauthorized` for invalid credentials
@@ -673,7 +673,7 @@ Expected columns include:
 ### 1. Product Entry Authorization
 
 1. User submits login credentials
-2. Team Book authenticates enterprise identity
+2. Configured authentication provider validates login identity
 3. Deployment Agent resolves local Access Grant
 4. System either:
    - denies entry with access-state message, or
@@ -758,13 +758,13 @@ Expected columns include:
 
 ## Integration Design
 
-### Team Book
+### Authentication Provider
 
 **Purpose**
-- Authenticate enterprise identity
+- Authenticate login identity for session creation
 
 **Pattern**
-- Interface-based provider with stub implementation for dev/test
+- Interface-based provider; current baseline uses the stub implementation and future environments may swap in a Team Book adapter
 
 **Failure Behavior**
 - Invalid credentials return `401`
@@ -816,7 +816,7 @@ Expected columns include:
 
 ### Access Control
 
-- Team Book authenticates identity
+- The configured authentication provider authenticates login identity
 - Access Grants authorize product entry
 - Effective permissions drive menus, routes, and API access
 - Admin management actions are explicit and auditable
@@ -871,7 +871,7 @@ Audit should record at least:
 
 - Jenkins / Ansible submission failure marks the attempt and task as failed
 - Missing required configuration blocks AUTO submission with a clear validation / configuration error
-- Team Book provider failures block login
+- Authentication-provider failures block login
 
 ### User-Facing Error Messaging Expectations
 
@@ -951,7 +951,7 @@ Audit should record at least:
 
 ## Open Questions
 
-1. Should a later phase expand Access Management beyond the current existing-grants-only search model to include enterprise users without grants?
+1. Should a later phase expand Access Management beyond the current provider-backed directory search and manual display-name fallback into broader enterprise sync or richer directory attributes?
 2. Should Access Grant role edits require a mandatory admin note?
 3. Should a later phase extend authorization beyond the current product-entry grant plus `Application + SNOW Group` scopes into agent- or environment-scoped control?
 4. Should AUTO completion ingestion be addressed by callback, polling, or explicit manual completion in the next phase?

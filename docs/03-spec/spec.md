@@ -1,8 +1,8 @@
 # Feature Specification: Deployment Agent MVP
 
 > **Source stories:** US-01 through US-11, US-21 through US-25
-> **Spec status:** Draft – Ready for Architecture with tracked open decisions
-> **Last updated:** 2026-03-24
+> **Spec status:** Draft – current code-aligned baseline with tracked open questions
+> **Last updated:** 2026-03-28
 
 ---
 
@@ -31,7 +31,7 @@ The MVP shall support the following end-to-end capabilities:
 5. View selected Release Flow details
 6. View task-level execution details and results
 7. Edit task input before execution in supported statuses
-8. Make task-level decisions: Approve / Reject / Rerun / Skip
+8. Make task-level decisions as the task owner or DevOps Admin: Approve / Reject / Rerun / Skip
 9. Record key operator actions in audit logs
 10. Maintain core integration configuration in UI
 11. View minimal read-only audit log list in MVP
@@ -71,13 +71,19 @@ The MVP shall support the following end-to-end capabilities:
 - **Developer**
   - Uploads deployment requests
   - Views Release Flow and task status
+  - May act on assigned tasks or rundowns when designated as owner
 - **Tech Lead (TL)**
   - Reviews Release Flow context and task results
+  - Participates in release execution like other delivery roles
+  - Is not the sole decision actor; owner-based controls apply only when the TL is the assigned owner
+- **Task Owner**
   - Edits task input where allowed
-  - Makes Approve / Reject / Rerun / Skip decisions
+  - Starts MANUAL tasks, records MANUAL results, or submits AUTO tasks
+  - Makes Approve / Reject / Rerun / Skip decisions for assigned tasks
 - **DevOps Admin**
   - Maintains integration configuration
   - Manages Deployment Agent access grants and roles
+  - Can override owner-based task and rundown controls
   - Views operational status as needed
 - **Audit / Management User**
   - Views audit logs for compliance and accountability
@@ -102,7 +108,8 @@ The MVP shall support the following end-to-end capabilities:
 - **Request**: A stage-scoped unit within a Release Flow
 - **Task**: An executable unit within a Request
 - **Current Stage**: The current stage of a Release Flow, such as SIT, UAT, or PROD
-- **Review Gate**: The point after execution where TL must explicitly decide how to proceed
+- **Review Gate**: The point after execution where the task owner or a DevOps Admin must explicitly decide how to proceed
+- **Task Owner**: The user identified by the task `owner` field; controls task-level edit, run, result, and decision actions unless overridden by a DevOps Admin
 - **Access Grant**: A product authorization record that determines whether an enterprise user may enter Deployment Agent and which `Application + SNOW Group` scopes are visible/manageable
 - **Effective Permissions**: The combined permissions derived from a user's assigned Deployment Agent roles
 - **Suspended Access**: An access state in which the employee identity still exists but product entry is blocked
@@ -114,7 +121,7 @@ The MVP shall support the following end-to-end capabilities:
 
 A Release Flow contains one or more Requests.  
 Each Request contains one or more Tasks.  
-Task operations such as View Result, Edit, Approve, Reject, Rerun, and Skip occur at the Task level within the selected Request context.
+Task operations such as View Result, Edit, Run, Approve, Reject, Rerun, and Skip occur at the Task level within the selected Request context. Task-level mutation actions are authorized for the task owner or a DevOps Admin.
 
 ### 5.1 Entity Relationships
 
@@ -143,7 +150,6 @@ Minimum attributes:
 - `current_stage` — SIT | UAT | PROD (source TBD; see OQ-25)
 - `flow_status`
 - `review_status`
-- `review_owner`
 - `created_at`
 - `updated_at`
 
@@ -178,15 +184,15 @@ Core workflow attributes:
 - `execution_type` — from template `Execution Type`; enum: `MANUAL` | `AUTO`; determines execution path (MANUAL = human-executed externally with system reference display; AUTO = system submits to execution pipeline)
 - `input_parameters` — JSON `{ "script": "...", "parameters": "..." }` from template fields
 - `expected_output` — from template `Parameter (Expected Output)`; shown during result review
+- `owner` — from template `Owner`; identifies the task owner used for task-level edit / run / result / decision authorization and display
 - `task_status`
 - `current_result_summary`
 - `start_time` — actual execution start (system-generated; not from template)
-- `end_time` — actual execution end (system-generated from callback; not from template)
+- `end_time` — actual execution end (system-generated from manual result recording or external completion reconciliation; not from template)
 - `latest_execution_id`
 - `last_updated_at`
 
-Display-only attributes (stored as explicit columns; do not control workflow):
-- `owner` — from template `Owner`
+Display-only attributes (stored as explicit columns; do not control workflow state):
 - `planned_start_time` — from template `Planned Start date/time`
 - `planned_end_time` — from template `Planned End date/time`
 
@@ -310,7 +316,7 @@ Minimum attributes:
 ### 7.5 Selected Release Flow Details
 
 - **FR-27**: When a user selects a Release Flow, the system shall update the Selected Release Flow Details section.
-- **FR-28**: The details section shall display `Project`, `Release ID`, `Current Stage`, `Review Status`, `Review Owner`, active rundown scope (`Application`, `SNOW Group`, `Agent`), and `Rundown Owner`.
+- **FR-28**: The details section shall display `Project`, `Release ID`, `Current Stage`, `Review Status`, active rundown scope (`Application`, `SNOW Group`, `Agent`), and `Rundown Owner`.
 - **FR-29**: When a different Release Flow is selected, the details section shall refresh accordingly.
 - **FR-29a**: The Rundown Information panel shall expose request-level actions such as `Refresh`, `Start Deployment`, and `Mark as Failed` when the request status permits them.
 - **FR-29b**: `Start Deployment` and `Mark as Failed` shall be executable only by the rundown owner or a DevOps Admin.
@@ -325,8 +331,9 @@ Minimum attributes:
   - raw execution logs
   - start and end timestamps
 - **FR-34**: The system shall display supported task actions through an `Available Actions` menu.
-- **FR-35**: Supported actions may include `Edit`, `View Result`, and `Decision`.
-- **FR-36**: When applicable, `Decision` actions shall include `Approve`, `Reject`, `Rerun`, and `Skip`.
+- **FR-35**: Supported actions may include `Edit`, `Run`, `View Result`, `Rerun`, and `Decision`.
+- **FR-36**: Review actions shall support `Approve`, `Reject`, `Rerun`, and `Skip`; current UI may surface `Rerun` separately from the main decision dropdown.
+- **FR-36a**: `Edit`, `Run`, `Record Result`, `Approve`, `Reject`, `Rerun`, and `Skip` shall require task-owner or DevOps Admin authorization; `View Result` remains read-only within normal visibility rules.
 
 ### 7.7 Task Input Editing
 
@@ -336,17 +343,21 @@ Minimum attributes:
 - **FR-40**: The system shall validate edited input using the task input schema.
 - **FR-41**: On validation failure, the system shall reject the change and display validation errors.
 - **FR-42**: On validation success, the system shall persist the updated task input.
+- **FR-42a**: Only the task owner or a DevOps Admin may save task input updates.
 - **FR-43**: Subsequent execution or rerun of that task shall use the latest saved task input.
 - **FR-44**: The system shall create an audit log entry for each successful task input edit.
 - **FR-45**: Editing after a task enters `Executing` or later statuses is out of scope for MVP.
+- **FR-45a**: MANUAL tasks shall support an explicit `Run` action from `Ready_For_Execution` and a `Record Result` action while in `Ready_For_Execution` or `Executing`.
+- **FR-45b**: AUTO tasks shall support an explicit `Run` action that submits the task to the configured external system from `Ready_For_Execution`.
 
 ### 7.8 Task-Level Human Decision Gate
 
 - **FR-46**: After execution completes, a task shall enter a review-required state before the flow can proceed.
 - **FR-47**: The system shall display `Approve`, `Reject`, `Rerun`, and `Skip` as supported decision options when the task is waiting for review.
+- **FR-47a**: Only the task owner or a DevOps Admin may apply `Approve`, `Reject`, `Rerun`, or `Skip`.
 - **FR-48**: `Approve` shall allow the Release Flow to continue to the next available step.
 - **FR-49**: `Reject` shall stop the current Release Flow and prevent further step execution.
-- **FR-50**: `Rerun` shall re-execute the current step using the latest saved task input.
+- **FR-50**: `Rerun` shall return the current step to `Ready_For_Execution`, preserve prior execution history, and require an explicit subsequent run using the latest saved task input.
 - **FR-51**: `Skip` shall bypass the current step and continue to the next available step.
 - **FR-52**: The system shall record an audit log entry for each decision action.
 - **FR-53**: The system shall not auto-progress a Release Flow after execution without explicit human decision.
@@ -394,7 +405,9 @@ Minimum attributes:
 - **FR-77**: The system shall provide an `Access Management` capability that is accessible only to DevOps Admin users. *(Source: US-23)*
 - **FR-78**: The Access Management page shall display employee ID, display name, grant status, assigned roles, scope grants, last login time, updated by, and updated at for each access grant. *(Source: US-23)*
 - **FR-79**: DevOps Admin users shall be able to search Access Grants by employee ID or employee name. *(Source: US-23)*
+- **FR-79a**: Access Management shall support directory search for enterprise users who do not yet have a Deployment Agent Access Grant when the authentication provider exposes searchable employee data. *(Source: US-23)*
 - **FR-80**: DevOps Admin users shall be able to create an Access Grant that stores employee ID, display name snapshot, grant status, assigned roles, scope grants, and note. *(Source: US-21, US-23)*
+- **FR-80a**: If directory lookup cannot resolve an employee display name, DevOps Admin users shall still be able to create an Access Grant by supplying employee ID plus a manual display name. *(Source: US-21, US-23)*
 - **FR-81**: DevOps Admin users shall be able to update the assigned roles and scope grants on an existing Access Grant. *(Source: US-21, US-23)*
 - **FR-82**: DevOps Admin users shall be able to suspend an existing Access Grant without physically deleting the record. *(Source: US-21)*
 - **FR-83**: DevOps Admin users shall be able to reactivate a suspended Access Grant. *(Source: US-21)*
@@ -422,13 +435,13 @@ flowchart TD
     H --> I{Task execution_type?}
 
     I -- MANUAL --> J[Task executed externally]
-    J --> K[TL records result via View Result]
+    J --> K[Task owner/admin records result]
     I -- AUTO --> L[System submits to Jenkins/Ansible]
-    L --> M[System stores external job URL]
-    M --> K
+    L --> M[Execution outcome is captured]
 
     K --> N[Task enters Awaiting_Review]
-    N --> O{TL Decision}
+    M --> N
+    N --> O{Owner/Admin Decision}
     O -- Approve --> P[Advance to next task]
     O -- Reject --> Q[Release Flow terminated]
     O -- Rerun --> R[Task returns to Ready_For_Execution]
@@ -459,17 +472,19 @@ flowchart TD
 8. User views Release Flow Summary and selects a Release Flow
 9. System displays selected Release Flow details
 10. System displays tasks for the selected Request context
-11. Task execution occurs through connected execution integrations
-12. TL inspects results through Task Details and `View Result`
-13. TL optionally edits task input before eligible execution
-14. TL makes one decision: `Approve`, `Reject`, `Rerun`, or `Skip`
+11. When a task becomes runnable, the task owner or a DevOps Admin explicitly triggers execution through `Run`, `Record Result`, or AUTO submission actions
+12. For MANUAL work, the task owner or a DevOps Admin records the result in the task UI; for AUTO work, the system stores execution history and external job details
+13. The task owner or a DevOps Admin inspects results through Task Details and `View Result`
+14. The task owner or a DevOps Admin optionally edits eligible task input and makes one decision: `Approve`, `Reject`, `Rerun`, or `Skip`
 15. System records audit entries for all key actions, including access-governance actions
 16. Release Flow progresses, repeats, or terminates
 
 ### 8.3 Initial Execution Trigger
-For MVP, once a task is in `Ready_For_Execution`, execution may be initiated automatically by the orchestration flow. `[ASSUMPTION]`
+For the current MVP, execution is explicit rather than auto-triggered when a task reaches `Ready_For_Execution`.
 
-If this assumption changes, the system must introduce an explicit execution trigger in a future revision.
+- MANUAL task: the task owner or a DevOps Admin uses `Run`, then records result through the task UI
+- AUTO task: the task owner or a DevOps Admin uses `Run`, which submits the task to Jenkins or Ansible
+- Promoting a task to `Ready_For_Execution` does not start execution by itself
 
 ### 8.4 Decision Effects
 - **Approve**
@@ -478,8 +493,9 @@ If this assumption changes, the system must introduce an explicit execution trig
 - **Reject**
   - terminates current Release Flow
 - **Rerun**
-  - re-executes current step
+  - returns current step to `Ready_For_Execution`
   - preserves prior execution history
+  - requires an explicit subsequent run using the latest saved input
 - **Skip**
   - bypasses current step
   - advances to next available step
@@ -540,15 +556,15 @@ Valid values:
 ### 9.4 Task State Transitions
 
 - `Pending` → `Ready_For_Execution` (on import or auto-progression)
-- `Pending` → `Skipped` (TL skip decision)
-- `Ready_For_Execution` → `Executing` (auto-triggered or manual record-result)
-- `Ready_For_Execution` → `Skipped` (TL skip decision)
-- `Executing` → `Awaiting_Review` (callback or manual result recording)
+- `Pending` → `Skipped` (task owner or DevOps Admin skip decision)
+- `Ready_For_Execution` → `Executing` (explicit MANUAL start or AUTO submission)
+- `Ready_For_Execution` → `Skipped` (task owner or DevOps Admin skip decision)
+- `Executing` → `Awaiting_Review` (manual result recording or external completion reconciliation)
 - `Executing` → `Failed` (execution failure)
-- `Awaiting_Review` → `Approved` (TL approve decision)
-- `Awaiting_Review` → `Rejected` (TL reject decision)
-- `Rejected` → `Ready_For_Execution` (TL rerun decision; creates new execution history)
-- `Failed` → `Ready_For_Execution` (TL rerun decision; creates new execution history)
+- `Awaiting_Review` → `Approved` (task owner or DevOps Admin approve decision)
+- `Awaiting_Review` → `Rejected` (task owner or DevOps Admin reject decision)
+- `Rejected` → `Ready_For_Execution` (task owner or DevOps Admin rerun decision; creates new execution history)
+- `Failed` → `Ready_For_Execution` (task owner or DevOps Admin rerun decision; creates new execution history)
 
 > *Previous draft used `Awaiting_Review → Rerun_Queued → Executing` for reruns. The implemented model requires the task to be in a terminal-error state (`Rejected` or `Failed`) before rerun, transitioning back to `Ready_For_Execution`. This is intentionally conservative — explicit rejection before rerun.*
 
@@ -575,7 +591,7 @@ If mixed states exist and at least one task is in a running-like or active state
 > *`Rejected` and `Failed` are terminal states and map to `Done` in summary display (the stage will not progress further). `Ready_For_Execution` is treated as active/running because at least one task has been promoted from its initial state.*
 
 ### 9.6 Reject Handling
-For MVP, when a TL selects `Reject`:
+For MVP, when the task owner or a DevOps Admin selects `Reject`:
 - the affected task status becomes `Rejected`
 - the current Request status becomes `Rejected`
 - the Release Flow `flow_status` becomes `Rejected`
@@ -615,7 +631,7 @@ The table below classifies each field by its intended use in the MVP system. Fie
 | `Validation` | Parse and store | Raw metadata; no automated validation in MVP | `task.import_metadata` JSON blob |
 | `Status` | **Ignored on import** | Template tracking artifact; system always creates Tasks in `Pending` | Not stored |
 | `Start date/time` | **Dropped** | System generates actual start from execution | Not stored from template |
-| `End date/time` | **Dropped** | System generates actual end from callback | Not stored from template |
+| `End date/time` | **Dropped** | System generates actual end from execution completion handling | Not stored from template |
 | `Release ID` | **System-generated** — not from template | **Core** — Release Flow identification; format: `{stage}-{normalized_project_name}-{seq}` | `release_flow.release_id` column |
 | `Stage` | **From upload UI** — not from template rows | **Core** — Request stage; user selects SIT/UAT/PROD in upload dialog | `request.stage` column |
 
@@ -761,16 +777,14 @@ The architecture solution must ensure:
 | R-02 | ~~Release ID / Stage source unknown~~ **Resolved**: Stage from upload UI; Release ID = `{stage}-{normalized_project_name}-{seq}` | Closed | — | No action required |
 | R-03 | ~~Execution Type valid values unknown~~ **Resolved**: MANUAL \| AUTO | Closed | — | No action required |
 | R-05 | Editable task statuses are currently based on working assumption | Assumption | Medium | Validate during architecture review |
-| R-06 | Review Owner cardinality (single user vs group) not finalized | Unclear | Medium | Confirm in design |
 | R-07 | ~~MANUAL task execution UX~~ **Resolved**: inline "Record Result" button in Task Details row; form to enter actual result; system transitions to `Awaiting_Review` | Closed | — | No action required |
 | R-05 | Editable task statuses are currently based on working assumption | Assumption | Medium | Validate during architecture review |
 | R-06 | Result display detail beyond minimum output may expand later | Scope | Medium | Keep minimum guarantee in MVP |
-| R-07 | Review Owner cardinality (single user vs group) is not finalized | Unclear | Medium | Confirm in design |
 | R-08 | ~~Audit log visibility scope beyond Audit / Management users is not fully defined~~ **Resolved**: any signed-in user may read audit history for records visible to their assigned scopes; global DevOps Admin may read all audit history | Closed | — | No action required |
 | R-09 | Rerun history presentation is only minimally defined | Unclear | Medium | Finalize UI/trace behavior during design |
 | R-10 | Default sorting and filtering behavior is not finalized | Unclear | Low | Confirm in product/design refinement |
 | R-11 | ~~Product roles are expanding from a single role value toward a permission-based model~~ **Resolved**: auth/session returns compatibility `role` plus `roles[]`, effective `permissions[]`, and applicable `scopes[]` | Closed | — | No action required |
-| R-12 | A later phase may expand Access Management beyond the current existing-grants-only search model | Product | Medium | Treat enterprise directory lookup as a separately scoped follow-up |
+| R-12 | ~~Access Management search was limited to existing grants only~~ **Resolved**: current implementation supports provider-backed directory search plus manual display-name fallback when grant creation cannot resolve the employee directly. | Closed | — | No action required |
 
 ---
 
@@ -812,8 +826,6 @@ The following are explicitly out of scope for MVP:
 | OQ-07 | Should completed Release Flows be shown by default in summary? | Product |
 | OQ-08 | What is the default sorting rule for Release Flow Summary? | Product |
 | OQ-09 | What filters are supported in MVP summary view? | Product |
-| OQ-10 | Is Review Owner always a single user or can it be a group? | Product |
-| OQ-11 | How should empty review fields be displayed? | Product / UX |
 | OQ-12 | Is the task list strictly scoped to selected Request context in all cases? | Product / Architecture |
 | OQ-13 | What additional result presentation beyond minimum summary + logs is needed? | Product / UX |
 | OQ-14 | Should editable statuses remain only `Pending` and `Ready_For_Execution`? | Product / Architecture |
@@ -825,12 +837,12 @@ The following are explicitly out of scope for MVP:
 | OQ-20 | Should the audit log view be a standalone page or embedded list? | Product / UX |
 | OQ-21 | How many recent audit records should be shown by default? | Product |
 | OQ-22 | What credential / secret storage solution will architecture adopt? | Architecture |
-| OQ-23 | Is initial execution always auto-triggered from `Ready_For_Execution`? | Product / Architecture |
+| OQ-23 | ~~Is initial execution always auto-triggered from `Ready_For_Execution`?~~ **Resolved**: execution is explicit; owner/admin triggers `Run`, `Record Result`, or AUTO submission. | Closed |
 | OQ-24 | What is the final SLA / performance target for MVP operations? | Product / Engineering |
 | OQ-25 | ~~Where do Release ID and Stage come from?~~ **Resolved**: Stage is selected by user at upload time; Release ID is system-generated (`{stage}-{normalized_project_name}-{seq}`). | Closed |
 | OQ-28 | ~~What are the valid values for Execution Type?~~ **Resolved**: `MANUAL` \| `AUTO`. MANUAL = human-executed externally; AUTO = system-submitted to pipeline. | Closed |
 | OQ-29 | Should the `Access not granted` message include contact guidance to a DevOps Admin? | Product / UX |
-| OQ-30 | Should a later phase expand Access Management beyond the current existing-grants-only search model to include enterprise users without an Access Grant? | Product |
+| OQ-30 | Should a later phase expand Access Management beyond the current provider-backed directory search and manual fallback model (for example, broader enterprise sync or richer directory attributes)? | Product |
 | OQ-31 | Should Access Grant role changes require a mandatory admin note? | Product / Governance |
 | OQ-32 | Should Template Management be restricted to DevOps Admin only in Phase 1? | Product |
 | OQ-33 | ~~Should the frontend session model return roles only, or roles plus effective permissions?~~ **Resolved**: the session contract returns `role` for compatibility plus `roles[]`, effective `permissions[]`, and applicable `scopes[]`. | Closed |
@@ -849,9 +861,9 @@ The following decisions should be confirmed before implementation design is fina
 4. Final confirmation of editable task statuses
 5. Task input schema per `execution_type` (MANUAL vs AUTO may have different editable fields)
 6. Final confirmation of third configuration item
-7. Final confirmation of initial execution trigger behavior for AUTO tasks
+7. ~~Final confirmation of initial execution trigger behavior for AUTO tasks~~ — **Resolved**: execution is explicit; `Ready_For_Execution` does not auto-start execution
 8. ~~Final confirmation of the Access Grant permission model and auth/session response contract~~ — **Resolved**: auth/session returns `role` for compatibility plus `roles[]`, effective `permissions[]`, and applicable `scopes[]`
-9. Confirm whether a later phase should expand Access Management search beyond the current existing-grants-only scope
+9. Confirm whether a later phase should expand Access Management beyond the current provider-backed directory search and manual fallback model
 
 These items are tracked in `Open Questions` and `Risks / Ambiguities` and are not hidden assumptions.
 
@@ -865,6 +877,7 @@ This specification intentionally freezes:
 - the core workflow
 - the data hierarchy
 - the user roles
+- the owner-based task and rundown control model
 - the deny-by-default product entry rule
 - the minimum result-view contract
 - the task decision contract

@@ -17,6 +17,7 @@ The MVP should support:
 - human decision control
 - basic audit logging
 - basic configuration management
+- deny-by-default product entry with Deployment Agent-managed access control
 
 The design should also prepare WWA to become a reusable platform layer for future agents.
 
@@ -45,6 +46,7 @@ The following capabilities should be shared and reusable across WWA:
 - Template Management
 - Configuration Management
 - Audit Log
+- Access Management
 - operator identity and traceability
 - human decision control pattern
 
@@ -76,11 +78,12 @@ Add the following menu structure in FinBlock:
 - WWA (level-1 menu)
   - Deployment Agent (level-2 menu)
 
-WWA should also reserve shared capability entries for future use:
+WWA should also expose shared capability entries alongside Deployment Agent:
 
 - Template Management
 - Configuration Management
 - Audit Log
+- Access Management
 
 #### B. Deployment Agent Main Page
 
@@ -161,7 +164,7 @@ When a user selects one release flow, the page should display:
 - Current Stage
 - Current Request ID
 - Review Status
-- Review Owner
+- Rundown Owner
 
 #### H. Task Details
 
@@ -177,8 +180,9 @@ For the currently selected request, the page should display:
 Suggested task status values:
 
 - Pending
-- Running
-- Waiting Review
+- Ready For Execution
+- Executing
+- Awaiting Review
 - Approved
 - Rejected
 - Failed
@@ -189,19 +193,22 @@ Suggested task status values:
 Each task should support:
 
 - **Edit**: update task input
+- **Activity**: review task activity and execution history
 - **View Result**: review task execution output
-- **Decision** dropdown:
+- **Run**: explicitly start MANUAL or AUTO execution when the task becomes runnable
+- **Record Result**: submit the outcome of a MANUAL task
+- **Rerun**: return an eligible failed/rejected task to the runnable state
+- **Review Decision** dropdown:
   - Approve
   - Reject
-  - Rerun
   - Skip
 
 #### J. Human-in-the-Loop Control
 
 Each task should follow this lifecycle:
 
-1. Execute
-2. Review Result
+1. Explicit Run
+2. Record / Review Result
 3. Human Decision
 
 The system must not automatically move to the next step after execution. A human decision is required before progression.
@@ -243,10 +250,10 @@ These values should not be hardcoded in the codebase.
 
 The following items are not included in this MVP:
 
-- full visual Template Management page
-- full Audit Log query page
+- backend-backed template persistence and versioning
+- advanced audit filtering, search, and export
 - deep GitHub integration
-- complex role and permission model
+- enterprise directory sync or real Team Book production rollout
 - multiple agents going live at the same time
 - AI autonomous decision making
 - advanced dashboard metrics
@@ -316,7 +323,7 @@ The template uses a steps table where **one row = one atomic execution step**. M
 - `Step` — name/description of this atomic step
 - `Execution Type` — execution mode: `MANUAL` or `AUTO`
   - `MANUAL`: step requires human execution outside the system; script and parameters are displayed as reference
-  - `AUTO`: system submits to execution pipeline; result received via callback
+  - `AUTO`: system submits to execution pipeline; current MVP tracks submission/execution history inside Deployment Agent rather than relying on callback-only completion
 - `Script to be executed` and `Parameter (input)` — execution payload (for AUTO) or reference instructions (for MANUAL)
 - `Parameter (Expected Output)` — expected result; displayed alongside actual output during verification
 - `Task ID` — groups related steps for UI display and sequential ordering context
