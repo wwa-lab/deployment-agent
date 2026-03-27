@@ -15,6 +15,7 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
     application?: string
     snowGroup?: string
     agent?: string
+    attemptView?: 'latest' | 'history'
     includeArchived?: boolean
   }>({})
   const selectedId = ref<string | null>(null)
@@ -22,12 +23,15 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
   const loading = ref(false)
   const pollingInterval = ref<number | null>(null)
   const detailIncludeArchived = ref(false)
+  const detailLinked = ref<string | null>(null)
 
   async function fetchList() {
     loading.value = true
     try {
       const result = await listReleaseFlows({
         ...filters.value,
+        view: 'stitched',
+        attemptView: filters.value.attemptView ?? 'latest',
         page: page.value,
         size: size.value,
       })
@@ -41,6 +45,7 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
   async function selectFlow(id: string) {
     selectedId.value = id
     detailIncludeArchived.value = false
+    detailLinked.value = null
     loading.value = true
     try {
       detail.value = await getReleaseFlow(id)
@@ -49,12 +54,16 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
     }
   }
 
-  async function selectFlowWithArchived(id: string, includeArchived = false) {
+  async function selectFlowWithArchived(id: string, includeArchived = false, linked?: string) {
     selectedId.value = id
     detailIncludeArchived.value = includeArchived
+    detailLinked.value = linked ?? null
     loading.value = true
     try {
-      detail.value = await getReleaseFlow(id, includeArchived ? { includeArchived: true } : undefined)
+      detail.value = await getReleaseFlow(id, {
+        ...(includeArchived ? { includeArchived: true } : {}),
+        ...(linked ? { linked } : {}),
+      })
     } finally {
       loading.value = false
     }
@@ -64,7 +73,10 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
     if (selectedId.value) {
       detail.value = await getReleaseFlow(
         selectedId.value,
-        detailIncludeArchived.value ? { includeArchived: true } : undefined,
+        {
+          ...(detailIncludeArchived.value ? { includeArchived: true } : {}),
+          ...(detailLinked.value ? { linked: detailLinked.value } : {}),
+        },
       )
     }
   }
@@ -103,6 +115,7 @@ export const useReleaseFlowStore = defineStore('releaseFlow', () => {
     loading,
     pollingInterval,
     detailIncludeArchived,
+    detailLinked,
     fetchList,
     selectFlow,
     selectFlowWithArchived,

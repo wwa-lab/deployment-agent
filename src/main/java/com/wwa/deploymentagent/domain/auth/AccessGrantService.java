@@ -23,8 +23,11 @@ import java.util.LinkedHashMap;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class AccessGrantService {
@@ -77,6 +80,31 @@ public class AccessGrantService {
 
         int end = Math.min(start + pageable.getPageSize(), filtered.size());
         return new PageImpl<>(filtered.subList(start, end), pageable, filtered.size());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccessGrantDirectoryCandidate> searchDirectory(String query, int limit, UserContext user) {
+        String normalizedQuery = normalizeSearchQuery(query);
+        if (normalizedQuery == null || limit <= 0) {
+            return List.of();
+        }
+
+        List<TeamBookEmployee> employees = authProvider.searchEmployees(normalizedQuery, Math.min(limit, 20));
+        if (employees.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, AccessGrant> grantsById = accessGrantRepository.findAllById(
+                        employees.stream()
+                                .map(TeamBookEmployee::employeeId)
+                                .toList())
+                .stream()
+                .collect(Collectors.toMap(AccessGrant::getEmployeeId, Function.identity()));
+
+        return employees.stream()
+                .map(employee -> toDirectoryCandidate(employee, grantsById.get(employee.employeeId()), user))
+                .filter(candidate -> candidate != null)
+                .toList();
     }
 
     @Transactional
@@ -301,16 +329,30 @@ public class AccessGrantService {
         if (query == null || query.isBlank()) {
             return null;
         }
-        return query.trim().toLowerCase();
+        return query.trim().toLowerCase(Locale.ROOT);
     }
 
     private boolean matchesQuery(AccessGrant grant, String normalizedQuery) {
-        return grant.getEmployeeId().toLowerCase().contains(normalizedQuery)
-                || grant.getDisplayNameSnapshot().toLowerCase().contains(normalizedQuery);
+        return grant.getEmployeeId().toLowerCase(Locale.ROOT).contains(normalizedQuery)
+                || grant.getDisplayNameSnapshot().toLowerCase(Locale.ROOT).contains(normalizedQuery);
     }
 
     private String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private AccessGrantDirectoryCandidate toDirectoryCandidate(TeamBookEmployee employee,
+                                                               AccessGrant grant,
+                                                               UserContext user) {
+        if (grant != null && !canViewGrant(user, grant)) {
+            return null;
+        }
+        return new AccessGrantDirectoryCandidate(
+                employee.employeeId(),
+                employee.displayName(),
+                grant != null,
+                grant == null ? null : grant.getGrantStatus()
+        );
     }
 
     private List<String> normalizeRolesForMutation(Collection<String> rawRoles) {

@@ -29,6 +29,7 @@ CREATE TABLE DA_REQUEST (
     id                          VARCHAR2(36)   NOT NULL,
     release_flow_id             VARCHAR2(36)   NOT NULL,
     stage                       VARCHAR2(10)   NOT NULL,
+    attempt_number              NUMBER(10,0)   DEFAULT 1 NOT NULL,
     request_status              VARCHAR2(30)   NOT NULL,
     snow_group                  VARCHAR2(255),
     application                 VARCHAR2(255),
@@ -49,6 +50,9 @@ CREATE TABLE DA_REQUEST (
 
 CREATE INDEX IDX_REQ_FLOW_STAGE
     ON DA_REQUEST (release_flow_id, stage);
+
+CREATE UNIQUE INDEX UK_REQ_FLOW_STAGE_ATTEMPT
+    ON DA_REQUEST (release_flow_id, stage, attempt_number);
 
 CREATE TABLE DA_TASK (
     id                     VARCHAR2(36)   NOT NULL,
@@ -107,6 +111,9 @@ CREATE TABLE DA_TASK_EXECUTION_HISTORY (
     submitted_at          TIMESTAMP(6),
     submission_status     VARCHAR2(30),
     submission_message    VARCHAR2(2000),
+    config_application    VARCHAR2(255),
+    config_snow_group     VARCHAR2(255),
+    config_agent          VARCHAR2(255),
     CONSTRAINT PK_DA_TASK_EXEC_HISTORY PRIMARY KEY (id),
     CONSTRAINT FK_TEH_TASK
         FOREIGN KEY (task_id) REFERENCES DA_TASK (id)
@@ -128,7 +135,9 @@ CREATE TABLE DA_CONFIGURATION_ITEM (
 );
 
 CREATE TABLE DA_CONFIGURATION_COMPONENT (
+    id                  VARCHAR2(36)   NOT NULL,
     component_id        VARCHAR2(50)   NOT NULL,
+    scope_key           VARCHAR2(500)  NOT NULL,
     system_type         VARCHAR2(30)   NOT NULL,
     display_name        VARCHAR2(255)  NOT NULL,
     area                VARCHAR2(100)  NOT NULL,
@@ -143,8 +152,20 @@ CREATE TABLE DA_CONFIGURATION_COMPONENT (
     description         VARCHAR2(500),
     updated_by          VARCHAR2(255)  NOT NULL,
     updated_at          TIMESTAMP(6)   NOT NULL,
-    CONSTRAINT PK_DA_CONFIGURATION_COMPONENT PRIMARY KEY (component_id)
+    CONSTRAINT PK_DA_CONFIGURATION_COMPONENT PRIMARY KEY (id)
 );
+
+CREATE INDEX IDX_DCC_COMPONENT
+    ON DA_CONFIGURATION_COMPONENT (component_id);
+
+CREATE INDEX IDX_DCC_SYSTEM_TYPE
+    ON DA_CONFIGURATION_COMPONENT (system_type);
+
+CREATE INDEX IDX_DCC_SCOPE
+    ON DA_CONFIGURATION_COMPONENT (application, snow_group, agent);
+
+CREATE UNIQUE INDEX UK_DCC_COMPONENT_SCOPE
+    ON DA_CONFIGURATION_COMPONENT (component_id, scope_key);
 
 CREATE TABLE DA_AUDIT_LOG_ENTRY (
     id              VARCHAR2(36)   NOT NULL,

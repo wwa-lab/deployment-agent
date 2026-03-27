@@ -18,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -91,6 +92,30 @@ class ReleaseFlowControllerTest {
     }
 
     @Test
+    @DisplayName("list_viewStitched_attemptViewSwitchesBetweenLatestAndHistoryForRepeatedStageAttempts")
+    void list_viewStitched_attemptViewSwitchesBetweenLatestAndHistoryForRepeatedStageAttempts() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
+        helper.seedRequest(rf, Stage.SIT, RequestStatus.Completed);
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .param("attemptView", "latest")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].sitStatus").value("Completed"));
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .param("attemptView", "history")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].sitStatus").value("Failed"));
+    }
+
+    @Test
     @DisplayName("list_filtersByScopeFields_andReturnsScopeSummary")
     void list_filtersByScopeFields_andReturnsScopeSummary() throws Exception {
         ReleaseFlow releaseFlow = helper.seedReleaseFlow();
@@ -123,6 +148,35 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.data[0].owner").value("alice"));
     }
 
+    @Test
+    @DisplayName("list_viewStitched_groupsStagePrefixedReleaseFamilyIntoOneSummary")
+    void list_viewStitched_groupsStagePrefixedReleaseFamilyIntoOneSummary() throws Exception {
+        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "sit-01", "sit-01", Stage.SIT);
+        Request sitRequest = helper.seedRequest(sitFlow, Stage.SIT, RequestStatus.Completed);
+        sitRequest.setApplication("AMH HCC");
+        sitRequest.setOwner("alice");
+        requestRepository.save(sitRequest);
+
+        ReleaseFlow uatFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "uat-01", "uat-01", Stage.UAT);
+        Request uatRequest = helper.seedRequest(uatFlow, Stage.UAT, RequestStatus.Pending);
+        uatRequest.setApplication("AMH HCC");
+        uatRequest.setOwner("alice");
+        requestRepository.save(uatRequest);
+
+        mockMvc.perform(get(BASE)
+                        .param("view", "stitched")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].stitched").value(true))
+                .andExpect(jsonPath("$.data[0].linkedReleaseCount").value(2))
+                .andExpect(jsonPath("$.data[0].currentStage").value("UAT"))
+                .andExpect(jsonPath("$.data[0].sitPresent").value(true))
+                .andExpect(jsonPath("$.data[0].uatPresent").value(true))
+                .andExpect(jsonPath("$.data[0].prodPresent").value(false));
+    }
+
     // ─── getById ─────────────────────────────────────────────────────────────
 
     @Test
@@ -139,6 +193,45 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.id").value(rf.getId()))
                 .andExpect(jsonPath("$.projectId").value(rf.getProjectId()))
                 .andExpect(jsonPath("$.requests[0].releaseFlowId").value(rf.getId()));
+    }
+
+    @Test
+    @DisplayName("getById_returnsAttemptNumbers_forRepeatedStageRequests")
+    void getById_returnsAttemptNumbers_forRepeatedStageRequests() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request first = helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
+        Request second = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
+        helper.seedTask(first);
+        helper.seedTask(second);
+
+        mockMvc.perform(get(BASE + "/" + rf.getId())
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requests.length()").value(2))
+                .andExpect(jsonPath("$.requests[*].attemptNumber", containsInAnyOrder(2, 1)));
+    }
+
+    @Test
+    @DisplayName("getById_withLinkedReleaseIds_returnsStitchedDetail")
+    void getById_withLinkedReleaseIds_returnsStitchedDetail() throws Exception {
+        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "sit-01", "sit-01", Stage.SIT);
+        Request sitRequest = helper.seedRequest(sitFlow, Stage.SIT, RequestStatus.Pending);
+        helper.seedTask(sitRequest);
+
+        ReleaseFlow prodFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "prod-01", "prod-01", Stage.PROD);
+        Request prodRequest = helper.seedRequest(prodFlow, Stage.PROD, RequestStatus.Pending);
+        helper.seedTask(prodRequest);
+
+        mockMvc.perform(get(BASE + "/" + prodFlow.getId())
+                        .param("linked", sitFlow.getId())
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "TL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stitched").value(true))
+                .andExpect(jsonPath("$.linkedReleaseCount").value(2))
+                .andExpect(jsonPath("$.currentStage").value("PROD"))
+                .andExpect(jsonPath("$.requests.length()").value(2));
     }
 
     @Test

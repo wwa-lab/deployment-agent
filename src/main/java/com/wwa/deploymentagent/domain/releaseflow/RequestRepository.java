@@ -40,8 +40,19 @@ public interface RequestRepository extends JpaRepository<Request, String> {
     List<Request> findByReleaseFlowIds(@Param("releaseFlowIds") List<String> releaseFlowIds,
                                        @Param("includeArchived") boolean includeArchived);
 
-    /** Find existing Request for a specific release flow and stage – used during import upsert. */
-    Optional<Request> findByReleaseFlowIdAndStageAndArchivedAtIsNull(String releaseFlowId, Stage stage);
+    Optional<Request> findTopByReleaseFlowIdAndStageAndArchivedAtIsNullOrderByAttemptNumberDescUpdatedAtDesc(
+            String releaseFlowId, Stage stage);
+
+    Optional<Request> findTopByReleaseFlowIdAndStageOrderByAttemptNumberDescUpdatedAtDesc(
+            String releaseFlowId, Stage stage);
+
+    @Query("""
+            SELECT COALESCE(MAX(r.attemptNumber), 0) FROM Request r
+            WHERE r.releaseFlow.id = :releaseFlowId
+              AND r.stage = :stage
+            """)
+    int findMaxAttemptNumberByReleaseFlowIdAndStage(@Param("releaseFlowId") String releaseFlowId,
+                                                     @Param("stage") Stage stage);
 
     Optional<Request> findByIdAndReleaseFlowId(String id, String releaseFlowId);
 

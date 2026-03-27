@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.execution;
 
+import com.wwa.deploymentagent.domain.configuration.ConfigurationScope;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistory;
 
 import java.util.Map;
@@ -28,9 +29,10 @@ public interface AutoExecutionAdapter {
      *
      * @param target          resolved target descriptor (tool type, normalized target ID, display URL)
      * @param inputParameters task input parameters (contains parameters, extra fields)
+     * @param scope           normalized request scope snapshot for runtime config resolution
      * @return submission result with external execution ID and job URL on success
      */
-    AutoSubmissionResult submit(ExecutionTarget target, Map<String, Object> inputParameters);
+    AutoSubmissionResult submit(ExecutionTarget target, Map<String, Object> inputParameters, ConfigurationScope scope);
 
     /**
      * Poll the current execution state for an active execution attempt.

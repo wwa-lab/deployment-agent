@@ -1,9 +1,11 @@
 package com.wwa.deploymentagent.domain.execution;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.ConfigurationComponentDto;
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
+import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.domain.task.Task;
@@ -55,6 +57,7 @@ class AutoExecutionServiceTest {
     @Autowired private TaskExecutionHistoryRepository executionHistoryRepository;
     @Autowired private TestDataHelper helper;
     @Autowired private RestTemplate restTemplate;
+    @Autowired private ConfigurationComponentService configurationComponentService;
 
     private ReleaseFlow releaseFlow;
     private Request request;
@@ -136,6 +139,58 @@ class AutoExecutionServiceTest {
         Task result = autoExecutionService.submitAutoExecution(task.getId(), adminUser);
 
         assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Executing);
+    }
+
+    @Test
+    @DisplayName("scoped component config is used for submission and captured in execution history")
+    void submitAuto_scopedConfigUsedAndSnapshotted() {
+        request.setApplication("AMH HCC");
+        request.setSnowGroup("HTSA-CSI-HCC-AMH-PRJ");
+        request.setAgent("Deployment Agent");
+
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
+        configurationComponentService.upsertComponent(
+                new ConfigurationComponentDto.UpsertRequest(
+                        null,
+                        "jenkins",
+                        "Jenkins Pipeline",
+                        "CI/CD",
+                        null,
+                        null,
+                        null,
+                        "http://default-jenkins:8080",
+                        "default-user",
+                        "default-token",
+                        null
+                ),
+                adminUser
+        );
+        configurationComponentService.upsertComponent(
+                new ConfigurationComponentDto.UpsertRequest(
+                        null,
+                        "jenkins",
+                        "Jenkins Pipeline",
+                        "CI/CD",
+                        "AMH HCC",
+                        "HTSA-CSI-HCC-AMH-PRJ",
+                        "Deployment Agent",
+                        "http://agent-jenkins:8080",
+                        "agent-user",
+                        "agent-token",
+                        null
+                ),
+                adminUser
+        );
+        mockJenkinsSuccess();
+
+        autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
+
+        verify(restTemplate).postForEntity(eq("http://agent-jenkins:8080/job/deploy-job/buildWithParameters"), any(), eq(String.class));
+
+        TaskExecutionHistory history = executionHistoryRepository.findByTaskIdOrderByAttemptNumberAsc(task.getId()).get(0);
+        assertThat(history.getConfigApplication()).isEqualTo("AMH HCC");
+        assertThat(history.getConfigSnowGroup()).isEqualTo("HTSA-CSI-HCC-AMH-PRJ");
+        assertThat(history.getConfigAgent()).isEqualTo("Deployment Agent");
     }
 
     @Test

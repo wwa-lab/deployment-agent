@@ -24,6 +24,7 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   async function saveConfig(item: {
+    componentInstanceId?: string
     componentId?: string
     key: string
     value: string
@@ -48,12 +49,13 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   async function saveComponent(component: {
+    componentInstanceId?: string
     componentId: string
     displayName: string
     area: string
-    application: string
-    snowGroup: string
-    agent: string
+    application?: string
+    snowGroup?: string
+    agent?: string
     serviceEndpoint: string
     serviceUser?: string
     credentialValue?: string

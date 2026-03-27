@@ -7,6 +7,7 @@ import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.configuration.ConfigurationScope;
 import com.wwa.deploymentagent.domain.decision.ReleaseFlowProgressionService;
 import com.wwa.deploymentagent.domain.task.*;
 import com.wwa.deploymentagent.errors.ConflictAppException;
@@ -75,6 +76,7 @@ public class AutoExecutionService {
         Map<String, Object> inputParams = task.getInputParameters() != null ? task.getInputParameters() : Map.of();
         ExecutionTarget target = targetResolver.resolve(inputParams);
         AutoExecutionAdapter adapter = findAdapter(target.systemType());
+        ConfigurationScope scope = ConfigurationScope.from(task.getRequest());
 
         // Create execution history record
         int maxAttempt = executionHistoryRepository.findMaxAttemptNumberByTaskId(taskId);
@@ -90,6 +92,9 @@ public class AutoExecutionService {
         history.setSubmittedAt(Instant.now());
         history.setExternalStatus(ExternalStatus.QUEUED);
         history.setExternalStatusMessage("Submitting to " + target.systemType());
+        history.setConfigApplication(scope.application());
+        history.setConfigSnowGroup(scope.snowGroup());
+        history.setConfigAgent(scope.agent());
         TaskExecutionHistory savedHistory = executionHistoryRepository.save(history);
 
         // Transition task to Executing
@@ -98,7 +103,7 @@ public class AutoExecutionService {
         task.setStartTime(Instant.now());
 
         // Call external system
-        AutoSubmissionResult result = adapter.submit(target, inputParams);
+        AutoSubmissionResult result = adapter.submit(target, inputParams, scope);
 
         if (result.success()) {
             savedHistory.setSubmissionStatus("SUBMITTED");
@@ -130,6 +135,15 @@ public class AutoExecutionService {
         auditContext.put("targetKind", target.targetKind());
         auditContext.put("attemptNumber", nextAttempt);
         auditContext.put("submissionStatus", savedHistory.getSubmissionStatus());
+        if (scope.application() != null) {
+            auditContext.put("application", scope.application());
+        }
+        if (scope.snowGroup() != null) {
+            auditContext.put("snowGroup", scope.snowGroup());
+        }
+        if (scope.agent() != null) {
+            auditContext.put("agent", scope.agent());
+        }
         if (result.jobUrl() != null) {
             auditContext.put("externalJobUrl", result.jobUrl());
         }

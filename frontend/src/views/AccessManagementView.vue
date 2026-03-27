@@ -158,7 +158,7 @@ function statusClass(status: AccessGrantStatus) {
         :title="canManageAccess ? '' : 'Access Management is available to DEVOPS_ADMIN users.'"
         @click="openCreateDialog"
       >
-        Grant Access
+        Add User
       </button>
     </div>
 
@@ -168,8 +168,9 @@ function statusClass(status: AccessGrantStatus) {
     >
       <template v-if="canManageAccess">
         Access grants control product entry, while scope grants control which `Application + SNOW
-        Group` data the employee can view or administer. Use this workspace to manage both without
-        changing Team Book identity records.
+        Group` data the employee can view or administer. Use `Add User` to search Team Book for a
+        first-time employee, then create or update grants here without changing Team Book identity
+        records.
       </template>
       <template v-else>
         Access Management is restricted to `DEVOPS_ADMIN`. The menu remains visible so teammates can

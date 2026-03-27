@@ -95,6 +95,16 @@ public class TaskExecutionHistory {
     @Column(name = "submission_message", length = 2000)
     private String submissionMessage;
 
+    /** Scope snapshot captured at submit time for configuration resolution stability. */
+    @Column(name = "config_application", length = 255)
+    private String configApplication;
+
+    @Column(name = "config_snow_group", length = 255)
+    private String configSnowGroup;
+
+    @Column(name = "config_agent", length = 255)
+    private String configAgent;
+
     // ─── External status synchronization (polling) ────────────────────────────
 
     /** Normalized remote state for UI and monitor decisions. */

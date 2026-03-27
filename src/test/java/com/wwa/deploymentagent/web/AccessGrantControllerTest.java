@@ -66,15 +66,28 @@ class AccessGrantControllerTest {
     }
 
     @Test
+    @DisplayName("GET /access-grants/directory returns Team Book matches for grant creation")
+    void directory_returnsSearchResults() throws Exception {
+        mockMvc.perform(get(BASE + "/directory")
+                        .param("query", "Frank")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].employeeId").value("emp-006"))
+                .andExpect(jsonPath("$[0].displayName").value("Frank Han (Developer)"))
+                .andExpect(jsonPath("$[0].hasAccessGrant").value(false))
+                .andExpect(jsonPath("$[0].grantStatus").doesNotExist());
+    }
+
+    @Test
     @DisplayName("POST /access-grants creates a grant and writes audit")
     void create_createsGrant_andAudits() throws Exception {
-        accessGrantRepository.deleteById("emp-005");
-
         mockMvc.perform(post(BASE)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "employeeId": "emp-005",
+                                  "employeeId": "emp-006",
                                   "grantStatus": "ACTIVE",
                                   "assignedRoles": ["AUDIT", "MANAGEMENT"],
                                   "scopeGrants": [
@@ -89,8 +102,8 @@ class AccessGrantControllerTest {
                         .header("X-User-Id", "emp-003")
                         .header("X-User-Role", "DEVOPS_ADMIN"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.employeeId").value("emp-005"))
-                .andExpect(jsonPath("$.displayName").value("Eve Yoon (Management)"))
+                .andExpect(jsonPath("$.employeeId").value("emp-006"))
+                .andExpect(jsonPath("$.displayName").value("Frank Han (Developer)"))
                 .andExpect(jsonPath("$.grantStatus").value("ACTIVE"))
                 .andExpect(jsonPath("$.assignedRoles.length()").value(2))
                 .andExpect(jsonPath("$.assignedRoles[0]").value("AUDIT"))
@@ -100,7 +113,7 @@ class AccessGrantControllerTest {
                 .andExpect(jsonPath("$.scopeGrants[0].snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
                 .andExpect(jsonPath("$.updatedBy").value("emp-003"));
 
-        AccessGrant saved = accessGrantRepository.findById("emp-005").orElseThrow();
+        AccessGrant saved = accessGrantRepository.findById("emp-006").orElseThrow();
         assertThat(saved.getAssignedRoles()).containsExactly("AUDIT", "MANAGEMENT");
         assertThat(saved.getScopeGrants()).hasSize(1);
 
@@ -110,7 +123,7 @@ class AccessGrantControllerTest {
                 .getContent()
                 .getFirst();
         assertThat(audit.getOperatorId()).isEqualTo("emp-003");
-        assertThat(audit.getContextPayload()).containsEntry("employeeId", "emp-005");
+        assertThat(audit.getContextPayload()).containsEntry("employeeId", "emp-006");
     }
 
     @Test

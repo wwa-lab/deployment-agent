@@ -1,6 +1,8 @@
 package com.wwa.deploymentagent.domain.auth;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -24,5 +26,19 @@ public interface TeamBookAuthenticationProvider {
 
     default List<TeamBookEmployee> listKnownEmployees() {
         return List.of();
+    }
+
+    default List<TeamBookEmployee> searchEmployees(String query, int limit) {
+        if (query == null || query.isBlank() || limit <= 0) {
+            return List.of();
+        }
+
+        String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
+        return listKnownEmployees().stream()
+                .filter(employee -> employee.employeeId().toLowerCase(Locale.ROOT).contains(normalizedQuery)
+                        || employee.displayName().toLowerCase(Locale.ROOT).contains(normalizedQuery))
+                .sorted(Comparator.comparing(TeamBookEmployee::displayName))
+                .limit(limit)
+                .toList();
     }
 }

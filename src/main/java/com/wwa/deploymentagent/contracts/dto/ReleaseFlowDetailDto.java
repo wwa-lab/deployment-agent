@@ -17,5 +17,8 @@ public record ReleaseFlowDetailDto(
         ReviewStatus reviewStatus,
         java.time.Instant archivedAt,
         String archivedBy,
+        boolean stitched,
+        int linkedReleaseCount,
+        List<String> linkedReleaseIds,
         List<RequestDto> requests
 ) {}

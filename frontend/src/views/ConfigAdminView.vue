@@ -5,14 +5,18 @@ import { useConfigStore } from '../stores/config'
 import { useUserStore } from '../stores/user'
 import type { ConfigComponentDraft, ConfigComponentRow, ConfigIntegrationId, ConfigKey } from '../types'
 
+type ScopeSource = 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
+
 type ConfigCatalogRow = {
-  componentId?: ConfigIntegrationId
+  rowId: string
+  componentInstanceId?: string
+  componentId: ConfigIntegrationId
   key: ConfigKey
   label: string
   application: string
   owningGroup: string
   agent: string
-  scopeSource: 'Platform Default'
+  scopeSource: ScopeSource
   integration: string
   area: string
   value: string
@@ -59,26 +63,15 @@ const COMPONENT_DEFINITIONS: Array<{
   },
 ]
 
-const CONFIG_CATALOG: Array<{
-  key: ConfigKey
-  label: string
-  integrationId: ConfigIntegrationId
-}> = [
-  { key: 'jenkins_url', label: 'JENKINS_URL', integrationId: 'jenkins' },
-  { key: 'jenkins_user', label: 'JENKINS_USER', integrationId: 'jenkins' },
-  { key: 'jenkins_api_token', label: 'JENKINS_API_TOKEN', integrationId: 'jenkins' },
-  { key: 'ansible_url', label: 'ANSIBLE_URL', integrationId: 'ansible' },
-  { key: 'ansible_user', label: 'ANSIBLE_USER', integrationId: 'ansible' },
-  { key: 'ansible_api_token', label: 'ANSIBLE_API_TOKEN', integrationId: 'ansible' },
-  { key: 'execution_callback_endpoint', label: 'EXECUTION_CALLBACK_ENDPOINT', integrationId: 'callback' },
-]
-
 const SECRET_KEYS: ConfigKey[] = ['jenkins_api_token', 'ansible_api_token']
 
 const store = useConfigStore()
 const userStore = useUserStore()
 
 const canEdit = computed(() => userStore.isDevOpsAdmin)
+const componentDefinitionById = computed(
+  () => new Map(COMPONENT_DEFINITIONS.map((definition) => [definition.id, definition])),
+)
 
 const activeView = ref<'component' | 'raw'>('raw')
 const searchTerm = ref('')
@@ -101,13 +94,14 @@ const appliedFilters = reactive({
   configItem: 'All',
 })
 
-const editingComponentId = ref<ConfigIntegrationId | null>(null)
+const editingComponentInstanceId = ref<string | null>(null)
+const creatingComponent = ref(false)
 const componentSaving = ref(false)
 const componentError = ref('')
 
-const editingKey = ref<string | null>(null)
+const editingRowId = ref<string | null>(null)
 const editForm = reactive<{ value: string; description: string }>({ value: '', description: '' })
-const savingKey = ref<string | null>(null)
+const savingRowId = ref<string | null>(null)
 const rowError = ref<Record<string, string>>({})
 const rowSuccess = ref<Record<string, boolean>>({})
 
@@ -115,28 +109,14 @@ onMounted(() => {
   void store.fetchConfig()
 })
 
-const configItemsByKey = computed(() => {
-  return new Map(store.items.map((item) => [item.key, item]))
-})
-
-const componentsById = computed(() => {
-  return new Map(store.components.map((component) => [component.componentId, component]))
-})
-
 const componentRows = computed<ConfigComponentRow[]>(() => {
-  return COMPONENT_DEFINITIONS.map((definition) => {
-    const component = componentsById.value.get(definition.id)
-    const endpointItem = configItemsByKey.value.get(definition.endpointKey)
-    const userItem = definition.userKey ? configItemsByKey.value.get(definition.userKey) : undefined
-    const secretItem = definition.secretKey ? configItemsByKey.value.get(definition.secretKey) : undefined
-
-    const trackServiceUser = component?.trackServiceUser ?? Boolean(definition.userKey)
-    const trackCredential = component?.trackCredential ?? Boolean(definition.secretKey)
-    const requiredCount = 1 + (trackServiceUser ? 1 : 0) + (trackCredential ? 1 : 0)
+  return store.components.map((component) => {
+    const definition = componentDefinitionById.value.get(component.componentId)
+    const requiredCount = 1 + (component.trackServiceUser ? 1 : 0) + (component.trackCredential ? 1 : 0)
     const configuredRequiredCount =
-      (component?.serviceEndpoint?.trim() ? 1 : 0) +
-      (trackServiceUser && component?.serviceUser?.trim() ? 1 : 0) +
-      (trackCredential && component?.credentialConfigured ? 1 : 0)
+      (component.serviceEndpoint?.trim() ? 1 : 0) +
+      (component.trackServiceUser && component.serviceUser?.trim() ? 1 : 0) +
+      (component.trackCredential && component.credentialConfigured ? 1 : 0)
 
     let status: ConfigComponentRow['status'] = 'Needs Setup'
     if (configuredRequiredCount === requiredCount && requiredCount > 0) {
@@ -146,46 +126,47 @@ const componentRows = computed<ConfigComponentRow[]>(() => {
     }
 
     return {
-      id: definition.id,
-      label: component?.displayName ?? definition.label,
-      category: component?.area ?? definition.category,
-      application: component?.application ?? '',
-      owningGroup: component?.snowGroup ?? '',
-      agent: component?.agent ?? '',
-      scopeSource: 'Platform Default',
-      endpointKey: definition.endpointKey,
-      userKey: definition.userKey,
-      secretKey: definition.secretKey,
-      trackServiceUser,
-      trackCredential,
-      endpoint: component?.serviceEndpoint ?? '',
-      serviceUser: component?.serviceUser ?? '',
-      secretState: trackCredential
-        ? component?.credentialConfigured
+      id: component.componentInstanceId,
+      componentId: component.componentId,
+      label: component.displayName,
+      category: component.area,
+      application: component.application ?? '',
+      owningGroup: component.snowGroup ?? '',
+      agent: component.agent ?? '',
+      scopeSource: component.scopeSource,
+      endpointKey: definition?.endpointKey,
+      userKey: definition?.userKey,
+      secretKey: definition?.secretKey,
+      trackServiceUser: component.trackServiceUser,
+      trackCredential: component.trackCredential,
+      endpoint: component.serviceEndpoint ?? '',
+      serviceUser: component.serviceUser ?? '',
+      credentialConfigured: component.credentialConfigured,
+      secretState: component.trackCredential
+        ? component.credentialConfigured
           ? 'Configured'
           : 'Missing'
         : 'Not required',
-      description: component?.description ?? endpointItem?.description ?? definition.defaultDescription,
-      updatedBy: component?.updatedBy ?? endpointItem?.updatedBy ?? userItem?.updatedBy ?? secretItem?.updatedBy,
-      updatedAt: component?.updatedAt ?? endpointItem?.updatedAt ?? userItem?.updatedAt ?? secretItem?.updatedAt,
+      description: component.description ?? definition?.defaultDescription,
+      updatedBy: component.updatedBy,
+      updatedAt: component.updatedAt,
       status,
-      credentialConfigured: component?.credentialConfigured ?? Boolean(secretItem?.configured),
     }
   })
 })
 
 const componentOwningGroupOptions = computed(() => [
   'All',
-  ...new Set(componentRows.value.map((row) => row.owningGroup ?? '')),
-].filter(Boolean))
+  ...new Set(componentRows.value.map((row) => row.owningGroup).filter(Boolean)),
+])
 const componentApplicationOptions = computed(() => [
   'All',
-  ...new Set(componentRows.value.map((row) => row.application ?? '')),
-].filter(Boolean))
+  ...new Set(componentRows.value.map((row) => row.application).filter(Boolean)),
+])
 const componentAgentOptions = computed(() => [
   'All',
-  ...new Set(componentRows.value.map((row) => row.agent ?? '')),
-].filter(Boolean))
+  ...new Set(componentRows.value.map((row) => row.agent).filter(Boolean)),
+])
 
 const filteredComponentRows = computed(() => {
   const query = searchTerm.value.trim().toLowerCase()
@@ -210,27 +191,27 @@ const filteredComponentRows = computed(() => {
 })
 
 const rawRows = computed<ConfigCatalogRow[]>(() => {
-  return CONFIG_CATALOG.map((entry) => {
-    const item = configItemsByKey.value.get(entry.key)
-    const component = componentsById.value.get(entry.integrationId)
-    const definition = COMPONENT_DEFINITIONS.find((value) => value.id === entry.integrationId)
+  return store.items.map((item) => {
+    const definition = item.componentId ? componentDefinitionById.value.get(item.componentId) : undefined
 
     return {
-      componentId: item?.componentId ?? entry.integrationId,
-      key: entry.key,
-      label: entry.label,
-      application: item?.application ?? component?.application ?? '',
-      owningGroup: item?.snowGroup ?? component?.snowGroup ?? '',
-      agent: item?.agent ?? component?.agent ?? '',
-      scopeSource: 'Platform Default',
-      integration: item?.integration ?? component?.displayName ?? definition?.label ?? '',
-      area: item?.area ?? component?.area ?? definition?.category ?? '',
-      value: item?.value ?? '',
-      configured: item?.configured ?? Boolean(item?.value),
-      sensitive: item?.sensitive ?? SECRET_KEYS.includes(entry.key),
-      description: item?.description,
-      updatedBy: item?.updatedBy ?? component?.updatedBy,
-      updatedAt: item?.updatedAt ?? component?.updatedAt,
+      rowId: `${item.componentInstanceId ?? 'legacy'}:${item.key}`,
+      componentInstanceId: item.componentInstanceId,
+      componentId: item.componentId ?? definition?.id ?? 'jenkins',
+      key: item.key,
+      label: item.key.toUpperCase() as Uppercase<ConfigKey>,
+      application: item.application ?? '',
+      owningGroup: item.snowGroup ?? '',
+      agent: item.agent ?? '',
+      scopeSource: (item.scopeSource as ScopeSource | undefined) ?? 'Platform Default',
+      integration: item.integration ?? definition?.label ?? '',
+      area: item.area ?? definition?.category ?? '',
+      value: item.value ?? '',
+      configured: item.configured ?? Boolean(item.value),
+      sensitive: item.sensitive ?? SECRET_KEYS.includes(item.key),
+      description: item.description,
+      updatedBy: item.updatedBy,
+      updatedAt: item.updatedAt,
     }
   })
 })
@@ -238,7 +219,7 @@ const rawRows = computed<ConfigCatalogRow[]>(() => {
 const owningGroupOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.owningGroup).filter(Boolean))])
 const applicationOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.application).filter(Boolean))])
 const agentOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.agent).filter(Boolean))])
-const configItemOptions = computed(() => ['All', ...rawRows.value.map((row) => row.label)])
+const configItemOptions = computed(() => ['All', ...new Set(rawRows.value.map((row) => row.label))])
 
 const filteredRawRows = computed(() => {
   return rawRows.value.filter((row) => {
@@ -255,9 +236,20 @@ const filteredRawRows = computed(() => {
 })
 
 const editingComponent = computed(() => {
-  if (!editingComponentId.value) return null
-  return componentRows.value.find((row) => row.id === editingComponentId.value) ?? null
+  if (!editingComponentInstanceId.value) return null
+  return componentRows.value.find((row) => row.id === editingComponentInstanceId.value) ?? null
 })
+
+const componentDialogOptions = computed(() =>
+  COMPONENT_DEFINITIONS.map((definition) => ({
+    componentId: definition.id,
+    label: definition.label,
+    area: definition.category,
+    trackServiceUser: Boolean(definition.userKey),
+    trackCredential: Boolean(definition.secretKey),
+    defaultDescription: definition.defaultDescription,
+  })),
+)
 
 async function refreshConfig() {
   await store.fetchConfig()
@@ -282,27 +274,37 @@ function selectView(view: 'component' | 'raw') {
   activeView.value = view
 }
 
+function openCreateComponent() {
+  if (!canEdit.value) return
+  creatingComponent.value = true
+  editingComponentInstanceId.value = null
+  componentError.value = ''
+}
+
 function openComponentEditor(component: ConfigComponentRow) {
   if (!canEdit.value) return
-  editingComponentId.value = component.id
+  creatingComponent.value = false
+  editingComponentInstanceId.value = component.id
   componentError.value = ''
 }
 
 function closeComponentEditor() {
-  editingComponentId.value = null
+  editingComponentInstanceId.value = null
+  creatingComponent.value = false
   componentSaving.value = false
   componentError.value = ''
 }
 
 async function saveComponent(draft: ConfigComponentDraft) {
-  if (!editingComponent.value || !canEdit.value) return
+  if (!canEdit.value) return
 
   componentSaving.value = true
   componentError.value = ''
 
   try {
     await store.saveComponent({
-      componentId: editingComponent.value.id,
+      componentInstanceId: creatingComponent.value ? undefined : editingComponent.value?.id,
+      componentId: draft.componentId,
       displayName: draft.displayName,
       area: draft.area,
       application: draft.application,
@@ -323,51 +325,52 @@ async function saveComponent(draft: ConfigComponentDraft) {
 }
 
 function startEdit(row: ConfigCatalogRow) {
-  editingKey.value = row.key
+  editingRowId.value = row.rowId
   editForm.value = row.sensitive ? '' : row.value
   editForm.description = row.description ?? ''
-  rowError.value = { ...rowError.value, [row.key]: '' }
-  rowSuccess.value = { ...rowSuccess.value, [row.key]: false }
+  rowError.value = { ...rowError.value, [row.rowId]: '' }
+  rowSuccess.value = { ...rowSuccess.value, [row.rowId]: false }
 }
 
 function cancelEdit() {
-  editingKey.value = null
+  editingRowId.value = null
 }
 
 async function saveEdit(row: ConfigCatalogRow) {
   if (!canEdit.value) return
-  savingKey.value = row.key
-  rowError.value = { ...rowError.value, [row.key]: '' }
+  savingRowId.value = row.rowId
+  rowError.value = { ...rowError.value, [row.rowId]: '' }
 
   if (!editForm.value.trim()) {
     rowError.value = {
       ...rowError.value,
-      [row.key]: row.sensitive ? 'Enter a new credential value.' : 'Value must not be blank.',
+      [row.rowId]: row.sensitive ? 'Enter a new credential value.' : 'Value must not be blank.',
     }
-    savingKey.value = null
+    savingRowId.value = null
     return
   }
 
   try {
     await store.saveConfig({
+      componentInstanceId: row.componentInstanceId,
       componentId: row.componentId,
       key: row.key,
       value: editForm.value,
       description: editForm.description,
     })
     await store.fetchConfig()
-    rowSuccess.value = { ...rowSuccess.value, [row.key]: true }
-    editingKey.value = null
+    rowSuccess.value = { ...rowSuccess.value, [row.rowId]: true }
+    editingRowId.value = null
     setTimeout(() => {
-      rowSuccess.value = { ...rowSuccess.value, [row.key]: false }
+      rowSuccess.value = { ...rowSuccess.value, [row.rowId]: false }
     }, 2000)
   } catch (error: unknown) {
     rowError.value = {
       ...rowError.value,
-      [row.key]: error instanceof Error ? error.message : 'Save failed',
+      [row.rowId]: error instanceof Error ? error.message : 'Save failed',
     }
   } finally {
-    savingKey.value = null
+    savingRowId.value = null
   }
 }
 
@@ -441,10 +444,11 @@ function displayValue(value?: string) {
 
     <div v-if="activeView === 'component'" class="component-workspace">
         <div class="helper-banner">
-          This view groups the current backend configuration keys into reusable integration
-          components. Scope fields show who this shared default is meant to serve today; true
-          per-agent overrides are not wired yet. Use <strong>Configuration</strong> only when you
-          need key-level edits.
+          This view manages scoped integration components directly. Runtime resolution now prefers
+          the most specific matching row in this order: <strong>Agent Override</strong>,
+          <strong>SNOW Group Default</strong>, <strong>Application Default</strong>, then
+          <strong>Platform Default</strong>. Use <strong>Configuration</strong> when you need
+          key-level edits against one scoped row.
         </div>
 
         <div v-if="store.error" class="alert alert-error">
@@ -507,9 +511,18 @@ function displayValue(value?: string) {
             <div>
               <h2 class="section-title">Available Components ({{ filteredComponentRows.length }})</h2>
               <p class="section-subtitle">
-                Fixed integrations backed by the current system configuration keys.
+                Scoped integration rows that can override shared defaults for a specific
+                application, SNOW group, or agent.
               </p>
             </div>
+            <button
+              v-if="canEdit"
+              class="btn btn-primary"
+              type="button"
+              @click="openCreateComponent"
+            >
+              Add Scoped Component
+            </button>
           </div>
 
           <div v-if="filteredComponentRows.length === 0" class="empty-state">
@@ -584,9 +597,9 @@ function displayValue(value?: string) {
 
     <div v-else class="raw-workspace">
         <div class="helper-banner helper-banner-muted">
-          Configuration lists the fixed catalog of backend-managed settings. This view is closer to
-          a traditional admin table: filter by context, review values, and edit only when needed.
-          Today these keys still act as shared defaults, even when scoped ownership fields are shown.
+          Configuration lists the derived key rows behind each scoped component instance. When a
+          task runs, the backend resolves the most specific matching row for each tool based on its
+          Application, SNOW Group, and Agent context.
         </div>
 
         <div class="toolbar-card">
@@ -652,8 +665,8 @@ function displayValue(value?: string) {
             <div>
               <h2 class="section-title">Configuration Items ({{ filteredRawRows.length }})</h2>
               <p class="section-subtitle">
-                Current backend supports a fixed set of integration keys, so this table focuses on
-                review and maintenance rather than free-form creation.
+                Each row belongs to one scoped component instance; edits here update that same
+                component and therefore affect runtime resolution.
               </p>
             </div>
           </div>
@@ -674,7 +687,7 @@ function displayValue(value?: string) {
               </tr>
             </thead>
             <tbody>
-              <template v-for="row in filteredRawRows" :key="row.key">
+              <template v-for="row in filteredRawRows" :key="row.rowId">
                 <tr>
                   <td>{{ row.application }}</td>
                   <td>{{ row.owningGroup }}</td>
@@ -684,11 +697,11 @@ function displayValue(value?: string) {
                     <div class="config-item-meta">{{ row.integration }}</div>
                   </td>
                   <td class="config-value-cell">
-                    <template v-if="editingKey === row.key">
+                    <template v-if="editingRowId === row.rowId">
                       <input
                         v-model="editForm.value"
                         class="form-control inline-input"
-                        :type="isSecretKey(row.key) ? 'password' : 'text'"
+                        :type="row.sensitive ? 'password' : 'text'"
                       />
                       <input
                         v-model="editForm.description"
@@ -709,14 +722,14 @@ function displayValue(value?: string) {
                   <td class="timestamp">{{ formatDate(row.updatedAt) }}</td>
                   <td>
                     <div class="action-btns">
-                      <template v-if="editingKey === row.key">
+                      <template v-if="editingRowId === row.rowId">
                         <button
                           class="btn btn-primary btn-sm"
-                          :disabled="savingKey === row.key"
+                          :disabled="savingRowId === row.rowId"
                           @click="saveEdit(row)"
                         >
                           <span
-                            v-if="savingKey === row.key"
+                            v-if="savingRowId === row.rowId"
                             class="spinner"
                             style="width: 12px; height: 12px; border-width: 1px"
                           ></span>
@@ -737,10 +750,10 @@ function displayValue(value?: string) {
                     </div>
                   </td>
                 </tr>
-                <tr v-if="rowError[row.key] || rowSuccess[row.key]">
+                <tr v-if="rowError[row.rowId] || rowSuccess[row.rowId]">
                   <td colspan="9" class="feedback-row">
-                    <span v-if="rowError[row.key]" class="feedback-error">{{ rowError[row.key] }}</span>
-                    <span v-if="rowSuccess[row.key]" class="feedback-success">Saved successfully.</span>
+                    <span v-if="rowError[row.rowId]" class="feedback-error">{{ rowError[row.rowId] }}</span>
+                    <span v-if="rowSuccess[row.rowId]" class="feedback-success">Saved successfully.</span>
                   </td>
                 </tr>
               </template>
@@ -751,9 +764,11 @@ function displayValue(value?: string) {
     </div>
 
     <ConfigComponentDialog
-      v-if="editingComponent"
-      :key="editingComponent.id"
+      v-if="editingComponent || creatingComponent"
+      :key="editingComponent?.id ?? 'new-component'"
       :component="editingComponent"
+      :mode="creatingComponent ? 'create' : 'edit'"
+      :component-options="componentDialogOptions"
       :saving="componentSaving"
       :error="componentError"
       @close="closeComponentEditor"

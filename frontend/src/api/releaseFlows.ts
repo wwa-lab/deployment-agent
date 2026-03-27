@@ -15,6 +15,8 @@ export interface ListReleaseFlowsParams {
   application?: string
   snowGroup?: string
   agent?: string
+  view?: 'flow' | 'stitched'
+  attemptView?: 'latest' | 'history'
   includeArchived?: boolean
   page?: number
   size?: number
@@ -29,7 +31,7 @@ export async function listReleaseFlows(
 
 export async function getReleaseFlow(
   id: string,
-  params?: { includeArchived?: boolean }
+  params?: { includeArchived?: boolean; linked?: string }
 ): Promise<ReleaseFlowDetail> {
   const response = await apiClient.get(`/release-flows/${id}`, { params })
   return response.data

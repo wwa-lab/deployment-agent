@@ -7,7 +7,6 @@ import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.ImportValidationException;
-import com.wwa.deploymentagent.errors.ValidationAppException;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.DisplayName;
@@ -169,8 +168,34 @@ class ImportServiceTest {
     }
 
     @Test
-    @DisplayName("explicit release identifier rejects a duplicate upload for the same stage")
-    void importFile_explicitReleaseIdentifier_rejectsDuplicateStage() throws IOException {
+    @DisplayName("stage-prefixed explicit identifiers are stitched into the same release family")
+    void importFile_stagePrefixedExplicitIdentifiers_shareReleaseFamily() throws IOException {
+        ImportResult sitResult = importService.importFile(
+                buildXlsx("PROJ-E1", "Project E1", "TG-01", "Task E1", 1, "sit-step", "MANUAL"),
+                Stage.SIT,
+                developer,
+                "sit-01",
+                null,
+                null,
+                null);
+        ImportResult uatResult = importService.importFile(
+                buildXlsx("PROJ-E1", "Project E1", "TG-01", "Task E1", 1, "uat-step", "MANUAL"),
+                Stage.UAT,
+                developer,
+                "uat-01",
+                null,
+                null,
+                null);
+
+        assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
+        assertThat(requestRepository.findByReleaseFlowId(sitResult.releaseFlowId()))
+                .extracting(request -> request.getStage().name())
+                .containsExactlyInAnyOrder("SIT", "UAT");
+    }
+
+    @Test
+    @DisplayName("explicit release identifier allows repeated same-stage uploads as incremented attempts")
+    void importFile_explicitReleaseIdentifier_incrementsAttemptForDuplicateStage() throws IOException {
         String releaseIdentifier = "Workflow-Release-20260327-02";
 
         importService.importFile(
@@ -182,16 +207,23 @@ class ImportServiceTest {
                 null,
                 null);
 
-        assertThatThrownBy(() -> importService.importFile(
+        ImportResult retryResult = importService.importFile(
                 buildXlsx("PROJ-F", "Project F", "TG-01", "Task F", 1, "sit-step-2", "MANUAL"),
                 Stage.SIT,
                 developer,
                 releaseIdentifier,
                 null,
                 null,
-                null))
-                .isInstanceOf(ValidationAppException.class)
-                .hasMessageContaining("already contains stage SIT");
+                null);
+
+        var requests = requestRepository.findByReleaseFlowId(retryResult.releaseFlowId()).stream()
+                .filter(request -> request.getStage() == Stage.SIT)
+                .sorted(java.util.Comparator.comparing(request -> request.getAttemptNumber()))
+                .toList();
+
+        assertThat(requests).hasSize(2);
+        assertThat(requests.get(0).getAttemptNumber()).isEqualTo(1);
+        assertThat(requests.get(1).getAttemptNumber()).isEqualTo(2);
     }
 
     @Test

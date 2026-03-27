@@ -2,6 +2,7 @@ package com.wwa.deploymentagent.domain.execution;
 
 import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
+import com.wwa.deploymentagent.domain.configuration.ConfigurationScope;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,9 +58,13 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
     // ─── Submit ───────────────────────────────────────────────────────────────
 
     @Override
-    public AutoSubmissionResult submit(ExecutionTarget target, Map<String, Object> inputParameters) {
+    public AutoSubmissionResult submit(
+            ExecutionTarget target,
+            Map<String, Object> inputParameters,
+            ConfigurationScope scope
+    ) {
         try {
-            var config = configurationComponentService.resolveForSystem(systemType());
+            var config = configurationComponentService.resolveForSystem(systemType(), scope);
             String baseUrl = config.endpoint();
             String user    = config.serviceUser();
             String token   = config.credential();
@@ -98,7 +103,10 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
     @SuppressWarnings("unchecked")
     public AutoPollResult pollStatus(TaskExecutionHistory executionHistory) {
         try {
-            var config = configurationComponentService.resolveForSystem(systemType());
+            var config = configurationComponentService.resolveForSystem(
+                    systemType(),
+                    ConfigurationScope.from(executionHistory)
+            );
             String baseUrl = config.endpoint();
             String user    = config.serviceUser();
             String token   = config.credential();

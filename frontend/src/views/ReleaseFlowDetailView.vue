@@ -27,6 +27,9 @@ const userStore = useUserStore()
 
 const flowId = computed(() => route.params.id as string)
 const includeArchivedView = computed(() => userStore.isDevOpsAdmin && route.query.archived === '1')
+const linkedFlowQuery = computed(() =>
+  typeof route.query.linked === 'string' ? route.query.linked : undefined,
+)
 
 const editingTask = ref<Task | null>(null)
 const taskDialogMode = ref<TaskDialogMode>('edit')
@@ -41,9 +44,9 @@ const refreshingDetail = ref(false)
 const viewingResult = ref<{ task: Task; result: TaskResult | null; loading: boolean } | null>(null)
 
 watch(
-  [flowId, includeArchivedView],
-  async ([id, includeArchived]) => {
-    await store.selectFlowWithArchived(id, includeArchived)
+  [flowId, includeArchivedView, linkedFlowQuery],
+  async ([id, includeArchived, linked]) => {
+    await store.selectFlowWithArchived(id, includeArchived, linked)
   },
   { immediate: true },
 )
@@ -468,7 +471,9 @@ function activeStageIndex(requests: Request[]): number {
 }
 
 function requestTabLabel(request: Request): string {
-  return request.archivedAt ? `${request.stage} (Archived)` : request.stage
+  const attemptLabel = `Attempt #${request.attemptNumber ?? 1}`
+  const baseLabel = `${request.stage} (${attemptLabel})`
+  return request.archivedAt ? `${baseLabel} (Archived)` : baseLabel
 }
 
 function canEditRundownFields(request: Request): boolean {
@@ -642,6 +647,12 @@ watch(() => store.detail, (val) => {
           <div class="header-field">
             <span class="field-label">Release ID</span>
             <span class="field-value mono">{{ store.detail.releaseId }}</span>
+            <span
+              v-if="store.detail.stitched && store.detail.linkedReleaseCount > 1"
+              class="field-note"
+            >
+              Stitched from {{ store.detail.linkedReleaseIds.join(', ') }}
+            </span>
           </div>
           <div class="header-field">
             <span class="field-label">Current Stage</span>
@@ -770,6 +781,7 @@ watch(() => store.detail, (val) => {
                 <div class="rundown-field">
                   <span class="rundown-field-label">Environment:</span>
                   <span class="badge badge-pending">{{ req.stage }}</span>
+                  <span class="rundown-field-value" style="margin-left:8px;">Attempt #{{ req.attemptNumber ?? 1 }}</span>
                 </div>
                 <div v-if="hasValue(req.snowGroup)" class="rundown-field">
                   <span class="rundown-field-label">SNOW Group:</span>
@@ -1208,6 +1220,13 @@ watch(() => store.detail, (val) => {
   font-size: 14px;
   font-weight: 500;
   color: #1e293b;
+}
+
+.field-note {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 320px;
+  line-height: 1.4;
 }
 
 .mono { font-family: monospace; }

@@ -93,6 +93,7 @@ export interface Request {
   id: string
   releaseFlowId: string
   stage: Stage
+  attemptNumber: number
   requestStatus: RequestStatus
   snowGroup?: string
   application?: string
@@ -128,6 +129,13 @@ export interface ReleaseFlowListItem {
   sitStatus: RequestStatus
   uatStatus: RequestStatus
   prodStatus: RequestStatus
+  sitPresent: boolean
+  uatPresent: boolean
+  prodPresent: boolean
+  stitched: boolean
+  linkedReleaseCount: number
+  linkedReleaseIds: string[]
+  linkedReleaseFlowIds: string[]
 }
 
 // ReleaseFlow (detail)
@@ -142,11 +150,15 @@ export interface ReleaseFlowDetail {
   reviewStatus: ReviewStatus
   archivedAt?: string
   archivedBy?: string
+  stitched: boolean
+  linkedReleaseCount: number
+  linkedReleaseIds: string[]
   requests: Request[]
 }
 
 // ConfigItem
 export interface ConfigItem {
+  componentInstanceId?: string
   componentId?: ConfigIntegrationId
   key: ConfigKey
   value: string
@@ -164,13 +176,15 @@ export interface ConfigItem {
 }
 
 export interface ConfigComponent {
+  componentInstanceId: string
   componentId: ConfigIntegrationId
   systemType: string
   displayName: string
   area: string
-  application: string
-  snowGroup: string
-  agent: string
+  application?: string
+  snowGroup?: string
+  agent?: string
+  scopeSource: 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
   trackServiceUser: boolean
   trackCredential: boolean
   serviceEndpoint: string
@@ -182,7 +196,8 @@ export interface ConfigComponent {
 }
 
 export interface ConfigComponentRow {
-  id: ConfigIntegrationId
+  id: string
+  componentId: ConfigIntegrationId
   label: string
   category: string
   application?: string
@@ -205,11 +220,12 @@ export interface ConfigComponentRow {
 }
 
 export interface ConfigComponentDraft {
+  componentId: ConfigIntegrationId
   displayName: string
   area: string
-  application: string
-  snowGroup: string
-  agent: string
+  application?: string
+  snowGroup?: string
+  agent?: string
   endpoint: string
   serviceUser?: string
   credentialValue?: string
@@ -244,6 +260,13 @@ export interface AccessGrant {
   createdAt?: string
   updatedBy?: string
   updatedAt?: string
+}
+
+export interface AccessGrantDirectoryCandidate {
+  employeeId: string
+  displayName: string
+  hasAccessGrant: boolean
+  grantStatus?: AccessGrantStatus
 }
 
 // TaskResult

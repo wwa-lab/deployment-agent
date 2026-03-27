@@ -6,6 +6,7 @@ import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowFamilyKey;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
@@ -100,7 +101,7 @@ public class ImportService {
 
             ReleaseFlow rf = findOrCreateReleaseFlow(projectId, projectName, stage, requestedReleaseId);
 
-            Request request = findOrCreateRequest(rf, stage, user, snowGroup, application, agent, requestOwner);
+            Request request = createRequestAttempt(rf, stage, user, snowGroup, application, agent, requestOwner);
 
             for (ParsedTaskRow row : rows) {
                 upsertTask(request, row);
@@ -169,15 +170,6 @@ public class ImportService {
                         "Release identifier '" + explicitReleaseId + "' is already archived for project '"
                                 + projectId + "'. Restore that rundown or use a new release identifier.");
             }
-            if (requestRepository.findByReleaseFlowIdAndStageAndArchivedAtIsNull(releaseFlow.getId(), stage)
-                    .isPresent()) {
-                throw new ValidationAppException(
-                        "Release identifier '" + explicitReleaseId + "' already contains stage "
-                                + stage.name()
-                                + ". Use a new release identifier for a new "
-                                + stage.name()
-                                + " rundown.");
-            }
             return releaseFlow;
         }
 
@@ -197,7 +189,7 @@ public class ImportService {
                 stage);
     }
 
-    private Request findOrCreateRequest(
+    private Request createRequestAttempt(
             ReleaseFlow rf,
             Stage stage,
             UserContext user,
@@ -205,24 +197,33 @@ public class ImportService {
             String application,
             String agent,
             String owner) {
-        Request request = requestRepository.findByReleaseFlowIdAndStageAndArchivedAtIsNull(rf.getId(), stage)
-                .orElseGet(() -> {
-                    Request req = new Request();
-                    req.setReleaseFlow(rf);
-                    req.setStage(stage);
-                    req.setRequestStatus(RequestStatus.Pending);
-                    req.setCreatedBy(user.userId());
-                    req.setArchivedAt(null);
-                    req.setArchivedBy(null);
-                    return req;
-                });
+        Request latestAttempt = requestRepository
+                .findTopByReleaseFlowIdAndStageOrderByAttemptNumberDescUpdatedAtDesc(rf.getId(), stage)
+                .orElse(null);
 
-        request.setSnowGroup(coalesceScopeValue(snowGroup, request.getSnowGroup()));
-        request.setApplication(coalesceScopeValue(application, request.getApplication(), rf.getProjectName()));
-        request.setAgent(coalesceScopeValue(agent, request.getAgent()));
-        if (normalizeBlank(request.getOwner()) == null) {
-            request.setOwner(normalizeBlank(owner));
-        }
+        int nextAttempt = requestRepository.findMaxAttemptNumberByReleaseFlowIdAndStage(rf.getId(), stage) + 1;
+
+        Request request = new Request();
+        request.setReleaseFlow(rf);
+        request.setStage(stage);
+        request.setAttemptNumber(nextAttempt);
+        request.setRequestStatus(RequestStatus.Pending);
+        request.setCreatedBy(user.userId());
+        request.setArchivedAt(null);
+        request.setArchivedBy(null);
+        request.setSnowGroup(coalesceScopeValue(
+                snowGroup,
+                latestAttempt != null ? latestAttempt.getSnowGroup() : null));
+        request.setApplication(coalesceScopeValue(
+                application,
+                latestAttempt != null ? latestAttempt.getApplication() : null,
+                rf.getProjectName()));
+        request.setAgent(coalesceScopeValue(
+                agent,
+                latestAttempt != null ? latestAttempt.getAgent() : null));
+        request.setOwner(coalesceScopeValue(
+                owner,
+                latestAttempt != null ? latestAttempt.getOwner() : null));
         return requestRepository.save(request);
     }
 
@@ -253,7 +254,7 @@ public class ImportService {
     }
 
     private String normalizeReleaseIdentifier(String releaseIdentifier) {
-        String normalizedReleaseIdentifier = normalizeId(releaseIdentifier);
+        String normalizedReleaseIdentifier = ReleaseFlowFamilyKey.fromIdentifier(releaseIdentifier);
         if (normalizedReleaseIdentifier.isBlank()) {
             throw new ValidationAppException("Release identifier must contain at least one letter or number.");
         }
@@ -275,10 +276,25 @@ public class ImportService {
 
         String legacyNormalizedReleaseId = explicitReleaseId.trim().toLowerCase();
         if (legacyNormalizedReleaseId.equals(normalizedReleaseId)) {
-            return Optional.empty();
+            return releaseFlowRepository.findByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId).stream()
+                    .filter(releaseFlow -> ReleaseFlowFamilyKey.fromStoredRelease(
+                            releaseFlow.getReleaseId(),
+                            releaseFlow.getNormalizedReleaseId()).equals(normalizedReleaseId))
+                    .findFirst();
         }
 
-        return releaseFlowRepository.findByProjectIdAndNormalizedReleaseId(projectId, legacyNormalizedReleaseId);
+        Optional<ReleaseFlow> legacy = releaseFlowRepository.findByProjectIdAndNormalizedReleaseId(
+                projectId,
+                legacyNormalizedReleaseId);
+        if (legacy.isPresent()) {
+            return legacy;
+        }
+
+        return releaseFlowRepository.findByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId).stream()
+                .filter(releaseFlow -> ReleaseFlowFamilyKey.fromStoredRelease(
+                        releaseFlow.getReleaseId(),
+                        releaseFlow.getNormalizedReleaseId()).equals(normalizedReleaseId))
+                .findFirst();
     }
 
     private String inferRequestOwner(List<ParsedTaskRow> rows, UserContext user) {

@@ -41,6 +41,8 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
     /** Look up the first (active) Release Flow for a given projectId – used during import. */
     Optional<ReleaseFlow> findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(String projectId);
 
+    List<ReleaseFlow> findByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(String projectId);
+
     @Query("""
             SELECT rf FROM ReleaseFlow rf
             WHERE rf.projectId = :projectId

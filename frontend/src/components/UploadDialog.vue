@@ -139,8 +139,11 @@ function close() {
             />
             <div class="field-hint">
               Recommended for repeated uploads. Reuse the same identifier for later UAT/PROD
-              stages in the same release, and use a new identifier for a new SIT rundown. If left
-              blank, WWA falls back to project + stage matching.
+              stages in the same release. Re-uploading the same stage under the same identifier
+              creates a new attempt (for example, SIT Attempt #2). Use a new identifier for a new
+              SIT rundown. WWA also
+              stitches stage-prefixed families such as `sit-01 / uat-01 / prod-01` into one release
+              summary. If left blank, WWA falls back to project + stage matching.
             </div>
           </div>
 

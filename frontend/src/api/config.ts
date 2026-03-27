@@ -2,6 +2,7 @@ import apiClient from './client'
 import type { ConfigComponent, ConfigItem } from '../types'
 
 interface ConfigApiItem {
+  componentInstanceId?: string
   componentId?: ConfigItem['componentId']
   configKey: ConfigItem['key']
   configValue: string
@@ -19,13 +20,15 @@ interface ConfigApiItem {
 }
 
 interface ConfigApiComponent {
+  componentInstanceId: string
   componentId: ConfigComponent['componentId']
   systemType: string
   displayName: string
   area: string
-  application: string
-  snowGroup: string
-  agent: string
+  application?: string
+  snowGroup?: string
+  agent?: string
+  scopeSource: ConfigComponent['scopeSource']
   trackServiceUser: boolean
   trackCredential: boolean
   serviceEndpoint: string
@@ -38,6 +41,7 @@ interface ConfigApiComponent {
 
 function mapConfigItem(item: ConfigApiItem): ConfigItem {
   return {
+    componentInstanceId: item.componentInstanceId,
     componentId: item.componentId,
     key: item.configKey,
     value: item.configValue,
@@ -57,6 +61,7 @@ function mapConfigItem(item: ConfigApiItem): ConfigItem {
 
 function mapConfigComponent(component: ConfigApiComponent): ConfigComponent {
   return {
+    componentInstanceId: component.componentInstanceId,
     componentId: component.componentId,
     systemType: component.systemType,
     displayName: component.displayName,
@@ -64,6 +69,7 @@ function mapConfigComponent(component: ConfigApiComponent): ConfigComponent {
     application: component.application,
     snowGroup: component.snowGroup,
     agent: component.agent,
+    scopeSource: component.scopeSource,
     trackServiceUser: component.trackServiceUser,
     trackCredential: component.trackCredential,
     serviceEndpoint: component.serviceEndpoint,
@@ -90,6 +96,7 @@ export async function listConfigComponents(): Promise<{ data: ConfigComponent[] 
 }
 
 export async function updateConfig(item: {
+  componentInstanceId?: string
   componentId?: string
   key: string
   value: string
@@ -100,12 +107,13 @@ export async function updateConfig(item: {
 }
 
 export async function updateConfigComponent(component: {
+  componentInstanceId?: string
   componentId: string
   displayName: string
   area: string
-  application: string
-  snowGroup: string
-  agent: string
+  application?: string
+  snowGroup?: string
+  agent?: string
   serviceEndpoint: string
   serviceUser?: string
   credentialValue?: string
