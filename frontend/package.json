@@ -9,13 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "1.13.6",
     "pinia": "^2.1.0",
     "vue": "^3.4.0",
     "vue-router": "^4.3.0"
   },
   "overrides": {
-    "brace-expansion": "^3.0.2"
+    "brace-expansion": "^3.0.2",
+    "axios": "1.13.6"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",
