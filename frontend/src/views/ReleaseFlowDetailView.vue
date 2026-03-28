@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
@@ -87,6 +87,9 @@ function clearActionError() {
 
 function setActionError(error: unknown, fallback: string) {
   actionError.value = error instanceof Error ? error.message : fallback
+  nextTick(() => {
+    document.querySelector('.alert-error')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
 }
 
 function normalizeIdentity(value: string | null | undefined): string {
