@@ -1,8 +1,8 @@
 -- Deployment Agent Oracle current schema
 -- Generated for greenfield UAT / internal environment setup.
 -- Use this script for a fresh Oracle schema.
--- Do not run V2-V12 incremental scripts on top of this file for a brand-new database,
--- because this script already includes the current end-state columns from V2 through V12.
+-- Do not run V2-V13 incremental scripts on top of this file for a brand-new database,
+-- because this script already includes the current end-state columns from V2 through V13.
 
 CREATE TABLE DA_RELEASE_FLOW (
     id                    VARCHAR2(36)   NOT NULL,
@@ -114,6 +114,11 @@ CREATE TABLE DA_TASK_EXECUTION_HISTORY (
     config_application    VARCHAR2(255),
     config_snow_group     VARCHAR2(255),
     config_agent          VARCHAR2(255),
+    external_status       VARCHAR2(50),
+    external_status_message VARCHAR2(2000),
+    external_log_url      VARCHAR2(2000),
+    external_approval_url VARCHAR2(2000),
+    last_synced_at        TIMESTAMP(6),
     CONSTRAINT PK_DA_TASK_EXEC_HISTORY PRIMARY KEY (id),
     CONSTRAINT FK_TEH_TASK
         FOREIGN KEY (task_id) REFERENCES DA_TASK (id)

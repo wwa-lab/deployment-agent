@@ -1,2 +1,9 @@
 ALTER TABLE DA_ACCESS_GRANT
-    ADD COLUMN scope_grants CLOB DEFAULT '[]' NOT NULL;
+    ADD (scope_grants CLOB);
+
+UPDATE DA_ACCESS_GRANT
+SET scope_grants = TO_CLOB('[]')
+WHERE scope_grants IS NULL;
+
+ALTER TABLE DA_ACCESS_GRANT
+    MODIFY (scope_grants NOT NULL);
