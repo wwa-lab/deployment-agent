@@ -6,24 +6,45 @@ import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
 import com.wwa.deploymentagent.errors.AccessNotGrantedAppException;
 import com.wwa.deploymentagent.errors.AccessSuspendedAppException;
 import com.wwa.deploymentagent.errors.UnauthorizedAppException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
 @DisplayName("AuthService")
 class AuthServiceTest {
+
+    private static final List<TestGrantSeed> KNOWN_GRANTS = List.of(
+            new TestGrantSeed("emp-001", "Alice Park (Developer)", "DEVELOPER"),
+            new TestGrantSeed("emp-002", "Bob Kim (Tech Lead)", "TL"),
+            new TestGrantSeed("emp-003", "Carol Lee (DevOps Admin)", "DEVOPS_ADMIN"),
+            new TestGrantSeed("emp-004", "David Cho (Auditor)", "AUDIT"),
+            new TestGrantSeed("emp-005", "Eve Yoon (Management)", "MANAGEMENT")
+    );
 
     @Autowired
     private AuthService authService;
     @Autowired
     private AccessGrantRepository accessGrantRepository;
+
+    @BeforeEach
+    void resetKnownAccessGrants() {
+        accessGrantRepository.deleteAll();
+        accessGrantRepository.saveAll(KNOWN_GRANTS.stream()
+                .map(AuthServiceTest::toAccessGrant)
+                .toList());
+    }
 
     @Test
     @DisplayName("valid employee ID → returns UserContext with roles and permissions")
@@ -74,35 +95,23 @@ class AuthServiceTest {
     @Test
     @DisplayName("employee without access grant → throws AccessNotGrantedAppException")
     void authenticate_missingAccessGrant_throwsForbidden() {
-        AccessGrant grant = accessGrantRepository.findById("emp-005").orElseThrow();
         accessGrantRepository.deleteById("emp-005");
 
-        try {
-            assertThatThrownBy(() -> authService.authenticate("emp-005", "any-password"))
-                    .isInstanceOf(AccessNotGrantedAppException.class)
-                    .hasMessageContaining("Access not granted");
-        } finally {
-            accessGrantRepository.save(grant);
-        }
+        assertThatThrownBy(() -> authService.authenticate("emp-005", "any-password"))
+                .isInstanceOf(AccessNotGrantedAppException.class)
+                .hasMessageContaining("Access not granted");
     }
 
     @Test
     @DisplayName("suspended access grant → throws AccessSuspendedAppException")
     void authenticate_suspendedGrant_throwsForbidden() {
         AccessGrant grant = accessGrantRepository.findById("emp-004").orElseThrow();
-        AccessGrantStatus originalStatus = grant.getGrantStatus();
         grant.setGrantStatus(AccessGrantStatus.SUSPENDED);
         accessGrantRepository.save(grant);
 
-        try {
-            assertThatThrownBy(() -> authService.authenticate("emp-004", "any-password"))
-                    .isInstanceOf(AccessSuspendedAppException.class)
-                    .hasMessageContaining("Access suspended");
-        } finally {
-            AccessGrant persistedGrant = accessGrantRepository.findById("emp-004").orElseThrow();
-            persistedGrant.setGrantStatus(originalStatus);
-            accessGrantRepository.save(persistedGrant);
-        }
+        assertThatThrownBy(() -> authService.authenticate("emp-004", "any-password"))
+                .isInstanceOf(AccessSuspendedAppException.class)
+                .hasMessageContaining("Access suspended");
     }
 
     @Test
@@ -125,5 +134,20 @@ class AuthServiceTest {
     void authenticate_nullPassword_throwsUnauthorized() {
         assertThatThrownBy(() -> authService.authenticate("emp-001", null))
                 .isInstanceOf(UnauthorizedAppException.class);
+    }
+
+    private static AccessGrant toAccessGrant(TestGrantSeed seed) {
+        AccessGrant grant = new AccessGrant();
+        grant.setEmployeeId(seed.employeeId());
+        grant.setDisplayNameSnapshot(seed.displayName());
+        grant.setGrantStatus(AccessGrantStatus.ACTIVE);
+        grant.setAssignedRoles(List.of(seed.role()));
+        grant.setScopeGrants(List.of(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD)));
+        grant.setCreatedBy("test");
+        grant.setUpdatedBy("test");
+        return grant;
+    }
+
+    private record TestGrantSeed(String employeeId, String displayName, String role) {
     }
 }

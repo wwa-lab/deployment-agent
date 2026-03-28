@@ -1,10 +1,12 @@
 package com.wwa.deploymentagent.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wwa.deploymentagent.contracts.AccessScope;
 import com.wwa.deploymentagent.contracts.dto.LoginRequestDto;
 import com.wwa.deploymentagent.contracts.enums.AccessGrantStatus;
 import com.wwa.deploymentagent.domain.auth.AccessGrant;
 import com.wwa.deploymentagent.domain.auth.AccessGrantRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,9 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -23,12 +28,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Transactional
 @DisplayName("AuthController")
 class AuthControllerTest {
+
+    private static final List<TestGrantSeed> KNOWN_GRANTS = List.of(
+            new TestGrantSeed("emp-001", "Alice Park (Developer)", "DEVELOPER"),
+            new TestGrantSeed("emp-002", "Bob Kim (Tech Lead)", "TL"),
+            new TestGrantSeed("emp-003", "Carol Lee (DevOps Admin)", "DEVOPS_ADMIN"),
+            new TestGrantSeed("emp-004", "David Cho (Auditor)", "AUDIT"),
+            new TestGrantSeed("emp-005", "Eve Yoon (Management)", "MANAGEMENT")
+    );
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private AccessGrantRepository accessGrantRepository;
+
+    @BeforeEach
+    void resetKnownAccessGrants() {
+        accessGrantRepository.deleteAll();
+        accessGrantRepository.saveAll(KNOWN_GRANTS.stream()
+                .map(AuthControllerTest::toAccessGrant)
+                .toList());
+    }
 
     @Test
     @DisplayName("POST /auth/login with valid credentials → 200 + auth context")
@@ -62,43 +84,31 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /auth/login without access grant → 403")
     void login_missingGrant_returns403() throws Exception {
-        AccessGrant grant = accessGrantRepository.findById("emp-005").orElseThrow();
         accessGrantRepository.deleteById("emp-005");
 
-        try {
-            LoginRequestDto body = new LoginRequestDto("emp-005", "password");
+        LoginRequestDto body = new LoginRequestDto("emp-005", "password");
 
-            mockMvc.perform(post("/api/deployment-agent/auth/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(body)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("ACCESS_NOT_GRANTED"));
-        } finally {
-            accessGrantRepository.save(grant);
-        }
+        mockMvc.perform(post("/api/deployment-agent/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_NOT_GRANTED"));
     }
 
     @Test
     @DisplayName("POST /auth/login with suspended access grant → 403")
     void login_suspendedGrant_returns403() throws Exception {
         AccessGrant grant = accessGrantRepository.findById("emp-004").orElseThrow();
-        AccessGrantStatus originalStatus = grant.getGrantStatus();
         grant.setGrantStatus(AccessGrantStatus.SUSPENDED);
         accessGrantRepository.save(grant);
 
-        try {
-            LoginRequestDto body = new LoginRequestDto("emp-004", "password");
+        LoginRequestDto body = new LoginRequestDto("emp-004", "password");
 
-            mockMvc.perform(post("/api/deployment-agent/auth/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(body)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("ACCESS_SUSPENDED"));
-        } finally {
-            AccessGrant persistedGrant = accessGrantRepository.findById("emp-004").orElseThrow();
-            persistedGrant.setGrantStatus(originalStatus);
-            accessGrantRepository.save(persistedGrant);
-        }
+        mockMvc.perform(post("/api/deployment-agent/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_SUSPENDED"));
     }
 
     @Test
@@ -168,5 +178,20 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());
+    }
+
+    private static AccessGrant toAccessGrant(TestGrantSeed seed) {
+        AccessGrant grant = new AccessGrant();
+        grant.setEmployeeId(seed.employeeId());
+        grant.setDisplayNameSnapshot(seed.displayName());
+        grant.setGrantStatus(AccessGrantStatus.ACTIVE);
+        grant.setAssignedRoles(List.of(seed.role()));
+        grant.setScopeGrants(List.of(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD)));
+        grant.setCreatedBy("test");
+        grant.setUpdatedBy("test");
+        return grant;
+    }
+
+    private record TestGrantSeed(String employeeId, String displayName, String role) {
     }
 }
