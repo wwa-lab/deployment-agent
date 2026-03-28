@@ -156,6 +156,24 @@ const componentRows = computed<ConfigComponentRow[]>(() => {
   })
 })
 
+/* Platform Default rows that are shadowed by a more specific override for the same componentId */
+const shadowedComponentIds = computed(() => {
+  const overriddenComponentIds = new Set(
+    componentRows.value
+      .filter((row) => row.scopeSource !== 'Platform Default')
+      .map((row) => row.componentId),
+  )
+  return new Set(
+    componentRows.value
+      .filter((row) => row.scopeSource === 'Platform Default' && overriddenComponentIds.has(row.componentId))
+      .map((row) => row.id),
+  )
+})
+
+function isComponentShadowed(component: ConfigComponentRow): boolean {
+  return shadowedComponentIds.value.has(component.id)
+}
+
 const componentOwningGroupOptions = computed(() => [
   'All',
   ...new Set(componentRows.value.map((row) => row.owningGroup).filter(Boolean)),
@@ -591,7 +609,7 @@ function displayValue(value?: string) {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="component in filteredComponentRows" :key="component.id">
+                <tr v-for="component in filteredComponentRows" :key="component.id" :class="{ 'shadowed-row': isComponentShadowed(component) }">
                   <td>
                     <div class="component-name">{{ component.label }}</div>
                     <div class="component-description">{{ component.description }}</div>
@@ -603,9 +621,10 @@ function displayValue(value?: string) {
                   <td class="endpoint-cell">{{ displayValue(component.endpoint) }}</td>
                   <td>{{ displayValue(component.serviceUser) }}</td>
                   <td>
-                    <span class="scope-source-badge">
+                    <span class="scope-source-badge" :class="{ 'scope-overridden': isComponentShadowed(component) }">
                       {{ component.scopeSource ?? 'Platform Default' }}
                     </span>
+                    <span v-if="isComponentShadowed(component)" class="overridden-tag">Overridden</span>
                   </td>
                   <td>
                     <span class="secret-badge" :class="`secret-${component.secretState.toLowerCase().replace(/ /g, '-')}`">
@@ -1041,6 +1060,30 @@ function displayValue(value?: string) {
 .scope-source-badge {
   color: #334155;
   background: #e2e8f0;
+}
+
+.scope-overridden {
+  opacity: 0.5;
+}
+
+.overridden-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9a3412;
+  background: #fed7aa;
+}
+
+.shadowed-row {
+  opacity: 0.45;
+  background: #f8fafc;
+}
+
+.shadowed-row:hover {
+  opacity: 0.7;
 }
 
 .status-ready {
