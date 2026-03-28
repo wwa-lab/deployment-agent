@@ -240,7 +240,12 @@ public class AnsibleExecutionAdapter implements AutoExecutionAdapter {
             return "{}";
         }
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("extra_vars", params.toString());
+        // AWX expects extra_vars as a JSON string or object; serialize properly
+        if (params instanceof String) {
+            requestBody.put("extra_vars", params);
+        } else {
+            requestBody.put("extra_vars", OBJECT_MAPPER.writeValueAsString(params));
+        }
         return OBJECT_MAPPER.writeValueAsString(requestBody);
     }
 
