@@ -827,6 +827,19 @@ onBeforeUnmount(() => {
           </div>
 
           <table v-else class="data-table">
+            <colgroup>
+              <col style="width: 18%">
+              <col style="width: 6%">
+              <col style="width: 10%">
+              <col style="width: 10%">
+              <col style="width: 8%">
+              <col style="width: 8%">
+              <col style="width: 5%">
+              <col style="width: 5%">
+              <col style="width: 6%">
+              <col style="width: 16%">
+              <col style="width: 8%">
+            </colgroup>
             <thead>
               <tr>
                 <th>Template Name</th>
@@ -1371,11 +1384,13 @@ onBeforeUnmount(() => {
 }
 
 .table-card {
-  overflow: visible;
+  overflow-x: auto;
 }
 
 .table-card > .data-table {
-  overflow: visible;
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1100px;
 }
 
 .table-head {
@@ -1396,9 +1411,11 @@ onBeforeUnmount(() => {
 }
 
 .template-name-cell {
-  min-width: 220px;
   font-weight: 600;
   color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mono-cell {
@@ -1436,8 +1453,12 @@ onBeforeUnmount(() => {
 }
 
 .description-cell {
-  min-width: 260px;
   color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .empty-task-state {
