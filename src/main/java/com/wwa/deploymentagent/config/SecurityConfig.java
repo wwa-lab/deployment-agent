@@ -34,6 +34,7 @@ public class SecurityConfig {
                     session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/deployment-agent/auth/login").permitAll()
+                    .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                     .anyRequest().authenticated())
             .exceptionHandling(ex -> ex
                     .authenticationEntryPoint((request, response, authException) ->

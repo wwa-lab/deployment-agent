@@ -31,6 +31,7 @@ class SecurityTest {
     private static final String TASKS         = "/api/deployment-agent/tasks";
     private static final String CONFIG        = "/api/deployment-agent/config";
     private static final String UPLOAD        = "/api/deployment-agent/upload";
+    private static final String API_DOCS      = "/v3/api-docs";
 
     @Autowired
     private MockMvc mockMvc;
@@ -64,6 +65,13 @@ class SecurityTest {
         mockMvc.perform(get(RELEASE_FLOWS)
                         .header("X-User-Id", "user1"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("apiDocs_missingAuthHeaders_returns200 - OpenAPI docs stay publicly reachable")
+    void apiDocs_missingAuthHeaders_returns200() throws Exception {
+        mockMvc.perform(get(API_DOCS))
+                .andExpect(status().isOk());
     }
 
     // ─── Role-based access: wrong role → 403 ─────────────────────────────────
