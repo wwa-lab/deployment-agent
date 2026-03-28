@@ -40,6 +40,7 @@ const allowedDecisionOptions = ref<DecisionOption[]>(['Approve', 'Reject', 'Skip
 const editingRundown = ref<Request | null>(null)
 const requestActionLoadingId = ref<string | null>(null)
 const refreshingDetail = ref(false)
+const actionError = ref('')
 
 const viewingResult = ref<{ task: Task; result: TaskResult | null; loading: boolean } | null>(null)
 
@@ -78,6 +79,14 @@ function criticalBadgeClass(isCritical: boolean): string {
 
 function criticalLabel(isCritical: boolean): string {
   return isCritical ? 'Y' : 'N'
+}
+
+function clearActionError() {
+  actionError.value = ''
+}
+
+function setActionError(error: unknown, fallback: string) {
+  actionError.value = error instanceof Error ? error.message : fallback
 }
 
 function normalizeIdentity(value: string | null | undefined): string {
@@ -253,13 +262,31 @@ function markRequestFailedDisabledReason(request: Request): string | null {
 
 const submittingAuto = ref<string | null>(null)
 
+function replaceTaskInDetail(updatedTask: Task) {
+  const detail = store.detail
+  if (!detail) return
+
+  for (const request of detail.requests) {
+    const taskIndex = request.tasks.findIndex((task) => task.id === updatedTask.id)
+    if (taskIndex >= 0) {
+      request.tasks.splice(taskIndex, 1, {
+        ...request.tasks[taskIndex],
+        ...updatedTask,
+      })
+      return
+    }
+  }
+}
+
 async function handleSubmitAuto(task: Task) {
+  clearActionError()
   submittingAuto.value = task.id
   try {
-    await submitAutoExecution(task.id)
+    const updatedTask = await submitAutoExecution(task.id)
+    replaceTaskInDetail(updatedTask)
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (error: unknown) {
+    setActionError(error, 'Failed to run the AUTO task.')
   } finally {
     submittingAuto.value = null
   }
@@ -303,12 +330,14 @@ async function openViewResult(task: Task) {
 }
 
 async function onTaskSaved() {
+  clearActionError()
   editingTask.value = null
   taskDialogMode.value = 'edit'
   await store.refreshDetail()
 }
 
 async function onDecisionMade() {
+  clearActionError()
   decidingTask.value = null
   initialDecision.value = null
   allowedDecisionOptions.value = ['Approve', 'Reject', 'Skip']
@@ -322,14 +351,18 @@ function closeDecisionDialog() {
 }
 
 async function onRundownSaved() {
+  clearActionError()
   editingRundown.value = null
   await store.refreshDetail()
 }
 
 async function handleRefreshDetail() {
+  clearActionError()
   refreshingDetail.value = true
   try {
     await store.refreshDetail()
+  } catch (error: unknown) {
+    setActionError(error, 'Failed to refresh the release flow detail.')
   } finally {
     refreshingDetail.value = false
   }
@@ -337,12 +370,13 @@ async function handleRefreshDetail() {
 
 async function handleStartDeployment(request: Request) {
   if (!canStartDeployment(request)) return
+  clearActionError()
   requestActionLoadingId.value = `${request.id}:start`
   try {
     await startRequestDeployment(request.releaseFlowId, request.id)
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (error: unknown) {
+    setActionError(error, 'Failed to start the rundown.')
   } finally {
     requestActionLoadingId.value = null
   }
@@ -350,12 +384,13 @@ async function handleStartDeployment(request: Request) {
 
 async function handleMarkRequestFailed(request: Request) {
   if (!canMarkRequestFailed(request)) return
+  clearActionError()
   requestActionLoadingId.value = `${request.id}:fail`
   try {
     await markRequestFailed(request.releaseFlowId, request.id)
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (error: unknown) {
+    setActionError(error, 'Failed to mark the rundown as failed.')
   } finally {
     requestActionLoadingId.value = null
   }
@@ -373,6 +408,7 @@ async function handleArchiveRundown(request: Request) {
   if (!canEditRundown()) return
   if (!window.confirm(archiveRundownConfirmationMessage(request))) return
 
+  clearActionError()
   requestActionLoadingId.value = `${request.id}:archive`
   try {
     const result = await archiveRequestRundown(request.releaseFlowId, request.id)
@@ -382,8 +418,8 @@ async function handleArchiveRundown(request: Request) {
       return
     }
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (error: unknown) {
+    setActionError(error, 'Failed to archive the rundown.')
   } finally {
     requestActionLoadingId.value = null
   }
@@ -393,13 +429,14 @@ async function handleRestoreRundown(request: Request) {
   if (!canRestoreRundown()) return
   if (!window.confirm(`Restore the ${request.stage} rundown back into the active workflow?`)) return
 
+  clearActionError()
   requestActionLoadingId.value = `${request.id}:restore`
   try {
     await restoreRequestRundown(request.releaseFlowId, request.id)
     await store.fetchList()
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (error: unknown) {
+    setActionError(error, 'Failed to restore the rundown.')
   } finally {
     requestActionLoadingId.value = null
   }
@@ -417,6 +454,7 @@ async function handlePurgeRundown(request: Request) {
   if (!canPurgeRundown(request)) return
   if (!window.confirm(purgeRundownConfirmationMessage(request))) return
 
+  clearActionError()
   requestActionLoadingId.value = `${request.id}:purge`
   try {
     const result = await purgeRequestRundown(request.releaseFlowId, request.id)
@@ -426,8 +464,8 @@ async function handlePurgeRundown(request: Request) {
       return
     }
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (error: unknown) {
+    setActionError(error, 'Failed to delete the archived rundown.')
   } finally {
     requestActionLoadingId.value = null
   }
@@ -694,6 +732,10 @@ watch(() => store.detail, (val) => {
             {{ includeArchivedView ? 'Hide Archived Rundowns' : 'Show Archived Rundowns' }}
           </button>
         </div>
+      </div>
+
+      <div v-if="actionError" class="alert alert-error">
+        {{ actionError }}
       </div>
 
       <!-- Stage tabs -->

@@ -2,9 +2,13 @@ package com.wwa.deploymentagent.domain.task;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
+import com.wwa.deploymentagent.contracts.enums.FlowStatus;
+import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
+import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.errors.ConflictAppException;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.InvalidStateTransitionException;
@@ -32,6 +36,8 @@ class TaskServiceTest {
 
     @Autowired private TaskService taskService;
     @Autowired private TestDataHelper helper;
+    @Autowired private ReleaseFlowRepository releaseFlowRepository;
+    @Autowired private RequestRepository requestRepository;
 
     private ReleaseFlow releaseFlow;
     private Request request;
@@ -178,13 +184,17 @@ class TaskServiceTest {
     // ─── startManualExecution ────────────────────────────────────────────────
 
     @Test
-    @DisplayName("startManualExecution transitions MANUAL task Ready_For_Execution → Executing")
+    @DisplayName("startManualExecution transitions MANUAL task Ready_For_Execution → Executing and recomputes parent statuses")
     void startManualExecution_manualReady_transitionsToExecuting() {
         Task task = createManualTask(TaskStatus.Ready_For_Execution);
 
         Task started = taskService.startManualExecution(task.getId(), ownerUser);
+        Request refreshedRequest = requestRepository.findById(request.getId()).orElseThrow();
+        ReleaseFlow refreshedFlow = releaseFlowRepository.findById(releaseFlow.getId()).orElseThrow();
 
         assertThat(started.getTaskStatus()).isEqualTo(TaskStatus.Executing);
+        assertThat(refreshedRequest.getRequestStatus()).isEqualTo(RequestStatus.Running);
+        assertThat(refreshedFlow.getFlowStatus()).isEqualTo(FlowStatus.Running);
     }
 
     @Test

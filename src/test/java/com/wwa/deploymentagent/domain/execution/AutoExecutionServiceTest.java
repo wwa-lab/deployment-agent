@@ -4,10 +4,14 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.ConfigurationComponentDto;
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
+import com.wwa.deploymentagent.contracts.enums.FlowStatus;
+import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
+import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistory;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryRepository;
@@ -58,6 +62,8 @@ class AutoExecutionServiceTest {
     @Autowired private TestDataHelper helper;
     @Autowired private RestTemplate restTemplate;
     @Autowired private ConfigurationComponentService configurationComponentService;
+    @Autowired private ReleaseFlowRepository releaseFlowRepository;
+    @Autowired private RequestRepository requestRepository;
 
     private ReleaseFlow releaseFlow;
     private Request request;
@@ -79,7 +85,7 @@ class AutoExecutionServiceTest {
     // ─── Success path (Jenkins) ───────────────────────────────────────────────
 
     @Test
-    @DisplayName("AUTO + Ready_For_Execution → task becomes Executing on successful Jenkins submission")
+    @DisplayName("AUTO + Ready_For_Execution → task becomes Executing on successful Jenkins submission and recomputes parent statuses")
     void submitAuto_jenkins_success_transitionsToExecuting() {
         Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
         seedJenkinsConfig();
@@ -87,9 +93,13 @@ class AutoExecutionServiceTest {
         mockJenkinsSuccess();
 
         Task result = autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
+        Request refreshedRequest = requestRepository.findById(request.getId()).orElseThrow();
+        ReleaseFlow refreshedFlow = releaseFlowRepository.findById(releaseFlow.getId()).orElseThrow();
 
         assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Executing);
         assertThat(result.getLatestExecutionId()).isNotNull();
+        assertThat(refreshedRequest.getRequestStatus()).isEqualTo(RequestStatus.Running);
+        assertThat(refreshedFlow.getFlowStatus()).isEqualTo(FlowStatus.Running);
     }
 
     @Test

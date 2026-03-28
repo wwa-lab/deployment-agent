@@ -9,6 +9,7 @@ import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationScope;
 import com.wwa.deploymentagent.domain.decision.ReleaseFlowProgressionService;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.task.*;
 import com.wwa.deploymentagent.errors.ConflictAppException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
@@ -54,6 +55,7 @@ public class AutoExecutionService {
     private final ExecutionTargetResolver targetResolver;
     private final AuditLoggerService auditLogger;
     private final ReleaseFlowProgressionService progressionService;
+    private final ReleaseFlowService releaseFlowService;
     private final TaskService taskService;
 
     @Transactional
@@ -127,6 +129,10 @@ public class AutoExecutionService {
 
         executionHistoryRepository.save(savedHistory);
         Task savedTask = taskRepository.save(task);
+
+        if (result.success()) {
+            releaseFlowService.recomputeAndPersistStatus(task.getRequest().getReleaseFlow().getId());
+        }
 
         // Audit
         Map<String, Object> auditContext = new HashMap<>();

@@ -325,7 +325,7 @@ public class ReleaseFlowService {
         List<Request> requests = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, false);
 
         for (Request req : requests) {
-            List<TaskStatus> taskStatuses = req.getTasks().stream()
+            List<TaskStatus> taskStatuses = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(req.getId()).stream()
                     .map(task -> task.getTaskStatus())
                     .toList();
             RequestStatus newStatus = ReleaseFlowAggregation.aggregateTasksToRequestStatus(taskStatuses);

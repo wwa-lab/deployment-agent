@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed release-detail task execution feedback so clicking `Run` now pushes parent rundown/flow statuses into their current aggregated state as soon as a task enters execution, and the detail page now shows inline API errors instead of failing silently when task/rundown actions are rejected.
 - Aligned the Oracle schema artifacts again by restoring the task-execution sync columns in the fresh-schema baseline script and rewriting the historical `V7` / `V8` / `V9` upgrade SQL into Oracle-compatible DDL so manual database upgrades do not silently drift from the JPA model.
 - Fixed release-flow archive failures caused by platform audit schema drift: audit logging now isolates and swallows commit-time DB errors correctly, and the Oracle upgrade/baseline DDL now adds the missing `agent_name`, `target_type`, `target_id`, and `source_system` columns on `DA_AUDIT_LOG_ENTRY`.
 - Allowed unauthenticated access to Swagger UI and `/v3/api-docs` outside the `local` profile, and made SpringDoc enablement explicit in application config so Oracle-backed backend runs can still open the OpenAPI page for local verification.

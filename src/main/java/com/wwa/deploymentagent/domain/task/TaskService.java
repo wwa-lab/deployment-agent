@@ -5,6 +5,7 @@ import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.errors.ConflictAppException;
 import com.wwa.deploymentagent.errors.InvalidStateTransitionException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
@@ -31,6 +32,7 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final AuditLoggerService auditLogger;
     private final TaskPermissionService taskPermissionService;
+    private final ReleaseFlowService releaseFlowService;
 
     /** Retrieve a task by ID. Throws {@link NotFoundAppException} if not found. */
     @Transactional(readOnly = true)
@@ -160,7 +162,9 @@ public class TaskService {
                             + task.getTaskStatus().name());
         }
 
-        return updateStatus(taskId, TaskStatus.Executing, user, "manual_execution_started");
+        Task started = updateStatus(taskId, TaskStatus.Executing, user, "manual_execution_started");
+        releaseFlowService.recomputeAndPersistStatus(task.getRequest().getReleaseFlow().getId());
+        return started;
     }
 
     /**
