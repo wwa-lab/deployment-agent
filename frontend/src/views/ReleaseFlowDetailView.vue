@@ -1168,11 +1168,25 @@ watch(() => store.detail, (val) => {
               <div class="external-link-row">
                 <span class="badge badge-auto">{{ viewingResult.result.externalSystemType }}</span>
                 <a :href="viewingResult.result.externalJobUrl" target="_blank" rel="noopener" class="external-link">
-                  {{ viewingResult.result.externalJobUrl }}
+                  View Job
                 </a>
                 <span v-if="viewingResult.result.submissionStatus" class="badge" :class="viewingResult.result.submissionStatus === 'SUBMITTED' ? 'badge-completed' : 'badge-failed'">
                   {{ viewingResult.result.submissionStatus }}
                 </span>
+                <span v-if="viewingResult.result.externalStatus" class="badge badge-auto">
+                  {{ viewingResult.result.externalStatus }}
+                </span>
+              </div>
+              <div v-if="viewingResult.result.externalLogUrl || viewingResult.result.externalApprovalUrl" class="external-link-row" style="margin-top:6px; gap:12px">
+                <a v-if="viewingResult.result.externalLogUrl" :href="viewingResult.result.externalLogUrl" target="_blank" rel="noopener" class="external-link">
+                  View Logs
+                </a>
+                <a v-if="viewingResult.result.externalApprovalUrl" :href="viewingResult.result.externalApprovalUrl" target="_blank" rel="noopener" class="external-link external-link-approval">
+                  Approve / Review
+                </a>
+              </div>
+              <div v-if="viewingResult.result.externalStatusMessage" class="submission-error" style="color: inherit; margin-top:4px">
+                {{ viewingResult.result.externalStatusMessage }}
               </div>
               <div v-if="viewingResult.result.submissionMessage && viewingResult.result.submissionStatus === 'FAILED'" class="submission-error">
                 {{ viewingResult.result.submissionMessage }}
@@ -1723,6 +1737,11 @@ watch(() => store.detail, (val) => {
 
 .external-link:hover {
   text-decoration: underline;
+}
+
+.external-link-approval {
+  color: #d97706;
+  font-weight: 600;
 }
 
 .submission-error {

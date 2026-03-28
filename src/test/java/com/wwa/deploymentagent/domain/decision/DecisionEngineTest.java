@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.domain.decision;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
@@ -115,9 +116,9 @@ class DecisionEngineTest {
     // ─── rerun ───────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("rerun: Rejected → Ready_For_Execution and creates execution history")
-    void rerun_rejected_createsExecutionHistory() {
-        Task task = helper.seedTask(request, TaskStatus.Rejected);
+    @DisplayName("rerun: MANUAL Rejected → Ready_For_Execution and pre-creates execution history")
+    void rerun_manualRejected_createsExecutionHistory() {
+        Task task = helper.seedTask(request, TaskStatus.Rejected, ExecutionType.MANUAL);
 
         decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null);
 
@@ -127,8 +128,20 @@ class DecisionEngineTest {
     }
 
     @Test
-    @DisplayName("rerun: Failed → Ready_For_Execution and creates execution history")
-    void rerun_failed_createsExecutionHistory() {
+    @DisplayName("rerun: AUTO Rejected → Ready_For_Execution without pre-creating execution history")
+    void rerun_autoRejected_doesNotPreCreateExecutionHistory() {
+        Task task = helper.seedTask(request, TaskStatus.Rejected, ExecutionType.AUTO);
+
+        decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null);
+
+        Task updated = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Ready_For_Execution);
+        assertThat(updated.getLatestExecutionId()).isNull();
+    }
+
+    @Test
+    @DisplayName("rerun: Failed → Ready_For_Execution")
+    void rerun_failed_transitionsToReadyForExecution() {
         Task task = helper.seedTask(request, TaskStatus.Failed);
 
         decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null);

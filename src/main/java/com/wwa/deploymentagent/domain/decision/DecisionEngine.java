@@ -2,6 +2,7 @@ package com.wwa.deploymentagent.domain.decision;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
+import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
 import com.wwa.deploymentagent.domain.task.Task;
@@ -71,7 +72,11 @@ public class DecisionEngine {
                             task.getTaskStatus().name(), TaskStatus.Ready_For_Execution.name(), "Task");
                 }
                 taskService.updateStatus(taskId, TaskStatus.Ready_For_Execution, user, comment);
-                executionHistoryService.createExecution(taskId);
+                // Only pre-create the execution record for MANUAL tasks.
+                // AUTO tasks create their own execution record in AutoExecutionService.submitAutoExecution.
+                if (task.getExecutionType() == ExecutionType.MANUAL) {
+                    executionHistoryService.createExecution(taskId);
+                }
             }
             case skip -> {
                 if (task.getTaskStatus() != TaskStatus.Pending

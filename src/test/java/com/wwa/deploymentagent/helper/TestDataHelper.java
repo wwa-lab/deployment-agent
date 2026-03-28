@@ -71,13 +71,23 @@ public class TestDataHelper {
 
     @Transactional
     public Task seedTask(Request request, TaskStatus status, boolean critical) {
+        return seedTask(request, status, critical, ExecutionType.AUTO);
+    }
+
+    @Transactional
+    public Task seedTask(Request request, TaskStatus status, ExecutionType executionType) {
+        return seedTask(request, status, false, executionType);
+    }
+
+    @Transactional
+    public Task seedTask(Request request, TaskStatus status, boolean critical, ExecutionType executionType) {
         Task task = new Task();
         task.setRequest(request);
         task.setTaskGroupId("TG-001");
         task.setTaskGroupName("Deploy App");
         task.setStepSeq(1);
         task.setTaskName("deploy-app");
-        task.setExecutionType(ExecutionType.AUTO);
+        task.setExecutionType(executionType);
         task.setCritical(critical);
         task.setTaskStatus(status);
         task.setInputParameters(java.util.Map.of("script", "deploy.sh", "parameters", "--env staging"));

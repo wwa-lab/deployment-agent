@@ -53,6 +53,10 @@ export async function getTaskResult(
     submittedAt: selectedExecution.submittedAt,
     submissionStatus: selectedExecution.submissionStatus,
     submissionMessage: selectedExecution.submissionMessage,
+    externalStatus: selectedExecution.externalStatus,
+    externalStatusMessage: selectedExecution.externalStatusMessage,
+    externalLogUrl: selectedExecution.externalLogUrl,
+    externalApprovalUrl: selectedExecution.externalApprovalUrl,
   }
 }
 

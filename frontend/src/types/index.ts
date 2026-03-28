@@ -86,6 +86,11 @@ export interface TaskExecutionHistory {
   submittedAt?: string
   submissionStatus?: string
   submissionMessage?: string
+  externalStatus?: string
+  externalStatusMessage?: string
+  externalLogUrl?: string
+  externalApprovalUrl?: string
+  lastSyncedAt?: string
 }
 
 // Request
@@ -283,6 +288,10 @@ export interface TaskResult {
   submittedAt?: string
   submissionStatus?: string
   submissionMessage?: string
+  externalStatus?: string
+  externalStatusMessage?: string
+  externalLogUrl?: string
+  externalApprovalUrl?: string
 }
 
 // Paginated
