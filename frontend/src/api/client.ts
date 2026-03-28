@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '../router'
+import { useUserStore } from '../stores/user'
 
 const apiClient = axios.create({
   baseURL: '/api/deployment-agent',
@@ -13,7 +14,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Redirect to login on 401 (session expired or not authenticated)
+      // Clear stale auth state so the router guard sends the user to login
+      const userStore = useUserStore()
+      userStore.isAuthenticated = false
       const currentPath = window.location.pathname
       if (currentPath !== '/login') {
         router.push('/login')
