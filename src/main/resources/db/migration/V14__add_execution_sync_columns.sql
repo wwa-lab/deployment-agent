@@ -1,4 +1,4 @@
--- V3: Add external status synchronization columns to DA_TASK_EXECUTION_HISTORY
+-- V14: Add external status synchronization columns to DA_TASK_EXECUTION_HISTORY
 -- These columns support polling-based completion sync (EXE-001).
 -- All columns are nullable (MANUAL tasks and unsynced rows have NULLs).
 
