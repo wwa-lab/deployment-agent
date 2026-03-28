@@ -85,8 +85,9 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
                     || response.getStatusCode().value() == 303) {
                 String queueUrl = response.getHeaders().getFirst("Location");
                 String executionId = queueUrl != null ? extractQueueId(queueUrl) : "unknown";
-                String jobUrl = queueUrl != null ? queueUrl : (baseUrl + "/job/" + jobPath);
-                String logUrl = baseUrl + "/job/" + jobPath + "/lastBuild/consoleText";
+                // Store the job page URL (not queue URL) so "View Job" opens the right page
+                String jobUrl = baseUrl + "/job/" + jobPath;
+                String logUrl = jobUrl + "/lastBuild/consoleText";
                 return AutoSubmissionResult.ok(executionId, jobUrl, logUrl, null);
             } else {
                 return AutoSubmissionResult.failure(
@@ -118,39 +119,37 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
                 return AutoPollResult.unknown("No external job URL recorded; cannot poll");
             }
 
-            // Phase 1: Resolve queue item to build URL
-            if (jobUrl.contains("/queue/item/")) {
-                String queueApiUrl = trimTrailingSlash(jobUrl) + "/api/json";
-                ResponseEntity<Map> queueResponse = getJson(queueApiUrl, auth, Map.class);
-                if (queueResponse.getStatusCode().is2xxSuccessful() && queueResponse.getBody() != null) {
-                    Map<String, Object> body = queueResponse.getBody();
-                    Object executable = body.get("executable");
-                    if (executable instanceof Map) {
-                        String buildUrl = (String) ((Map<?, ?>) executable).get("url");
-                        if (buildUrl != null) {
-                            // Update jobUrl to the build URL for subsequent polls
-                            jobUrl = buildUrl;
+            // Phase 1: Resolve queue item to build URL using externalExecutionId (queue item number)
+            String executionId = executionHistory.getExternalExecutionId();
+            String buildUrl = null;
+
+            if (executionId != null && !executionId.equals("unknown")) {
+                String queueApiUrl = baseUrl + "/queue/item/" + executionId + "/api/json";
+                try {
+                    ResponseEntity<Map> queueResponse = getJson(queueApiUrl, auth, Map.class);
+                    if (queueResponse.getStatusCode().is2xxSuccessful() && queueResponse.getBody() != null) {
+                        Map<String, Object> body = queueResponse.getBody();
+                        Object executable = body.get("executable");
+                        if (executable instanceof Map) {
+                            buildUrl = (String) ((Map<?, ?>) executable).get("url");
                         } else {
+                            Object cancelled = body.get("cancelled");
+                            if (Boolean.TRUE.equals(cancelled)) {
+                                return AutoPollResult.failed(ExternalStatus.ABORTED,
+                                        "Jenkins queue item was cancelled", jobUrl, null);
+                            }
                             return AutoPollResult.running(ExternalStatus.QUEUED, "Waiting in Jenkins queue", jobUrl, null);
                         }
-                    } else {
-                        // Item cancelled or not yet assigned
-                        Object cancelled = body.get("cancelled");
-                        if (Boolean.TRUE.equals(cancelled)) {
-                            return AutoPollResult.failed(ExternalStatus.ABORTED,
-                                    "Jenkins queue item was cancelled", jobUrl, null);
-                        }
-                        return AutoPollResult.running(ExternalStatus.QUEUED, "Waiting in Jenkins queue", jobUrl, null);
                     }
-                } else {
-                    return AutoPollResult.unknown("Could not poll Jenkins queue item; HTTP "
-                            + queueResponse.getStatusCode().value());
+                } catch (Exception e) {
+                    log.debug("Queue item {} no longer available, polling job URL directly", executionId);
                 }
             }
 
-            // Phase 2: Poll build status
-            String buildApiUrl = trimTrailingSlash(jobUrl) + "/api/json";
-            String logUrl = trimTrailingSlash(jobUrl) + "/consoleText";
+            // Phase 2: Poll build status (use resolved build URL or fall back to job URL)
+            String pollUrl = buildUrl != null ? buildUrl : jobUrl;
+            String buildApiUrl = trimTrailingSlash(pollUrl) + "/api/json";
+            String logUrl = trimTrailingSlash(pollUrl) + "/consoleText";
 
             ResponseEntity<Map> buildResponse = getJson(buildApiUrl, auth, Map.class);
             if (!buildResponse.getStatusCode().is2xxSuccessful() || buildResponse.getBody() == null) {
@@ -164,8 +163,8 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
 
             if (Boolean.TRUE.equals(building)) {
                 // Check for pending input actions (pipeline paused at an `input` step)
-                if (hasPendingInputActions(jobUrl, auth)) {
-                    String approvalUrl = trimTrailingSlash(jobUrl) + "/input";
+                if (hasPendingInputActions(pollUrl, auth)) {
+                    String approvalUrl = trimTrailingSlash(pollUrl) + "/input";
                     return new AutoPollResult(
                             ExternalStatus.WAITING_APPROVAL, false, ExecutionStatus.Running,
                             "Build is paused — waiting for approval in Jenkins",
