@@ -15,6 +15,7 @@ import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
 import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
@@ -381,15 +382,18 @@ public class ReleaseFlowService {
             throw new ValidationAppException("Only pending requests can be started.");
         }
 
-        request.getTasks().stream()
+        List<Task> pendingTasks = request.getTasks().stream()
                 .filter(task -> task.getTaskStatus() == TaskStatus.Pending)
-                .findFirst()
-                .ifPresentOrElse(task -> {
-                    task.setTaskStatus(TaskStatus.Ready_For_Execution);
-                    taskRepository.save(task);
-                }, () -> {
-                    throw new ValidationAppException("Request has no pending tasks to start.");
-                });
+                .toList();
+
+        if (pendingTasks.isEmpty()) {
+            throw new ValidationAppException("Request has no pending tasks to start.");
+        }
+
+        pendingTasks.forEach(task -> {
+            task.setTaskStatus(TaskStatus.Ready_For_Execution);
+            taskRepository.save(task);
+        });
 
         recomputeAndPersistStatus(releaseFlowId);
         Request refreshed = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
