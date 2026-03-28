@@ -1181,6 +1181,9 @@ watch(() => store.detail, (val) => {
               <div class="result-panel-title">Logs</div>
               <div class="external-link-row">
                 <span class="badge badge-auto">{{ viewingResult.result.externalSystemType }}</span>
+                <a v-if="viewingResult.result.externalJobUrl" :href="viewingResult.result.externalJobUrl" target="_blank" rel="noopener" class="external-link">
+                  View Job
+                </a>
                 <a :href="viewingResult.result.externalLogUrl || viewingResult.result.externalJobUrl" target="_blank" rel="noopener" class="external-link">
                   View Logs
                 </a>
