@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.execution;
 
+import com.wwa.deploymentagent.contracts.enums.ExecutionStatus;
 import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationScope;
@@ -146,8 +147,8 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
                 }
             }
 
-            // Phase 2: Poll build status (use resolved build URL or fall back to job URL)
-            String pollUrl = buildUrl != null ? buildUrl : jobUrl;
+            // Phase 2: Poll build status (use resolved build URL or fall back to lastBuild)
+            String pollUrl = buildUrl != null ? buildUrl : (trimTrailingSlash(jobUrl) + "/lastBuild");
             String buildApiUrl = trimTrailingSlash(pollUrl) + "/api/json";
             String logUrl = trimTrailingSlash(pollUrl) + "/consoleText";
 
