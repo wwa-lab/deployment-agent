@@ -46,7 +46,12 @@ public class StubTeamBookAuthenticationProvider implements TeamBookAuthenticatio
         if (employeeId == null || password == null || password.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(DIRECTORY_EMPLOYEE_MAP.get(employeeId));
+        // Accept hardcoded employees, or fall back to any employee ID (dev/local stub)
+        TeamBookEmployee known = DIRECTORY_EMPLOYEE_MAP.get(employeeId);
+        if (known != null) {
+            return Optional.of(known);
+        }
+        return Optional.of(new TeamBookEmployee(employeeId, employeeId, null));
     }
 
     @Override

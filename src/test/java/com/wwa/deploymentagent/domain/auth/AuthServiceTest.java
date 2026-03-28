@@ -115,11 +115,10 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("unknown employee → throws UnauthorizedAppException")
-    void authenticate_unknownEmployee_throwsUnauthorized() {
+    @DisplayName("unknown employee without access grant → throws AccessNotGrantedAppException")
+    void authenticate_unknownEmployee_throwsAccessNotGranted() {
         assertThatThrownBy(() -> authService.authenticate("unknown", "password"))
-                .isInstanceOf(UnauthorizedAppException.class)
-                .hasMessageContaining("Invalid");
+                .isInstanceOf(AccessNotGrantedAppException.class);
     }
 
     @Test

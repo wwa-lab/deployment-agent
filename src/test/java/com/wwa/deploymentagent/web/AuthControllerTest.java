@@ -71,14 +71,14 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /auth/login with invalid credentials → 401")
-    void login_invalidCredentials_returns401() throws Exception {
+    @DisplayName("POST /auth/login with unknown user (no access grant) → 403")
+    void login_invalidCredentials_returns403() throws Exception {
         LoginRequestDto body = new LoginRequestDto("unknown-user", "password");
 
         mockMvc.perform(post("/api/deployment-agent/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isForbidden());
     }
 
     @Test

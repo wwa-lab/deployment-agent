@@ -122,7 +122,9 @@ public class AccessGrantService {
             throw new AccessNotGrantedAppException();
         }
 
-        grant.setDisplayNameSnapshot(employee.displayName());
+        // Prefer TeamBook display name; fall back to the admin-maintained grant snapshot
+        String displayName = resolveDisplayName(employee, grant);
+        grant.setDisplayNameSnapshot(displayName);
         grant.setLastLoginAt(Instant.now());
         accessGrantRepository.save(grant);
 
@@ -132,7 +134,7 @@ public class AccessGrantService {
                 roles.get(0),
                 roles,
                 permissions,
-                employee.displayName(),
+                displayName,
                 List.copyOf(grant.getScopeGrants())
         );
     }
@@ -383,6 +385,20 @@ public class AccessGrantService {
         } catch (IllegalArgumentException ex) {
             throw new ValidationAppException("Invalid role assignment: " + ex.getMessage());
         }
+    }
+
+    private String resolveDisplayName(TeamBookEmployee employee, AccessGrant grant) {
+        String teamBookName = employee.displayName();
+        // If TeamBook provides a real name (not just the employeeId fallback), use it
+        if (teamBookName != null && !teamBookName.isBlank()
+                && !teamBookName.equals(employee.employeeId())) {
+            return teamBookName;
+        }
+        // Otherwise keep the admin-maintained display name from the grant
+        if (grant.getDisplayNameSnapshot() != null && !grant.getDisplayNameSnapshot().isBlank()) {
+            return grant.getDisplayNameSnapshot();
+        }
+        return employee.employeeId();
     }
 
     private List<String> normalizeRoles(Collection<String> rawRoles) {
