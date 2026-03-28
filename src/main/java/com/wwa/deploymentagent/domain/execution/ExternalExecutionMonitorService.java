@@ -154,6 +154,15 @@ public class ExternalExecutionMonitorService {
         }
         history.setLastSyncedAt(now);
 
+        // Sync denormalized externalStatus onto the task for UI rendering
+        if (poll.externalStatus() != null && poll.externalStatus() != ExternalStatus.UNKNOWN) {
+            Task ownerTask = taskRepository.findById(history.getTask().getId()).orElse(null);
+            if (ownerTask != null && ownerTask.getExternalStatus() != poll.externalStatus()) {
+                ownerTask.setExternalStatus(poll.externalStatus());
+                taskRepository.save(ownerTask);
+            }
+        }
+
         if (!poll.terminal()) {
             executionHistoryRepository.save(history);
             return;
@@ -189,6 +198,7 @@ public class ExternalExecutionMonitorService {
 
         if (externalStatus == ExternalStatus.SUCCEEDED) {
             task.setTaskStatus(TaskStatus.Awaiting_Review);
+            task.setExternalStatus(externalStatus);
             task.setCurrentResultSummary(poll.resultSummary());
             taskRepository.save(task);
             log.info("Monitor: execution {} SUCCEEDED → task {} now Awaiting_Review",
@@ -196,6 +206,7 @@ public class ExternalExecutionMonitorService {
         } else {
             // FAILED, ABORTED, TIMED_OUT
             task.setTaskStatus(TaskStatus.Failed);
+            task.setExternalStatus(externalStatus);
             task.setEndTime(now);
             taskRepository.save(task);
             log.info("Monitor: execution {} {} → task {} now Failed",

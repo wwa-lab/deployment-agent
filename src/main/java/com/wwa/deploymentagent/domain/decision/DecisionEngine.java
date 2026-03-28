@@ -72,10 +72,13 @@ public class DecisionEngine {
                             task.getTaskStatus().name(), TaskStatus.Ready_For_Execution.name(), "Task");
                 }
                 taskService.updateStatus(taskId, TaskStatus.Ready_For_Execution, user, comment);
-                // Only pre-create the execution record for MANUAL tasks.
-                // AUTO tasks create their own execution record in AutoExecutionService.submitAutoExecution.
                 if (task.getExecutionType() == ExecutionType.MANUAL) {
+                    // Pre-create the execution record for MANUAL tasks.
                     executionHistoryService.createExecution(taskId);
+                } else {
+                    // AUTO tasks create their own record in AutoExecutionService.submitAutoExecution.
+                    // Clear stale latestExecutionId so View Result is disabled until Run is clicked.
+                    taskService.clearLatestExecutionId(taskId);
                 }
             }
             case skip -> {

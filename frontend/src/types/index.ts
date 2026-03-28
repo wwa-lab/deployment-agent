@@ -65,6 +65,7 @@ export interface Task {
   plannedEndTime?: string
   currentResultSummary?: Record<string, unknown>
   latestExecutionId?: string
+  externalStatus?: string
   startTime?: string
   endTime?: string
   lastUpdatedAt?: string

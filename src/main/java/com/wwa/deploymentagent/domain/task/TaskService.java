@@ -182,6 +182,17 @@ public class TaskService {
         return save(task);
     }
 
+    /**
+     * Clear latestExecutionId and externalStatus so View Result is disabled until a new execution is created.
+     */
+    @Transactional
+    public void clearLatestExecutionId(String taskId) {
+        Task task = getById(taskId);
+        task.setLatestExecutionId(null);
+        task.setExternalStatus(null);
+        save(task);
+    }
+
     public void assertTaskRequestActive(Task task) {
         if (task.getRequest().getArchivedAt() != null
                 || task.getRequest().getReleaseFlow().getArchivedAt() != null) {

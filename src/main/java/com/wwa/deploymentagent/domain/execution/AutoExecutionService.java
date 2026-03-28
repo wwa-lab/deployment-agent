@@ -102,6 +102,7 @@ public class AutoExecutionService {
         // Transition task to Executing
         task.setTaskStatus(TaskStatus.Executing);
         task.setLatestExecutionId(savedHistory.getId());
+        task.setExternalStatus(ExternalStatus.QUEUED);
         task.setStartTime(Instant.now());
 
         // Call external system
@@ -124,6 +125,7 @@ public class AutoExecutionService {
             savedHistory.setExternalStatusMessage(result.message());
             savedHistory.setEndTime(Instant.now());
             task.setTaskStatus(TaskStatus.Failed);
+            task.setExternalStatus(ExternalStatus.FAILED);
             task.setEndTime(Instant.now());
         }
 

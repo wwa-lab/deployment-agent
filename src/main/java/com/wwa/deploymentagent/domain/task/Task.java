@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.domain.task;
 
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
+import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.util.JsonAttributeConverter;
@@ -149,6 +150,11 @@ public class Task {
     /** References the id of the most recent TaskExecutionHistory record. */
     @Column(name = "latest_execution_id", length = 36)
     private String latestExecutionId;
+
+    /** Denormalized external execution state, synced by monitor and auto-execution service. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "external_status", length = 50)
+    private ExternalStatus externalStatus;
 
     /** Actual start time populated by the Execution Service (NOT from template). */
     @Column(name = "start_time")

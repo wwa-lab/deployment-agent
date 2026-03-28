@@ -1035,6 +1035,12 @@ watch(() => store.detail, (val) => {
                   <span class="badge" :class="statusBadgeClass(task.taskStatus)">
                     {{ task.taskStatus }}
                   </span>
+                  <span v-if="task.externalStatus === 'WAITING_APPROVAL'" class="badge badge-approval" title="This job is paused and waiting for approval in the external platform">
+                    Needs Approval
+                  </span>
+                  <span v-else-if="task.externalStatus && task.taskStatus === 'Executing'" class="badge badge-external-status">
+                    {{ task.externalStatus }}
+                  </span>
                 </td>
                 <td>{{ task.owner ?? '—' }}</td>
                 <td>
@@ -1712,6 +1718,25 @@ watch(() => store.detail, (val) => {
   margin-top: 12px;
   font-size: 13px;
   color: #64748b;
+}
+
+.badge-approval {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  font-weight: 600;
+  animation: pulse-approval 2s infinite;
+}
+
+@keyframes pulse-approval {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.badge-external-status {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
 }
 
 .approval-reminder {

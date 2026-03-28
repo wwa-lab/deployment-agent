@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.contracts.dto;
 
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
+import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.task.Task;
 
@@ -26,6 +27,7 @@ public record TaskDto(
         Instant plannedEndTime,
         Map<String, Object> currentResultSummary,
         String latestExecutionId,
+        ExternalStatus externalStatus,
         long version
 ) {
     public static TaskDto from(Task task) {
@@ -52,6 +54,7 @@ public record TaskDto(
                 task.getPlannedEndTime(),
                 task.getCurrentResultSummary(),
                 task.getLatestExecutionId(),
+                task.getExternalStatus(),
                 task.getVersion() != null ? task.getVersion() : 0L
         );
     }
