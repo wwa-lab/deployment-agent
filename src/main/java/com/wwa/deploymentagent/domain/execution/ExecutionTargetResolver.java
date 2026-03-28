@@ -107,11 +107,13 @@ public class ExecutionTargetResolver {
     }
 
     private static boolean isAnsibleJobTemplateUrl(String url) {
-        return url.contains("/api/v2/job_templates/");
+        return url.contains("/api/v2/job_templates/")
+                || url.contains("/templates/job_template/");
     }
 
     private static boolean isAnsibleWorkflowUrl(String url) {
-        return url.contains("/api/v2/workflow_job_templates/");
+        return url.contains("/api/v2/workflow_job_templates/")
+                || url.contains("/templates/workflow_job_template/");
     }
 
     private static String extractExplicitSystem(Map<String, Object> params) {
@@ -150,20 +152,27 @@ public class ExecutionTargetResolver {
 
     /**
      * Extracts the template ID from an Ansible AWX URL.
-     * E.g. {@code http://awx/api/v2/job_templates/42/launch/} → {@code 42}
+     * Supports both API URLs and UI URLs:
+     * <ul>
+     *   <li>{@code http://awx/api/v2/job_templates/42/launch/} → {@code 42}</li>
+     *   <li>{@code http://awx/#/templates/job_template/42/details} → {@code 42}</li>
+     * </ul>
      */
     static String extractAnsibleTemplateId(String url) {
-        // Pattern: .../job_templates/{id}/... or .../workflow_job_templates/{id}/...
         String[] parts = url.split("/");
         boolean nextIsId = false;
         for (String part : parts) {
-            if (nextIsId && !part.isBlank() && !part.equals("launch")) {
+            if (nextIsId && !part.isBlank()
+                    && !"launch".equals(part) && !"details".equals(part)) {
                 return part.replaceAll("[^0-9a-zA-Z_\\-]", "");
             }
-            if ("job_templates".equals(part) || "workflow_job_templates".equals(part)) {
+            // API: .../job_templates/{id}/... or .../workflow_job_templates/{id}/...
+            // UI:  .../job_template/{id}/... or .../workflow_job_template/{id}/...
+            if ("job_templates".equals(part) || "workflow_job_templates".equals(part)
+                    || "job_template".equals(part) || "workflow_job_template".equals(part)) {
                 nextIsId = true;
             }
         }
-        return url; // fallback: return raw URL if pattern not matched
+        return url;
     }
 }
