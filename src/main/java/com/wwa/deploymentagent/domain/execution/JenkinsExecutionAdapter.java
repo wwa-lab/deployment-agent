@@ -81,7 +81,8 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
 
             ResponseEntity<String> response = restTemplate.postForEntity(buildUrl, request, String.class);
 
-            if (response.getStatusCode().is2xxSuccessful()) {
+            if (response.getStatusCode().is2xxSuccessful()
+                    || response.getStatusCode().value() == 303) {
                 String queueUrl = response.getHeaders().getFirst("Location");
                 String executionId = queueUrl != null ? extractQueueId(queueUrl) : "unknown";
                 String jobUrl = queueUrl != null ? queueUrl : (baseUrl + "/job/" + jobPath);
@@ -162,6 +163,14 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
             String result = (String) build.get("result");
 
             if (Boolean.TRUE.equals(building)) {
+                // Check for pending input actions (pipeline paused at an `input` step)
+                if (hasPendingInputActions(jobUrl, auth)) {
+                    String approvalUrl = trimTrailingSlash(jobUrl) + "/input";
+                    return new AutoPollResult(
+                            ExternalStatus.WAITING_APPROVAL, false, ExecutionStatus.Running,
+                            "Build is paused — waiting for approval in Jenkins",
+                            null, jobUrl, logUrl, approvalUrl, null, null, java.time.Instant.now());
+                }
                 return AutoPollResult.running(ExternalStatus.RUNNING, "Build is running", jobUrl, logUrl);
             }
 
@@ -174,6 +183,20 @@ public class JenkinsExecutionAdapter implements AutoExecutionAdapter {
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private boolean hasPendingInputActions(String buildUrl, String auth) {
+        try {
+            String inputUrl = trimTrailingSlash(buildUrl) + "/wfapi/pendingInputActions";
+            ResponseEntity<java.util.List> response = getJson(inputUrl, auth, java.util.List.class);
+            return response.getStatusCode().is2xxSuccessful()
+                    && response.getBody() != null
+                    && !response.getBody().isEmpty();
+        } catch (Exception e) {
+            log.debug("Could not check pending input actions for {}: {}", buildUrl, e.getMessage());
+            return false;
+        }
+    }
 
     private AutoPollResult mapJenkinsResult(String result, String jobUrl, String logUrl) {
         if (result == null) {

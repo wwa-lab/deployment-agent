@@ -1163,12 +1163,20 @@ watch(() => store.detail, (val) => {
               <div class="result-panel-title">Logs</div>
               <pre class="result-pre log-pre">{{ viewingResult.result.resultLogs }}</pre>
             </div>
-            <div v-if="viewingResult.result.externalJobUrl" class="external-link-section">
-              <div class="result-panel-title">External Job</div>
+            <div v-if="viewingResult.result.externalStatus === 'WAITING_APPROVAL'" class="approval-reminder">
+              <div class="approval-reminder-text">
+                This job is paused and waiting for approval in {{ viewingResult.result.externalSystemType }}.
+              </div>
+              <a :href="viewingResult.result.externalApprovalUrl || viewingResult.result.externalJobUrl" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
+                Open {{ viewingResult.result.externalSystemType }} to Approve
+              </a>
+            </div>
+            <div v-if="viewingResult.result.externalLogUrl || viewingResult.result.externalJobUrl" class="external-link-section">
+              <div class="result-panel-title">Logs</div>
               <div class="external-link-row">
                 <span class="badge badge-auto">{{ viewingResult.result.externalSystemType }}</span>
-                <a :href="viewingResult.result.externalJobUrl" target="_blank" rel="noopener" class="external-link">
-                  View Job
+                <a :href="viewingResult.result.externalLogUrl || viewingResult.result.externalJobUrl" target="_blank" rel="noopener" class="external-link">
+                  View Logs
                 </a>
                 <span v-if="viewingResult.result.submissionStatus" class="badge" :class="viewingResult.result.submissionStatus === 'SUBMITTED' ? 'badge-completed' : 'badge-failed'">
                   {{ viewingResult.result.submissionStatus }}
@@ -1176,14 +1184,6 @@ watch(() => store.detail, (val) => {
                 <span v-if="viewingResult.result.externalStatus" class="badge badge-auto">
                   {{ viewingResult.result.externalStatus }}
                 </span>
-              </div>
-              <div v-if="viewingResult.result.externalLogUrl || viewingResult.result.externalApprovalUrl" class="external-link-row" style="margin-top:6px; gap:12px">
-                <a v-if="viewingResult.result.externalLogUrl" :href="viewingResult.result.externalLogUrl" target="_blank" rel="noopener" class="external-link">
-                  View Logs
-                </a>
-                <a v-if="viewingResult.result.externalApprovalUrl" :href="viewingResult.result.externalApprovalUrl" target="_blank" rel="noopener" class="external-link external-link-approval">
-                  Approve / Review
-                </a>
               </div>
               <div v-if="viewingResult.result.externalStatusMessage" class="submission-error" style="color: inherit; margin-top:4px">
                 {{ viewingResult.result.externalStatusMessage }}
@@ -1712,6 +1712,24 @@ watch(() => store.detail, (val) => {
   margin-top: 12px;
   font-size: 13px;
   color: #64748b;
+}
+
+.approval-reminder {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.approval-reminder-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #92400e;
 }
 
 .external-link-section {

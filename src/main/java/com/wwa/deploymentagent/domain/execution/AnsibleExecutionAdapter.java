@@ -147,12 +147,15 @@ public class AnsibleExecutionAdapter implements AutoExecutionAdapter {
 
             ExternalStatus externalStatus = mapAnsibleStatus(status);
 
-            if (externalStatus == ExternalStatus.WAITING_APPROVAL) {
+            // For running workflow jobs, check if an approval node is pending
+            if (externalStatus == ExternalStatus.RUNNING && isWorkflow) {
                 String approvalUrl = resolveApprovalUrl(baseUrl, token, executionId);
-                return new AutoPollResult(
-                        ExternalStatus.WAITING_APPROVAL, false, com.wwa.deploymentagent.contracts.enums.ExecutionStatus.Running,
-                        "Waiting for approval in Ansible workflow",
-                        null, jobUrl, logUrl, approvalUrl, null, null, java.time.Instant.now());
+                if (approvalUrl != null) {
+                    return new AutoPollResult(
+                            ExternalStatus.WAITING_APPROVAL, false, com.wwa.deploymentagent.contracts.enums.ExecutionStatus.Running,
+                            "Workflow is paused — waiting for approval in Ansible",
+                            null, jobUrl, logUrl, approvalUrl, null, null, java.time.Instant.now());
+                }
             }
 
             if (externalStatus.isTerminal()) {
