@@ -9,12 +9,12 @@ import com.wwa.deploymentagent.domain.task.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * AuditLoggerService – centralises audit logging.
@@ -31,14 +31,14 @@ public class AuditLoggerService {
     private final AuditLogRepository auditLogRepository;
     private final RequestRepository requestRepository;
     private final TaskRepository taskRepository;
+    private final PlatformTransactionManager transactionManager;
 
     /**
      * Appends an audit log entry.
      *
-     * <p>Uses {@code REQUIRES_NEW} propagation so that the audit write succeeds or fails
-     * independently of the outer transaction. Failures are swallowed with a log warning.
+     * <p>Uses an explicit {@code REQUIRES_NEW} transaction so audit failures stay isolated
+     * from the calling business transaction, including commit-time/flush-time failures.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(UserContext user,
                     AuditActionType actionType,
                     String releaseFlowId,
@@ -46,22 +46,29 @@ public class AuditLoggerService {
                     String taskId,
                     Map<String, Object> context) {
         try {
-            ScopeSnapshot scope = resolveScope(context, requestId, taskId);
-            AuditLogEntry entry = new AuditLogEntry();
-            entry.setOperatorId(user.userId());
-            entry.setOperatorRole(user.role());
-            entry.setActionType(actionType);
-            entry.setReleaseFlowId(releaseFlowId);
-            entry.setRequestId(requestId);
-            entry.setTaskId(taskId);
-            entry.setApplication(scope.application());
-            entry.setSnowGroup(scope.snowGroup());
-            entry.setAgent(scope.agent());
-            // Platform audit standard fields (WWA-009)
-            entry.setAgentName("deployment-agent");
-            entry.setSourceSystem("wwa-api");
-            entry.setContextPayload(enrichContext(context, scope));
-            auditLogRepository.save(entry);
+            TransactionTemplate tx = new TransactionTemplate(transactionManager);
+            tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            tx.executeWithoutResult(status -> {
+                ScopeSnapshot scope = resolveScope(context, requestId, taskId);
+                TargetSnapshot target = resolveTarget(releaseFlowId, requestId, taskId);
+                AuditLogEntry entry = new AuditLogEntry();
+                entry.setOperatorId(user.userId());
+                entry.setOperatorRole(user.role());
+                entry.setActionType(actionType);
+                entry.setReleaseFlowId(releaseFlowId);
+                entry.setRequestId(requestId);
+                entry.setTaskId(taskId);
+                entry.setApplication(scope.application());
+                entry.setSnowGroup(scope.snowGroup());
+                entry.setAgent(scope.agent());
+                // Platform audit standard fields (WWA-009)
+                entry.setAgentName("deployment-agent");
+                entry.setSourceSystem("wwa-api");
+                entry.setTargetType(target.targetType());
+                entry.setTargetId(target.targetId());
+                entry.setContextPayload(enrichContext(context, scope));
+                auditLogRepository.saveAndFlush(entry);
+            });
         } catch (Exception ex) {
             // Audit failure must not propagate to caller.
             log.warn("[AuditLoggerService] Failed to write audit entry for action={} user={}: {}",
@@ -78,6 +85,19 @@ public class AuditLoggerService {
     public void log(UserContext user, AuditActionType actionType,
                     String releaseFlowId, String requestId, String taskId) {
         log(user, actionType, releaseFlowId, requestId, taskId, null);
+    }
+
+    private TargetSnapshot resolveTarget(String releaseFlowId, String requestId, String taskId) {
+        if (taskId != null && !taskId.isBlank()) {
+            return new TargetSnapshot("Task", taskId);
+        }
+        if (requestId != null && !requestId.isBlank()) {
+            return new TargetSnapshot("Request", requestId);
+        }
+        if (releaseFlowId != null && !releaseFlowId.isBlank()) {
+            return new TargetSnapshot("ReleaseFlow", releaseFlowId);
+        }
+        return TargetSnapshot.empty();
     }
 
     private ScopeSnapshot resolveScope(Map<String, Object> context, String requestId, String taskId) {
@@ -177,6 +197,12 @@ public class AuditLoggerService {
 
         private static String firstNonBlank(String primary, String fallback) {
             return primary != null ? primary : fallback;
+        }
+    }
+
+    private record TargetSnapshot(String targetType, String targetId) {
+        static TargetSnapshot empty() {
+            return new TargetSnapshot(null, null);
         }
     }
 }

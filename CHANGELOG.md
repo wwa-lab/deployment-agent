@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed release-flow archive failures caused by platform audit schema drift: audit logging now isolates and swallows commit-time DB errors correctly, and the Oracle upgrade/baseline DDL now adds the missing `agent_name`, `target_type`, `target_id`, and `source_system` columns on `DA_AUDIT_LOG_ENTRY`.
 - Allowed unauthenticated access to Swagger UI and `/v3/api-docs` outside the `local` profile, and made SpringDoc enablement explicit in application config so Oracle-backed backend runs can still open the OpenAPI page for local verification.
 - Corrected repo-operating documentation so agent/runbook guidance matches the current Spring Boot + Vue codebase: `AGENTS.md` and `CLAUDE.md` now use real commands and paths, the Claude SDLC playbook now points to the staged `docs/02..06-*` artifact locations and includes the repo-docs consistency review skill, and the UAT runbook no longer contradicts itself about the bundled Oracle baseline schema script.
 - Cleaned the next layer of stale repository docs by fixing onboarding/review/migration references that no longer matched the repo, marking historical review artifacts as dated snapshots, removing nonexistent taxonomy/file references, and updating several review findings whose underlying code gaps have already been addressed.

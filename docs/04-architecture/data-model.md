@@ -214,6 +214,10 @@ Immutable, append-only record of operator actions. Uses soft references (nullabl
 | `task_id` | VARCHAR(36) | Yes | Soft reference |
 | `application` | VARCHAR(255) | Yes | Scope field for filtering / traceability |
 | `snow_group` | VARCHAR(255) | Yes | Scope field for filtering / traceability |
+| `agent_name` | VARCHAR(255) | Yes | Stable agent key for platform audit |
+| `target_type` | VARCHAR(100) | Yes | Primary affected domain object type |
+| `target_id` | VARCHAR(36) | Yes | Primary affected domain object ID |
+| `source_system` | VARCHAR(100) | Yes | Originating system, e.g. `wwa-api` |
 | `agent` | VARCHAR(255) | Yes | Scope field for filtering / traceability |
 | `context_payload` | CLOB | Yes | JSON; action-specific detail |
 

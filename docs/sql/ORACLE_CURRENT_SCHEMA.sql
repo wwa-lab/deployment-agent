@@ -178,6 +178,10 @@ CREATE TABLE DA_AUDIT_LOG_ENTRY (
     task_id         VARCHAR2(36),
     application     VARCHAR2(255),
     snow_group      VARCHAR2(255),
+    agent_name      VARCHAR2(255),
+    target_type     VARCHAR2(100),
+    target_id       VARCHAR2(36),
+    source_system   VARCHAR2(100),
     agent           VARCHAR2(255),
     context_payload CLOB,
     CONSTRAINT PK_DA_AUDIT_LOG_ENTRY PRIMARY KEY (id)

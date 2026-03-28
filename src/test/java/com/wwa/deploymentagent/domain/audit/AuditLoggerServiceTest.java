@@ -49,6 +49,10 @@ class AuditLoggerServiceTest {
         assertThat(entry.getReleaseFlowId()).isEqualTo("rf-001");
         assertThat(entry.getRequestId()).isEqualTo("req-001");
         assertThat(entry.getTaskId()).isEqualTo("task-001");
+        assertThat(entry.getAgentName()).isEqualTo("deployment-agent");
+        assertThat(entry.getSourceSystem()).isEqualTo("wwa-api");
+        assertThat(entry.getTargetType()).isEqualTo("Task");
+        assertThat(entry.getTargetId()).isEqualTo("task-001");
         assertThat(entry.getContextPayload()).containsEntry("field", "taskStatus");
         assertThat(entry.getTimestamp()).isNotNull();
     }

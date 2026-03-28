@@ -138,7 +138,7 @@ Deployment Agent is a controlled, human-in-the-loop release orchestration worksp
 | Task | Atomic executable step (one per Excel row) | execution_type (MANUAL/AUTO), task_status, input_parameters (JSON), expected_output |
 | Task Execution History | Per-attempt execution record | attempt_number, execution_status, result_summary, external job fields (6) |
 | Configuration Item | Runtime config (Jenkins/Ansible URLs, credentials) | config_key (enum PK), config_value |
-| Audit Log Entry | Immutable operator action record | operator_id, action_type, application, snow_group, agent, context_payload (JSON) |
+| Audit Log Entry | Immutable operator action record | operator_id, action_type, application, snow_group, agent_name, target_type, target_id, source_system, agent, context_payload (JSON) |
 | Access Grant | Product authorization record for one employee | employee_id, grant_status, assigned_roles, scope_grants, last_login_at, updated_by |
 
 ### Entity Relationships

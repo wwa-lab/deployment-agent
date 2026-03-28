@@ -119,7 +119,7 @@ Before starting the backend, confirm:
 - all required tables exist
 - `DA_ACCESS_GRANT` exists with `assigned_roles` and `scope_grants`
 - `DA_REQUEST` includes `snow_group`, `application`, `agent`, `owner`
-- `DA_AUDIT_LOG_ENTRY` includes `application`, `snow_group`, `agent`
+- `DA_AUDIT_LOG_ENTRY` includes `application`, `snow_group`, `agent`, `agent_name`, `target_type`, `target_id`, `source_system`
 
 Reference schema: [data-model.md](/Users/leo/wwa-lab/deployment-agent/docs/04-architecture/data-model.md)
 
