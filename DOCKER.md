@@ -61,6 +61,7 @@ docker run -d \
   -e DB_URL='jdbc:oracle:thin:@host.docker.internal:1521/XEPDB1' \
   -e DB_USERNAME='da_user' \
   -e DB_PASSWORD='changeme' \
+  -e SPRING_PROFILES_ACTIVE=test \
   -e APP_CONFIG_CRYPTO_SECRET='change-me-in-real-env' \
   ghcr.io/wwa-lab/deployment-agent-backend:latest
 ```
