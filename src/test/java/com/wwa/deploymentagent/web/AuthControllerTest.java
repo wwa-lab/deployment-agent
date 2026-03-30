@@ -64,6 +64,7 @@ class AuthControllerTest {
     void login_missingGrant_returns403() throws Exception {
         AccessGrant grant = accessGrantRepository.findById("emp-005").orElseThrow();
         accessGrantRepository.deleteById("emp-005");
+        accessGrantRepository.flush();
 
         try {
             LoginRequestDto body = new LoginRequestDto("emp-005", "password");
@@ -74,7 +75,7 @@ class AuthControllerTest {
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("ACCESS_NOT_GRANTED"));
         } finally {
-            accessGrantRepository.save(grant);
+            accessGrantRepository.saveAndFlush(copyGrant(grant));
         }
     }
 
@@ -168,5 +169,21 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());
+    }
+
+    private static AccessGrant copyGrant(AccessGrant source) {
+        AccessGrant copy = new AccessGrant();
+        copy.setEmployeeId(source.getEmployeeId());
+        copy.setDisplayNameSnapshot(source.getDisplayNameSnapshot());
+        copy.setGrantStatus(source.getGrantStatus());
+        copy.setAssignedRoles(source.getAssignedRoles() == null ? null : java.util.List.copyOf(source.getAssignedRoles()));
+        copy.setScopeGrants(source.getScopeGrants() == null ? null : java.util.List.copyOf(source.getScopeGrants()));
+        copy.setNote(source.getNote());
+        copy.setLastLoginAt(source.getLastLoginAt());
+        copy.setCreatedBy(source.getCreatedBy());
+        copy.setCreatedAt(source.getCreatedAt());
+        copy.setUpdatedBy(source.getUpdatedBy());
+        copy.setUpdatedAt(source.getUpdatedAt());
+        return copy;
     }
 }

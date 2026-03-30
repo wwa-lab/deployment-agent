@@ -76,13 +76,14 @@ class AuthServiceTest {
     void authenticate_missingAccessGrant_throwsForbidden() {
         AccessGrant grant = accessGrantRepository.findById("emp-005").orElseThrow();
         accessGrantRepository.deleteById("emp-005");
+        accessGrantRepository.flush();
 
         try {
             assertThatThrownBy(() -> authService.authenticate("emp-005", "any-password"))
                     .isInstanceOf(AccessNotGrantedAppException.class)
                     .hasMessageContaining("Access not granted");
         } finally {
-            accessGrantRepository.save(grant);
+            accessGrantRepository.saveAndFlush(copyGrant(grant));
         }
     }
 
@@ -125,5 +126,21 @@ class AuthServiceTest {
     void authenticate_nullPassword_throwsUnauthorized() {
         assertThatThrownBy(() -> authService.authenticate("emp-001", null))
                 .isInstanceOf(UnauthorizedAppException.class);
+    }
+
+    private static AccessGrant copyGrant(AccessGrant source) {
+        AccessGrant copy = new AccessGrant();
+        copy.setEmployeeId(source.getEmployeeId());
+        copy.setDisplayNameSnapshot(source.getDisplayNameSnapshot());
+        copy.setGrantStatus(source.getGrantStatus());
+        copy.setAssignedRoles(source.getAssignedRoles() == null ? null : java.util.List.copyOf(source.getAssignedRoles()));
+        copy.setScopeGrants(source.getScopeGrants() == null ? null : java.util.List.copyOf(source.getScopeGrants()));
+        copy.setNote(source.getNote());
+        copy.setLastLoginAt(source.getLastLoginAt());
+        copy.setCreatedBy(source.getCreatedBy());
+        copy.setCreatedAt(source.getCreatedAt());
+        copy.setUpdatedBy(source.getUpdatedBy());
+        copy.setUpdatedAt(source.getUpdatedAt());
+        return copy;
     }
 }
