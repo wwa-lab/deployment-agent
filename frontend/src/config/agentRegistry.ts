@@ -38,16 +38,15 @@ export const agentRegistry: AgentDescriptor[] = [
     enabled: true,
     category: 'deployment',
   },
-  // Add future agents here. Example:
-  // {
-  //   key: 'testing-agent',
-  //   name: 'Testing Agent',
-  //   description: 'Automated test execution and quality gate management.',
-  //   route: '/wwa/testing-agent',
-  //   icon: '🧪',
-  //   enabled: false,
-  //   category: 'testing',
-  // },
+  {
+    key: 'testing-agent',
+    name: 'Testing Agent',
+    description: 'Controlled, human-in-the-loop testing workflow across SIT, UAT, and PROD stages.',
+    route: '/wwa/testing-agent',
+    icon: '🧪',
+    enabled: true,
+    category: 'testing',
+  },
 ]
 
 /** Platform-owned shared capability nav items. Not agent workspaces. */
