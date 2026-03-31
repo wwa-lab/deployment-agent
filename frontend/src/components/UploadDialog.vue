@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { downloadTemplate, uploadFile } from '../api/upload'
-import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
 import type { Stage, UploadResponse } from '../types'
+
+interface UploadOptions {
+  releaseId?: string
+  application?: string
+  snowGroup?: string
+  agent?: string
+}
 
 const props = defineProps<{
   initialScope?: {
@@ -12,11 +17,13 @@ const props = defineProps<{
     agent?: string
   }
   allowedStages?: Stage[]
+  uploadFn: (file: File, stage: Stage, options?: UploadOptions) => Promise<UploadResponse>
+  downloadTemplateFn: () => Promise<Blob>
+  onUploadSuccess: () => Promise<void>
 }>()
 
 const emit = defineEmits<{ close: [] }>()
 
-const store = useReleaseFlowStore()
 const userStore = useUserStore()
 
 const ALL_STAGES: Stage[] = ['SIT', 'UAT', 'PROD']
@@ -50,13 +57,13 @@ async function submit() {
   uploading.value = true
   error.value = ''
   try {
-    successResult.value = await uploadFile(file.value, stage.value as Stage, {
+    successResult.value = await props.uploadFn(file.value, stage.value as Stage, {
       releaseId: releaseIdentifier.value.trim() || undefined,
       application: scopeForm.application.trim() || undefined,
       snowGroup: scopeForm.snowGroup.trim() || undefined,
       agent: scopeForm.agent.trim() || undefined,
     })
-    await store.fetchList()
+    await props.onUploadSuccess()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Upload failed'
   } finally {
@@ -68,7 +75,7 @@ async function handleTemplateDownload() {
   downloadingTemplate.value = true
   error.value = ''
   try {
-    const blob = await downloadTemplate()
+    const blob = await props.downloadTemplateFn()
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
 import UploadDialog from '../components/UploadDialog.vue'
+import { uploadFile, downloadTemplate } from '../api/upload'
 import type { FlowStatus, ReleaseFlowListItem, RequestStatus, Stage } from '../types'
 
 const router = useRouter()
@@ -352,7 +353,14 @@ function toggleArchivedVisibility() {
     </div>
 
     <!-- Upload dialog -->
-    <UploadDialog v-if="showUpload" :initial-scope="uploadScope" @close="showUpload = false" />
+    <UploadDialog
+      v-if="showUpload"
+      :initial-scope="uploadScope"
+      :upload-fn="uploadFile"
+      :download-template-fn="downloadTemplate"
+      :on-upload-success="store.fetchList"
+      @close="showUpload = false"
+    />
   </div>
 </template>
 

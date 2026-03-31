@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useTestingAgentReleaseFlowStore } from '../stores/testingAgentReleaseFlow'
 import { useUserStore } from '../stores/user'
 import UploadDialog from '../components/UploadDialog.vue'
+import { uploadFile, downloadTemplate } from '../api/testingAgentUpload'
 import type { FlowStatus, ReleaseFlowListItem, RequestStatus, Stage } from '../types'
 
 const router = useRouter()
@@ -13,7 +14,7 @@ const userStore = useUserStore()
 const showUpload = ref(false)
 
 const flowStatuses: FlowStatus[] = ['Pending', 'Running', 'Completed', 'Failed', 'Rejected']
-const stages: Stage[] = ['SIT', 'UAT', 'PROD']
+const stages: Stage[] = ['UAT']
 const attemptViews = [
   { value: 'latest', label: 'Latest Attempt' },
   { value: 'history', label: 'Include History' },
@@ -144,7 +145,7 @@ function toggleArchivedVisibility() {
       <div>
         <p class="view-eyebrow">WWA Workspace</p>
         <h1 class="view-title">Testing Agent</h1>
-        <p class="view-subtitle">Track testing rundowns, upload test plans, and monitor stage progress across SIT, UAT, and PROD.</p>
+        <p class="view-subtitle">Track testing rundowns, upload test plans, and monitor UAT stage progress.</p>
       </div>
       <div class="header-actions">
         <button
@@ -171,8 +172,8 @@ function toggleArchivedVisibility() {
       <h2 id="wwa-testing-intro-title" class="wwa-intro-title">Testing workflow with human control</h2>
       <p class="wwa-intro-text">
         WWA currently supports a Testing Agent workspace. Testing Agent is the test-execution
-        workspace for tracking and progressing test rundowns across SIT, UAT, and PROD, with
-        human-in-the-loop controls at every stage.
+        workspace for tracking and progressing UAT test rundowns, with
+        human-in-the-loop controls at every step.
       </p>
     </section>
 
@@ -231,14 +232,7 @@ function toggleArchivedVisibility() {
       </div>
       <div class="filter-group">
         <label class="form-label">Stage</label>
-        <select
-          class="form-control"
-          :value="store.filters.stage ?? ''"
-          @change="onFilterChange('stage', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">All</option>
-          <option v-for="s in stages" :key="s" :value="s">{{ s }}</option>
-        </select>
+        <input class="form-control" type="text" value="UAT" disabled />
       </div>
       <div class="filter-group">
         <label class="form-label">Attempt View</label>
@@ -352,7 +346,15 @@ function toggleArchivedVisibility() {
     </div>
 
     <!-- Upload dialog -->
-    <UploadDialog v-if="showUpload" :initial-scope="uploadScope" :allowed-stages="['UAT']" @close="showUpload = false" />
+    <UploadDialog
+      v-if="showUpload"
+      :initial-scope="uploadScope"
+      :allowed-stages="['UAT']"
+      :upload-fn="uploadFile"
+      :download-template-fn="downloadTemplate"
+      :on-upload-success="store.fetchList"
+      @close="showUpload = false"
+    />
   </div>
 </template>
 
