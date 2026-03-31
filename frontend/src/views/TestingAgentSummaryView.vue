@@ -352,7 +352,7 @@ function toggleArchivedVisibility() {
     </div>
 
     <!-- Upload dialog -->
-    <UploadDialog v-if="showUpload" :initial-scope="uploadScope" @close="showUpload = false" />
+    <UploadDialog v-if="showUpload" :initial-scope="uploadScope" :allowed-stages="['UAT']" @close="showUpload = false" />
   </div>
 </template>
 

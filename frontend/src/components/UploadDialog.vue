@@ -11,6 +11,7 @@ const props = defineProps<{
     snowGroup?: string
     agent?: string
   }
+  allowedStages?: Stage[]
 }>()
 
 const emit = defineEmits<{ close: [] }>()
@@ -18,7 +19,9 @@ const emit = defineEmits<{ close: [] }>()
 const store = useReleaseFlowStore()
 const userStore = useUserStore()
 
-const stage = ref<Stage | ''>('')
+const ALL_STAGES: Stage[] = ['SIT', 'UAT', 'PROD']
+const availableStages = computed(() => props.allowedStages ?? ALL_STAGES)
+const stage = ref<Stage | ''>(availableStages.value.length === 1 ? availableStages.value[0] : '')
 const file = ref<File | null>(null)
 const releaseIdentifier = ref('')
 const uploading = ref(false)
@@ -120,11 +123,9 @@ function close() {
 
           <div class="form-group">
             <label class="form-label">Stage <span class="required">*</span></label>
-            <select v-model="stage" class="form-control" :disabled="!canUseUpload">
-              <option value="">Select stage...</option>
-              <option value="SIT">SIT</option>
-              <option value="UAT">UAT</option>
-              <option value="PROD">PROD</option>
+            <select v-model="stage" class="form-control" :disabled="!canUseUpload || availableStages.length === 1">
+              <option v-if="availableStages.length > 1" value="">Select stage...</option>
+              <option v-for="s in availableStages" :key="s" :value="s">{{ s }}</option>
             </select>
           </div>
 

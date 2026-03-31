@@ -41,7 +41,7 @@ export const agentRegistry: AgentDescriptor[] = [
   {
     key: 'testing-agent',
     name: 'Testing Agent',
-    description: 'Controlled, human-in-the-loop testing workflow across SIT, UAT, and PROD stages.',
+    description: 'Controlled, human-in-the-loop testing workflow for UAT stage.',
     route: '/wwa/testing-agent',
     icon: '🧪',
     enabled: true,
