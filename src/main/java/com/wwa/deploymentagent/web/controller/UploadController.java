@@ -43,7 +43,7 @@ public class UploadController {
                 .contentType(MediaType.parseMediaType(
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"deployment-request-template.xlsx\"")
+                        "attachment; filename=\"request-template.xlsx\"")
                 .body(uploadTemplateService.generateTemplate());
     }
 
