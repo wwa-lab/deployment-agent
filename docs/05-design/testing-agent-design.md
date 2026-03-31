@@ -224,17 +224,23 @@ The existing `GET /audit-logs` endpoint already supports filtering. To enable ag
 
 ---
 
-### Module 4: Frontend API Client
+### Module 4: Frontend API Client and Modules
 
 **Responsibilities**
-- Provide axios instances configured for `/api/testing-agent`
-- Create API function modules that mirror the deployment agent API
+- Provide axios instance configured for `/api/testing-agent`
+- Provide API function modules that mirror the deployment agent API
+
+**Approach: Duplicate First, Extract Later**
+
+For MVP, the API modules are created by duplicating the existing deployment agent modules and swapping the client import. This eliminates the risk of a factory pattern introducing subtle behavioral differences. A shared API factory can be extracted in a follow-up refactoring PR.
 
 **Design**
 
 #### API Client
 
 File: `frontend/src/api/testingAgentClient.ts`
+
+Duplicate `client.ts` with `baseURL: '/api/testing-agent'`:
 
 ```typescript
 import axios from 'axios'
@@ -258,62 +264,17 @@ testingAgentClient.interceptors.response.use(
 export default testingAgentClient
 ```
 
-#### API Factory Pattern (Recommended)
+#### Duplicated API Modules
 
-File: `frontend/src/api/agentApiFactory.ts`
+Each existing API module is duplicated with only the client import changed:
 
-To avoid duplicating API function modules, extract a factory that accepts an axios client:
+| New File | Duplicated From | Change |
+|---|---|---|
+| `frontend/src/api/testingAgentReleaseFlows.ts` | `releaseFlows.ts` | `import client from './testingAgentClient'` |
+| `frontend/src/api/testingAgentUpload.ts` | `upload.ts` | `import client from './testingAgentClient'` |
+| `frontend/src/api/testingAgentTasks.ts` | `tasks.ts` | `import client from './testingAgentClient'` |
 
-```typescript
-import type { AxiosInstance } from 'axios'
-
-export function createReleaseFlowApi(client: AxiosInstance) {
-  return {
-    list: (params?: Record<string, string>) =>
-      client.get('/release-flows', { params }),
-    getById: (id: string) =>
-      client.get(`/release-flows/${id}`),
-  }
-}
-
-export function createUploadApi(client: AxiosInstance) {
-  return {
-    upload: (formData: FormData) =>
-      client.post('/upload', formData),
-    downloadTemplate: () =>
-      client.get('/upload/template', { responseType: 'blob' }),
-  }
-}
-
-export function createTaskApi(client: AxiosInstance) {
-  return {
-    updateInput: (id: string, input: unknown) =>
-      client.put(`/tasks/${id}/input`, input),
-    getExecutions: (id: string) =>
-      client.get(`/tasks/${id}/executions`),
-    startManual: (id: string) =>
-      client.post(`/tasks/${id}/start-manual`),
-    recordResult: (id: string, result: unknown) =>
-      client.post(`/tasks/${id}/record-result`, result),
-    submitAuto: (id: string) =>
-      client.post(`/tasks/${id}/submit-auto`),
-    applyDecision: (id: string, decision: unknown) =>
-      client.post(`/tasks/${id}/decision`, decision),
-  }
-}
-```
-
-Both agents then instantiate the same factory with their own client:
-
-```typescript
-// Deployment Agent
-import client from './client'
-export const releaseFlowApi = createReleaseFlowApi(client)
-
-// Testing Agent
-import testingAgentClient from './testingAgentClient'
-export const testingAgentReleaseFlowApi = createReleaseFlowApi(testingAgentClient)
-```
+All function signatures, return types, and error handling remain identical to the originals.
 
 ---
 
@@ -323,161 +284,67 @@ export const testingAgentReleaseFlowApi = createReleaseFlowApi(testingAgentClien
 - Provide a dedicated Pinia store for Testing Agent release flow state
 - Prevent state collision between agent workspaces
 
+**Approach: Duplicate First, Extract Later**
+
+For MVP, the store is created by duplicating `releaseFlow.ts` and changing the store ID and API imports. This eliminates the risk of a store factory missing subtle state management behavior. A shared store factory can be extracted in a follow-up refactoring PR.
+
 **Design**
 
-#### Store Factory Pattern
-
-File: `frontend/src/stores/agentReleaseFlowFactory.ts`
-
-```typescript
-import { defineStore } from 'pinia'
-import type { ReleaseFlowApi, UploadApi, TaskApi } from '@/api/agentApiFactory'
-
-export function createAgentReleaseFlowStore(
-  storeId: string,
-  api: { releaseFlow: ReleaseFlowApi; upload: UploadApi; task: TaskApi }
-) {
-  return defineStore(storeId, {
-    // Same state, getters, and actions as useReleaseFlowStore
-    // but using the injected API functions
-  })
-}
-```
-
-#### Store Instances
+#### Duplicated Store
 
 File: `frontend/src/stores/testingAgentReleaseFlow.ts`
 
-```typescript
-import { createAgentReleaseFlowStore } from './agentReleaseFlowFactory'
-import { testingAgentReleaseFlowApi, testingAgentUploadApi, testingAgentTaskApi } from '@/api/testingAgent'
+Duplicate `releaseFlow.ts` with the following changes:
+- Store ID: `'testingAgentReleaseFlow'` (was `'releaseFlow'`)
+- API imports: from `../api/testingAgentReleaseFlows` and `../api/testingAgentUpload` (was `../api/releaseFlows` and `../api/upload`)
 
-export const useTestingAgentReleaseFlowStore = createAgentReleaseFlowStore(
-  'testingAgentReleaseFlow',
-  {
-    releaseFlow: testingAgentReleaseFlowApi,
-    upload: testingAgentUploadApi,
-    task: testingAgentTaskApi,
-  }
-)
-```
+All state, getters, and actions remain identical to the original store.
 
 **Internal Design Concerns**
 - Each store instance manages its own loading, error, pagination, and selected release flow state
 - Navigating between agents does not reset the other agent's store (unless explicitly cleared)
-- The store factory must support all state, getters, and actions currently in `useReleaseFlowStore`
+- The duplicated store has an independent Pinia ID, preventing state collision
 
 ---
 
-### Module 6: Frontend Views and Shared Components
+### Module 6: Frontend Views
 
 **Responsibilities**
 - Display Testing Agent workspace with the same UI as Deployment Agent
-- Extract shared components to eliminate view duplication
+
+**Approach: Duplicate First, Extract Later**
+
+For MVP, the Testing Agent views are created by duplicating the existing Deployment Agent views and modifying store imports, API imports, page titles, and route paths. This eliminates the HIGH risk of breaking Deployment Agent through shared component extraction. Existing Deployment Agent views remain completely untouched.
+
+Shared component extraction (`AgentSummaryView.vue`, `AgentDetailView.vue`) is deferred to a follow-up refactoring PR with no functional changes.
 
 **Design**
 
-#### Shared Component Extraction
+#### TestingAgentSummaryView.vue
 
-The existing `ReleaseFlowSummaryView.vue` and `ReleaseFlowDetailView.vue` are refactored into shared components that accept agent-specific configuration as props.
+File: `frontend/src/views/TestingAgentSummaryView.vue`
 
-**AgentSummaryView.vue**
+Duplicate `ReleaseFlowSummaryView.vue` with the following changes:
+- `useReleaseFlowStore` → `useTestingAgentReleaseFlowStore`
+- API imports from `../api/releaseFlows` and `../api/upload` → `../api/testingAgentReleaseFlows` and `../api/testingAgentUpload`
+- Page title: `"Testing Agent"` (was `"Deployment Agent"`)
+- Page description: testing-specific introductory text
+- Detail route path: `/wwa/testing-agent/release-flows/` (was `/wwa/deployment-agent/release-flows/`)
 
-File: `frontend/src/components/AgentSummaryView.vue`
+#### TestingAgentDetailView.vue
 
-Props:
-```typescript
-{
-  agentId: string           // 'deployment-agent' | 'testing-agent'
-  agentName: string         // 'Deployment Agent' | 'Testing Agent'
-  agentDescription: string  // Page introduction text
-  store: StoreInstance      // The agent's Pinia store
-  detailRouteName: string   // 'wwa-deployment-agent-detail' | 'wwa-testing-agent-detail'
-}
-```
+File: `frontend/src/views/TestingAgentDetailView.vue`
 
-Responsibilities:
-- Page header with agent name and description
-- Filter area (Project, Release ID, Stage, Status)
-- Release Flow summary table
-- Upload dialog (passes `agentId` to the upload API)
-- Row click navigates to `detailRouteName` with the selected flow ID
-
-**AgentDetailView.vue**
-
-File: `frontend/src/components/AgentDetailView.vue`
-
-Props:
-```typescript
-{
-  agentId: string           // 'deployment-agent' | 'testing-agent'
-  agentName: string         // 'Deployment Agent' | 'Testing Agent'
-  store: StoreInstance      // The agent's Pinia store
-  summaryRouteName: string  // 'wwa-deployment-agent' | 'wwa-testing-agent'
-}
-```
-
-Responsibilities:
-- Release Flow detail header with breadcrumb showing agent name
-- Stage tabs and rundown information panel
-- Task table with all action controls
-- All dialog components (RecordResultDialog, TaskEditDialog, DecisionDialog)
-
-#### Thin View Wrappers
-
-After shared component extraction, each agent's view becomes a thin wrapper:
-
-**TestingAgentSummaryView.vue** (~20 lines)
-
-```vue
-<template>
-  <AgentSummaryView
-    :agent-id="AGENT_ID.TESTING"
-    agent-name="Testing Agent"
-    agent-description="Controlled, human-in-the-loop testing workflow across SIT, UAT, and PROD stages."
-    :store="store"
-    detail-route-name="wwa-testing-agent-detail"
-  />
-</template>
-
-<script setup lang="ts">
-import AgentSummaryView from '@/components/AgentSummaryView.vue'
-import { useTestingAgentReleaseFlowStore } from '@/stores/testingAgentReleaseFlow'
-import { AGENT_ID } from '@/config/agentId'
-
-const store = useTestingAgentReleaseFlowStore()
-</script>
-```
-
-**TestingAgentDetailView.vue** (~20 lines)
-
-```vue
-<template>
-  <AgentDetailView
-    :agent-id="AGENT_ID.TESTING"
-    agent-name="Testing Agent"
-    :store="store"
-    summary-route-name="wwa-testing-agent"
-  />
-</template>
-
-<script setup lang="ts">
-import AgentDetailView from '@/components/AgentDetailView.vue'
-import { useTestingAgentReleaseFlowStore } from '@/stores/testingAgentReleaseFlow'
-import { AGENT_ID } from '@/config/agentId'
-
-const store = useTestingAgentReleaseFlowStore()
-</script>
-```
-
-**Refactored Deployment Agent Views** (same pattern)
-
-`ReleaseFlowSummaryView.vue` and `ReleaseFlowDetailView.vue` are refactored to the same thin wrapper pattern, using `useReleaseFlowStore` and Deployment Agent configuration.
+Duplicate `ReleaseFlowDetailView.vue` with the following changes:
+- `useReleaseFlowStore` → `useTestingAgentReleaseFlowStore`
+- API imports from `../api/releaseFlows` and `../api/tasks` → `../api/testingAgentReleaseFlows` and `../api/testingAgentTasks`
+- Page title / breadcrumb: `"Testing Agent"` (was `"Deployment Agent"`)
+- Summary route path: `/wwa/testing-agent` (was `/wwa/deployment-agent`)
 
 **Internal Design Concerns**
-- Shared components must not contain agent-specific logic — all differentiation is through props
-- Dialog components (`UploadDialog`, `RecordResultDialog`, `TaskEditDialog`, `DecisionDialog`) receive the API client or functions through provide/inject or props
-- The extraction must preserve all existing Deployment Agent behavior exactly
+- All dialog components (`UploadDialog`, `RecordResultDialog`, `TaskEditDialog`, `DecisionDialog`) are reused as-is — they import from the API modules used by the parent view
+- The duplicated views must function identically to the originals except for the agent-specific text and routes
+- Existing Deployment Agent views (`ReleaseFlowSummaryView.vue`, `ReleaseFlowDetailView.vue`) are NOT modified
 
 ---
 
@@ -719,6 +586,8 @@ src/test/java/com/wwa/deploymentagent/web/controller/
 
 ## Implementation Sequence
 
+**Approach:** Duplicate first, extract later. This eliminates the HIGH risk of breaking Deployment Agent through shared component extraction. Existing DA code is never modified.
+
 ### Phase 1: Backend Foundation (No Frontend Changes)
 
 1. Create `AgentId.java` constants
@@ -727,31 +596,40 @@ src/test/java/com/wwa/deploymentagent/web/controller/
 4. Create `TestingAgentTaskController`
 5. Write controller tests and data isolation tests
 
-### Phase 2: Frontend Foundation
+**Gate:** `mvn test` — all existing + new tests pass
+
+### Phase 2: Frontend Infrastructure
 
 6. Create `agentId.ts` constants
 7. Create `testingAgentClient.ts`
-8. Create `agentApiFactory.ts` and Testing Agent API modules
-9. Create `agentReleaseFlowFactory.ts` and Testing Agent store
+8. Duplicate API modules (`testingAgentReleaseFlows.ts`, `testingAgentUpload.ts`, `testingAgentTasks.ts`)
+9. Duplicate store (`testingAgentReleaseFlow.ts`)
 
-### Phase 3: Shared Component Extraction
+**Gate:** `cd frontend && npm run build` — succeeds
 
-10. Extract `AgentSummaryView.vue` from `ReleaseFlowSummaryView.vue`
-11. Extract `AgentDetailView.vue` from `ReleaseFlowDetailView.vue`
-12. Refactor Deployment Agent views to thin wrappers
-13. Verify Deployment Agent behavior is unchanged
+### Phase 3: Testing Agent Views and Routing
 
-### Phase 4: Testing Agent Views and Routing
+10. Duplicate `ReleaseFlowSummaryView.vue` → `TestingAgentSummaryView.vue` (modify store/API/title/routes)
+11. Duplicate `ReleaseFlowDetailView.vue` → `TestingAgentDetailView.vue` (modify store/API/title/routes)
+12. Update `agentRegistry.ts` — enable Testing Agent
+13. Update `router/index.ts` — add Testing Agent routes
 
-14. Create `TestingAgentSummaryView.vue` (thin wrapper)
-15. Create `TestingAgentDetailView.vue` (thin wrapper)
-16. Update `agentRegistry.ts` — enable Testing Agent
-17. Update `router/index.ts` — add Testing Agent routes
-18. End-to-end verification
+**Gate:** `cd frontend && npm run build` + `npx vue-tsc --noEmit` — both succeed
 
-### Verification Gates
+### Phase 4: Verification
 
-After each phase:
-- `mvn test` — all existing + new tests pass
-- `cd frontend && npm run build` — frontend compiles without errors
-- Manual smoke test of Deployment Agent — no regression
+14. `mvn test` — all backend tests pass
+15. `cd frontend && npm run build` — frontend compiles
+16. Manual E2E smoke test — full Testing Agent workflow + DA regression check
+
+### Follow-Up (Separate PR — Pure Refactoring)
+
+After Testing Agent is working, extract shared components in a separate PR:
+
+1. Extract `AgentSummaryView.vue` from duplicated summary views
+2. Extract `AgentDetailView.vue` from duplicated detail views
+3. Extract `agentApiFactory.ts` from duplicated API modules
+4. Extract `agentReleaseFlowFactory.ts` from duplicated stores
+5. Refactor dialog components to accept API functions via props
+
+These are pure refactoring tasks with no functional changes — lower risk when done independently.

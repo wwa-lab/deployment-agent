@@ -2,19 +2,23 @@
 
 ## Overview
 
-This document breaks the Testing Agent design into implementation-ready tasks. The scope is well-bounded: add a second agent workspace that mirrors Deployment Agent using thin controller delegation, shared component extraction, and agent-scoped data isolation.
+This document breaks the Testing Agent design into implementation-ready tasks. The scope is well-bounded: add a second agent workspace that mirrors Deployment Agent using thin controller delegation, duplicated frontend modules, and agent-scoped data isolation.
+
+**Delivery approach: Duplicate First, Extract Later**
+
+This task breakdown uses Approach B — duplicate existing frontend modules (API, store, views) rather than extracting shared components. This eliminates the HIGH risk of breaking Deployment Agent during shared component extraction. Shared component extraction is deferred to a follow-up PR as pure refactoring with no functional changes.
 
 **Delivery objective**
 - Add Testing Agent as the second workspace under WWA Agent Workspace Hub
 - Achieve data isolation via `Request.agent = "testing-agent"`
-- Zero impact on existing Deployment Agent functionality
-- Minimize code duplication through factory patterns and shared component extraction
+- Zero impact on existing Deployment Agent functionality — no existing files are modified except `agentRegistry.ts` and `router/index.ts`
 
 **Planning assumptions**
 - All domain services, entities, repositories, and shared capabilities already exist and are agent-agnostic
 - The `Request.agent` column already exists (`V6__add_request_agent_column.sql`)
 - The agent registry already has a commented placeholder for Testing Agent
 - `ReleaseFlowService` already supports `agent` as a filter parameter
+- `ImportService.importFile()` already accepts `agent` as a parameter
 - No database migrations are needed
 - No new domain logic is needed
 
@@ -27,9 +31,8 @@ This document breaks the Testing Agent design into implementation-ready tasks. T
 **Design scope summary**
 - 3 thin backend controllers delegating to existing services
 - Agent identity constants (backend + frontend)
-- Frontend API client, store factory, and store instance
-- Shared component extraction from existing Deployment Agent views
-- Testing Agent thin view wrappers
+- Duplicated frontend API modules, store, and views (with Testing Agent imports/config)
+- Duplicated Testing Agent views (summary + detail)
 - Agent registry and router updates
 - Backend controller tests and data isolation integration tests
 
@@ -40,25 +43,24 @@ This document breaks the Testing Agent design into implementation-ready tasks. T
 ### Major Implementation Streams
 
 1. Backend controller layer
-2. Frontend API and store infrastructure
-3. Shared component extraction (refactoring existing code)
-4. Testing Agent views and routing
+2. Frontend API and store infrastructure (duplicated modules)
+3. Testing Agent views (duplicated from Deployment Agent)
+4. Agent registry and routing
 5. Testing and verification
 
 ### Recommended Sequencing
 
 1. Create agent identity constants (backend + frontend)
 2. Create backend controllers and write tests
-3. Create frontend API client and store infrastructure
-4. Extract shared components from existing Deployment Agent views
-5. Create Testing Agent thin view wrappers
-6. Update agent registry and router
-7. Full verification (backend tests + frontend build + manual smoke test)
+3. Create frontend API client, duplicated API modules, and duplicated store
+4. Create Testing Agent views (duplicated from DA, modified imports/titles/routes)
+5. Update agent registry and router
+6. Full verification (backend tests + frontend build + manual smoke test)
 
 ### Parallel Work Opportunities
 
 - Backend tasks (TA-TASK-001 through TA-TASK-005) can run in parallel with frontend infrastructure tasks (TA-TASK-006 through TA-TASK-009)
-- Shared component extraction (TA-TASK-010, TA-TASK-011) can begin once the extraction strategy is agreed, independent of backend work
+- Agent registry update (TA-TASK-008) can be done anytime
 - Test tasks can begin preparing fixtures while implementation is in progress
 
 ---
@@ -139,32 +141,33 @@ This document breaks the Testing Agent design into implementation-ready tasks. T
 - **Estimated size**: M (~200 lines across 4 test files)
 - **Notes**: Follow existing test patterns in `src/test/java/com/wwa/deploymentagent/web/`. Use `@SpringBootTest` with H2 for integration tests. Target 80%+ coverage on new controller code.
 
-### TA-TASK-006: Create Frontend API Client and Factory
+### TA-TASK-006: Create Frontend API Client and Duplicated API Modules
 
 - **Objective**: Set up the API infrastructure for Testing Agent frontend.
 - **Scope**:
-  - Create `testingAgentClient.ts` — axios instance with `baseURL: '/api/testing-agent'` and same interceptors as existing client.
-  - Create `agentApiFactory.ts` — extract shared API function factories (`createReleaseFlowApi`, `createUploadApi`, `createTaskApi`) that accept an axios instance and return typed API functions.
-  - Refactor existing deployment agent API modules to use the factory (to prove the factory works).
-  - Create Testing Agent API modules using the factory with `testingAgentClient`.
+  - Create `testingAgentClient.ts` — axios instance with `baseURL: '/api/testing-agent'` and same interceptors as existing `client.ts`.
+  - Duplicate `releaseFlows.ts` → `testingAgentReleaseFlows.ts` — replace `import client from './client'` with `import client from './testingAgentClient'`.
+  - Duplicate `upload.ts` → `testingAgentUpload.ts` — same client swap.
+  - Duplicate `tasks.ts` → `testingAgentTasks.ts` — same client swap.
 - **Dependencies**: TA-TASK-001
 - **Owner type**: frontend
 - **Priority**: Must
-- **Estimated size**: S (~80 lines new, ~30 lines refactored)
-- **Notes**: The factory pattern eliminates API code duplication. Existing deployment agent API modules must continue to work identically after refactoring.
+- **Estimated size**: S (~220 lines, mostly duplicated)
+- **Notes**: Existing deployment agent API modules are NOT modified. The duplication is intentional (Approach B) and will be replaced by a shared API factory in a follow-up refactoring PR.
 
-### TA-TASK-007: Create Frontend Store Factory and Testing Agent Store
+### TA-TASK-007: Create Duplicated Testing Agent Store
 
-- **Objective**: Set up the Pinia store infrastructure for Testing Agent.
+- **Objective**: Set up a dedicated Pinia store for Testing Agent release flow state.
 - **Scope**:
-  - Create `agentReleaseFlowFactory.ts` — extract shared store factory from existing `releaseFlow.ts` that accepts a store ID and API functions, returns a Pinia store definition.
-  - Create `testingAgentReleaseFlow.ts` — instantiate the factory with `'testingAgentReleaseFlow'` ID and Testing Agent API functions.
-  - Refactor existing `releaseFlow.ts` to use the factory (to prove it works).
+  - Duplicate `releaseFlow.ts` → `testingAgentReleaseFlow.ts`.
+  - Change store ID: `'testingAgentReleaseFlow'` (was `'releaseFlow'`).
+  - Change API imports: from `../api/testingAgentReleaseFlows` and `../api/testingAgentUpload` (was `../api/releaseFlows` and `../api/upload`).
+  - Export `useTestingAgentReleaseFlowStore`.
 - **Dependencies**: TA-TASK-006
 - **Owner type**: frontend
 - **Priority**: Must
-- **Estimated size**: M (~100 lines new, ~50 lines refactored)
-- **Notes**: Each store instance must maintain independent state. Verify that navigating between agents does not corrupt either store.
+- **Estimated size**: S (~130 lines, duplicated)
+- **Notes**: Existing `releaseFlow.ts` is NOT modified. Each store instance has an independent Pinia ID preventing state collision. The duplication will be replaced by a shared store factory in a follow-up refactoring PR.
 
 ### TA-TASK-008: Update Agent Registry
 
@@ -193,71 +196,50 @@ This document breaks the Testing Agent design into implementation-ready tasks. T
 - **Estimated size**: XS (~10 lines)
 - **Notes**: Routes must be children of the `/wwa` parent route.
 
-### TA-TASK-010: Extract AgentSummaryView Shared Component
+### TA-TASK-010: Create TestingAgentSummaryView (Duplicated)
 
-- **Objective**: Extract common summary view logic from `ReleaseFlowSummaryView.vue` into a reusable component.
+- **Objective**: Create the Testing Agent summary page by duplicating the Deployment Agent summary view.
 - **Scope**:
-  - Create `AgentSummaryView.vue` in `frontend/src/components/`
-  - Accept props: `agentId`, `agentName`, `agentDescription`, `store`, `detailRouteName`
-  - Move all layout, filter, table, and upload dialog logic into the shared component
-  - Refactor `ReleaseFlowSummaryView.vue` to a thin wrapper (~20 lines) that passes Deployment Agent props
-  - Verify Deployment Agent summary behavior is unchanged after refactoring
+  - Duplicate `ReleaseFlowSummaryView.vue` → `TestingAgentSummaryView.vue` in `frontend/src/views/`
+  - Replace `useReleaseFlowStore` → `useTestingAgentReleaseFlowStore`
+  - Replace API imports → Testing Agent API modules (`testingAgentReleaseFlows`, `testingAgentUpload`)
+  - Replace page title → `"Testing Agent"`
+  - Replace page description → testing-specific introductory text
+  - Replace detail route path → `/wwa/testing-agent/release-flows/`
 - **Dependencies**: TA-TASK-007
 - **Owner type**: frontend
 - **Priority**: Must
-- **Estimated size**: L (~400 lines extracted, ~20 lines wrapper)
-- **Notes**: This is the highest-risk frontend task — it refactors an existing working view. Must be done carefully with before/after comparison. The `UploadDialog` must receive `agentId` to pass the correct agent value on upload.
+- **Estimated size**: M (~496 lines, duplicated with modifications)
+- **Notes**: Existing `ReleaseFlowSummaryView.vue` is NOT modified. Zero DA regression risk.
 
-### TA-TASK-011: Extract AgentDetailView Shared Component
+### TA-TASK-011: Create TestingAgentDetailView (Duplicated)
 
-- **Objective**: Extract common detail view logic from `ReleaseFlowDetailView.vue` into a reusable component.
+- **Objective**: Create the Testing Agent detail page by duplicating the Deployment Agent detail view.
 - **Scope**:
-  - Create `AgentDetailView.vue` in `frontend/src/components/`
-  - Accept props: `agentId`, `agentName`, `store`, `summaryRouteName`
-  - Move all layout, stage tabs, rundown panel, task table, and dialog logic into the shared component
-  - Refactor `ReleaseFlowDetailView.vue` to a thin wrapper (~20 lines)
-  - Verify Deployment Agent detail behavior is unchanged after refactoring
+  - Duplicate `ReleaseFlowDetailView.vue` → `TestingAgentDetailView.vue` in `frontend/src/views/`
+  - Replace `useReleaseFlowStore` → `useTestingAgentReleaseFlowStore`
+  - Replace API imports → Testing Agent API modules (`testingAgentReleaseFlows`, `testingAgentTasks`)
+  - Replace page title / breadcrumb → `"Testing Agent"`
+  - Replace summary route path → `/wwa/testing-agent`
 - **Dependencies**: TA-TASK-007
 - **Owner type**: frontend
 - **Priority**: Must
-- **Estimated size**: L (~400 lines extracted, ~20 lines wrapper)
-- **Notes**: Same risk profile as TA-TASK-010. Dialog components (`RecordResultDialog`, `TaskEditDialog`, `DecisionDialog`) must receive API functions through props or provide/inject.
+- **Estimated size**: L (~600 lines, duplicated with modifications)
+- **Notes**: Existing `ReleaseFlowDetailView.vue` is NOT modified. Dialog components are reused as-is. Zero DA regression risk.
 
-### TA-TASK-012: Create TestingAgentSummaryView
-
-- **Objective**: Create the Testing Agent summary page as a thin wrapper around `AgentSummaryView`.
-- **Scope**:
-  - Create `TestingAgentSummaryView.vue` in `frontend/src/views/`
-  - Pass Testing Agent props: `agentId = AGENT_ID.TESTING`, `agentName = 'Testing Agent'`, `store = useTestingAgentReleaseFlowStore()`, `detailRouteName = 'wwa-testing-agent-detail'`
-- **Dependencies**: TA-TASK-007, TA-TASK-010
-- **Owner type**: frontend
-- **Priority**: Must
-- **Estimated size**: XS (~20 lines)
-
-### TA-TASK-013: Create TestingAgentDetailView
-
-- **Objective**: Create the Testing Agent detail page as a thin wrapper around `AgentDetailView`.
-- **Scope**:
-  - Create `TestingAgentDetailView.vue` in `frontend/src/views/`
-  - Pass Testing Agent props: `agentId = AGENT_ID.TESTING`, `agentName = 'Testing Agent'`, `store = useTestingAgentReleaseFlowStore()`, `summaryRouteName = 'wwa-testing-agent'`
-- **Dependencies**: TA-TASK-007, TA-TASK-011
-- **Owner type**: frontend
-- **Priority**: Must
-- **Estimated size**: XS (~20 lines)
-
-### TA-TASK-014: Frontend Build Verification
+### TA-TASK-012: Frontend Build Verification
 
 - **Objective**: Verify the complete frontend builds and typechecks without errors.
 - **Scope**:
   - Run `cd frontend && npm run build` — must succeed
   - Run `cd frontend && npx vue-tsc --noEmit` — must succeed
-  - Verify no TypeScript errors in new or refactored files
-- **Dependencies**: TA-TASK-008, TA-TASK-009, TA-TASK-012, TA-TASK-013
+  - Verify no TypeScript errors in new files
+- **Dependencies**: TA-TASK-008, TA-TASK-009, TA-TASK-010, TA-TASK-011
 - **Owner type**: frontend / QA
 - **Priority**: Must
 - **Estimated size**: XS
 
-### TA-TASK-015: End-to-End Verification
+### TA-TASK-013: End-to-End Verification
 
 - **Objective**: Verify the complete Testing Agent workflow works end-to-end.
 - **Scope**:
@@ -289,7 +271,7 @@ This document breaks the Testing Agent design into implementation-ready tasks. T
 ```
 TA-TASK-001 → TA-TASK-002/003/004 → TA-TASK-005
                                          ↓
-TA-TASK-001 → TA-TASK-006 → TA-TASK-007 → TA-TASK-010/011 → TA-TASK-012/013 → TA-TASK-009 → TA-TASK-014 → TA-TASK-015
+TA-TASK-001 → TA-TASK-006 → TA-TASK-007 → TA-TASK-010/011 → TA-TASK-008/009 → TA-TASK-012 → TA-TASK-013
 ```
 
 ### Prerequisite Clusters
@@ -297,16 +279,15 @@ TA-TASK-001 → TA-TASK-006 → TA-TASK-007 → TA-TASK-010/011 → TA-TASK-012/
 | Cluster | Tasks | Description |
 |---|---|---|
 | **Backend controllers** | TA-TASK-001, 002, 003, 004, 005 | Agent constants + 3 controllers + tests |
-| **Frontend infrastructure** | TA-TASK-001, 006, 007 | API factory + store factory |
-| **Shared component extraction** | TA-TASK-010, 011 | Refactor existing views |
-| **Testing Agent views** | TA-TASK-008, 009, 012, 013 | Registry + routes + thin wrappers |
-| **Verification** | TA-TASK-014, 015 | Build check + E2E |
+| **Frontend infrastructure** | TA-TASK-001, 006, 007 | Duplicated API modules + store |
+| **Testing Agent views** | TA-TASK-010, 011 | Duplicated summary + detail views |
+| **Routing** | TA-TASK-008, 009 | Registry + routes |
+| **Verification** | TA-TASK-012, 013 | Build check + E2E |
 
 ### Parallel Workstreams
 
 - **Backend** (TA-TASK-001 → 002/003/004 → 005) can run in parallel with **Frontend infrastructure** (TA-TASK-006 → 007)
 - **Agent registry** (TA-TASK-008) can be done anytime
-- **Shared component extraction** (TA-TASK-010/011) can begin once the store factory is ready, independent of backend
 - **Backend tests** (TA-TASK-005) can run in parallel with frontend work
 
 ---
@@ -320,35 +301,49 @@ TA-TASK-001 → TA-TASK-006 → TA-TASK-007 → TA-TASK-010/011 → TA-TASK-012/
 | TA-TASK-003 | TestingAgentUploadController | S | Must | backend |
 | TA-TASK-004 | TestingAgentTaskController | S | Must | backend |
 | TA-TASK-005 | Backend controller + isolation tests | M | Must | QA / backend |
-| TA-TASK-006 | Frontend API client + factory | S | Must | frontend |
-| TA-TASK-007 | Frontend store factory + instance | M | Must | frontend |
+| TA-TASK-006 | Frontend API client + duplicated API modules | S | Must | frontend |
+| TA-TASK-007 | Duplicated Testing Agent store | S | Must | frontend |
 | TA-TASK-008 | Update agent registry | XS | Must | frontend |
 | TA-TASK-009 | Add Testing Agent routes | XS | Must | frontend |
-| TA-TASK-010 | Extract AgentSummaryView | L | Must | frontend |
-| TA-TASK-011 | Extract AgentDetailView | L | Must | frontend |
-| TA-TASK-012 | TestingAgentSummaryView wrapper | XS | Must | frontend |
-| TA-TASK-013 | TestingAgentDetailView wrapper | XS | Must | frontend |
-| TA-TASK-014 | Frontend build verification | XS | Must | QA |
-| TA-TASK-015 | End-to-end verification | M | Must | QA |
+| TA-TASK-010 | TestingAgentSummaryView (duplicated) | M | Must | frontend |
+| TA-TASK-011 | TestingAgentDetailView (duplicated) | L | Must | frontend |
+| TA-TASK-012 | Frontend build verification | XS | Must | QA |
+| TA-TASK-013 | End-to-end verification | M | Must | QA |
 
-**Total: 15 tasks** — 6 XS, 3 S, 3 M, 2 L, 1 M (manual)
+**Total: 13 tasks** — 3 XS, 4 S, 3 M, 1 L, 2 M (verification)
 
 ---
 
 ## Risks / Blockers
 
-| Risk | Severity | Mitigation |
+| Risk | Severity | Status |
 |---|---|---|
-| Shared component extraction breaks existing Deployment Agent views | HIGH | Careful before/after testing; keep refactoring as a separate commit |
-| `ImportService` may not accept `agent` as a parameter today | LOW | Check existing API; add parameter if missing (minor change) |
-| Store factory may not support all current store features | MEDIUM | Extract incrementally; verify each getter/action still works |
-| Dialog components may have hardcoded API references | MEDIUM | Audit dialog imports and convert to props/inject pattern |
+| ~~Shared component extraction breaks existing DA views~~ | ~~HIGH~~ | **ELIMINATED** — using Approach B (duplicate, don't extract) |
+| ~~Store factory may not support all current store features~~ | ~~MEDIUM~~ | **ELIMINATED** — duplicating store instead of factory |
+| ~~Dialog components have hardcoded API references~~ | ~~MEDIUM~~ | **ELIMINATED** — duplicated views use their own imports |
+| `ImportService` may not accept `agent` as a parameter today | LOW | Confirmed: `ImportService.importFile()` already accepts agent at line 70 |
 | Concurrent navigation between agents may cause state issues | LOW | Each store has a unique Pinia ID; test explicitly |
+| `matchesContains` uses substring matching for agent filter | LOW | Acceptable for MVP — no false matches with current agent values |
+
+---
+
+## Follow-Up Tasks (Separate PR — Pure Refactoring)
+
+After Testing Agent is working, the following refactoring tasks should be completed in a separate PR to eliminate duplication:
+
+| ID | Task | Description |
+|---|---|---|
+| FU-001 | Extract `AgentSummaryView.vue` | Extract shared component from `ReleaseFlowSummaryView.vue` and `TestingAgentSummaryView.vue`; both become thin wrappers |
+| FU-002 | Extract `AgentDetailView.vue` | Extract shared component from `ReleaseFlowDetailView.vue` and `TestingAgentDetailView.vue`; both become thin wrappers |
+| FU-003 | Extract `agentApiFactory.ts` | Replace duplicated API modules with a factory that accepts an axios instance |
+| FU-004 | Extract `agentReleaseFlowFactory.ts` | Replace duplicated stores with a factory that accepts a store ID and API functions |
+| FU-005 | Refactor dialog components | Accept API functions via props instead of hardcoded imports (required for FU-001/002) |
+
+These are pure refactoring tasks with **no functional changes** — lower risk when done independently after the feature is proven working.
 
 ---
 
 ## Open Questions
 
-1. Should the shared component extraction (TA-TASK-010/011) happen before or after the Testing Agent thin wrappers? (Recommendation: before, so wrappers can reference the shared component immediately)
-2. Should the existing Deployment Agent API modules be refactored to use the factory in this phase, or deferred? (Recommendation: do it now to validate the factory and reduce future tech debt)
-3. Should an agent filter dropdown be added to the Audit Log page as part of this delivery? (Recommendation: optional enhancement, not blocking)
+1. Should an agent filter dropdown be added to the Audit Log page as part of this delivery? (Recommendation: optional enhancement, not blocking)
+2. When should the follow-up refactoring PR (FU-001 through FU-005) be scheduled? (Recommendation: immediately after Testing Agent is merged and verified)
