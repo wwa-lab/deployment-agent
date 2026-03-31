@@ -41,7 +41,7 @@ export const agentRegistry: AgentDescriptor[] = [
   {
     key: 'testing-agent',
     name: 'Testing Agent',
-    description: 'Controlled, human-in-the-loop testing workflow for UAT stage.',
+    description: 'Controlled, human-in-the-loop A/B testing workflow for iSeries programs.',
     route: '/wwa/testing-agent',
     icon: '🧪',
     enabled: true,

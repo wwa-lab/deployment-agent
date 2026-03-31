@@ -145,7 +145,7 @@ function toggleArchivedVisibility() {
       <div>
         <p class="view-eyebrow">WWA Workspace</p>
         <h1 class="view-title">Testing Agent</h1>
-        <p class="view-subtitle">Track testing rundowns, upload test plans, and monitor UAT stage progress.</p>
+        <p class="view-subtitle">Track iSeries A/B testing rundowns by program level with human-in-the-loop controls.</p>
       </div>
       <div class="header-actions">
         <button
@@ -169,11 +169,11 @@ function toggleArchivedVisibility() {
 
     <section class="wwa-intro-card" aria-labelledby="wwa-testing-intro-title">
       <div class="wwa-intro-kicker">WWA Today</div>
-      <h2 id="wwa-testing-intro-title" class="wwa-intro-title">Testing workflow with human control</h2>
+      <h2 id="wwa-testing-intro-title" class="wwa-intro-title">iSeries A/B testing with human control</h2>
       <p class="wwa-intro-text">
-        WWA currently supports a Testing Agent workspace. Testing Agent is the test-execution
-        workspace for tracking and progressing UAT test rundowns, with
-        human-in-the-loop controls at every step.
+        WWA currently supports a Testing Agent workspace. Testing Agent is the A/B testing
+        workspace for iSeries programs, enabling controlled rundowns by program level
+        with human-in-the-loop sign-off at every step.
       </p>
     </section>
 
