@@ -66,6 +66,24 @@ const router = createRouter({
           },
         },
         {
+          path: 'testing-agent',
+          name: 'wwa-testing-agent',
+          component: () => import('../views/TestingAgentSummaryView.vue'),
+          meta: {
+            section: 'testing-agent',
+            sectionTitle: 'Testing Agent',
+          },
+        },
+        {
+          path: 'testing-agent/release-flows/:id',
+          name: 'wwa-testing-agent-detail',
+          component: () => import('../views/TestingAgentDetailView.vue'),
+          meta: {
+            section: 'testing-agent',
+            sectionTitle: 'Testing Agent',
+          },
+        },
+        {
           path: 'template-management',
           name: 'wwa-template-management',
           component: () => import('../views/TemplateManagementView.vue'),

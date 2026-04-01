@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { downloadTemplate, uploadFile } from '../api/upload'
-import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
 import type { Stage, UploadResponse } from '../types'
+
+interface UploadOptions {
+  releaseId?: string
+  application?: string
+  snowGroup?: string
+  agent?: string
+}
 
 const props = defineProps<{
   initialScope?: {
@@ -11,14 +16,19 @@ const props = defineProps<{
     snowGroup?: string
     agent?: string
   }
+  allowedStages?: Stage[]
+  uploadFn: (file: File, stage: Stage, options?: UploadOptions) => Promise<UploadResponse>
+  downloadTemplateFn: () => Promise<Blob>
+  onUploadSuccess: () => Promise<void>
 }>()
 
 const emit = defineEmits<{ close: [] }>()
 
-const store = useReleaseFlowStore()
 const userStore = useUserStore()
 
-const stage = ref<Stage | ''>('')
+const ALL_STAGES: Stage[] = ['SIT', 'UAT', 'PROD']
+const availableStages = computed(() => props.allowedStages ?? ALL_STAGES)
+const stage = ref<Stage | ''>(availableStages.value.length === 1 ? availableStages.value[0] : '')
 const file = ref<File | null>(null)
 const releaseIdentifier = ref('')
 const uploading = ref(false)
@@ -47,13 +57,13 @@ async function submit() {
   uploading.value = true
   error.value = ''
   try {
-    successResult.value = await uploadFile(file.value, stage.value as Stage, {
+    successResult.value = await props.uploadFn(file.value, stage.value as Stage, {
       releaseId: releaseIdentifier.value.trim() || undefined,
       application: scopeForm.application.trim() || undefined,
       snowGroup: scopeForm.snowGroup.trim() || undefined,
       agent: scopeForm.agent.trim() || undefined,
     })
-    await store.fetchList()
+    await props.onUploadSuccess()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Upload failed'
   } finally {
@@ -65,11 +75,11 @@ async function handleTemplateDownload() {
   downloadingTemplate.value = true
   error.value = ''
   try {
-    const blob = await downloadTemplate()
+    const blob = await props.downloadTemplateFn()
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'deployment-request-template.xlsx'
+    link.download = 'request-template.xlsx'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -120,11 +130,9 @@ function close() {
 
           <div class="form-group">
             <label class="form-label">Stage <span class="required">*</span></label>
-            <select v-model="stage" class="form-control" :disabled="!canUseUpload">
-              <option value="">Select stage...</option>
-              <option value="SIT">SIT</option>
-              <option value="UAT">UAT</option>
-              <option value="PROD">PROD</option>
+            <select v-model="stage" class="form-control" :disabled="!canUseUpload || availableStages.length === 1">
+              <option v-if="availableStages.length > 1" value="">Select stage...</option>
+              <option v-for="s in availableStages" :key="s" :value="s">{{ s }}</option>
             </select>
           </div>
 

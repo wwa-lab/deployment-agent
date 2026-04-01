@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.web.controller;
 
+import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.UploadResponseDto;
 import com.wwa.deploymentagent.contracts.enums.Stage;
@@ -19,18 +20,20 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 /**
- * Upload controller – accepts an XLSX file + stage, runs the full import.
+ * Testing Agent Upload controller – accepts an XLSX file + stage, runs the full import.
  *
  * <pre>
- *   POST /api/deployment-agent/upload   (multipart: file + stage + optional releaseId)
+ *   POST /api/testing-agent/upload   (multipart: file + stage + optional releaseId)
+ *   GET  /api/testing-agent/upload/template
  * </pre>
  *
  * <p>Authorization: DEVELOPER, TL, or DEVOPS_ADMIN role.
+ * <p>Agent is always forced to {@link AgentId#TESTING_AGENT} regardless of client-supplied param.
  */
 @RestController
-@RequestMapping("/api/deployment-agent/upload")
+@RequestMapping("/api/testing-agent/upload")
 @RequiredArgsConstructor
-public class UploadController {
+public class TestingAgentUploadController {
 
     private final ImportService importService;
     private final UploadTemplateService uploadTemplateService;
@@ -43,7 +46,7 @@ public class UploadController {
                 .contentType(MediaType.parseMediaType(
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"request-template.xlsx\"")
+                        "attachment; filename=\"testing-request-template.xlsx\"")
                 .body(uploadTemplateService.generateTemplate());
     }
 
@@ -54,7 +57,7 @@ public class UploadController {
             @RequestParam(value = "releaseId", required = false) String releaseId,
             @RequestParam(value = "snowGroup", required = false) String snowGroup,
             @RequestParam(value = "application", required = false) String application,
-            @RequestParam(value = "agent", required = false) String agent,
+            @RequestParam(value = "agent", required = false) String agent, // accepted but ignored — overridden server-side
             @AuthenticationPrincipal UserContext user) throws IOException {
         validateUploadRole(user);
 
@@ -71,6 +74,7 @@ public class UploadController {
             throw new ValidationAppException("Uploaded file is empty");
         }
 
+        // Security boundary: always use TESTING_AGENT regardless of client-supplied agent param
         ImportResult result = importService.importFile(
                 file.getBytes(),
                 stage,
@@ -78,7 +82,7 @@ public class UploadController {
                 releaseId,
                 snowGroup,
                 application,
-                agent);
+                AgentId.TESTING_AGENT);
         return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 

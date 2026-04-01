@@ -51,6 +51,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - JSON columns use the shared converter helpers and Oracle/H2-compatible CLOB storage
 - Audit logging should not break core business flows
 
+## Multi-Agent Rules
+
+### Shared Components Must Be Agent-Agnostic
+
+`UploadDialog` is shared across all agents. It must NOT hardcode any agent-specific API client or store. Always inject `uploadFn`, `downloadTemplateFn`, and `onUploadSuccess` as props. Each agent view is responsible for passing its own API functions.
+
+- Deployment Agent view passes: `uploadFile` / `downloadTemplate` from `api/upload`, `store.fetchList` from `releaseFlow` store
+- Testing Agent view passes: `uploadFile` / `downloadTemplate` from `api/testingAgentUpload`, `store.fetchList` from `testingAgentReleaseFlow` store
+
+Violating this causes silent data routing bugs — uploads go to the wrong agent's backend, records are saved under the wrong `agentId`, and the list query (which filters by `agentId`) returns nothing.
+
+### Shared File Names Must Not Be Agent-Specific
+
+Downloadable assets shared across agents (e.g. the XLSX upload template) must use a neutral name such as `request-template.xlsx`, not `deployment-request-template.xlsx`. The backend `Content-Disposition` header and frontend `link.download` must match and stay neutral.
+
+### Per-Agent Stage Restrictions
+
+Each agent defines its own allowed stages. Do not default to `['SIT', 'UAT', 'PROD']` for new agents.
+
+| Agent | Allowed Stages |
+|-------|---------------|
+| Deployment Agent | SIT, UAT, PROD |
+| Testing Agent | UAT only |
+
+Enforce via `:allowed-stages` prop on `UploadDialog` and a `stages` constant in the summary view. Also update: page subtitle, WWA Today description, Stage filter (use a disabled input when only one stage is allowed), and `agentRegistry.ts` description.
+
+### Checklist When Adding a New Agent
+
+- [ ] Agent view passes its own `uploadFn`, `downloadTemplateFn`, `onUploadSuccess` to `UploadDialog`
+- [ ] Agent view passes `:allowed-stages` matching the agent's scope
+- [ ] `stages` constant in the summary view matches allowed stages
+- [ ] Page subtitle and WWA Today text do not mention stages outside the agent's scope
+- [ ] Stage filter is a disabled input (not a dropdown) when only one stage is allowed
+- [ ] `agentRegistry.ts` description is accurate
+- [ ] Backend controller forces `effectiveAgent = AgentId.<THIS_AGENT>` (never trusts client-supplied agent param)
+
 ## Safety Rails
 
 ## NEVER

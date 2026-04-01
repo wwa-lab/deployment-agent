@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useReleaseFlowStore } from '../stores/releaseFlow'
+import { useTestingAgentReleaseFlowStore } from '../stores/testingAgentReleaseFlow'
 import { useUserStore } from '../stores/user'
 import UploadDialog from '../components/UploadDialog.vue'
-import { uploadFile, downloadTemplate } from '../api/upload'
+import { uploadFile, downloadTemplate } from '../api/testingAgentUpload'
 import type { FlowStatus, ReleaseFlowListItem, RequestStatus, Stage } from '../types'
 
 const router = useRouter()
-const store = useReleaseFlowStore()
+const store = useTestingAgentReleaseFlowStore()
 const userStore = useUserStore()
 
 const showUpload = ref(false)
 
 const flowStatuses: FlowStatus[] = ['Pending', 'Running', 'Completed', 'Failed', 'Rejected']
-const stages: Stage[] = ['SIT', 'UAT', 'PROD']
+const stages: Stage[] = ['UAT']
 const attemptViews = [
   { value: 'latest', label: 'Latest Attempt' },
   { value: 'history', label: 'Include History' },
@@ -43,7 +43,7 @@ function onFilterChange(
 function goToDetail(flow: ReleaseFlowListItem) {
   const linked = flow.linkedReleaseFlowIds.length > 1 ? flow.linkedReleaseFlowIds.join(',') : undefined
   router.push({
-    path: `/wwa/deployment-agent/release-flows/${flow.id}`,
+    path: `/wwa/testing-agent/release-flows/${flow.id}`,
     query: {
       ...(showArchived.value ? { archived: '1' } : {}),
       ...(linked ? { linked } : {}),
@@ -144,8 +144,8 @@ function toggleArchivedVisibility() {
     <div class="view-header">
       <div>
         <p class="view-eyebrow">WWA Workspace</p>
-        <h1 class="view-title">Deployment Agent</h1>
-        <p class="view-subtitle">Track release flows, upload deployment files, and monitor stage progress across SIT, UAT, and PROD.</p>
+        <h1 class="view-title">Testing Agent</h1>
+        <p class="view-subtitle">Track iSeries A/B testing rundowns by program level with human-in-the-loop controls.</p>
       </div>
       <div class="header-actions">
         <button
@@ -167,13 +167,13 @@ function toggleArchivedVisibility() {
       </div>
     </div>
 
-    <section class="wwa-intro-card" aria-labelledby="wwa-deployment-intro-title">
+    <section class="wwa-intro-card" aria-labelledby="wwa-testing-intro-title">
       <div class="wwa-intro-kicker">WWA Today</div>
-      <h2 id="wwa-deployment-intro-title" class="wwa-intro-title">DevOps automation with human control</h2>
+      <h2 id="wwa-testing-intro-title" class="wwa-intro-title">iSeries A/B testing with human control</h2>
       <p class="wwa-intro-text">
-        WWA currently focuses on DevOps automation. Deployment Agent is the release-execution
-        workspace for tracking and progressing rundowns across SIT, UAT, and PROD, with AI-assisted
-        capabilities planned for future phases.
+        WWA currently supports a Testing Agent workspace. Testing Agent is the A/B testing
+        workspace for iSeries programs, enabling controlled rundowns by program level
+        with human-in-the-loop sign-off at every step.
       </p>
     </section>
 
@@ -232,14 +232,7 @@ function toggleArchivedVisibility() {
       </div>
       <div class="filter-group">
         <label class="form-label">Stage</label>
-        <select
-          class="form-control"
-          :value="store.filters.stage ?? ''"
-          @change="onFilterChange('stage', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">All</option>
-          <option v-for="s in stages" :key="s" :value="s">{{ s }}</option>
-        </select>
+        <input class="form-control" type="text" value="UAT" disabled />
       </div>
       <div class="filter-group">
         <label class="form-label">Attempt View</label>
@@ -356,6 +349,7 @@ function toggleArchivedVisibility() {
     <UploadDialog
       v-if="showUpload"
       :initial-scope="uploadScope"
+      :allowed-stages="['UAT']"
       :upload-fn="uploadFile"
       :download-template-fn="downloadTemplate"
       :on-upload-success="store.fetchList"

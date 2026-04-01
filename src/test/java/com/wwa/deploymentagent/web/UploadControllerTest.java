@@ -35,7 +35,7 @@ class UploadControllerTest {
                         .header("X-User-Role", "DEVELOPER"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
-                        "attachment; filename=\"deployment-request-template.xlsx\""))
+                        "attachment; filename=\"request-template.xlsx\""))
                 .andExpect(header().string("Content-Type",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     }
@@ -48,7 +48,7 @@ class UploadControllerTest {
                         .header("X-User-Role", "DEVOPS_ADMIN"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
-                        "attachment; filename=\"deployment-request-template.xlsx\""))
+                        "attachment; filename=\"request-template.xlsx\""))
                 .andExpect(header().string("Content-Type",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     }

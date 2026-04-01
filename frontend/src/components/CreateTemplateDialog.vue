@@ -148,7 +148,7 @@ async function handleTemplateDownload() {
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'deployment-request-template.xlsx'
+    link.download = 'request-template.xlsx'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

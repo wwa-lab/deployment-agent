@@ -48,15 +48,26 @@ public class TestDataHelper {
 
     @Transactional
     public Request seedRequest(ReleaseFlow releaseFlow, Stage stage, RequestStatus status) {
+        return seedRequest(releaseFlow, stage, status, null);
+    }
+
+    @Transactional
+    public Request seedRequest(ReleaseFlow releaseFlow, Stage stage, RequestStatus status, String agent) {
         Request req = new Request();
         req.setReleaseFlow(releaseFlow);
         req.setStage(stage);
         req.setAttemptNumber(requestRepository.findMaxAttemptNumberByReleaseFlowIdAndStage(releaseFlow.getId(), stage) + 1);
         req.setRequestStatus(status);
+        req.setAgent(agent);
         Request saved = requestRepository.save(req);
         entityManager.flush();
         entityManager.refresh(releaseFlow);
         return saved;
+    }
+
+    @Transactional
+    public Request seedRequest(ReleaseFlow releaseFlow, String agent) {
+        return seedRequest(releaseFlow, Stage.SIT, RequestStatus.Pending, agent);
     }
 
     @Transactional
