@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split Oracle datasource settings out of the default Spring config into a dedicated `test` profile so `local` H2 startup no longer risks inheriting Oracle dialect settings; updated README and Docker docs to use the `test` profile for Oracle-backed runs.
+- Added `DOCKER.md` with backend/frontend image naming plus copy-ready Docker `build`, `push`, `pull`, and `run` commands for local H2 and Oracle-backed startup flows.
 - Corrected repo-operating documentation so agent/runbook guidance matches the current Spring Boot + Vue codebase: `AGENTS.md` and `CLAUDE.md` now use real commands and paths, the Claude SDLC playbook now points to the staged `docs/02..06-*` artifact locations and includes the repo-docs consistency review skill, and the UAT runbook no longer contradicts itself about the bundled Oracle baseline schema script.
 - Cleaned the next layer of stale repository docs by fixing onboarding/review/migration references that no longer matched the repo, marking historical review artifacts as dated snapshots, removing nonexistent taxonomy/file references, and updating several review findings whose underlying code gaps have already been addressed.
 - Closed the last two docs-vs-code review gaps by resolving the remaining `spec.md` field-source `TBD`s to match the implemented release-flow behavior and marking the early shared-menu HTML as a historical Deployment Agent prototype instead of a current UI baseline.
