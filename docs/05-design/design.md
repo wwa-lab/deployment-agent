@@ -958,6 +958,375 @@ Audit should record at least:
 
 ---
 
-## Summary
+## Development Workspace Extension: Code Spec Workbench
 
-The current Deployment Agent design centers on controlled workflow execution, explicit human review, strong auditability, and operational clarity. Phase 1 extends that foundation by introducing local Access Grants, deny-by-default product entry, and an admin-managed Access Management capability, while preserving the existing separation between enterprise identity and product authorization. The design is intentionally explicit about current MVP tradeoffs, especially around AUTO execution completion and dependency handling, so follow-on implementation work can proceed with fewer hidden assumptions.
+### Objective
+
+Add a new `Development` workspace page under the existing `/wwa` route hierarchy to help users produce structured AS400-oriented code specifications before implementation. The page is not a source-code editor and does not execute deployment workflow actions. Its primary purpose is to collect implementation intent, normalize development inputs, and generate a reusable code-spec artifact that can guide later AS400 development in either free-format or fixed-format style.
+
+This extension follows the current Deployment Agent operating model:
+- existing login/session behavior remains unchanged
+- existing `Application + SNOW Group` authorization model remains unchanged
+- existing WWA shell navigation and page framing remain unchanged
+- existing audit and operational expectations remain unchanged where persistence is introduced
+
+### Scope
+
+#### In Scope
+
+1. A new `Development` page under `/wwa/development`
+2. Form-driven capture of implementation requirements for AS400 development work
+3. Explicit support for AS400 code-style targeting:
+   - free format
+   - fixed format
+   - dual-support planning
+4. Template-based generation of a structured code-spec document preview
+5. Draft save/load behavior for generated specifications
+6. Export of generated specifications in at least Markdown and JSON form
+7. Reuse of existing authenticated user context and scoped access model
+
+#### Out of Scope
+
+- In-browser source-code editing
+- Direct source-code generation as the primary user workflow
+- Compilation, linting, or execution of AS400 code
+- Direct IBM i / AS400 runtime integration in the initial phase
+- Release-flow orchestration coupling beyond shared shell and authorization patterns
+- Full document-versioning workflow in the initial phase
+
+### Design Positioning
+
+The `Development` page is a spec-generation workbench, not a programming IDE. This boundary is intentional.
+
+The page should help users transform business and technical intent into an implementation-facing artifact with enough structure to support downstream development, review, estimation, and later code generation. This keeps the first phase stable, auditable, and testable without prematurely coupling the feature to code-editor complexity or runtime platform integration.
+
+---
+
+## Module Design Extension
+
+### 12. Development Spec Module
+
+**Responsibilities**
+- Capture structured input for a planned AS400 development change
+- Normalize form input into a stable spec-generation payload
+- Produce a generated code specification from stored inputs
+- Persist spec drafts and generated outputs
+- Support export of spec artifacts for downstream development use
+
+**Key Interactions**
+- Uses current authenticated user context from the session model
+- Uses current scoped authorization model for page access and record visibility
+- Exposes REST endpoints for CRUD, generation, and export
+- Writes audit events when specs are created, regenerated, updated, or exported if persistence/audit is enabled for the action
+
+**Internal Design Concerns**
+- The module must distinguish raw user input from generated output
+- Spec generation should be deterministic in the first phase
+- Generation rules must explicitly support AS400-specific design concerns
+- Free-format and fixed-format expectations must be represented as spec content, not only as labels
+- Open questions and unresolved assumptions must remain visible in the generated output rather than being silently dropped
+
+### 13. Development Workspace UI Module
+
+**Responsibilities**
+- Present a workbench-style page for structured spec authoring
+- Guide the user through required and optional AS400 development inputs
+- Show a real-time or on-demand generated code-spec preview
+- Support edit, regenerate, save draft, and export actions
+
+**Primary View**
+- `DevelopmentWorkbenchView`
+
+**Key Components**
+- `DevelopmentSpecForm` — structured input form grouped by design topic
+- `DevelopmentSpecPreview` — generated spec preview pane
+- `DevelopmentSpecSectionEditor` — optional manual refinement for generated sections
+- `DevelopmentSpecExportDialog` — export action surface
+
+**Internal Design Concerns**
+- The page should privilege clarity over density
+- Users should always understand which content is manually entered versus generated
+- Validation feedback should appear near the relevant section, not only in a global error summary
+- Generated sections should remain readable even when some optional source fields are missing
+
+---
+
+## API / Interface Design Extension
+
+### Development Spec Interfaces
+
+**Purpose**
+- Create, read, update, generate, and export structured development specs
+
+**Main Interfaces**
+- `GET /development-specs`
+- `POST /development-specs`
+- `GET /development-specs/{id}`
+- `PUT /development-specs/{id}`
+- `POST /development-specs/{id}/generate`
+- `GET /development-specs/{id}/export`
+
+**Validation Expectations**
+- Spec title is required
+- At least one implementation objective or business objective field must be present
+- `programType` must be from the supported AS400 catalog
+- `codeStyle` must be `FREE_FORMAT`, `FIXED_FORMAT`, or `BOTH`
+- Export format must be from the supported export catalog
+- Visibility and mutation must respect the same scoped authorization pattern already used by Deployment Agent
+
+**Error Behavior**
+- `400` for malformed payloads or unsupported enum values
+- `403` for unauthorized access to the page or target record
+- `404` when the requested spec does not exist
+- `409` for conflicting updates if optimistic locking is applied
+
+### Generation Strategy
+
+The initial generation model should be rule/template-driven rather than LLM-dependent.
+
+This means:
+- the backend receives structured inputs
+- generation logic maps those inputs into a stable sectioned document
+- the output is deterministic for the same input payload
+- the result is easy to test with standard backend contract tests
+
+A later phase may add AI-assisted wording refinement, but the first phase should not depend on model availability to generate a usable code spec.
+
+---
+
+## Data Design Extension
+
+### Logical Entities
+
+| Entity | Purpose | Key Attributes |
+|--------|---------|----------------|
+| Development Spec | Top-level code-spec draft and generated artifact | `title`, `module_name`, `program_type`, `code_style`, `status`, `created_by`, `updated_by` |
+| Development Spec Input | Raw structured authoring input | `business_objective`, `trigger_condition`, `input_definition`, `output_definition`, `processing_rules`, `constraints`, `open_questions` |
+| Development Spec Artifact | Generated output payloads and exports | `format`, `generated_content`, `generated_at`, `generated_by` |
+
+### Development Spec Design
+
+**Core fields**
+- `title`
+- `module_name`
+- `program_type`
+- `code_style`
+- `business_objective`
+- `trigger_condition`
+- `input_definition`
+- `output_definition`
+- `processing_rules`
+- `file_references`
+- `program_calls`
+- `error_handling`
+- `test_scenarios`
+- `constraints`
+- `open_questions`
+- `status`
+- `created_by`, `created_at`, `updated_by`, `updated_at`
+
+**Status guidance**
+- `DRAFT`
+- `GENERATED`
+- `REVIEWED`
+
+**Storage guidance**
+- Large structured sections may be stored as JSON/CLOB-backed payloads for Oracle/H2 compatibility
+- Generated Markdown export can be stored or produced on demand
+- JSON export should preserve the normalized source model as well as generated sections where applicable
+
+### AS400-Specific Input Design
+
+The source model should explicitly represent AS400-specific design choices so the generated spec is implementation-useful rather than generic.
+
+Recommended catalogs include:
+- `programType`
+  - `RPGLE`
+  - `SQLRPGLE`
+  - `CLLE`
+  - `DSPF`
+  - `PRTF`
+- `codeStyle`
+  - `FREE_FORMAT`
+  - `FIXED_FORMAT`
+  - `BOTH`
+
+Recommended AS400-focused content areas include:
+- file usage intent (`INPUT`, `UPDATE`, `OUTPUT`)
+- record format references
+- external program call expectations
+- batch vs interactive execution expectation
+- indicator usage notes for fixed-format planning
+- migration notes when both free and fixed format must be supported
+- naming or library-list assumptions
+
+---
+
+## UI / User Flow Design Extension
+
+### 8. Development Page Entry
+
+- User navigates to `/wwa/development`
+- Standard session/auth behavior applies
+- Standard shell layout applies
+- The page appears as a separate workspace function alongside current WWA pages
+
+### 9. Development Workbench Layout
+
+The recommended first-phase layout is a two-pane workbench:
+
+**Left pane: structured authoring form**
+Grouped input sections:
+1. Basic Info
+2. Business Requirement
+3. Data / File Design
+4. Program Structure
+5. Error / Audit Expectations
+6. Delivery Notes / Open Questions
+
+**Right pane: generated code-spec preview**
+Generated sections:
+1. Overview
+2. Program Objective
+3. Input / Output Definition
+4. Processing Flow
+5. Data and File Usage
+6. Procedure / Program Structure
+7. Error Handling
+8. Free-Format Considerations
+9. Fixed-Format Considerations
+10. Test Scenarios
+11. Open Questions
+
+### 10. Development Authoring Flow
+
+1. User opens the `Development` page
+2. User enters structured development inputs
+3. User chooses AS400 target context (`programType`, `codeStyle`)
+4. User triggers generation or receives live preview updates depending on implementation choice
+5. System generates the sectioned code spec
+6. User reviews and optionally refines source inputs
+7. User saves the draft and/or exports the artifact
+
+### 11. Editing and Regeneration Behavior
+
+- Source inputs remain the primary editable model
+- Generated output may support section-level refinement, but regeneration should not silently overwrite manual edits without explicit user action
+- If manual section editing is introduced, the UI should make clear whether the user is looking at:
+  - source input
+  - generated output
+  - manually adjusted output
+
+### 12. Export Behavior
+
+Supported initial exports:
+- Markdown
+- JSON
+
+Expected behavior:
+- Markdown is optimized for human review and downstream documentation
+- JSON is optimized for later machine-assisted transformation into tasks, code skeletons, or review pipelines
+
+---
+
+## Security / Audit / Reliability Extension
+
+### Access Control
+
+- The `Development` page follows existing authenticated-session requirements
+- Record visibility should follow the same scoped authorization approach already used in the product unless a narrower rule is approved later
+- Mutation actions require authenticated access and should be attributable to the acting user
+
+### Audit Design
+
+If development-spec persistence is included in the first phase, audit should record at least:
+- spec create
+- spec update
+- spec generate/regenerate
+- spec export
+
+### Reliability
+
+- Generation must be deterministic in the first phase
+- Save and generate operations should tolerate incomplete optional sections
+- Export must fail clearly when the requested artifact cannot be produced
+
+---
+
+## Validation and Error Handling Extension
+
+### Input Validation
+
+- Require a title and minimum implementation intent
+- Require supported `programType`
+- Require supported `codeStyle`
+- Validate export format
+- Validate structured lists and large text sections for shape, not only presence
+
+### User-Facing Error Messaging Expectations
+
+- Missing required authoring fields should point users to the exact section needing attention
+- Unsupported AS400 target combinations should return explicit validation errors
+- Generation errors should preserve user-entered draft content
+- Export errors should not discard the generated preview already present in the UI
+
+---
+
+## Testing Considerations Extension
+
+### Key Test Areas
+
+1. Route access and page loading under existing auth/session rules
+2. Development-spec create/read/update flows
+3. Deterministic generation for the same input payload
+4. Markdown and JSON export behavior
+5. Validation around `programType` and `codeStyle`
+6. Preview rendering for partially complete source input
+7. Scoped visibility enforcement if record persistence is introduced
+
+### Critical Test Scenarios
+
+- User creates a spec for `RPGLE` with `FREE_FORMAT` and receives the correct free-format guidance section
+- User creates a spec for `RPGLE` with `FIXED_FORMAT` and receives the correct fixed-format guidance section
+- User selects `BOTH` and receives explicit dual-format planning notes
+- User omits optional file references and still receives a valid generated spec
+- User exports Markdown after generation and receives the same content shown in preview
+
+---
+
+## Risks / Design Tradeoffs Extension
+
+### Design Risks
+
+1. **Spec/editor boundary drift**
+   - The page may become overloaded if code-editing expectations creep into the first phase
+
+2. **Over-generic generation**
+   - If the source model is too generic, the resulting spec will not be useful for real AS400 implementation work
+
+3. **Manual-edit vs regenerate conflict**
+   - If generated output becomes directly editable, regeneration rules must remain explicit to avoid user confusion or data loss
+
+### Notable Tradeoffs
+
+| Tradeoff | Choice | Rationale |
+|----------|--------|-----------|
+| Primary workflow | Spec generation before code generation | Matches current need and keeps first phase stable |
+| Generation engine | Rule/template-driven first | Easier to validate and test than LLM-dependent generation |
+| UX shape | Two-pane workbench | Best balance of structured input and immediate preview |
+| AS400 support | Explicit free/fixed/both support | Keeps the output useful for actual downstream implementation |
+
+---
+
+## Open Questions Extension
+
+1. Should later phases add reusable development-spec templates for common AS400 program types?
+2. Should generated specs be linkable to release flows or task records in a future phase?
+3. Should manual section editing be supported in Phase 1, or should editing remain source-input-only?
+4. Should a future phase transform generated development specs directly into implementation tasks or starter code artifacts?
+
+---
+
+## Summary Addendum
+
+The `Development` workspace extension adds a structured code-spec generation capability to Deployment Agent without changing the system's existing authentication, authorization, or WWA shell model. The recommended first phase is a deterministic spec workbench focused on AS400 implementation planning, with explicit support for free-format, fixed-format, and dual-support development. This design keeps the new page useful for real delivery work while avoiding premature expansion into full code editing or runtime platform integration.

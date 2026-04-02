@@ -64,12 +64,28 @@ public class HeaderAuthFilter extends OncePerRequestFilter {
                     List.of(role.trim()),
                     Set.of(),
                     userId.trim(),
-                    List.of(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD))
+                    parseScopes(request.getHeader("X-User-Scopes"))
             );
             UserContextAuthentication auth = new UserContextAuthentication(ctx);
             SecurityContextHolder.getContext().setAuthentication(auth);
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private List<AccessScope> parseScopes(String rawScopes) {
+        if (rawScopes == null || rawScopes.isBlank()) {
+            return List.of(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD));
+        }
+        return java.util.Arrays.stream(rawScopes.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(scope -> {
+                    String[] parts = scope.split("\\|", 2);
+                    String application = parts.length > 0 ? parts[0].trim() : null;
+                    String snowGroup = parts.length > 1 ? parts[1].trim() : null;
+                    return new AccessScope(application, snowGroup);
+                })
+                .toList();
     }
 }

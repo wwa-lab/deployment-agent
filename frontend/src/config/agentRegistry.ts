@@ -9,7 +9,7 @@
  * docs/00-context/multi-agent-integration-standard.md section 8.
  */
 
-export type AgentCategory = 'deployment' | 'testing' | 'platform' | 'other'
+export type AgentCategory = 'deployment' | 'development' | 'testing' | 'platform' | 'other'
 
 export type AgentDescriptor = {
   /** Unique stable key. Used as route segment and CSS key. */
@@ -37,6 +37,15 @@ export const agentRegistry: AgentDescriptor[] = [
     icon: '🚀',
     enabled: true,
     category: 'deployment',
+  },
+  {
+    key: 'development-specs',
+    name: 'Development Spec',
+    description: 'Draft, generate, and export structured development specifications from a guided workspace.',
+    route: '/wwa/development-specs',
+    icon: '🧾',
+    enabled: true,
+    category: 'development',
   },
   // Add future agents here. Example:
   // {

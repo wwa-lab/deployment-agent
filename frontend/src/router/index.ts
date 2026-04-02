@@ -66,6 +66,24 @@ const router = createRouter({
           },
         },
         {
+          path: 'development-specs',
+          name: 'wwa-development-specs',
+          component: () => import('../views/DevelopmentSpecListView.vue'),
+          meta: {
+            section: 'development-specs',
+            sectionTitle: 'Development Spec',
+          },
+        },
+        {
+          path: 'development-specs/:id',
+          name: 'wwa-development-specs-detail',
+          component: () => import('../views/DevelopmentSpecDetailView.vue'),
+          meta: {
+            section: 'development-specs',
+            sectionTitle: 'Development Spec',
+          },
+        },
+        {
           path: 'template-management',
           name: 'wwa-template-management',
           component: () => import('../views/TemplateManagementView.vue'),

@@ -285,6 +285,49 @@ export interface TaskResult {
   submissionMessage?: string
 }
 
+export interface DevelopmentSpecSourcePayload {
+  businessObjective?: string
+  implementationObjective?: string[]
+  inputs?: string[]
+  outputs?: string[]
+}
+
+export type DevelopmentSpecProgramType = 'RPGLE' | 'SQLRPGLE' | 'CLLE' | 'DSPF' | 'PRTF'
+export type DevelopmentSpecCodeStyle = 'FREE_FORMAT' | 'FIXED_FORMAT' | 'BOTH'
+export type DevelopmentSpecStatus = 'DRAFT' | 'GENERATED' | 'REVIEWED'
+
+export interface DevelopmentSpec {
+  id: string
+  title: string
+  moduleName?: string
+  programType: DevelopmentSpecProgramType
+  codeStyle: DevelopmentSpecCodeStyle
+  application: string
+  snowGroup: string
+  sourcePayload: DevelopmentSpecSourcePayload
+  generatedPayload?: Record<string, unknown>
+  generatedContent?: string
+  generatedAt?: string
+  generatedBy?: string
+  status: DevelopmentSpecStatus
+  createdBy?: string
+  createdAt?: string
+  updatedBy?: string
+  updatedAt?: string
+  version?: number
+}
+
+export interface DevelopmentSpecUpsertRequest {
+  title: string
+  moduleName?: string
+  programType: DevelopmentSpecProgramType
+  codeStyle: DevelopmentSpecCodeStyle
+  application: string
+  snowGroup: string
+  sourcePayload: DevelopmentSpecSourcePayload
+  version?: number
+}
+
 // Paginated
 export interface PaginatedResponse<T> {
   data: T[]
