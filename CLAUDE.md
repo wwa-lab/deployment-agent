@@ -18,9 +18,83 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build And Test
 
 - Backend test: `mvn test`
+- Backend single test class: `mvn test -Dtest=ReleaseFlowControllerTest`
+- Backend single test method: `mvn test -Dtest=ReleaseFlowControllerTest#methodName`
 - Backend local run: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
 - Frontend dev: `cd frontend && npm install && npm run dev` (Vite on `:5173`, proxies `/api` to `:8080`)
-- Frontend build/typecheck: `cd frontend && npm run build`
+- Frontend build/typecheck: `cd frontend && npm run build` (runs `vue-tsc && vite build`)
+
+## Spring Profiles
+
+| Profile | Database | DDL | Header Auth | Use |
+|---------|----------|-----|-------------|-----|
+| `default` | Oracle | validate | disabled | Production |
+| `local` | H2 in-memory | update | enabled | Local dev |
+| `test` | H2 in-memory | validate | enabled | Tests |
+
+## Local Login Credentials
+
+Any non-empty password works with the stub auth provider.
+
+| Employee ID | Display Name | Role |
+|-------------|-------------|------|
+| `emp-001` | Alice Park | DEVELOPER |
+| `emp-002` | Bob Kim | TL |
+| `emp-003` | Carol Lee | DEVOPS_ADMIN |
+| `emp-004` | David Cho | AUDIT |
+| `emp-005` | Eve Yoon | MANAGEMENT |
+
+## Architecture Overview
+
+### Entity Hierarchy
+
+```
+ReleaseFlow (root aggregate, @Version optimistic lock)
+ └─ Request (stage-specific, has optional `agent` field for multi-agent isolation)
+     └─ Task (atomic execution unit, MANUAL or AUTO)
+         └─ TaskExecutionHistory (immutable record of each attempt)
+```
+
+### Multi-Agent Architecture
+
+The system supports multiple agents (Deployment Agent, Testing Agent) sharing the same domain services but isolated at three layers:
+
+**Backend isolation:**
+- Separate controller routes: `/api/deployment-agent/*` vs `/api/testing-agent/*`
+- Controllers force `effectiveAgent = AgentId.<AGENT>` server-side (client `?agent=` param is ignored)
+- Shared domain services receive `agentId` as a parameter; queries filter by `request.agent`
+
+**Frontend isolation:**
+- Separate Axios clients: `api/client.ts` (baseURL `/api/deployment-agent`) vs `api/testingAgentClient.ts` (baseURL `/api/testing-agent`)
+- Separate Pinia stores: `releaseFlow.ts` vs `testingAgentReleaseFlow.ts`
+- Separate view components: `ReleaseFlowSummaryView` / `ReleaseFlowDetailView` vs `TestingAgentSummaryView` / `TestingAgentDetailView`
+- Agent registry in `frontend/src/config/agentRegistry.ts` drives home page cards and nav
+
+### Security Architecture
+
+1. `SessionAuthFilter` reads `UserContext` from HTTP session
+2. `HeaderAuthFilter` reads `X-User-Id` / `X-User-Role` headers (test/local only, controlled by `app.auth.header-fallback-enabled`)
+3. `UserContext` carries `roles[]`, `permissions[]`, `scopes[]` (application + snowGroup pairs)
+4. DEVOPS_ADMIN with no scopes = global admin; with scopes = scoped admin
+
+### Error Handling
+
+Custom `AppException` hierarchy in `errors/` maps to HTTP status codes. `GlobalExceptionHandler` (@RestControllerAdvice) intercepts all exceptions and returns `ErrorResponseDto`. Reuse existing exception types; do not create new ones without justification.
+
+### Frontend Routing
+
+```
+/login                                     → LoginView (public)
+/wwa/home                                 → WwaHomeView (agent cards)
+/wwa/deployment-agent                      → ReleaseFlowSummaryView
+/wwa/deployment-agent/release-flows/:id    → ReleaseFlowDetailView
+/wwa/testing-agent                         → TestingAgentSummaryView
+/wwa/testing-agent/release-flows/:id       → TestingAgentDetailView
+/wwa/template-management                   → TemplateManagementView
+/wwa/configuration-management              → ConfigAdminView
+/wwa/audit-log                             → AuditLogView
+/wwa/access-management                     → AccessManagementView
+```
 
 ## Architecture Boundaries
 
@@ -49,7 +123,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Entity IDs are String UUIDs generated via `@PrePersist`
 - Enum constant names match DB string values directly
 - JSON columns use the shared converter helpers and Oracle/H2-compatible CLOB storage
-- Audit logging should not break core business flows
+- Audit logging should not break core business flows (`AuditLoggerService` uses `Propagation.REQUIRES_NEW`)
+- Optimistic locking via `@Version Long version` on ReleaseFlow, Request, Task
 
 ## Multi-Agent Rules
 
@@ -79,12 +154,19 @@ Enforce via `:allowed-stages` prop on `UploadDialog` and a `stages` constant in 
 
 ### Checklist When Adding a New Agent
 
+- [ ] Add `AgentId` constant in `contracts/AgentId.java`
+- [ ] Create backend controllers under `/api/<agent-key>/` that force `effectiveAgent` server-side
+- [ ] Create frontend Axios client with `baseURL: '/api/<agent-key>'`
+- [ ] Create frontend Pinia store (parallel to `releaseFlow.ts`)
+- [ ] Create frontend API modules (parallel to `releaseFlows.ts`, `upload.ts`, `tasks.ts`)
+- [ ] Create summary and detail view components
+- [ ] Register in `agentRegistry.ts` with accurate description
+- [ ] Add routes in `frontend/src/router/index.ts`
 - [ ] Agent view passes its own `uploadFn`, `downloadTemplateFn`, `onUploadSuccess` to `UploadDialog`
 - [ ] Agent view passes `:allowed-stages` matching the agent's scope
 - [ ] `stages` constant in the summary view matches allowed stages
 - [ ] Page subtitle and WWA Today text do not mention stages outside the agent's scope
 - [ ] Stage filter is a disabled input (not a dropdown) when only one stage is allowed
-- [ ] `agentRegistry.ts` description is accurate
 - [ ] Backend controller forces `effectiveAgent = AgentId.<THIS_AGENT>` (never trusts client-supplied agent param)
 
 ## Safety Rails

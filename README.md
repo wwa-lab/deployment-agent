@@ -1,26 +1,41 @@
-# Deployment Agent
+# WWA Agent Workspace Hub
 
-Deployment Agent is the first active workspace inside the **WWA Agent Workspace Hub**. It is a controlled, human-in-the-loop release orchestration product for creating, running, reviewing, and auditing deployment rundowns across SIT, UAT, and PROD.
+This repository hosts the **WWA Agent Workspace Hub** — a multi-agent platform for controlled, human-in-the-loop operational workflows. It currently contains two active agent workspaces:
+
+| Agent | Purpose | Stages |
+|-------|---------|--------|
+| **Deployment Agent** | Release orchestration — creating, running, reviewing, and auditing deployment rundowns | SIT, UAT, PROD |
+| **Testing Agent** | iSeries A/B testing — tracking and progressing test rundowns by program level | UAT |
 
 This README reflects the current repository code and the current design baseline in [`docs/05-design/design.md`](docs/05-design/design.md).
 
 ## Current Baseline
 
-- Product/workspace name: **Deployment Agent**
 - Platform shell name: **WWA Agent Workspace Hub** (`WWA`)
-- Current technical identifiers remain unchanged:
+- Active agent workspaces: **Deployment Agent**, **Testing Agent**
+- Current technical identifiers:
   - repository / artifact: `deployment-agent`
-  - frontend route: `/wwa/deployment-agent`
-  - API base path: `/api/deployment-agent`
   - Java package: `com.wwa.deploymentagent`
-- Current implementation status: MVP release orchestration plus scoped access-governance foundations, template-based rundown creation, rundown archive lifecycle, scoped configuration management, and WWA shell integration
+  - Deployment Agent: route `/wwa/deployment-agent`, API `/api/deployment-agent`
+  - Testing Agent: route `/wwa/testing-agent`, API `/api/testing-agent`
+- Current implementation status: MVP release orchestration, iSeries A/B testing workspace, scoped access-governance foundations, template-based rundown creation, rundown archive lifecycle, scoped configuration management, and WWA shell integration
 
 ## What Is Implemented Today
+
+### Platform (shared across all agents)
 
 - Session-based login through a configurable authentication-provider abstraction (`TeamBookAuthenticationProvider` in code)
 - Deny-by-default product access via local `AccessGrant` records
 - Effective auth/session payload with compatibility `role`, plus `roles[]`, `permissions[]`, and `scopes[]`
 - Scoped visibility and delegated administration based on `Application + SNOW Group`
+- Configuration Management with scoped component overrides: `Platform Default`, `Application Default`, `SNOW Group Default`, `Agent Override`
+- Encrypted storage for sensitive configuration values
+- Audit Log with `application`, `snowGroup`, and `agent` trace fields
+- WWA Access Management for listing, creating, updating, suspending, reactivating, and directory-searching access grants
+- Shared `UploadDialog` component with agent-injected API functions and per-agent stage restrictions
+
+### Deployment Agent
+
 - Release-flow summary and detail pages inside the WWA shell
 - Stitched rollout views that group related SIT / UAT / PROD uploads together
 - Attempt-aware rundown history with `latest` and `history` views for repeated stage uploads
@@ -29,14 +44,14 @@ This README reflects the current repository code and the current design baseline
 - Task lifecycle actions for edit input, start MANUAL execution, submit AUTO execution, record results, and apply review decisions
 - Execution history per task attempt, including reruns and external job links
 - Rundown-level controls for editing scope metadata, starting deployment, marking failed, archiving, restoring, and purging
-- Configuration Management with scoped component overrides:
-  - `Platform Default`
-  - `Application Default`
-  - `SNOW Group Default`
-  - `Agent Override`
-- Encrypted storage for sensitive configuration values
-- Audit Log with `application`, `snowGroup`, and `agent` trace fields
-- WWA Access Management for listing, creating, updating, suspending, reactivating, and directory-searching access grants
+
+### Testing Agent
+
+- iSeries A/B testing workspace for tracking test rundowns by program level
+- UAT-only stage (SIT and PROD are not applicable)
+- Separate summary and detail views with testing-specific descriptions
+- Isolated data path — backend controllers force `AgentId.TESTING_AGENT`, frontend uses dedicated API client and Pinia store
+- Shared upload, template download, task lifecycle, archive/restore/purge, and rundown editing with Deployment Agent via common domain services
 
 ## Important Current Boundaries
 
@@ -81,7 +96,7 @@ src/main/java/com/wwa/deploymentagent/
   errors/           Shared application exceptions
   util/             Shared converters and helpers
   web/
-    controller/     Current HTTP entry points
+    controller/     HTTP entry points (deployment-agent + testing-agent controllers)
     exception/      Global exception handling
     security/       Session/header auth filters and Spring Security glue
 
@@ -193,15 +208,17 @@ npm run build
 
 WWA shell pages currently exposed by the frontend:
 
-- `/wwa/home`
-- `/wwa/deployment-agent`
-- `/wwa/template-management`
-- `/wwa/configuration-management`
-- `/wwa/audit-log`
-- `/wwa/access-management`
+- `/wwa/home` — agent workspace selector
+- `/wwa/deployment-agent` — Deployment Agent summary and detail
+- `/wwa/testing-agent` — Testing Agent summary and detail
+- `/wwa/template-management` — template authoring (platform)
+- `/wwa/configuration-management` — scoped config management (platform)
+- `/wwa/audit-log` — audit trail viewer (platform)
+- `/wwa/access-management` — user access grants (platform)
 
 Main backend API groups:
 
+Deployment Agent:
 - `/api/deployment-agent/auth`
 - `/api/deployment-agent/access-grants`
 - `/api/deployment-agent/upload`
@@ -209,6 +226,11 @@ Main backend API groups:
 - `/api/deployment-agent/tasks`
 - `/api/deployment-agent/config`
 - `/api/deployment-agent/audit-logs`
+
+Testing Agent:
+- `/api/testing-agent/upload`
+- `/api/testing-agent/release-flows`
+- `/api/testing-agent/tasks`
 
 ## Source Documents
 
