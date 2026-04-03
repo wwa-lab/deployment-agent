@@ -112,15 +112,22 @@ function canModifyTask(task: Task): boolean {
 }
 
 function canEdit(task: Task): boolean {
-  return (
-    canModifyTask(task) &&
-    (task.taskStatus === 'Pending' || task.taskStatus === 'Ready_For_Execution')
-  )
+  if (!canModifyTask(task)) return false
+  // MANUAL tasks can be edited in Pending, Ready_For_Execution, or Executing states
+  // (Executing allows viewing/editing script and submitting result in run mode)
+  if (task.executionType === 'MANUAL') {
+    return ['Pending', 'Ready_For_Execution', 'Executing'].includes(task.taskStatus)
+  }
+  // AUTO tasks can only be edited in Pending or Ready_For_Execution
+  return task.taskStatus === 'Pending' || task.taskStatus === 'Ready_For_Execution'
 }
 
 function editDisabledReason(task: Task): string | null {
   if (canEdit(task)) return null
   if (!canModifyTask(task)) return 'Task owner or admin only'
+  if (task.executionType === 'MANUAL') {
+    return 'Available only when task is Pending, Ready_For_Execution, or Executing'
+  }
   return 'Available only when task is Pending or Ready_For_Execution'
 }
 
