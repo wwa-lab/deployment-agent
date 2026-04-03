@@ -132,13 +132,39 @@ function editDisabledReason(task: Task): string | null {
 }
 
 function canDecide(task: Task): boolean {
-  return canModifyTask(task) && task.taskStatus === 'Awaiting_Review'
+  if (!canModifyTask(task)) return false
+  // Approve/Reject available only in Awaiting_Review
+  // Skip available in Pending, Ready_For_Execution, or Awaiting_Review
+  return ['Pending', 'Ready_For_Execution', 'Awaiting_Review'].includes(task.taskStatus)
 }
 
 function decisionDisabledReason(task: Task): string | null {
   if (canDecide(task)) return null
   if (!canModifyTask(task)) return 'Task owner or admin only'
-  return 'Available only when task status is Awaiting_Review'
+  return 'Available only when task status is Pending, Ready_For_Execution, or Awaiting_Review'
+}
+
+/**
+ * Get allowed decision options based on task status
+ * - Pending / Ready_For_Execution: Skip only
+ * - Awaiting_Review: Approve, Reject, Skip
+ * - Failed / Rejected: Rerun only
+ */
+function getAllowedDecisions(task: Task): ('Approve' | 'Reject' | 'Rerun' | 'Skip')[] {
+  if (!canModifyTask(task)) return []
+
+  switch (task.taskStatus) {
+    case 'Pending':
+    case 'Ready_For_Execution':
+      return ['Skip']
+    case 'Awaiting_Review':
+      return ['Approve', 'Reject', 'Skip']
+    case 'Failed':
+    case 'Rejected':
+      return ['Rerun']
+    default:
+      return []
+  }
 }
 
 function canRun(task: Task): boolean {
@@ -472,7 +498,7 @@ function handleDecisionSelect(task: Task, event: Event) {
   if (!decision) return
   openDecision(task, {
     decision,
-    allowedDecisions: ['Approve', 'Reject', 'Skip'],
+    allowedDecisions: getAllowedDecisions(task),
   })
   select.value = ''
 }
@@ -1101,9 +1127,7 @@ onUnmounted(() => {
                         @change="handleDecisionSelect(task, $event)"
                       >
                         <option value="">Review Decision</option>
-                        <option value="Approve">Approve</option>
-                        <option value="Reject">Reject</option>
-                        <option value="Skip">Skip</option>
+                        <option v-for="opt in getAllowedDecisions(task)" :key="opt" :value="opt">{{ opt }}</option>
                       </select>
                     </span>
                   </div>
