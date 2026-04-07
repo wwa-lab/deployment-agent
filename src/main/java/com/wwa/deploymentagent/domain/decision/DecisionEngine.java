@@ -25,7 +25,7 @@ import java.util.Map;
  *   <li>Approve: Awaiting_Review → Approved (owner/admin)</li>
  *   <li>Reject:  Awaiting_Review → Rejected (owner/admin)</li>
  *   <li>Rerun:   Rejected/Failed → Ready_For_Execution (owner/admin), creates new execution history</li>
- *   <li>Skip:    Pending/Ready_For_Execution → Skipped (owner/admin)</li>
+ *   <li>Skip:    Pending/Ready_For_Execution/Awaiting_Review → Skipped (owner/admin)</li>
  * </ul>
  */
 @Service
@@ -75,7 +75,8 @@ public class DecisionEngine {
             }
             case skip -> {
                 if (task.getTaskStatus() != TaskStatus.Pending
-                        && task.getTaskStatus() != TaskStatus.Ready_For_Execution) {
+                        && task.getTaskStatus() != TaskStatus.Ready_For_Execution
+                        && task.getTaskStatus() != TaskStatus.Awaiting_Review) {
                     throw new InvalidStateTransitionException(
                             task.getTaskStatus().name(), TaskStatus.Skipped.name(), "Task");
                 }

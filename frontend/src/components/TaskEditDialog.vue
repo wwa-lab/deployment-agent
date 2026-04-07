@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { editTask, recordResult, startManualExecution } from '../api/tasks'
 import type { Task } from '../types'
 
@@ -8,15 +8,33 @@ const props = withDefaults(defineProps<{ task: Task; mode?: 'edit' | 'run' }>(),
 })
 const emit = defineEmits<{ saved: []; close: [] }>()
 
-const originalScript = props.task.inputParameters.script ?? ''
-const originalParameters = props.task.inputParameters.parameters ?? ''
+// Safely get inputParameters with fallback to empty object
+const getInputParams = () => ({
+  script: props.task.inputParameters?.script ?? '',
+  parameters: props.task.inputParameters?.parameters ?? '',
+})
 
+// Use refs for form data so we can reset them when task changes
 const form = reactive({
-  script: originalScript,
-  parameters: originalParameters,
+  script: getInputParams().script,
+  parameters: getInputParams().parameters,
   resultSummary: '',
   resultLogs: '',
 })
+
+// Track original values for change detection
+let originalScript = getInputParams().script
+let originalParameters = getInputParams().parameters
+
+// Reset form when task changes
+watch(() => props.task, (newTask) => {
+  form.script = newTask.inputParameters?.script ?? ''
+  form.parameters = newTask.inputParameters?.parameters ?? ''
+  form.resultSummary = ''
+  form.resultLogs = ''
+  originalScript = newTask.inputParameters?.script ?? ''
+  originalParameters = newTask.inputParameters?.parameters ?? ''
+}, { immediate: false })
 
 const saving = ref(false)
 const error = ref('')

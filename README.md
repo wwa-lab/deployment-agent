@@ -63,7 +63,7 @@ This README reflects the current repository code and the current design baseline
   - template authoring and storage in the current UI are still frontend-local draft data
   - the template upload tab is not backed by a dedicated template-import API yet
 - AUTO execution callback ingestion is not the main model. A polling monitor exists in code, but `execution.monitor.enabled=false` by default.
-- The default backend profile expects an Oracle schema that already exists. Use the `local` profile for the fastest local setup.
+- The `test` backend profile expects an Oracle schema that already exists. Use the `local` profile for the fastest local setup.
 
 ## Technology Stack
 
@@ -159,16 +159,16 @@ Frontend details:
 
 ### 3. Oracle-backed backend run
 
-The default profile expects Oracle and validates the schema on startup.
+The `test` profile expects Oracle and validates the schema on startup.
 
 ```bash
 export DB_URL='jdbc:oracle:thin:@localhost:1521/XEPDB1'
 export DB_USERNAME='da_user'
 export DB_PASSWORD='changeme'
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=test
 ```
 
-Before using the default profile:
+Before using the `test` profile:
 
 - create the schema from [`docs/sql/ORACLE_CURRENT_SCHEMA.sql`](docs/sql/ORACLE_CURRENT_SCHEMA.sql), or
 - provision an equivalent Oracle schema out of band
