@@ -15,7 +15,7 @@ export async function recordResult(
 }
 
 export async function submitDecision(taskId: string, decision: string): Promise<Task> {
-  const response = await apiClient.post(`/tasks/${taskId}/decision`, { decision })
+  const response = await apiClient.post(`/tasks/${taskId}/decision`, { decision: decision.toLowerCase() })
   return response.data
 }
 
