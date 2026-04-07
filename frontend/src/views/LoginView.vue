@@ -33,7 +33,7 @@ async function handleLogin() {
   loading.value = true
   try {
     await userStore.login(employeeId.value, password.value)
-    router.push('/wwa/deployment-agent')
+    router.push('/wwa/home')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Login failed'
   } finally {
@@ -49,16 +49,16 @@ async function handleLogin() {
         <div class="login-story-grid">
           <div class="login-story-copy-block">
             <div class="login-story-kicker">WWA Platform</div>
-            <h1 id="login-story-title" class="login-story-title">DevOps automation first, AI next</h1>
+            <h1 id="login-story-title" class="login-story-title">Workflow automation first, AI next</h1>
             <p class="login-story-copy">
-              WWA currently focuses on standardized DevOps automation, bringing release execution,
-              platform controls, and audit visibility into one shared workspace. AI-assisted workflows
-              will be layered in gradually in future phases.
+              WWA currently focuses on controlled workflow automation, bringing testing, deployment,
+              platform controls, and audit visibility into one shared workspace. AI-assisted
+              workflows will be layered in gradually in future phases.
             </p>
             <div class="login-story-pills">
-              <span class="login-story-pill">Release Automation</span>
+              <span class="login-story-pill">Testing Workflow</span>
+              <span class="login-story-pill">Deployment Workflow</span>
               <span class="login-story-pill">Platform Controls</span>
-              <span class="login-story-pill">Audit Traceability</span>
             </div>
           </div>
 
@@ -76,7 +76,7 @@ async function handleLogin() {
             <div class="login-console-metrics">
               <article class="login-console-metric">
                 <span class="metric-label">Current Focus</span>
-                <strong class="metric-value">Release Ops</strong>
+                <strong class="metric-value">Agent Ops</strong>
               </article>
               <article class="login-console-metric">
                 <span class="metric-label">Approval Model</span>
@@ -89,20 +89,20 @@ async function handleLogin() {
             </div>
 
             <div class="login-console-flow">
-              <div class="console-block-label">Execution Path</div>
+              <div class="console-block-label">Active Workspaces</div>
               <div class="login-flow-track">
-                <span class="login-flow-node is-active">SIT</span>
+                <span class="login-flow-node is-active">Testing</span>
                 <span class="login-flow-line"></span>
-                <span class="login-flow-node is-active">UAT</span>
+                <span class="login-flow-node is-active">Deploy</span>
                 <span class="login-flow-line is-dim"></span>
-                <span class="login-flow-node">PROD</span>
+                <span class="login-flow-node">Platform</span>
               </div>
             </div>
 
             <div class="login-console-stream">
               <div class="login-console-stream-row">
                 <span class="stream-dot"></span>
-                <span>Release pipeline status is visible from one workspace.</span>
+                <span>Testing and deployment status stay visible from one workspace hub.</span>
               </div>
               <div class="login-console-stream-row">
                 <span class="stream-dot"></span>
@@ -121,7 +121,7 @@ async function handleLogin() {
         <div class="login-header">
           <div class="login-kicker">Workspace Access</div>
           <h2 class="login-title">Sign in to continue</h2>
-          <p class="login-subtitle">Use your Team Book credentials to enter the DevOps automation workspace.</p>
+          <p class="login-subtitle">Use your Team Book credentials to enter the WWA workspace.</p>
         </div>
 
         <form class="login-form" @submit.prevent="handleLogin">

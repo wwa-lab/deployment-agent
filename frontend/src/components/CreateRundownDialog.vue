@@ -86,13 +86,13 @@ function validateForm(): boolean {
 
   const releaseId = form.releaseId.trim()
   if (!releaseId) {
-    fieldErrors.releaseId = 'Release Identifier is required.'
+    fieldErrors.releaseId = 'Workflow Identifier is required.'
   } else {
     const match = releaseId.match(RELEASE_IDENTIFIER_PATTERN)
     if (!match) {
       fieldErrors.releaseId = 'Use format xxx-sit-01 / xxx-uat-01 / xxx-prod-01.'
     } else if ((match.groups?.stage ?? '').toUpperCase() !== form.stage) {
-      fieldErrors.releaseId = `Release Identifier must match the selected stage ${form.stage}.`
+      fieldErrors.releaseId = `Workflow Identifier must match the selected stage ${form.stage}.`
     }
   }
 
@@ -163,7 +163,7 @@ async function submit() {
 
         <div v-if="error" class="alert alert-error">{{ error }}</div>
         <div v-if="template.tasks.length === 0" class="alert alert-info">
-          Add at least one task before creating a release rundown from this template.
+          Add at least one task before creating a workflow rundown from this template.
         </div>
 
         <div class="form-group">
@@ -176,7 +176,7 @@ async function submit() {
             :class="{ 'input-error': fieldErrors.projectName }"
           />
           <div class="field-hint">
-            This becomes the release flow name shown in the summary and detail pages.
+            This becomes the workflow name shown in the summary and detail pages.
           </div>
           <div v-if="attemptedSubmit && fieldErrors.projectName" class="field-error">
             {{ fieldErrors.projectName }}
@@ -194,7 +194,7 @@ async function submit() {
           </div>
 
           <div class="form-group">
-            <label class="form-label">Release Identifier <span class="required">*</span></label>
+            <label class="form-label">Workflow Identifier <span class="required">*</span></label>
             <input
               v-model="form.releaseId"
               type="text"

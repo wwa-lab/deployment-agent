@@ -364,7 +364,7 @@ async function handleMarkRequestFailed(request: Request) {
 function archiveRundownConfirmationMessage(request: Request): string {
   const activeRequestCount = store.detail?.requests.filter((item) => !item.archivedAt).length ?? 0
   if (activeRequestCount <= 1) {
-    return `Archive the ${request.stage} rundown? This is the last active stage, so the entire release flow will move into Archived and disappear from the default list.`
+    return `Archive the ${request.stage} rundown? This is the last active stage, so the entire workflow will move into Archived and disappear from the default list.`
   }
   return `Archive the ${request.stage} rundown and hide it from the default workflow view?`
 }
@@ -408,7 +408,7 @@ async function handleRestoreRundown(request: Request) {
 function purgeRundownConfirmationMessage(request: Request): string {
   const totalRequestCount = store.detail?.requests.length ?? 0
   if (totalRequestCount <= 1) {
-    return `Delete the ${request.stage} rundown permanently? This is irreversible and will permanently remove the entire release flow because no other rundowns remain.`
+    return `Delete the ${request.stage} rundown permanently? This is irreversible and will permanently remove the entire workflow because no other rundowns remain.`
   }
   return `Delete the ${request.stage} rundown permanently? This is irreversible and removes its archived task history from the system.`
 }
@@ -643,7 +643,7 @@ watch(() => store.detail, (val) => {
     <!-- Loading -->
     <div v-if="store.loading && !store.detail" class="loading-state">
       <span class="spinner"></span>
-      <span>Loading release flow...</span>
+      <span>Loading workflow...</span>
     </div>
 
     <template v-else-if="store.detail">
@@ -655,13 +655,13 @@ watch(() => store.detail, (val) => {
             <span class="field-value">{{ store.detail.projectName }}</span>
           </div>
           <div class="header-field">
-            <span class="field-label">Release ID</span>
+            <span class="field-label">Workflow ID</span>
             <span class="field-value mono">{{ store.detail.releaseId }}</span>
             <span
               v-if="store.detail.stitched && store.detail.linkedReleaseCount > 1"
               class="field-note"
             >
-              Stitched from {{ store.detail.linkedReleaseIds.join(', ') }}
+              Grouped from {{ store.detail.linkedReleaseIds.join(', ') }}
             </span>
           </div>
           <div class="header-field">
@@ -669,7 +669,7 @@ watch(() => store.detail, (val) => {
             <span class="badge badge-pending">{{ store.detail.currentStage }}</span>
           </div>
           <div class="header-field">
-            <span class="field-label">Flow Status</span>
+            <span class="field-label">Workflow Status</span>
             <span class="badge" :class="statusBadgeClass(store.detail.flowStatus)">
               {{ store.detail.flowStatus }}
             </span>
@@ -899,7 +899,7 @@ watch(() => store.detail, (val) => {
                   :title="startDeploymentDisabledReason(req) ?? undefined"
                   @click="handleStartDeployment(req)"
                 >
-                  {{ requestActionLoadingId === `${req.id}:start` ? 'Starting...' : 'Start Deployment' }}
+                  {{ requestActionLoadingId === `${req.id}:start` ? 'Starting...' : 'Start Rundown' }}
                 </button>
                 <button
                   type="button"
@@ -1090,7 +1090,7 @@ watch(() => store.detail, (val) => {
         </div>
       </div>
 
-      <div v-else class="empty-state">No requests found.</div>
+      <div v-else class="empty-state">No rundowns found.</div>
     </template>
 
     <!-- View Result Modal -->

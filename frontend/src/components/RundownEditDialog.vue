@@ -76,7 +76,12 @@ async function submit() {
 
         <div class="form-group">
           <label class="form-label">Agent</label>
-          <input v-model="form.agent" type="text" class="form-control" placeholder="e.g. Deployment Agent" />
+          <input
+            v-model="form.agent"
+            type="text"
+            class="form-control"
+            placeholder="e.g. Testing Agent or Deployment Agent"
+          />
         </div>
 
         <div class="form-group">

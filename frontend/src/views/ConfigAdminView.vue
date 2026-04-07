@@ -43,7 +43,7 @@ const COMPONENT_DEFINITIONS: Array<{
     endpointKey: 'jenkins_url',
     userKey: 'jenkins_user',
     secretKey: 'jenkins_api_token',
-    defaultDescription: 'Configuration used for Jenkins-triggered deployment jobs.',
+    defaultDescription: 'Configuration used for Jenkins-triggered workflow jobs.',
   },
   {
     id: 'ansible',
@@ -449,8 +449,7 @@ function displayValue(value?: string) {
         <p class="view-eyebrow">WWA Shared Capability</p>
         <h1 class="view-title">Configuration Management</h1>
         <p class="view-subtitle">
-          Manage the shared system integrations used by Deployment Agent execution and review
-          workflows.
+          Manage the shared system integrations used by agent execution and review workflows.
         </p>
       </div>
 
