@@ -24,12 +24,10 @@ const props = withDefaults(defineProps<{
 })
 const emit = defineEmits<{ saved: []; close: [] }>()
 
-function getInputParams() {
-  return {
-    script: props.task.inputParameters?.script ?? '',
-    parameters: props.task.inputParameters?.parameters ?? '',
-  }
-}
+const getInputParams = () => ({
+  script: props.task.inputParameters?.script ?? '',
+  parameters: props.task.inputParameters?.parameters ?? '',
+})
 
 const form = reactive({
   script: getInputParams().script,

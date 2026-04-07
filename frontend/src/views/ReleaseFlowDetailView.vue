@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useReleaseFlowStore } from '../stores/releaseFlow'
 import { useUserStore } from '../stores/user'
@@ -649,6 +649,24 @@ function plannedWindowLabel(start: Date | null, end: Date | null): string {
 watch(() => store.detail, (val) => {
   if (val) {
     activeTab.value = activeStageIndex(val.requests)
+  }
+})
+
+// Auto-refresh task status every 30 seconds
+let pollingInterval: number | null = null
+
+onMounted(() => {
+  pollingInterval = window.setInterval(() => {
+    if (store.selectedId) {
+      store.refreshDetail()
+    }
+  }, 30000) // 30 seconds
+})
+
+onUnmounted(() => {
+  if (pollingInterval !== null) {
+    clearInterval(pollingInterval)
+    pollingInterval = null
   }
 })
 </script>
