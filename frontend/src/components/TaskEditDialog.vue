@@ -1,22 +1,54 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { editTask, recordResult, startManualExecution } from '../api/tasks'
+import { computed, reactive, ref, watch } from 'vue'
+import {
+  editTask as editTaskApi,
+  recordResult as recordResultApi,
+  startManualExecution as startManualExecutionApi,
+} from '../api/tasks'
 import type { Task } from '../types'
 
-const props = withDefaults(defineProps<{ task: Task; mode?: 'edit' | 'run' }>(), {
+const props = withDefaults(defineProps<{
+  task: Task
+  mode?: 'edit' | 'run'
+  editTaskFn?: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  recordResultFn?: (
+    taskId: string,
+    body: { resultSummary: Record<string, unknown>; resultLogs?: string }
+  ) => Promise<Task>
+  startManualExecutionFn?: (taskId: string) => Promise<Task>
+}>(), {
   mode: 'edit',
+  editTaskFn: editTaskApi,
+  recordResultFn: recordResultApi,
+  startManualExecutionFn: startManualExecutionApi,
 })
 const emit = defineEmits<{ saved: []; close: [] }>()
 
-const originalScript = props.task.inputParameters.script ?? ''
-const originalParameters = props.task.inputParameters.parameters ?? ''
+function getInputParams() {
+  return {
+    script: props.task.inputParameters?.script ?? '',
+    parameters: props.task.inputParameters?.parameters ?? '',
+  }
+}
 
 const form = reactive({
-  script: originalScript,
-  parameters: originalParameters,
+  script: getInputParams().script,
+  parameters: getInputParams().parameters,
   resultSummary: '',
   resultLogs: '',
 })
+
+let originalScript = getInputParams().script
+let originalParameters = getInputParams().parameters
+
+watch(() => props.task, (newTask) => {
+  form.script = newTask.inputParameters?.script ?? ''
+  form.parameters = newTask.inputParameters?.parameters ?? ''
+  form.resultSummary = ''
+  form.resultLogs = ''
+  originalScript = newTask.inputParameters?.script ?? ''
+  originalParameters = newTask.inputParameters?.parameters ?? ''
+}, { immediate: false })
 
 const saving = ref(false)
 const error = ref('')
@@ -111,21 +143,21 @@ async function submit() {
   error.value = ''
   try {
     if (hasInputChanges.value) {
-      await editTask(props.task.id, {
+      await props.editTaskFn(props.task.id, {
         script: form.script,
         parameters: form.parameters,
       })
     }
 
     if (isSubmittingResult.value) {
-      await recordResult(props.task.id, {
+      await props.recordResultFn(props.task.id, {
         resultSummary: {
           summary: form.resultSummary.trim(),
         },
         resultLogs: form.resultLogs.trim() || undefined,
       })
     } else if (isStartingManualExecution.value) {
-      await startManualExecution(props.task.id)
+      await props.startManualExecutionFn(props.task.id)
     }
 
     emit('saved')

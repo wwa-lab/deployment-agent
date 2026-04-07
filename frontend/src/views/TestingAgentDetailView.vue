@@ -3,7 +3,14 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTestingAgentReleaseFlowStore } from '../stores/testingAgentReleaseFlow'
 import { useUserStore } from '../stores/user'
-import { getTaskResult, submitAutoExecution } from '../api/testingAgentTasks'
+import {
+  editTask as editTaskApi,
+  getTaskResult,
+  recordResult as recordResultApi,
+  startManualExecution as startManualExecutionApi,
+  submitAutoExecution,
+  submitDecision as submitDecisionApi,
+} from '../api/testingAgentTasks'
 import {
   archiveRequestRundown,
   markRequestFailed,
@@ -112,26 +119,48 @@ function canModifyTask(task: Task): boolean {
 }
 
 function canEdit(task: Task): boolean {
-  return (
-    canModifyTask(task) &&
-    (task.taskStatus === 'Pending' || task.taskStatus === 'Ready_For_Execution')
-  )
+  if (!canModifyTask(task)) return false
+  if (task.executionType === 'MANUAL') {
+    return ['Pending', 'Ready_For_Execution', 'Executing'].includes(task.taskStatus)
+  }
+  return task.taskStatus === 'Pending' || task.taskStatus === 'Ready_For_Execution'
 }
 
 function editDisabledReason(task: Task): string | null {
   if (canEdit(task)) return null
   if (!canModifyTask(task)) return 'Task owner or admin only'
+  if (task.executionType === 'MANUAL') {
+    return 'Available only when task is Pending, Ready_For_Execution, or Executing'
+  }
   return 'Available only when task is Pending or Ready_For_Execution'
 }
 
 function canDecide(task: Task): boolean {
-  return canModifyTask(task) && task.taskStatus === 'Awaiting_Review'
+  if (!canModifyTask(task)) return false
+  return ['Pending', 'Ready_For_Execution', 'Awaiting_Review'].includes(task.taskStatus)
 }
 
 function decisionDisabledReason(task: Task): string | null {
   if (canDecide(task)) return null
   if (!canModifyTask(task)) return 'Task owner or admin only'
-  return 'Available only when task status is Awaiting_Review'
+  return 'Available only when task status is Pending, Ready_For_Execution, or Awaiting_Review'
+}
+
+function getAllowedDecisions(task: Task): DecisionOption[] {
+  if (!canModifyTask(task)) return []
+
+  switch (task.taskStatus) {
+    case 'Pending':
+    case 'Ready_For_Execution':
+      return ['Skip']
+    case 'Awaiting_Review':
+      return ['Approve', 'Reject', 'Skip']
+    case 'Failed':
+    case 'Rejected':
+      return ['Rerun']
+    default:
+      return []
+  }
 }
 
 function canRun(task: Task): boolean {
@@ -465,7 +494,7 @@ function handleDecisionSelect(task: Task, event: Event) {
   if (!decision) return
   openDecision(task, {
     decision,
-    allowedDecisions: ['Approve', 'Reject', 'Skip'],
+    allowedDecisions: getAllowedDecisions(task),
   })
   select.value = ''
 }
@@ -1076,9 +1105,7 @@ watch(() => store.detail, (val) => {
                         @change="handleDecisionSelect(task, $event)"
                       >
                         <option value="">Review Decision</option>
-                        <option value="Approve">Approve</option>
-                        <option value="Reject">Reject</option>
-                        <option value="Skip">Skip</option>
+                        <option v-for="opt in getAllowedDecisions(task)" :key="opt" :value="opt">{{ opt }}</option>
                       </select>
                     </span>
                   </div>
@@ -1150,6 +1177,9 @@ watch(() => store.detail, (val) => {
       v-if="editingTask"
       :task="editingTask"
       :mode="taskDialogMode"
+      :edit-task-fn="editTaskApi"
+      :record-result-fn="recordResultApi"
+      :start-manual-execution-fn="startManualExecutionApi"
       @saved="onTaskSaved"
       @close="editingTask = null; taskDialogMode = 'edit'"
     />
@@ -1160,6 +1190,7 @@ watch(() => store.detail, (val) => {
       :task="decidingTask"
       :initial-decision="initialDecision"
       :allowed-decisions="allowedDecisionOptions"
+      :submit-decision-fn="submitDecisionApi"
       @decided="onDecisionMade"
       @close="closeDecisionDialog"
     />

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Synced the task feedback behavior across shared workflow surfaces: the shared task edit/decision dialogs can now call the correct agent-specific APIs, Deployment Agent and Testing Agent detail pages now expose the same status-aware edit/decision options, and backend decision rules now allow `Skip` from `Awaiting_Review` with test coverage.
 - Updated the WWA frontend copy so Testing Agent no longer inherits deployment-first wording in its primary flow: login now lands on the shared WWA home, Testing Agent actions and upload states use workflow/rundown language instead of `Start Deployment` / `Release File`, template-created rundowns route back to the matching agent workspace, and shared home/audit/access/config pages now use more neutral cross-agent descriptions.
 - Corrected repo-operating documentation so agent/runbook guidance matches the current Spring Boot + Vue codebase: `AGENTS.md` and `CLAUDE.md` now use real commands and paths, the Claude SDLC playbook now points to the staged `docs/02..06-*` artifact locations and includes the repo-docs consistency review skill, and the UAT runbook no longer contradicts itself about the bundled Oracle baseline schema script.
 - Cleaned the next layer of stale repository docs by fixing onboarding/review/migration references that no longer matched the repo, marking historical review artifacts as dated snapshots, removing nonexistent taxonomy/file references, and updating several review findings whose underlying code gaps have already been addressed.
