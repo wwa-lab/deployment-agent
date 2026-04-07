@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-
+- Updated the WWA frontend copy so Testing Agent no longer inherits deployment-first wording in its primary flow: login now lands on the shared WWA home, Testing Agent actions and upload states use workflow/rundown language instead of `Start Deployment` / `Release File`, template-created rundowns route back to the matching agent workspace, and shared home/audit/access/config pages now use more neutral cross-agent descriptions.
 - Split Oracle datasource settings out of the default Spring config into a dedicated `test` profile so `local` H2 startup no longer risks inheriting Oracle dialect settings; updated README and Docker docs to use the `test` profile for Oracle-backed runs.
 - Added `DOCKER.md` with backend/frontend image naming plus copy-ready Docker `build`, `push`, `pull`, and `run` commands for local H2 and Oracle-backed startup flows.
 - Corrected repo-operating documentation so agent/runbook guidance matches the current Spring Boot + Vue codebase: `AGENTS.md` and `CLAUDE.md` now use real commands and paths, the Claude SDLC playbook now points to the staged `docs/02..06-*` artifact locations and includes the repo-docs consistency review skill, and the UAT runbook no longer contradicts itself about the bundled Oracle baseline schema script.

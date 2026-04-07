@@ -38,7 +38,7 @@ function resolveSelectValue(options: string[], preferred?: string, fallback = ''
 const manualForm = ref({
   name: props.initialDraft?.name ?? '',
   version: props.initialDraft?.version ?? '1.0',
-  agent: resolveSelectValue(props.agents, props.initialDraft?.agent, 'Deployment Agent'),
+  agent: resolveSelectValue(props.agents, props.initialDraft?.agent, 'Testing Agent'),
   category: resolveSelectValue(props.categories, props.initialDraft?.category, 'development'),
   snowGroup: resolveSelectValue(props.snowGroups, props.initialDraft?.snowGroup, ''),
   application: resolveSelectValue(props.applications, props.initialDraft?.application, ''),
@@ -56,7 +56,7 @@ function syncManualSelectDefaults() {
   manualForm.value.agent = resolveSelectValue(
     props.agents,
     manualForm.value.agent || props.initialDraft?.agent,
-    'Deployment Agent',
+    'Testing Agent',
   )
   manualForm.value.snowGroup = resolveSelectValue(
     props.snowGroups,
@@ -194,7 +194,7 @@ async function createUploadTemplate() {
     emit('submit', {
       name: inferredName,
       version: '1.0',
-      agent: resolveSelectValue(props.agents, props.initialDraft?.agent, 'Deployment Agent'),
+      agent: resolveSelectValue(props.agents, props.initialDraft?.agent, 'Testing Agent'),
       category: resolveSelectValue(props.categories, props.initialDraft?.category, 'development'),
       snowGroup: resolveSelectValue(props.snowGroups, props.initialDraft?.snowGroup, ''),
       application: resolveSelectValue(props.applications, props.initialDraft?.application, ''),
@@ -344,7 +344,7 @@ async function createUploadTemplate() {
                 rundown.
               </span>
               <span v-else>
-                Create a new deployment template from scratch. Application metadata becomes the
+                Create a new workflow template from scratch. Application metadata becomes the
                 default context when creating a rundown from this template.
               </span>
             </p>

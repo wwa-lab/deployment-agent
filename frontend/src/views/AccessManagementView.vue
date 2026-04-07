@@ -162,7 +162,7 @@ function statusClass(status: AccessGrantStatus) {
         <h1 class="view-title">WWA Access Management</h1>
         <p class="view-subtitle">Controls platform entry and agent workspace visibility across the WWA platform.</p>
         <p class="view-subtitle">
-          Manage who can enter Deployment Agent, what product roles they hold, and which
+          Manage who can enter WWA workspaces, what product roles they hold, and which
           `Application + SNOW Group` scopes they can view or administer.
         </p>
       </div>
@@ -247,7 +247,7 @@ function statusClass(status: AccessGrantStatus) {
           <div>
             <h2 class="section-title">Product Access Grants</h2>
             <p class="section-subtitle">
-              Effective Deployment Agent access, sorted by latest admin change.
+              Effective WWA workspace access, sorted by latest admin change.
             </p>
           </div>
         </div>

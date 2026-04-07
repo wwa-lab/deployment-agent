@@ -251,13 +251,13 @@ function toggleArchivedVisibility() {
     <!-- Loading state -->
     <div v-if="store.loading && store.list.length === 0" class="loading-state">
       <span class="spinner"></span>
-      <span>Loading release flows...</span>
+      <span>Loading workflows...</span>
     </div>
 
     <!-- Empty state -->
     <div v-else-if="!store.loading && store.list.length === 0" class="empty-state">
-      <p>No release flows found.</p>
-      <p style="margin-top: 8px; font-size: 12px;">Upload a release file to get started.</p>
+      <p>No workflows found.</p>
+      <p style="margin-top: 8px; font-size: 12px;">Upload a workflow file to get started.</p>
     </div>
 
     <!-- Table -->
@@ -266,7 +266,7 @@ function toggleArchivedVisibility() {
         <thead>
           <tr>
             <th>Project</th>
-            <th>Release ID</th>
+            <th>Workflow ID</th>
             <th>Scope</th>
             <th>Rundown Owner</th>
             <th>Current Stage</th>

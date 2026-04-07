@@ -100,7 +100,7 @@ function close() {
   <div class="modal-overlay" @click.self="close">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">Upload Release File</span>
+        <span class="modal-title">Upload Workflow File</span>
         <button class="modal-close" @click="close">✕</button>
       </div>
 
@@ -108,7 +108,7 @@ function close() {
         <!-- Success state -->
         <div v-if="successResult" class="alert alert-success">
           <strong>Upload successful!</strong><br />
-          Release ID: <code>{{ successResult.releaseId }}</code><br />
+          Workflow ID: <code>{{ successResult.releaseId }}</code><br />
           Stage: {{ successResult.stage }}<br />
           Tasks created: {{ successResult.taskCount }}
           <template v-if="successResult.application || successResult.snowGroup || successResult.agent">
@@ -137,7 +137,7 @@ function close() {
           </div>
 
           <div class="form-group">
-            <label class="form-label">Release Identifier</label>
+            <label class="form-label">Workflow Identifier</label>
             <input
               v-model="releaseIdentifier"
               type="text"
@@ -146,12 +146,10 @@ function close() {
               :disabled="!canUseUpload"
             />
             <div class="field-hint">
-              Recommended for repeated uploads. Reuse the same identifier for later UAT/PROD
-              stages in the same release. Re-uploading the same stage under the same identifier
-              creates a new attempt (for example, SIT Attempt #2). Use a new identifier for a new
-              SIT rundown. WWA also
-              stitches stage-prefixed families such as `sit-01 / uat-01 / prod-01` into one release
-              summary. If left blank, WWA falls back to project + stage matching.
+              Recommended for repeated uploads. Reuse the same identifier when later uploads should
+              stay grouped under one workflow summary. Re-uploading the same stage under the same
+              identifier creates a new attempt. If left blank, WWA falls back to project + stage
+              matching.
             </div>
           </div>
 
@@ -183,13 +181,13 @@ function close() {
               v-model="scopeForm.agent"
               type="text"
               class="form-control"
-              placeholder="e.g. Deployment Agent"
+              placeholder="e.g. Testing Agent or Deployment Agent"
               :disabled="!canUseUpload"
             />
           </div>
 
           <div class="form-group">
-            <label class="form-label">Release File (XLSX) <span class="required">*</span></label>
+            <label class="form-label">Workflow File (XLSX) <span class="required">*</span></label>
             <input
               type="file"
               accept=".xlsx,.xls"

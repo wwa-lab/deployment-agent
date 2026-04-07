@@ -89,7 +89,7 @@ function actionLabel(log: AuditLogEntry): string {
     skip: 'Skip',
     config_update: 'Config Update',
     auto_submit: 'Auto Submit',
-    request_start: 'Start Deployment',
+    request_start: 'Start Workflow',
     request_fail: 'Mark as Failed',
     access_grant_create: 'Access Granted',
     access_grant_update: 'Access Updated',
@@ -233,7 +233,7 @@ function scopeValue(value?: string): string {
 
     <div class="helper-banner helper-banner-muted">
       Audit Log is read-only for all signed-in users. <b>Platform Events</b> cover access governance;
-      <b>Agent Activity</b> covers deployment workflow actions. Use task-level Activity for step-by-step
+      <b>Agent Activity</b> covers agent workflow actions. Use task-level Activity for step-by-step
       execution history.
     </div>
 

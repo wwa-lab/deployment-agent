@@ -328,7 +328,7 @@ const categories = computed(() =>
 
 const agents = computed(() =>
   mergeOptionLists(
-    defaultTemplateAgents.length > 0 ? defaultTemplateAgents : ['Deployment Agent'],
+    defaultTemplateAgents.length > 0 ? defaultTemplateAgents : ['Testing Agent'],
     templates.value.map((template) => template.agent),
   ),
 )
@@ -460,7 +460,7 @@ const createTemplateDefaults = computed<Partial<CreateTemplateDraft> | undefined
   }
 
   return {
-    agent: activeScopeFilters.value.agent ?? agents.value[0] ?? 'Deployment Agent',
+    agent: activeScopeFilters.value.agent ?? agents.value[0] ?? 'Testing Agent',
     snowGroup: activeScopeFilters.value.snowGroup ?? snowGroups.value[0] ?? '',
     application: activeScopeFilters.value.application ?? applications.value[0] ?? '',
     site: activeScopeFilters.value.site ?? sites.value[0] ?? '',
@@ -732,11 +732,23 @@ function closeCreateRundownDialog() {
   creatingRundownTemplateId.value = ''
 }
 
+function workspaceRouteForAgent(agentName?: string): string | null {
+  const normalized = agentName?.trim().toLowerCase()
+  if (!normalized) return null
+  const matchedAgent = agentRegistry.find((agent) => agent.name.trim().toLowerCase() === normalized)
+  return matchedAgent?.route ?? null
+}
+
 function handleRundownCreated(result: UploadResponse) {
   const templateName = creatingRundownTemplate.value?.name ?? 'template'
+  const targetWorkspaceRoute = workspaceRouteForAgent(creatingRundownTemplate.value?.agent)
   creatingRundownTemplateId.value = ''
-  actionFeedback.value = `Created release rundown from "${templateName}" as ${result.releaseId}.`
-  void router.push(`/wwa/deployment-agent/release-flows/${result.releaseFlowId}`)
+  actionFeedback.value = `Created workflow rundown from "${templateName}" as ${result.releaseId}.`
+  void router.push(
+    targetWorkspaceRoute
+      ? `${targetWorkspaceRoute}/release-flows/${result.releaseFlowId}`
+      : '/wwa/home',
+  )
 }
 
 function closeDeleteTemplateDialog() {
@@ -937,9 +949,9 @@ onBeforeUnmount(() => {
     <div class="view-header">
       <div>
         <p class="view-eyebrow">WWA Shared Capability</p>
-        <h1 class="view-title">Select Deployment Template</h1>
+        <h1 class="view-title">Template Management</h1>
         <p class="view-subtitle">
-          Pick a reusable template, narrow by ownership context, and start from a known deployment baseline.
+          Pick a reusable template, narrow by ownership context, and start from a known workflow baseline.
         </p>
       </div>
     </div>

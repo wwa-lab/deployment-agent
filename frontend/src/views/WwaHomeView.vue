@@ -20,7 +20,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
               <div class="home-platform-label">WWA Platform</div>
               <h1 class="home-title">WWA Control Center</h1>
               <p class="home-subtitle">
-                Operate release automation and shared platform controls from one command surface.
+                Operate agent workspaces and shared platform controls from one command surface.
               </p>
             </div>
             <div class="home-user-block">
@@ -32,11 +32,11 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 
           <section class="wwa-intro-card home-intro-card" aria-labelledby="wwa-home-intro-title">
             <div class="wwa-intro-kicker">WWA Today</div>
-            <h2 id="wwa-home-intro-title" class="wwa-intro-title">A shared DevOps automation workspace</h2>
+            <h2 id="wwa-home-intro-title" class="wwa-intro-title">A shared workflow automation workspace</h2>
             <p class="wwa-intro-text">
-              WWA currently serves DevOps automation use cases, including release execution and shared
-              platform operations. Use this hub to enter the active workspaces today, while AI-assisted
-              capabilities are introduced in later phases.
+              WWA currently serves controlled workflow operations, including Testing Agent,
+              Deployment Agent, and shared platform capabilities. Use this hub to enter the active
+              workspaces today, while AI-assisted capabilities are introduced in later phases.
             </p>
           </section>
         </div>
@@ -50,8 +50,8 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           <div class="home-console-panels">
             <article class="home-console-panel">
               <span class="home-console-panel-label">Current Focus</span>
-              <strong class="home-console-panel-value">Release Automation</strong>
-              <p class="home-console-panel-copy">Operational control across SIT, UAT, and PROD.</p>
+              <strong class="home-console-panel-value">Agent Workflows</strong>
+              <p class="home-console-panel-copy">Testing and deployment workspaces with human checkpoints.</p>
             </article>
             <article class="home-console-panel">
               <span class="home-console-panel-label">Shared Controls</span>
@@ -66,20 +66,20 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           </div>
 
           <div class="home-console-track">
-            <div class="home-console-track-label">Execution Path</div>
+            <div class="home-console-track-label">Active Workspaces</div>
             <div class="home-console-track-row">
-              <span class="home-console-node is-active">SIT</span>
+              <span class="home-console-node is-active">Testing</span>
               <span class="home-console-line"></span>
-              <span class="home-console-node is-active">UAT</span>
+              <span class="home-console-node is-active">Deploy</span>
               <span class="home-console-line is-dim"></span>
-              <span class="home-console-node">PROD</span>
+              <span class="home-console-node">Platform</span>
             </div>
           </div>
 
           <div class="home-console-stream">
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
-              <span>Release orchestration remains the current core product surface.</span>
+              <span>Testing and deployment workspaces stay available from one shared hub.</span>
             </div>
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>

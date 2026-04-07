@@ -92,7 +92,7 @@ function activityLabel(log: AuditLogEntry): string {
     skip: 'Skip',
     config_update: 'Config Update',
     auto_submit: 'Auto Submit',
-    request_start: 'Start Deployment',
+    request_start: 'Start Workflow',
     request_fail: 'Mark as Failed',
   }
 
