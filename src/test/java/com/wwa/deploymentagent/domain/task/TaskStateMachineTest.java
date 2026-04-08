@@ -53,6 +53,10 @@ class TaskStateMachineTest {
         assertThat(TaskStateMachine.isValid(TaskStatus.Awaiting_Review, TaskStatus.Rejected)).isTrue();
     }
 
+    @Test void awaitingReviewToSkipped_allowed() {
+        assertThat(TaskStateMachine.isValid(TaskStatus.Awaiting_Review, TaskStatus.Skipped)).isTrue();
+    }
+
     @Test void awaitingReviewToExecuting_disallowed() {
         assertThat(TaskStateMachine.isValid(TaskStatus.Awaiting_Review, TaskStatus.Executing)).isFalse();
     }

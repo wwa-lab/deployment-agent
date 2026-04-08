@@ -113,12 +113,9 @@ function canModifyTask(task: Task): boolean {
 
 function canEdit(task: Task): boolean {
   if (!canModifyTask(task)) return false
-  // MANUAL tasks can be edited in Pending, Ready_For_Execution, or Executing states
-  // (Executing allows viewing/editing script and submitting result in run mode)
   if (task.executionType === 'MANUAL') {
     return ['Pending', 'Ready_For_Execution', 'Executing'].includes(task.taskStatus)
   }
-  // AUTO tasks can only be edited in Pending or Ready_For_Execution
   return task.taskStatus === 'Pending' || task.taskStatus === 'Ready_For_Execution'
 }
 
@@ -133,8 +130,6 @@ function editDisabledReason(task: Task): string | null {
 
 function canDecide(task: Task): boolean {
   if (!canModifyTask(task)) return false
-  // Approve/Reject available only in Awaiting_Review
-  // Skip available in Pending, Ready_For_Execution, or Awaiting_Review
   return ['Pending', 'Ready_For_Execution', 'Awaiting_Review'].includes(task.taskStatus)
 }
 
@@ -144,13 +139,7 @@ function decisionDisabledReason(task: Task): string | null {
   return 'Available only when task status is Pending, Ready_For_Execution, or Awaiting_Review'
 }
 
-/**
- * Get allowed decision options based on task status
- * - Pending / Ready_For_Execution: Skip only
- * - Awaiting_Review: Approve, Reject, Skip
- * - Failed / Rejected: Rerun only
- */
-function getAllowedDecisions(task: Task): ('Approve' | 'Reject' | 'Rerun' | 'Skip')[] {
+function getAllowedDecisions(task: Task): DecisionOption[] {
   if (!canModifyTask(task)) return []
 
   switch (task.taskStatus) {

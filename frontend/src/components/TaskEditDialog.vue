@@ -1,20 +1,34 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { editTask, recordResult, startManualExecution } from '../api/tasks'
+import {
+  editTask as editTaskApi,
+  recordResult as recordResultApi,
+  startManualExecution as startManualExecutionApi,
+} from '../api/tasks'
 import type { Task } from '../types'
 
-const props = withDefaults(defineProps<{ task: Task; mode?: 'edit' | 'run' }>(), {
+const props = withDefaults(defineProps<{
+  task: Task
+  mode?: 'edit' | 'run'
+  editTaskFn?: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  recordResultFn?: (
+    taskId: string,
+    body: { resultSummary: Record<string, unknown>; resultLogs?: string }
+  ) => Promise<Task>
+  startManualExecutionFn?: (taskId: string) => Promise<Task>
+}>(), {
   mode: 'edit',
+  editTaskFn: editTaskApi,
+  recordResultFn: recordResultApi,
+  startManualExecutionFn: startManualExecutionApi,
 })
 const emit = defineEmits<{ saved: []; close: [] }>()
 
-// Safely get inputParameters with fallback to empty object
 const getInputParams = () => ({
   script: props.task.inputParameters?.script ?? '',
   parameters: props.task.inputParameters?.parameters ?? '',
 })
 
-// Use refs for form data so we can reset them when task changes
 const form = reactive({
   script: getInputParams().script,
   parameters: getInputParams().parameters,
@@ -22,11 +36,9 @@ const form = reactive({
   resultLogs: '',
 })
 
-// Track original values for change detection
 let originalScript = getInputParams().script
 let originalParameters = getInputParams().parameters
 
-// Reset form when task changes
 watch(() => props.task, (newTask) => {
   form.script = newTask.inputParameters?.script ?? ''
   form.parameters = newTask.inputParameters?.parameters ?? ''
@@ -129,21 +141,21 @@ async function submit() {
   error.value = ''
   try {
     if (hasInputChanges.value) {
-      await editTask(props.task.id, {
+      await props.editTaskFn(props.task.id, {
         script: form.script,
         parameters: form.parameters,
       })
     }
 
     if (isSubmittingResult.value) {
-      await recordResult(props.task.id, {
+      await props.recordResultFn(props.task.id, {
         resultSummary: {
           summary: form.resultSummary.trim(),
         },
         resultLogs: form.resultLogs.trim() || undefined,
       })
     } else if (isStartingManualExecution.value) {
-      await startManualExecution(props.task.id)
+      await props.startManualExecutionFn(props.task.id)
     }
 
     emit('saved')

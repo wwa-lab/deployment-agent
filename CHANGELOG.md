@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+- Synced the task feedback behavior across shared workflow surfaces: the shared task edit/decision dialogs can now call the correct agent-specific APIs, Deployment Agent and Testing Agent detail pages now expose the same status-aware edit/decision options, and backend decision rules now allow `Skip` from `Awaiting_Review` with test coverage.
 - Updated the WWA frontend copy so Testing Agent no longer inherits deployment-first wording in its primary flow: login now lands on the shared WWA home, Testing Agent actions and upload states use workflow/rundown language instead of `Start Deployment` / `Release File`, template-created rundowns route back to the matching agent workspace, and shared home/audit/access/config pages now use more neutral cross-agent descriptions.
 - Split Oracle datasource settings out of the default Spring config into a dedicated `test` profile so `local` H2 startup no longer risks inheriting Oracle dialect settings; updated README and Docker docs to use the `test` profile for Oracle-backed runs.
 - Added `DOCKER.md` with backend/frontend image naming plus copy-ready Docker `build`, `push`, `pull`, and `run` commands for local H2 and Oracle-backed startup flows.

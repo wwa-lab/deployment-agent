@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { submitDecision } from '../api/tasks'
+import { submitDecision as submitDecisionApi } from '../api/tasks'
 import type { Task } from '../types'
 
 const props = withDefaults(defineProps<{
   task: Task
   initialDecision?: Decision | null
   allowedDecisions?: Decision[]
+  submitDecisionFn?: (taskId: string, decision: string) => Promise<Task>
 }>(), {
   initialDecision: null,
   allowedDecisions: () => ['Approve', 'Reject', 'Rerun', 'Skip'],
+  submitDecisionFn: submitDecisionApi,
 })
 const emit = defineEmits<{ decided: []; close: [] }>()
 
@@ -55,7 +57,7 @@ async function submit() {
   error.value = ''
   successMsg.value = ''
   try {
-    await submitDecision(props.task.id, selected.value)
+    await props.submitDecisionFn(props.task.id, selected.value)
     successMsg.value = `Decision "${selected.value}" submitted successfully.`
     setTimeout(() => {
       emit('decided')

@@ -172,6 +172,17 @@ class DecisionEngineTest {
     }
 
     @Test
+    @DisplayName("skip: Awaiting_Review → Skipped for owner")
+    void skip_awaitingReview_succeeds() {
+        Task task = helper.seedTask(request, TaskStatus.Awaiting_Review);
+
+        decisionEngine.applyDecision(task.getId(), DecisionType.skip, ownerUser, null);
+
+        Task updated = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Skipped);
+    }
+
+    @Test
     @DisplayName("skip: throws InvalidStateTransitionException when Executing")
     void skip_executingState_throwsInvalidTransition() {
         Task task = helper.seedTask(request, TaskStatus.Executing);
