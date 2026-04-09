@@ -22,7 +22,12 @@ type ActivityRow = {
   rawType: string
 }
 
-const props = defineProps<{ task: Task }>()
+const props = withDefaults(defineProps<{
+  task: Task
+  listTaskExecutionsFn?: (taskId: string) => Promise<TaskExecutionHistory[]>
+}>(), {
+  listTaskExecutionsFn: listTaskExecutions,
+})
 const emit = defineEmits<{ close: [] }>()
 
 const loading = ref(false)
@@ -36,7 +41,7 @@ onMounted(async () => {
 
   const [auditResult, executionResult] = await Promise.allSettled([
     listAuditLogs({ taskId: props.task.id, page: 0, size: 100 }),
-    listTaskExecutions(props.task.id),
+    props.listTaskExecutionsFn(props.task.id),
   ])
 
   if (auditResult.status === 'fulfilled') {

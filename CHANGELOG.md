@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed Testing Agent detail dialogs that were still falling back to Deployment Agent API modules under the hood: the rundown edit dialog and task activity dialog now accept injected agent-specific API functions, and the Testing Agent detail page wires them to the `/api/testing-agent/...` clients so those actions stay inside the correct workspace boundary.
+- Fixed Testing Agent task input handling around Ansible submissions: partial task-input edits now preserve previously uploaded fields such as `parameters` and `system`, and the Ansible adapter now keeps structured `parameters` payloads as structured `extra_vars` instead of flattening everything through `toString()`.
 - Synced the task feedback behavior across shared workflow surfaces: the shared task edit/decision dialogs can now call the correct agent-specific APIs, Deployment Agent and Testing Agent detail pages now expose the same status-aware edit/decision options, and backend decision rules now allow `Skip` from `Awaiting_Review` with test coverage.
 - Updated the WWA frontend copy so Testing Agent no longer inherits deployment-first wording in its primary flow: login now lands on the shared WWA home, Testing Agent actions and upload states use workflow/rundown language instead of `Start Deployment` / `Release File`, template-created rundowns route back to the matching agent workspace, and shared home/audit/access/config pages now use more neutral cross-agent descriptions.
 - Split Oracle datasource settings out of the default Spring config into a dedicated `test` profile so `local` H2 startup no longer risks inheriting Oracle dialect settings; updated README and Docker docs to use the `test` profile for Oracle-backed runs.

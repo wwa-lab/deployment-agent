@@ -145,6 +145,32 @@ class TaskServiceTest {
     }
 
     @Test
+    @DisplayName("partial input edits preserve unspecified task input fields")
+    void editInput_partialUpdate_preservesExistingFields() {
+        Task task = taskService.create(new CreateTaskInput(
+                request,
+                "TG-ANSIBLE",
+                "Ansible Group",
+                1,
+                "ansible-step",
+                ExecutionType.AUTO,
+                true,
+                Map.of("script", "42", "parameters", "{\"inventory\":\"sit\"}", "system", "ANSIBLE"),
+                null,
+                "alice",
+                null,
+                null,
+                null));
+
+        Task updated = taskService.editInput(task.getId(), Map.of("script", "84"), ownerUser);
+
+        assertThat(updated.getInputParameters())
+                .containsEntry("script", "84")
+                .containsEntry("parameters", "{\"inventory\":\"sit\"}")
+                .containsEntry("system", "ANSIBLE");
+    }
+
+    @Test
     @DisplayName("throws ForbiddenAppException when non-owner developer edits input")
     void editInput_nonOwner_throwsForbidden() {
         Task task = helper.seedTask(request, TaskStatus.Pending);

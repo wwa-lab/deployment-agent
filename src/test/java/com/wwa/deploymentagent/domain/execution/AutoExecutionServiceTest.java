@@ -142,6 +142,38 @@ class AutoExecutionServiceTest {
     }
 
     @Test
+    @DisplayName("submitting a specific AUTO task uses that task's own input instead of the first task in the request")
+    void submitAuto_usesSelectedTaskInput() {
+        Task firstTask = seedAutoTask(TaskStatus.Pending, "first-job");
+        firstTask.setStepSeq(1);
+        firstTask.setTaskName("auto-deploy-1");
+        taskRepository.save(firstTask);
+
+        Task secondTask = seedAutoTask(TaskStatus.Ready_For_Execution, "second-job");
+        secondTask.setStepSeq(2);
+        secondTask.setTaskName("auto-deploy-2");
+        taskRepository.save(secondTask);
+
+        seedJenkinsConfig();
+        mockJenkinsSuccess();
+
+        Task result = autoExecutionService.submitAutoExecution(secondTask.getId(), ownerUser);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Executing);
+        verify(restTemplate).postForEntity(
+                eq("http://jenkins:8080/job/second-job/buildWithParameters"),
+                any(),
+                eq(String.class));
+
+        List<TaskExecutionHistory> history = executionHistoryRepository
+                .findByTaskIdOrderByAttemptNumberAsc(secondTask.getId());
+        assertThat(history).hasSize(1);
+        assertThat(history.get(0).getInputSnapshot())
+                .containsEntry("script", "second-job")
+                .containsEntry("parameters", "--env sit");
+    }
+
+    @Test
     @DisplayName("scoped component config is used for submission and captured in execution history")
     void submitAuto_scopedConfigUsedAndSnapshotted() {
         request.setApplication("AMH HCC");
