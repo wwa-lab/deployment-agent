@@ -6,6 +6,7 @@ import { useUserStore } from '../stores/user'
 import {
   editTask as editTaskApi,
   getTaskResult,
+  listTaskExecutions as listTestingAgentTaskExecutions,
   recordResult as recordResultApi,
   startManualExecution as startManualExecutionApi,
   submitAutoExecution,
@@ -17,6 +18,7 @@ import {
   purgeRequestRundown,
   restoreRequestRundown,
   startRequestDeployment,
+  updateRequestRundown as updateTestingAgentRequestRundown,
 } from '../api/testingAgentReleaseFlows'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
 import DecisionDialog from '../components/DecisionDialog.vue'
@@ -1198,6 +1200,7 @@ watch(() => store.detail, (val) => {
     <RundownEditDialog
       v-if="editingRundown"
       :request="editingRundown"
+      :update-request-rundown-fn="updateTestingAgentRequestRundown"
       @saved="onRundownSaved"
       @close="editingRundown = null"
     />
@@ -1206,6 +1209,7 @@ watch(() => store.detail, (val) => {
       v-if="viewingActivityTask"
       :key="viewingActivityTask.id"
       :task="viewingActivityTask"
+      :list-task-executions-fn="listTestingAgentTaskExecutions"
       @close="viewingActivityTask = null"
     />
   </div>

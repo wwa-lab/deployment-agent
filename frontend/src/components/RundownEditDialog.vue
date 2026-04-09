@@ -4,7 +4,23 @@ import { updateRequestRundown } from '../api/releaseFlows'
 import { useUserStore } from '../stores/user'
 import type { Request } from '../types'
 
-const props = defineProps<{ request: Request }>()
+const props = withDefaults(defineProps<{
+  request: Request
+  updateRequestRundownFn?: (
+    flowId: string,
+    requestId: string,
+    input: {
+      snowGroup?: string
+      application?: string
+      agent?: string
+      owner?: string
+      site?: string
+      estimatedRemainingMinutes?: number
+    }
+  ) => Promise<Request>
+}>(), {
+  updateRequestRundownFn: updateRequestRundown,
+})
 const emit = defineEmits<{ saved: []; close: [] }>()
 const userStore = useUserStore()
 
@@ -36,7 +52,7 @@ async function submit() {
   }
 
   try {
-    await updateRequestRundown(props.request.releaseFlowId, props.request.id, {
+    await props.updateRequestRundownFn(props.request.releaseFlowId, props.request.id, {
       snowGroup: form.snowGroup || undefined,
       application: form.application || undefined,
       agent: form.agent || undefined,

@@ -90,4 +90,21 @@ class TestingAgentTaskControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(task.getId()));
     }
+
+    @Test
+    @DisplayName("PUT /tasks/:id/input preserves unspecified input fields for Testing Agent tasks")
+    void editInput_partialUpdate_preservesExistingFields() throws Exception {
+        ReleaseFlow rf = helper.seedReleaseFlow();
+        Request req = helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        Task task = helper.seedTask(req);
+
+        mockMvc.perform(put(BASE + "/" + task.getId() + "/input")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"script\": \"test.sh\"}")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inputParameters.script").value("test.sh"))
+                .andExpect(jsonPath("$.inputParameters.parameters").value("--env staging"));
+    }
 }

@@ -110,6 +110,35 @@ class ImportServiceTest {
     }
 
     @Test
+    @DisplayName("multi-row import preserves distinct task input parameters")
+    void importFile_multiRowDistinctInputs_preservesEachTaskInput() throws IOException {
+        byte[] xlsx = buildMultiRowXlsx(List.of(
+                row("PROJ-MULTI", "Project Multi", "TG-01", "Task Multi",
+                        "1", "step-1", "AUTO",
+                        "first-job", "--env sit",
+                        "", "", "", "", "", "", "", ""),
+                row("PROJ-MULTI", "Project Multi", "TG-01", "Task Multi",
+                        "2", "step-2", "AUTO",
+                        "second-job", "--env uat",
+                        "", "", "", "", "", "", "", "")
+        ));
+
+        ImportResult result = importService.importFile(xlsx, Stage.SIT, developer);
+
+        var requests = requestRepository.findByReleaseFlowId(result.releaseFlowId());
+        assertThat(requests).hasSize(1);
+
+        var tasks = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(requests.get(0).getId());
+        assertThat(tasks).hasSize(2);
+        assertThat(tasks.get(0).getInputParameters())
+                .containsEntry("script", "first-job")
+                .containsEntry("parameters", "--env sit");
+        assertThat(tasks.get(1).getInputParameters())
+                .containsEntry("script", "second-job")
+                .containsEntry("parameters", "--env uat");
+    }
+
+    @Test
     @DisplayName("later-stage upload attaches to the newest release flow that does not already have that stage")
     void importFile_laterStageUpload_usesNewestEligibleReleaseFlow() throws IOException {
         ImportResult firstSit = importService.importFile(
@@ -377,6 +406,49 @@ class ImportServiceTest {
             wb.write(out);
             return out.toByteArray();
         }
+    }
+
+    private byte[] buildMultiRowXlsx(List<String[]> rows) throws IOException {
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet(ExcelParserService.SHEET_NAME);
+
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < HEADERS.length; i++) {
+                header.createCell(i).setCellValue(HEADERS[i]);
+            }
+
+            for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+                Row data = sheet.createRow(rowIndex + 1);
+                String[] values = rows.get(rowIndex);
+                for (int colIndex = 0; colIndex < values.length; colIndex++) {
+                    if (values[colIndex] != null && !values[colIndex].isEmpty()) {
+                        data.createCell(colIndex).setCellValue(values[colIndex]);
+                    }
+                }
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            wb.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private String[] row(String projectId, String projectName,
+                         String taskGroupId, String taskGroupName,
+                         String stepSeq, String step, String execType,
+                         String script, String parameters,
+                         String expectedOutput, String owner,
+                         String plannedStart, String plannedEnd,
+                         String activityCategory, String common,
+                         String dependencies, String validation) {
+        return new String[] {
+                projectId, projectName, taskGroupId, taskGroupName,
+                stepSeq, step, execType,
+                script, parameters,
+                expectedOutput, owner,
+                plannedStart, plannedEnd,
+                activityCategory, common, dependencies, validation
+        };
     }
 
     private byte[] buildXlsxWithMissingProjectId() throws IOException {

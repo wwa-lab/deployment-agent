@@ -15,6 +15,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -126,7 +127,13 @@ public class TaskService {
         }
 
         Map<String, Object> oldInput = task.getInputParameters();
-        task.setInputParameters(newInput);
+        Map<String, Object> mergedInput = new LinkedHashMap<>();
+        if (oldInput != null) {
+            mergedInput.putAll(oldInput);
+        }
+        mergedInput.putAll(newInput);
+
+        task.setInputParameters(mergedInput);
         Task saved = save(task);
 
         auditLogger.log(user, AuditActionType.edit,
@@ -135,7 +142,7 @@ public class TaskService {
                 taskId,
                 Map.of("fieldChanged", "inputParameters",
                        "oldValue", oldInput != null ? oldInput : Map.of(),
-                       "newValue", newInput));
+                       "newValue", mergedInput));
 
         return saved;
     }

@@ -13,8 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Submits and polls AUTO tasks via the Ansible Tower/AWX REST API.
@@ -46,6 +48,7 @@ import java.util.Map;
 public class AnsibleExecutionAdapter implements AutoExecutionAdapter {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Set<String> RESERVED_KEYS = Set.of("script", "system");
 
     private final ConfigurationComponentService configurationComponentService;
     private final RestTemplate restTemplate;
@@ -232,13 +235,60 @@ public class AnsibleExecutionAdapter implements AutoExecutionAdapter {
     }
 
     private String buildRequestBody(Map<String, Object> inputParameters) throws JsonProcessingException {
+        Map<String, Object> extraVars = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : inputParameters.entrySet()) {
+            String key = entry.getKey();
+            if (!"parameters".equals(key) && !RESERVED_KEYS.contains(key) && entry.getValue() != null) {
+                extraVars.put(key, entry.getValue());
+            }
+        }
+
         Object params = inputParameters.get("parameters");
         if (params == null) {
+            if (extraVars.isEmpty()) {
+                return "{}";
+            }
+            return OBJECT_MAPPER.writeValueAsString(Map.of("extra_vars", extraVars));
+        }
+
+        Object normalizedParams = normalizeParameters(params);
+        if (normalizedParams instanceof Map<?, ?> paramMap) {
+            paramMap.forEach((key, value) -> extraVars.put(String.valueOf(key), value));
+            return OBJECT_MAPPER.writeValueAsString(Map.of("extra_vars", extraVars));
+        }
+        if (!extraVars.isEmpty()) {
+            extraVars.put("PARAMETERS", normalizedParams);
+            return OBJECT_MAPPER.writeValueAsString(Map.of("extra_vars", extraVars));
+        }
+        if (normalizedParams == null) {
             return "{}";
         }
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("extra_vars", params.toString());
+        requestBody.put("extra_vars", normalizedParams);
         return OBJECT_MAPPER.writeValueAsString(requestBody);
+    }
+
+    private Object normalizeParameters(Object params) {
+        if (!(params instanceof String raw)) {
+            return params;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        if (!looksLikeStructuredPayload(trimmed)) {
+            return raw;
+        }
+        try {
+            return OBJECT_MAPPER.readValue(trimmed, Object.class);
+        } catch (JsonProcessingException ignored) {
+            return raw;
+        }
+    }
+
+    private boolean looksLikeStructuredPayload(String value) {
+        return (value.startsWith("{") && value.endsWith("}"))
+                || (value.startsWith("[") && value.endsWith("]"));
     }
 
 }
