@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.task;
 
+import com.wwa.deploymentagent.contracts.enums.ActorKind;
 import com.wwa.deploymentagent.contracts.enums.ExecutionStatus;
 import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.util.JsonAttributeConverter;
@@ -127,6 +128,25 @@ public class TaskExecutionHistory {
     /** Timestamp of the last successful poll-based state refresh. */
     @Column(name = "last_synced_at")
     private Instant lastSyncedAt;
+
+    // ─── MVP Foundation Seams (see architecture.md) ──────────────────────────
+
+    /**
+     * Who or what triggered this execution attempt. Always {@link ActorKind#HUMAN}
+     * in MVP (a human pressed Run / auto-submitted through a controller action).
+     * Reserved so that future policy-initiated and AI-initiated executions can
+     * be distinguished without retrofitting this immutable history table.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "actor_kind", length = 20, nullable = false)
+    private ActorKind actorKind = ActorKind.HUMAN;
+
+    /**
+     * Opaque reference describing the actor when it is not the human operator
+     * (e.g. {@code policy:<id>}, {@code ai:<model>#<session>}). Null in MVP.
+     */
+    @Column(name = "actor_ref", length = 255)
+    private String actorRef;
 
     @PrePersist
     protected void onCreate() {

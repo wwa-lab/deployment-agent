@@ -18,6 +18,16 @@ import java.util.Map;
  *   <li>Both methods must be idempotent with respect to side effects in Deployment Agent.</li>
  *   <li>Implementations must not expose credentials in return values or logs.</li>
  * </ul>
+ *
+ * <h3>MVP Foundation Seams</h3>
+ * <p>{@link #supportsCancel()} and {@link #cancel} are reserved for a future
+ * human-on-the-loop cancellation flow and SLA-timeout sweeper. MVP adapters
+ * return {@code false} from {@link #supportsCancel()} by default and throw
+ * {@link UnsupportedOperationException} from {@link #cancel}. No runtime code
+ * calls either method yet — the default methods exist so adapters can opt in
+ * later without a breaking interface change that would force every
+ * implementation to update at once. See
+ * {@code docs/04-architecture/architecture.md} §MVP Foundation Seams.
  */
 public interface AutoExecutionAdapter {
 
@@ -45,4 +55,30 @@ public interface AutoExecutionAdapter {
      * @return normalized poll result; never null
      */
     AutoPollResult pollStatus(TaskExecutionHistory executionHistory);
+
+    /**
+     * MVP Foundation Seam — whether this adapter supports cancelling an
+     * in-flight external execution. Default: {@code false}. Callers must
+     * check this flag before invoking {@link #cancel}.
+     */
+    default boolean supportsCancel() {
+        return false;
+    }
+
+    /**
+     * MVP Foundation Seam — request cancellation of an in-flight external
+     * execution. Default: throws {@link UnsupportedOperationException}. No
+     * runtime code invokes this in MVP; it exists so a future human-on-the-loop
+     * cancel button or SLA-timeout sweeper can opt-in per adapter without
+     * forcing every adapter to change at once.
+     *
+     * @param executionHistory the active execution history record identifying
+     *                         the external job to cancel
+     * @throws UnsupportedOperationException if {@link #supportsCancel()} is
+     *         {@code false} for this adapter
+     */
+    default void cancel(TaskExecutionHistory executionHistory) {
+        throw new UnsupportedOperationException(
+                "cancel() not supported by adapter " + systemType());
+    }
 }

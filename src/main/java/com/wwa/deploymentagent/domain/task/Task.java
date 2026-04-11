@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.domain.task;
 
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
+import com.wwa.deploymentagent.contracts.enums.RiskLevel;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.util.JsonAttributeConverter;
@@ -99,6 +100,28 @@ public class Task {
      */
     @Column(name = "critical_flag", nullable = false)
     private boolean critical;
+
+    // ─── MVP Foundation Seams (see architecture.md §MVP Foundation Seams) ────
+
+    /**
+     * Risk classification used to gate future decision automation. Every task
+     * defaults to {@link RiskLevel#L2} in MVP, which preserves the current
+     * "human must decide" behavior. No runtime code reads this field yet; the
+     * column exists so that policy / SLA / AI branches can be added later
+     * without a schema migration or per-row backfill.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "risk_level", length = 4, nullable = false)
+    private RiskLevel riskLevel = RiskLevel.L2;
+
+    /**
+     * Optional expected SLA for this task in minutes, used by a future
+     * timeout sweeper to escalate or default-hold tasks that have been
+     * waiting on a human decision for too long. Null in MVP; no runtime
+     * code reads it yet.
+     */
+    @Column(name = "expected_sla_minutes")
+    private Integer expectedSlaMinutes;
 
     /**
      * Task input parameters as JSON: { "script": "...", "parameters": "..." }.

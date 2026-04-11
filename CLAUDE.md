@@ -177,6 +177,28 @@ Enforce via `:allowed-stages` prop on `UploadDialog` and a `stages` constant in 
 - Remove feature flags without searching all call sites
 - Commit without running tests
 
+### Decisions that must always be synchronous human-in-the-loop
+
+The following task / decision classes must **never** be auto-approved by policy,
+**never** be auto-actioned by an AI advisor, and **never** default to "approve"
+on SLA timeout. They must require a real, interactive human click every time,
+and the audit trail must record `actor_kind = HUMAN`. This rule holds even
+after the MVP foundation seams (`DecisionGate`, `ActorKind`, `RiskLevel`) are
+later wired to real policy / AI implementations — any such implementation
+must explicitly skip these classes and escalate instead of deciding.
+
+- Production data **deletion**, **masking**, or cross-environment **migration**
+- **Access grant** changes — especially granting or revoking `DEVOPS_ADMIN`
+- Any action with **financial, regulatory, or external-audit** impact
+- Cross-environment **data writeback** (e.g. UAT → PROD, PROD → any non-prod)
+- Any action that **disables or bypasses audit logging itself**
+- **First execution** of a new task type or template before a policy baseline
+  exists — new task shapes must be human-gated until they have observed history
+- Any task marked `RiskLevel.L3` in its template or entity
+
+If a new feature would weaken any of these protections, stop and escalate to
+the user before proceeding.
+
 ## ALWAYS
 
 - Show diff before committing

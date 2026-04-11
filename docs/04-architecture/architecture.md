@@ -217,6 +217,65 @@ Before Build Agent v3 (Q2 2026), this repository treated Deployment Agent as the
 
 ---
 
+## MVP Foundation Seams
+
+This section documents a set of **day-1 seams** that reserve data-model and interface shapes for capabilities that the product will need later but that are **not implemented at runtime in MVP**. Every seam in this section satisfies all three of the following criteria:
+
+1. **Zero runtime behavior change.** MVP code paths look and behave identically with or without the seam. Existing tests pass unchanged.
+2. **Cheap to add on day 1, expensive to retrofit.** The seam lives in an immutable history table, an entity that will need to be backfilled for every existing row, or an interface that is implemented by multiple adapters — in other words, somewhere that a later migration would be painful.
+3. **Has a known future consumer.** The seam is not speculative. Each one is tied to a concrete follow-up capability that the product already intends to deliver.
+
+The seams exist because the product has a hard constraint of **"7×24 platform availability with human-in-the-loop decisions"**. Under MVP, every decision is human, synchronous, and unconditional. In follow-up releases the product will add policy-based auto-approval for low-risk tasks, an AI advisor that produces suggestions, and SLA-timeout fallbacks — all of which need to attribute decisions to non-human actors and branch on task risk level. The seams below make those follow-ups **additive** rather than cross-cutting refactors.
+
+### Seam Inventory
+
+| # | Seam | Location | MVP behavior | Future consumer |
+|---|------|----------|--------------|-----------------|
+| 1 | `ActorKind` enum + `actor_kind` / `actor_ref` columns on `DA_AUDIT_LOG_ENTRY` | `contracts/enums/ActorKind.java`, `domain/audit/AuditLogEntry.java` | Every row is `HUMAN`, `actor_ref` null | Policy / AI-assisted / system-initiated audit writes |
+| 2 | `ActorKind` columns on `DA_TASK_EXECUTION_HISTORY` | `domain/task/TaskExecutionHistory.java` | Every row is `HUMAN`, `actor_ref` null | Policy / AI / system-initiated execution attempts |
+| 3 | `RiskLevel` enum + `risk_level` column on `DA_TASK` | `contracts/enums/RiskLevel.java`, `domain/task/Task.java` | Every task defaults to `L2`, no runtime reads | Policy-based auto-approval branching, SLA sweeper, AI advisor gating |
+| 4 | `expected_sla_minutes` nullable column on `DA_TASK` | `domain/task/Task.java` | Always null, no runtime reads | Scheduled timeout sweeper that escalates overdue decisions |
+| 5 | `DecisionGate` interface + `ManualDecisionGate` implementation | `domain/decision/DecisionGate.java`, `domain/decision/ManualDecisionGate.java`, `domain/decision/GateOutcome.java` | `DecisionEngine.applyDecision` consults the gate; the only implementation always returns `proceedAsHuman(user)` | Policy and AI-assisted gates composed in front of the manual gate without touching call sites |
+| 6 | `AutoExecutionAdapter.supportsCancel()` + `cancel(TaskExecutionHistory)` default methods | `domain/execution/AutoExecutionAdapter.java` | `supportsCancel()` returns `false`; `cancel(...)` throws `UnsupportedOperationException`; no runtime code calls either | Human-on-the-loop cancel button and SLA-driven cancellation, per-adapter opt-in |
+
+The canonical Oracle DDL for seams 1–4 is in `src/main/resources/db/migration/V15__add_mvp_foundation_seams.sql`. Tests and the `local` Spring profile use Hibernate auto-DDL, so the seams are created from the JPA entities automatically in H2; the migration script is the authoritative reference for production Oracle rollouts.
+
+### What the Seams Do Not Provide
+
+The seams are deliberately narrow. They do **not** provide — and MVP should not be interpreted as providing — any of the following:
+
+- A policy language, policy evaluator, or policy admin UI
+- A scheduled job / sweeper that reads `expected_sla_minutes` or times out decisions
+- An AI advisor service, prompt management, or model integration
+- A cancellation control path in any controller, store, or UI component
+- A rollback adapter interface or rollback automation
+- An escalation / on-call routing chain
+- Any non-`HUMAN` value being written to any `actor_kind` column
+
+Every one of the items above is a **separate, future** piece of work. They are listed here so that contributors know the seams are **not half-finished features**; they are explicit placeholders with zero behavior.
+
+### Rules for Touching the Seams
+
+1. **Do not read seam fields from runtime code in MVP.** Reading `risk_level`, `expected_sla_minutes`, or `actor_kind` from a controller or service introduces a branch that MVP tests do not exercise. If you need to add a read, that is a new feature and must be proposed as such.
+2. **Do not change default values.** Every task must default to `RiskLevel.L2`; every audit and history write must default to `ActorKind.HUMAN`. Changing the default is equivalent to silently enabling a future behavior.
+3. **Do not broaden `DecisionGate` semantics.** In MVP the gate may not throw, may not persist, and may not mutate state. State mutation and audit writes remain owned by `DecisionEngine`.
+4. **Do not call `AutoExecutionAdapter.cancel(...)` from MVP code paths.** There is no UI, no controller, and no sweeper that should invoke it. Guard any future caller with `supportsCancel()`.
+5. **Respect the red-line decision list in `CLAUDE.md`.** Future policy and AI implementations must explicitly skip the classes listed under "Decisions that must always be synchronous human-in-the-loop" — the seams do not imply those decisions are automatable.
+
+### How the Seams Map to the 7×24 + Human-Decision Constraint
+
+The product operates under a constraint that is frequently misread as a contradiction: "the platform must be available 7×24, but humans must make the decisions." The contradiction is only apparent: "7×24" is a **platform-availability** property, and "human decision" is a **governance** property. They sit on different axes. The seams exist so that the follow-up releases can separate the two axes cleanly:
+
+- **Tiered decisions via `RiskLevel`** — low-risk tasks become eligible for policy-based auto-approval (still attributed to a human author of the policy) while high-risk tasks remain strictly human. The `L3` value is a permanent "never auto" marker.
+- **Actor attribution via `ActorKind`** — the audit trail can distinguish a human click from a policy execution from an AI-assisted click, which is what makes "policy decided while the on-call was asleep" auditable rather than a lie.
+- **SLA fallback via `expected_sla_minutes`** — overdue decisions can escalate or default to a **safe** state (not a permissive state) so the platform does not block indefinitely on a sleeping human.
+- **Pluggable gate via `DecisionGate`** — the place where a policy evaluator or AI advisor plugs in is a single, named seam instead of a series of `if`-statements scattered across controllers.
+- **Cancellation hook via `AutoExecutionAdapter.cancel(...)`** — a human-on-the-loop cancel button and an SLA-timeout sweeper both have a single contracted call site.
+
+None of those capabilities ships in MVP. The seams exist so that when each one does ship, it ships as **additive code** against a stable set of interfaces and columns, not as a schema migration plus a refactor plus a history rewrite.
+
+---
+
 ## Overview
 
 Deployment Agent is a controlled, human-in-the-loop release orchestration workspace operating as the first agent workspace within the WWA Agent Workspace Hub. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task owners or admins make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants, scoped visibility through `Application + SNOW Group`, and an Access Management MVP.

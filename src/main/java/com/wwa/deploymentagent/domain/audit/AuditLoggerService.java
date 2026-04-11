@@ -1,6 +1,7 @@
 package com.wwa.deploymentagent.domain.audit;
 
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.enums.ActorKind;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
@@ -118,6 +119,11 @@ public class AuditLoggerService {
             AuditLogEntry entry = new AuditLogEntry();
             entry.setOperatorId(user.userId());
             entry.setOperatorRole(user.role());
+            // MVP Foundation Seam: every audit write is attributed to a real human
+            // operator. The seam exists so that future policy / AI-assisted / system
+            // writes can override this value without retrofitting the table.
+            entry.setActorKind(ActorKind.HUMAN);
+            entry.setActorRef(null);
             entry.setActionType(actionType);
             entry.setReleaseFlowId(releaseFlowId);
             entry.setRequestId(requestId);

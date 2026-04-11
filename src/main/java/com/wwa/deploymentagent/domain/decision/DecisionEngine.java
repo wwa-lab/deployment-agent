@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -36,16 +37,35 @@ public class DecisionEngine {
     private final TaskExecutionHistoryService executionHistoryService;
     private final AuditLoggerService auditLogger;
     private final TaskPermissionService taskPermissionService;
+    private final DecisionGate decisionGate;
 
     /**
      * Apply a decision to a task.
      * Validates role and state constraints, then persists the result.
      * Audits the decision with an optional comment.
+     *
+     * <p>MVP Foundation Seam: the decision is first evaluated by
+     * {@link DecisionGate#evaluate}. In MVP the only implementation is
+     * {@link ManualDecisionGate}, which always returns
+     * {@link GateOutcome#proceedAsHuman(UserContext)}. The gate's actor
+     * attribution is threaded into the audit context so future policy /
+     * AI-assisted outcomes will be reflected in audit rows without touching
+     * call sites. See {@code docs/04-architecture/architecture.md}
+     * §MVP Foundation Seams.
      */
     @Transactional
     public void applyDecision(String taskId, DecisionType decision, UserContext user, String comment) {
         Task task = taskService.getById(taskId);
         taskPermissionService.assertOwnerOrAdmin(task, user, "decision:" + decision.name());
+
+        GateOutcome gateOutcome = decisionGate.evaluate(task, decision, user);
+        if (!gateOutcome.allowed()) {
+            throw new InvalidStateTransitionException(
+                    task.getTaskStatus().name(),
+                    decision.name(),
+                    gateOutcome.reason() != null ? gateOutcome.reason() : "Decision blocked by gate");
+        }
+
         String releaseFlowId = task.getRequest().getReleaseFlow().getId();
         String requestId = task.getRequest().getId();
 
@@ -92,9 +112,14 @@ public class DecisionEngine {
             case skip    -> AuditActionType.skip;
         };
 
-        auditLogger.log(user, auditAction, releaseFlowId, requestId, taskId,
-                Map.of("decisionType", decision.name(),
-                       "previousStatus", task.getTaskStatus().name(),
-                       "comment", comment != null ? comment : ""));
+        Map<String, Object> auditContext = new LinkedHashMap<>();
+        auditContext.put("decisionType", decision.name());
+        auditContext.put("previousStatus", task.getTaskStatus().name());
+        auditContext.put("comment", comment != null ? comment : "");
+        auditContext.put("actorKind", gateOutcome.actorKind().name());
+        if (gateOutcome.actorRef() != null) {
+            auditContext.put("actorRef", gateOutcome.actorRef());
+        }
+        auditLogger.log(user, auditAction, releaseFlowId, requestId, taskId, auditContext);
     }
 }
