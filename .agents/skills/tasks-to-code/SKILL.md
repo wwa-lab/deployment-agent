@@ -2,22 +2,33 @@
 name: tasks-to-code
 description: >
   Converts a structured implementation task breakdown (tasks.md) into working code changes,
-  tests, and supporting artifacts directly in the current repository. Use this skill whenever
-  the user provides a tasks.md or similar task list and wants Codex to implement it — even if
-  they phrase it as "start building this", "implement these tasks", "code from this plan",
-  "turn this into working code", "execute this engineering plan", or "help me build this".
-  Trigger this skill any time implementation work needs to happen from a structured task list,
-  regardless of domain (backend, frontend, DevOps, integrations, data, etc.).
+  tests, and supporting artifacts directly in an already-populated repository. Use this skill
+  whenever the user provides a tasks.md or similar task list and wants incremental feature work
+  implemented in the current codebase — even if they phrase it as "start building this",
+  "implement these tasks", "code from this plan", "turn this into working code",
+  "execute this engineering plan", or "help me build this". Do not use this skill for new-project
+  bootstrapping, empty-repo scaffolding, or migration/porting work; use `tasks-to-implementation`
+  for those cases instead.
 ---
 
 # tasks-to-code
 
 Converts an implementation task breakdown (tasks.md) into working code changes, tests, and
-supporting implementation artifacts in the current repository.
+supporting implementation artifacts in an already-populated repository.
 
 ---
 
 ## Workflow
+
+### 0. Confirm This Is Brownfield Incremental Work
+
+Before touching code, verify that the task fits this skill:
+
+- Use this skill when the repository already has meaningful source, build/test commands, and established conventions to extend
+- If the repo is empty or near-empty, the tasks require project bootstrapping/scaffolding, or the work is a migration/port/rewrite between stacks, stop and use `tasks-to-implementation` instead
+- If the request mixes incremental feature work with substantial new-project scaffolding or migration decisions, surface that mismatch before coding rather than silently proceeding
+
+---
 
 ### 1. Read and Analyze tasks.md
 
@@ -47,6 +58,7 @@ Before writing code, understand the existing codebase:
 - Before creating a new pattern, abstraction, helper, or module, check whether the repository already has an established way to solve the same problem and follow it.
 
 Surface any **gaps or blockers** found during inspection before coding starts.
+- If inspection shows the repo is effectively greenfield or the task is really a migration, stop and report that this skill is the wrong fit.
 
 ---
 
@@ -73,6 +85,7 @@ For each task implemented:
 - **Use the existing test framework and patterns** — do not introduce a new one
 - If infrastructure is missing for tests, clearly explain what is missing rather than skipping silently
 - **Do not claim tests passed unless they were actually executed and passed**
+- If the relevant test subset is already failing before the change, scope that baseline and avoid stacking unrelated edits on top of it
 - For backend: include input validation, error handling, and logging where appropriate
 - For frontend: include loading, empty, success, and error states where applicable
 - For workflow / DevOps platforms: implement state handling, retry/skip/resume behavior,
@@ -167,6 +180,7 @@ When applicable, prefer validating with the repository's existing lint, typechec
 | Rule | Detail |
 |------|--------|
 | Follow the repo | Use the existing stack, frameworks, and style. Do not impose a new one. |
+| Use the right implementation skill | `tasks-to-code` is for incremental brownfield work; hand off greenfield and migration cases to `tasks-to-implementation`. |
 | Stay minimal | Implement what the tasks require. No speculative extras. |
 | Stay safe | Prefer reviewable increments over large rewrites. |
 | Stay honest | Never claim completion of work not actually done. Never fabricate test results. |

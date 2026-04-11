@@ -24,7 +24,7 @@ The standard pipeline is:
 3. `spec-to-architecture`
 4. `architecture-to-design`
 5. `design-to-tasks`
-6. `tasks-to-code`
+6. `tasks-to-code` (incremental brownfield work) or `tasks-to-implementation` (greenfield / migration / mode-detection workflow)
 
 Quality gates:
 
@@ -123,13 +123,23 @@ Output:
 - blockers
 
 ### `tasks-to-code`
-Use when the repository is ready for implementation and tasks are clear enough to execute safely.
+Use for incremental brownfield work: the repository already has meaningful source, build/test commands, and established conventions to extend. This is the default implementation skill for this repo.
 
 Output:
 - code changes
 - tests
 - concise implementation summary
 - validation results
+- remaining blockers
+
+### `tasks-to-implementation`
+Use when the mode-detection workflow should govern the run: greenfield bootstrapping, migration/porting between stacks, or when you explicitly want the skill to classify the repo and select the appropriate workflow (greenfield / brownfield / migration) before coding.
+
+Output:
+- detected mode and signals
+- code changes
+- tests
+- validation results (including parity checks for migration mode)
 - remaining blockers
 
 ---
@@ -270,8 +280,11 @@ When implementing code:
 ### Generate tasks
 `Use design-to-tasks to convert docs/05-design/design.md into docs/06-tasks/tasks.md.`
 
-### Implement code
+### Implement code (brownfield, default)
 `Use tasks-to-code to implement the highest-priority coherent subset in the current repository.`
+
+### Implement code (greenfield / migration / mode-detection)
+`Use tasks-to-implementation to implement tasks with explicit mode detection before coding.`
 
 ### Review a document
 `Use review-doc-quality to review docs/05-design/design.md and assess whether it is ready for design-to-tasks.`

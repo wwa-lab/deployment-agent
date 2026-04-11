@@ -479,6 +479,19 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
   - ArchUnit report shows 0 violations.
   - No flaky tests introduced.
 - **Depends on:** BA-T22, BA-T23, BA-T24, BA-T25
+- **Blocks:** BA-T26.1, BA-T27
+
+#### BA-T26.1: Backfill migration — set `agent = 'deployment-agent'` on legacy null-agent rows (P-01 resolution)
+- **Phase:** I (lands after backend tests pass, before BA-T27 gate)
+- **Design ref:** §10 P-01
+- **Architecture ref:** P-01 (legacy null-agent visibility precondition)
+- **Effort:** S
+- **Description:** Add Flyway migration `V13__backfill_null_agent_to_deployment_agent.sql` that updates all `DA_REQUEST` rows where `agent IS NULL` to `agent = 'deployment-agent'`. This ensures legacy pre-agent-column rows remain visible in the Deployment Agent workspace after v3 agent filtering. The migration is idempotent (no effect if no null rows exist). Resolves P-01.
+- **Acceptance criteria:**
+  - Migration file exists at `src/main/resources/db/migration/V13__backfill_null_agent_to_deployment_agent.sql`.
+  - `mvn test` passes (H2 test profile applies the migration).
+  - After migration, `SELECT COUNT(*) FROM DA_REQUEST WHERE agent IS NULL` returns 0.
+- **Depends on:** BA-T26
 - **Blocks:** BA-T27
 
 #### BA-T27: Frontend build + manual smoke of 13 critical scenarios + P-01 gate check
@@ -492,7 +505,7 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
   - All 13 manual scenarios pass.
   - Session cookie preservation scenario (#11) verified end-to-end: login → access Deployment Agent → access Build Agent without re-login.
   - **P-01 is resolved** (§10 hard precondition). Resolution is recorded in either a linked decision document, a product-owner PR approval, or a landed backfill migration task before this gate.
-- **Depends on:** BA-T26, **P-01 resolution**
+- **Depends on:** BA-T26, BA-T26.1
 - **Blocks:** BA-T28
 
 #### BA-T28: Release notes + follow-up ticket creation
@@ -667,7 +680,7 @@ The first entry is a **hard precondition** that must be resolved before this del
   2. OR a backfill migration task is added to this delivery (set `agent = "deployment-agent"` on all null rows) and landed before BA-T27. This changes the scope of the delivery and adds roughly one S-effort task.
   3. OR Global View (FU-01) is pulled into this delivery's scope. This is a significant scope increase (new platform endpoint, new page, new query, new permission check) and is not recommended.
 
-  **Status:** OPEN. Not yet resolved. Owner: needs assignment to a named product owner. This entry is tracked as a merge-blocker for BA-T27 and BA-T28 — neither task can be marked complete until P-01 has an explicit resolution.
+  **Status:** RESOLVED (option 2 — backfill migration). BA-T26.1 adds Flyway migration `V13__backfill_null_agent_to_deployment_agent.sql` that sets `agent = 'deployment-agent'` on all legacy null-agent rows. This ensures pre-agent-column data remains visible in the Deployment Agent workspace. Decision recorded 2026-04-11.
 
 ### Soft defaults
 
