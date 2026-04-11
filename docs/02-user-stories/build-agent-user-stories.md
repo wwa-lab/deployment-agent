@@ -152,7 +152,7 @@ so that the created request is automatically tagged as a build-agent request and
 
 **Dependencies**
 
-- Backend `BuildUploadController` (under `agents/build/web/`) that delegates to Platform Core `ImportService` with `agent = "build-agent"`, `stage = "DEV"`, and `BuildStagePipeline`, all forced server-side.
+- Backend `BuildUploadController` (under `agents/build/web/`) that delegates to Platform Core `ImportService` with `agent = "build-agent"` and `stage = "DEV"` forced server-side. `ImportService` is agent-agnostic and does not take a `StagePipeline`; pipeline resolution happens later inside `ReleaseFlowProgressionService` via `StagePipelineRegistry`.
 - Frontend API client configured for `/api/build-agent`.
 - `UploadDialog` accepts `:allowed-stages` prop set to `['DEV']`.
 

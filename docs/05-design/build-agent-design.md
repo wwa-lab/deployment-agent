@@ -850,6 +850,7 @@ public enum DeploymentStage {
 // agents/deployment/domain/DeploymentStagePipeline.java
 package com.wwa.deploymentagent.agents.deployment.domain;
 
+import com.wwa.deploymentagent.platform.contracts.AgentId;
 import com.wwa.deploymentagent.platform.domain.StagePipeline;
 import org.springframework.stereotype.Component;
 
@@ -862,10 +863,23 @@ public class DeploymentStagePipeline implements StagePipeline {
     private static final List<String> ORDER = List.of("SIT", "UAT", "PROD");
 
     @Override
+    public String agentId() {
+        return AgentId.DEPLOYMENT_AGENT;
+    }
+
+    @Override
     public Optional<String> next(String currentStage) {
         int idx = ORDER.indexOf(currentStage);
-        if (idx < 0 || idx == ORDER.size() - 1) {
-            return Optional.empty();
+        if (idx < 0) {
+            // Fail-loud per M1 contract: unknown stage is a routing bug, not
+            // a terminal signal. Silently returning Optional.empty() would
+            // let a mis-routed progression call mark a foreign flow Completed.
+            throw new IllegalArgumentException(
+                    "Unknown stage for " + agentId() + " pipeline: '" + currentStage
+                            + "'. Valid stages: " + ORDER);
+        }
+        if (idx == ORDER.size() - 1) {
+            return Optional.empty();   // PROD is the terminal stage
         }
         return Optional.of(ORDER.get(idx + 1));
     }
@@ -873,7 +887,12 @@ public class DeploymentStagePipeline implements StagePipeline {
     @Override
     public boolean isTerminal(String stage) {
         int idx = ORDER.indexOf(stage);
-        return idx < 0 || idx == ORDER.size() - 1;
+        if (idx < 0) {
+            throw new IllegalArgumentException(
+                    "Unknown stage for " + agentId() + " pipeline: '" + stage
+                            + "'. Valid stages: " + ORDER);
+        }
+        return idx == ORDER.size() - 1;
     }
 
     @Override
@@ -1017,11 +1036,49 @@ public enum TestingStage {
 
 ```java
 // agents/testing/domain/TestingStagePipeline.java
+package com.wwa.deploymentagent.agents.testing.domain;
+
+import com.wwa.deploymentagent.platform.contracts.AgentId;
+import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Optional;
+
 @Component
 public class TestingStagePipeline implements StagePipeline {
-    @Override public Optional<String> next(String currentStage) { return Optional.empty(); }
-    @Override public boolean isTerminal(String stage) { return true; }
-    @Override public List<String> orderedStages() { return List.of("UAT"); }
+
+    private static final List<String> ORDER = List.of("UAT");
+
+    @Override
+    public String agentId() {
+        return AgentId.TESTING_AGENT;
+    }
+
+    @Override
+    public Optional<String> next(String currentStage) {
+        if (!ORDER.contains(currentStage)) {
+            throw new IllegalArgumentException(
+                    "Unknown stage for " + agentId() + " pipeline: '" + currentStage
+                            + "'. Valid stages: " + ORDER);
+        }
+        return Optional.empty();   // UAT is the only stage and it is terminal
+    }
+
+    @Override
+    public boolean isTerminal(String stage) {
+        if (!ORDER.contains(stage)) {
+            throw new IllegalArgumentException(
+                    "Unknown stage for " + agentId() + " pipeline: '" + stage
+                            + "'. Valid stages: " + ORDER);
+        }
+        return true;
+    }
+
+    @Override
+    public List<String> orderedStages() {
+        return ORDER;
+    }
 }
 ```
 
@@ -1065,11 +1122,49 @@ public enum BuildStage {
 
 ```java
 // agents/build/domain/BuildStagePipeline.java
+package com.wwa.deploymentagent.agents.build.domain;
+
+import com.wwa.deploymentagent.platform.contracts.AgentId;
+import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Optional;
+
 @Component
 public class BuildStagePipeline implements StagePipeline {
-    @Override public Optional<String> next(String currentStage) { return Optional.empty(); }
-    @Override public boolean isTerminal(String stage) { return true; }
-    @Override public List<String> orderedStages() { return List.of("DEV"); }
+
+    private static final List<String> ORDER = List.of("DEV");
+
+    @Override
+    public String agentId() {
+        return AgentId.BUILD_AGENT;
+    }
+
+    @Override
+    public Optional<String> next(String currentStage) {
+        if (!ORDER.contains(currentStage)) {
+            throw new IllegalArgumentException(
+                    "Unknown stage for " + agentId() + " pipeline: '" + currentStage
+                            + "'. Valid stages: " + ORDER);
+        }
+        return Optional.empty();   // DEV is the only stage and it is terminal
+    }
+
+    @Override
+    public boolean isTerminal(String stage) {
+        if (!ORDER.contains(stage)) {
+            throw new IllegalArgumentException(
+                    "Unknown stage for " + agentId() + " pipeline: '" + stage
+                            + "'. Valid stages: " + ORDER);
+        }
+        return true;
+    }
+
+    @Override
+    public List<String> orderedStages() {
+        return ORDER;
+    }
 }
 ```
 
@@ -1392,7 +1487,8 @@ public class AgentModuleBoundaryTest {
 
 | Test file | Scope | Count (estimate) |
 |---|---|---|
-| `StagePipelineContractTest` (parameterized for 3 impls) | M1 contract | 8 × 3 = 24 |
+| `StagePipelineContractTest` (parameterized for 3 impls) | M1.3 contract (11 rows including fail-loud cases and `agentId()` check) | 11 × 3 = 33 |
+| `StagePipelineRegistryTest` | M1.3 registry behavior (known / unknown / duplicate / non-empty) | 4 |
 | `AgentBoundaryGuardTest` | M2 | 12 |
 | `ReleaseFlowServiceTest` | M3 (new `listByAgent`, String stage) | +8 |
 | `ReleaseFlowProgressionServiceTest` | M4 (pipeline parameter threading) | +6 |

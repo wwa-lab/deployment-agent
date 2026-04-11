@@ -71,7 +71,7 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
 - **Design ref:** M1
 - **Architecture ref:** PL-4
 - **Effort:** S (small)
-- **Description:** Create the public `StagePipeline` interface with three methods (`next`, `isTerminal`, `orderedStages`). No implementations yet. No callers yet. The only file created.
+- **Description:** Create the public `StagePipeline` interface with four methods: `String agentId()` (routing key used by `StagePipelineRegistry` in BA-T04), `Optional<String> next(String currentStage)`, `boolean isTerminal(String stage)`, and `List<String> orderedStages()`. Both `next` and `isTerminal` MUST be documented in javadoc as throwing `IllegalArgumentException` when the argument is not a declared member of `orderedStages()` — this is the fail-loud contract that prevents mis-routed progression calls from silently marking flows Completed. No implementations yet. No callers yet. The only file created.
 - **Files created:** `src/main/java/com/wwa/deploymentagent/platform/domain/StagePipeline.java`
 - **Acceptance criteria:**
   - Interface compiles.
