@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { updateRequestRundown } from '../api/releaseFlows'
+import { updateRequestRundown } from '../agents/deployment/api'
 import { useUserStore } from '../stores/user'
 import type { Request } from '../types'
 

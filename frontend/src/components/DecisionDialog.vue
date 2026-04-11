@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { submitDecision as submitDecisionApi } from '../api/tasks'
+import { submitDecision as submitDecisionApi } from '../agents/deployment/api'
 import type { Task } from '../types'
 
 const props = withDefaults(defineProps<{

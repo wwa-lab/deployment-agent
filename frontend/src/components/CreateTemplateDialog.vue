@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useUserStore } from '../stores/user'
-import { downloadTemplate } from '../api/upload'
+import { downloadTemplate } from '../agents/deployment/api'
 import type { CreateTemplateDraft } from '../types'
 
 const props = defineProps<{

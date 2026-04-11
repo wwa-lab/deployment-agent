@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { createRundownFromTemplate } from '../api/releaseFlows'
+import { createRundownFromTemplate } from '../agents/deployment/api'
 import { useUserStore } from '../stores/user'
 import type { Stage, TemplateRecord, UploadResponse } from '../types'
 

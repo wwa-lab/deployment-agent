@@ -50,7 +50,7 @@ const router = createRouter({
         {
           path: 'deployment-agent',
           name: 'wwa-deployment-agent',
-          component: () => import('../views/ReleaseFlowSummaryView.vue'),
+          component: () => import('../agents/deployment/ReleaseFlowSummaryView.vue'),
           meta: {
             section: 'deployment-agent',
             sectionTitle: 'Deployment Agent',
@@ -59,7 +59,7 @@ const router = createRouter({
         {
           path: 'deployment-agent/release-flows/:id',
           name: 'wwa-deployment-agent-detail',
-          component: () => import('../views/ReleaseFlowDetailView.vue'),
+          component: () => import('../agents/deployment/ReleaseFlowDetailView.vue'),
           meta: {
             section: 'deployment-agent',
             sectionTitle: 'Deployment Agent',
@@ -68,7 +68,7 @@ const router = createRouter({
         {
           path: 'testing-agent',
           name: 'wwa-testing-agent',
-          component: () => import('../views/TestingAgentSummaryView.vue'),
+          component: () => import('../agents/testing/TestingAgentSummaryView.vue'),
           meta: {
             section: 'testing-agent',
             sectionTitle: 'Testing Agent',
@@ -77,7 +77,7 @@ const router = createRouter({
         {
           path: 'testing-agent/release-flows/:id',
           name: 'wwa-testing-agent-detail',
-          component: () => import('../views/TestingAgentDetailView.vue'),
+          component: () => import('../agents/testing/TestingAgentDetailView.vue'),
           meta: {
             section: 'testing-agent',
             sectionTitle: 'Testing Agent',

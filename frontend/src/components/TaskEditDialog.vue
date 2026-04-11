@@ -4,7 +4,7 @@ import {
   editTask as editTaskApi,
   recordResult as recordResultApi,
   startManualExecution as startManualExecutionApi,
-} from '../api/tasks'
+} from '../agents/deployment/api'
 import type { Task } from '../types'
 
 const props = withDefaults(defineProps<{

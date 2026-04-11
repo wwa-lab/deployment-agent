@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { listAuditLogs } from '../api/audit'
-import { listTaskExecutions } from '../api/tasks'
+import { listTaskExecutions } from '../agents/deployment/api'
 import type { AuditLogEntry, Task, TaskExecutionHistory } from '../types'
 
 type ActivityTone = 'success' | 'fail' | 'neutral'
