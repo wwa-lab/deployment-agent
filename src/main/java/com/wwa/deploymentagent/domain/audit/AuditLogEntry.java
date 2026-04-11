@@ -29,7 +29,8 @@ import java.util.UUID;
         @Index(name = "IDX_ALE_RELEASE_FLOW", columnList = "release_flow_id"),
         @Index(name = "IDX_ALE_APPLICATION", columnList = "application"),
         @Index(name = "IDX_ALE_SNOW_GROUP", columnList = "snow_group"),
-        @Index(name = "IDX_ALE_AGENT", columnList = "agent")
+        @Index(name = "IDX_ALE_AGENT", columnList = "agent"),
+        @Index(name = "IDX_ALE_CORRELATION", columnList = "correlation_id")
     }
 )
 @Getter
@@ -63,6 +64,19 @@ public class AuditLogEntry {
      */
     @Column(name = "actor_ref", length = 255)
     private String actorRef;
+
+    /**
+     * Request-scoped correlation ID set by {@code CorrelationIdFilter} and
+     * read from SLF4J MDC at write time. Null for entries produced by
+     * background jobs that run outside an HTTP request context.
+     *
+     * <p>This is infrastructure debt, not an MVP Foundation Seam — it is
+     * read and written today for every inbound request. Its purpose is to
+     * let operators stitch a single user action across server logs, audit
+     * entries, and downstream Jenkins/Ansible submissions.
+     */
+    @Column(name = "correlation_id", length = 64)
+    private String correlationId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "action_type", length = 50, nullable = false)

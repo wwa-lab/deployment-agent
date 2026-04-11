@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.Map;
 
 /**
@@ -43,6 +43,7 @@ public class RecordResultService {
     private final AuditLoggerService auditLogger;
     private final TaskPermissionService taskPermissionService;
     private final TaskService taskService;
+    private final Clock clock;
 
     @Transactional
     public Task recordResult(String taskId,
@@ -77,8 +78,8 @@ public class RecordResultService {
         history.setInputSnapshot(task.getInputParameters());
         history.setResultSummary(resultSummary);
         history.setResultLogs(resultLogs);
-        history.setStartTime(task.getLastUpdatedAt() != null ? task.getLastUpdatedAt() : Instant.now());
-        history.setEndTime(Instant.now());
+        history.setStartTime(task.getLastUpdatedAt() != null ? task.getLastUpdatedAt() : clock.instant());
+        history.setEndTime(clock.instant());
         TaskExecutionHistory savedHistory = executionHistoryRepository.save(history);
 
         // Transition task to Awaiting_Review

@@ -31,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
@@ -60,6 +61,7 @@ public class ReleaseFlowService {
     private final TaskRepository taskRepository;
     private final AuditLoggerService auditLogger;
     private final StagePipelineRegistry stagePipelineRegistry;
+    private final Clock clock;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -500,7 +502,7 @@ public class ReleaseFlowService {
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         ReleaseFlow releaseFlow = getById(releaseFlowId);
 
-        Instant archivedAt = Instant.now();
+        Instant archivedAt = clock.instant();
         request.setArchivedAt(archivedAt);
         request.setArchivedBy(user.userId());
         requestRepository.save(request);
@@ -589,7 +591,7 @@ public class ReleaseFlowService {
                     .toList();
             ReleaseFlow releaseFlow = getById(releaseFlowId, true);
             if (activeRequests.isEmpty()) {
-                Instant archivedAt = releaseFlow.getArchivedAt() != null ? releaseFlow.getArchivedAt() : Instant.now();
+                Instant archivedAt = releaseFlow.getArchivedAt() != null ? releaseFlow.getArchivedAt() : clock.instant();
                 String archivedBy = releaseFlow.getArchivedBy() != null ? releaseFlow.getArchivedBy() : user.userId();
                 archiveReleaseFlow(releaseFlow, archivedAt, archivedBy);
             } else {

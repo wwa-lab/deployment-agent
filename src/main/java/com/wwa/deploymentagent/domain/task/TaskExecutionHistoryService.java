@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +23,7 @@ public class TaskExecutionHistoryService {
     private final TaskExecutionHistoryRepository executionHistoryRepository;
     private final TaskRepository taskRepository;
     private final TaskService taskService;
+    private final Clock clock;
 
     /**
      * Create a new execution history record for a task.
@@ -49,7 +50,7 @@ public class TaskExecutionHistoryService {
         execution.setInputSnapshot(task.getInputParameters());
         execution.setResultSummary(null);
         execution.setResultLogs(null);
-        execution.setStartTime(Instant.now());
+        execution.setStartTime(clock.instant());
         execution.setEndTime(null);
 
         TaskExecutionHistory saved = executionHistoryRepository.save(execution);
@@ -87,7 +88,7 @@ public class TaskExecutionHistoryService {
         execution.setExecutionStatus(executionStatus);
         if (resultSummary != null) execution.setResultSummary(resultSummary);
         if (resultLogs != null) execution.setResultLogs(resultLogs);
-        execution.setEndTime(Instant.now());
+        execution.setEndTime(clock.instant());
 
         return executionHistoryRepository.save(execution);
     }

@@ -3,6 +3,7 @@ package com.wwa.deploymentagent.domain.audit;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.ActorKind;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
+import com.wwa.deploymentagent.platform.web.common.CorrelationIdFilter;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.domain.task.Task;
@@ -124,6 +125,11 @@ public class AuditLoggerService {
             // writes can override this value without retrofitting the table.
             entry.setActorKind(ActorKind.HUMAN);
             entry.setActorRef(null);
+            // Stitch this audit row into the originating HTTP request so
+            // operators can correlate with server logs and downstream calls.
+            // Null is acceptable for background jobs that run outside of an
+            // HTTP request context.
+            entry.setCorrelationId(CorrelationIdFilter.current());
             entry.setActionType(actionType);
             entry.setReleaseFlowId(releaseFlowId);
             entry.setRequestId(requestId);

@@ -16,6 +16,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
@@ -65,6 +66,7 @@ public class ExternalExecutionMonitorService {
     private final TaskRepository taskRepository;
     private final List<AutoExecutionAdapter> adapters;
     private final ReleaseFlowProgressionService progressionService;
+    private final Clock clock;
 
     /**
      * Main polling loop. Runs with fixedDelay so the next cycle only starts
@@ -131,7 +133,7 @@ public class ExternalExecutionMonitorService {
     // ─── Apply poll result ─────────────────────────────────────────────────────
 
     private void applyPollResult(TaskExecutionHistory history, AutoPollResult poll) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         // Always update normalized external status fields
         if (poll.externalStatus() != null && poll.externalStatus() != ExternalStatus.UNKNOWN) {

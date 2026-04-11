@@ -54,6 +54,18 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Flyway – schema migration authority for Oracle (dev profile).
+             Intentionally NOT used by local/test profiles, which keep
+             Hibernate DDL auto for fast iteration. See application.properties. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-oracle</artifactId>
+        </dependency>
+
         <!-- Apache POI – Excel parsing -->
         <dependency>
             <groupId>org.apache.poi</groupId>

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '../router'
+import { installCorrelationIdInterceptor } from './correlationId'
 
 /**
  * Platform-level API client — used for capability endpoints shared across all agents:
@@ -14,6 +15,8 @@ const platformClient = axios.create({
   },
   withCredentials: true,
 })
+
+installCorrelationIdInterceptor(platformClient)
 
 platformClient.interceptors.response.use(
   (response) => response,

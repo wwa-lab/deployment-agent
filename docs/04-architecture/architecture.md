@@ -276,6 +276,87 @@ None of those capabilities ships in MVP. The seams exist so that when each one d
 
 ---
 
+## Infrastructure Foundations
+
+This section documents cross-cutting infrastructure that is **active in MVP** (not reserved, not zero-behavior). These are classical day-1 investments in operability, reproducibility, and debuggability — the kind of work that is cheap to do on day one and painful to retrofit after a codebase has accumulated history and production traffic. They are documented alongside the MVP Foundation Seams because they share the "cheap now, expensive later" property, but they differ in one critical way: **every one of these is exercised on every request today**, not reserved for a future phase.
+
+### 1. Flyway as the schema migration authority
+
+**Status:** active on the `dev` (Oracle) profile; intentionally disabled on `local` and `test`.
+
+**Problem it solves.** Before this change, the repository maintained SQL files under `src/main/resources/db/migration/` that were **hand-applied by DBAs** during each production deployment, while `local` and `test` generated schemas from JPA entities via Hibernate `ddl-auto`. This created a silent drift hazard: a DBA could apply a migration in a slightly different form (different column name, missing index, wrong default value), and nothing would detect the drift until Hibernate `validate` failed at startup — usually far from the person who caused it. There was also an outright bug: two migrations shared the version number `V3`, which would have prevented any future migration tooling from adopting the existing files at all.
+
+**What changed.**
+- Renamed `V3__add_execution_sync_columns.sql` to `V3.1__add_execution_sync_columns.sql` to resolve the duplicate version.
+- Added `flyway-core` and `flyway-database-oracle` to the Maven build.
+- Configured Flyway to be **globally disabled by default** in `application.properties` and **enabled only in the `dev` profile**, where Oracle is the datastore:
+    ```
+    spring.flyway.enabled=true
+    spring.flyway.baseline-on-migrate=true
+    spring.flyway.baseline-version=1
+    spring.flyway.validate-on-migrate=true
+    ```
+- `baseline-on-migrate=true` lets Flyway adopt an Oracle schema that was manually migrated before Flyway was introduced. New Oracle databases start from a clean baseline; existing Oracle databases continue to work and begin tracking migrations from their current state.
+- `validate-on-migrate=true` causes startup to fail fast if any previously-applied migration's checksum has changed — preventing the classic "someone edited a migration after it was applied" class of bug.
+
+**What did not change.**
+- `local` and `test` profiles still use `ddl-auto=update` / `create-drop`, so iteration speed is unaffected. Tests continue to seed H2 from JPA entities at millisecond latency.
+- The JPA entities remain the canonical source of truth for schema **shape**; the V*.sql files are the canonical source of truth for Oracle **migration order and data transformations**. Every entity change must still be accompanied by a matching migration file so the two stay aligned.
+
+**Operational contract.** When editing schemas going forward:
+1. Add or modify the relevant JPA entity.
+2. Write a new `V{n}__description.sql` file describing the Oracle-side change.
+3. Verify with `mvn test` that local H2 / JPA still agree (create-drop regenerates the schema from entities).
+4. Deploy to `dev` and let Flyway apply the new migration; Hibernate `validate` will catch any residual mismatch.
+
+### 2. Correlation IDs across the full request pipeline
+
+**Status:** active on every inbound request.
+
+**Problem it solves.** Before this change, there was no mechanism to correlate a single user action across the HTTP layer, the service layer, the audit log, and downstream Jenkins / Ansible submissions. When an incident happened, operators had to guess which log lines belonged to which request based on nearby timestamps — a technique that works for one user in a test environment and fails spectacularly under real load.
+
+**What changed.**
+- `CorrelationIdFilter` (registered with `Ordered.HIGHEST_PRECEDENCE`) reads the `X-Correlation-Id` header from the inbound request or generates a short URL-safe random ID if none is supplied. The filter runs before Spring Security so that even auth failures and exception-handler paths carry a correlation ID.
+- The value is placed into SLF4J `MDC` under the key `correlationId` and echoed back to the client in the response header.
+- `application.properties` defines `logging.pattern.level=%5p [%X{correlationId:--}]` so every log line includes the correlation ID (or `-` when logging happens outside a request).
+- `AuditLogEntry` has a new `correlation_id` column (indexed), populated by `AuditLoggerService` from the MDC on every write. Background jobs that produce audit entries outside an HTTP context correctly leave the column null.
+- On the frontend, a shared `installCorrelationIdInterceptor` axios request interceptor stamps every outbound call with a fresh correlation ID, and a response interceptor caches the last observed ID so that global error handlers can surface it in user-facing toasts (`"Request failed — reference abc123def"`).
+- Client-supplied correlation IDs are validated against a strict alphanumeric-plus-dash-underscore pattern (max 64 chars) to prevent log-forging and MDC bloat attacks.
+
+**How it is used during an incident.** A user reports "my upload from 14:32 failed". Operator pipeline:
+1. Read the correlation ID from the user's error toast (or the browser devtools response header).
+2. `grep` the server logs for that ID — all lines that participated in the request are now trivially selectable.
+3. Query `DA_AUDIT_LOG_ENTRY WHERE correlation_id = ?` to find every audit entry that shares the same request context.
+4. If any Jenkins/Ansible submission happened, the correlation ID will also appear in that row's audit trail via the `AuditLoggerService` write — use it to pivot into the external system.
+
+### 3. Clock as an injected bean
+
+**Status:** active on every service that writes durable entity timestamps.
+
+**Problem it solves.** Before this change, services wrote `Instant.now()` directly wherever they needed the current time. This has two consequences: time-sensitive logic is not deterministically testable without static mocking libraries, and any future scheduled sweeper (e.g. SLA-timeout reconciliation driven by the `expected_sla_minutes` seam) would have required retrofitting every existing call site to accept an injectable clock. Retrofits of this kind tend to break quietly, because replacing a static call with an instance field does not always produce a compile error in adjacent code that relied on the old behavior.
+
+**What changed.**
+- `TimeConfig.clock()` exposes a single `Clock` bean defaulting to `Clock.system(ZoneOffset.UTC)`. UTC is the canonical storage timezone for durable entity timestamps; display-layer time-zone conversion is the frontend's responsibility.
+- Six services that manage durable entity timestamps now take `Clock` as a constructor dependency and use `clock.instant()` instead of `Instant.now()`:
+    - `TaskExecutionHistoryService` — execution attempt start / end
+    - `RecordResultService` — manual result recording start / end
+    - `AutoExecutionService` — AUTO submission start / submittedAt / task start / task end on failure
+    - `ExternalExecutionMonitorService` — last-synced timestamp during poll reconciliation
+    - `ReleaseFlowService` — request / flow archive timestamp
+    - `AccessGrantService` — last-login timestamp
+- Static factory methods in `AutoPollResult` and the adapter poll-observation stamp in `AnsibleExecutionAdapter` are intentionally left as `Instant.now()`. They represent "the instant we observed this poll result", are consumed immediately by their caller without being persisted in a determined-at-observation field, and threading a `Clock` through every static factory would multiply complexity without improving testability.
+
+**How tests use it.** A future test for the SLA-timeout sweeper can inject `Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)` via `@MockBean` or `@TestConfiguration`, fast-forward time by returning a later `Clock.offset(...)`, and observe deterministic behavior without touching real time. No such test exists today (the sweeper does not exist), but the seam is ready.
+
+### What these infrastructure foundations are not
+
+- **Not a seam.** These are live code paths, not reservations. They run on every request today.
+- **Not tenant-scoped.** Correlation IDs do not carry tenant information; they are request-scoped only.
+- **Not a tracing system.** Correlation IDs are a poor-man's trace ID — they are sufficient for correlating log lines and audit rows, but they are not a replacement for OpenTelemetry when distributed tracing is eventually adopted. The column name `correlation_id` was chosen intentionally to leave the name `trace_id` free for a future tracing integration.
+- **Not a complete observability stack.** Metrics, health checks, and distributed tracing remain separate Tier-3 work items. The infrastructure fixes here address the three items that were either actively drifting or actively missing in a way that would hurt debugging — no more, no less.
+
+---
+
 ## Overview
 
 Deployment Agent is a controlled, human-in-the-loop release orchestration workspace operating as the first agent workspace within the WWA Agent Workspace Hub. Users upload deployment requests via Excel, the system creates Release Flows that track deployment progress across SIT / UAT / PROD stages, and task owners or admins make explicit workflow decisions before the flow can advance. The current workspace already includes deny-by-default Access Grants, scoped visibility through `Application + SNOW Group`, and an Access Management MVP.

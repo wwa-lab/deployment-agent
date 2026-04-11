@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance } from 'axios'
 import router from '../../router'
+import { installCorrelationIdInterceptor } from '../../api/correlationId'
 import { createReleaseFlowApi, type ReleaseFlowApi } from './createReleaseFlowApi'
 import { createReleaseFlowStore } from './createReleaseFlowStore'
 
@@ -43,6 +44,8 @@ export function createAgentWorkspace(config: AgentWorkspaceConfig): AgentWorkspa
     },
     withCredentials: true,
   })
+
+  installCorrelationIdInterceptor(client)
 
   client.interceptors.response.use(
     (response) => response,
