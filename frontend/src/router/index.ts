@@ -84,6 +84,24 @@ const router = createRouter({
           },
         },
         {
+          path: 'build-agent',
+          name: 'wwa-build-agent',
+          component: () => import('../agents/build/BuildAgentSummaryView.vue'),
+          meta: {
+            section: 'build-agent',
+            sectionTitle: 'Build Agent',
+          },
+        },
+        {
+          path: 'build-agent/release-flows/:id',
+          name: 'wwa-build-agent-detail',
+          component: () => import('../agents/build/BuildAgentDetailView.vue'),
+          meta: {
+            section: 'build-agent',
+            sectionTitle: 'Build Agent',
+          },
+        },
+        {
           path: 'template-management',
           name: 'wwa-template-management',
           component: () => import('../views/TemplateManagementView.vue'),

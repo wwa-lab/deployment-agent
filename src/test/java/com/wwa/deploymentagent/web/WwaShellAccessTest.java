@@ -36,9 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WwaShellAccessTest {
 
     private static final String RELEASE_FLOWS  = "/api/deployment-agent/release-flows";
-    private static final String AUDIT_LOGS     = "/api/deployment-agent/audit-logs";
-    private static final String ACCESS_GRANTS  = "/api/deployment-agent/access-grants";
-    private static final String CONFIG         = "/api/deployment-agent/config";
+    private static final String AUDIT_LOGS     = "/api/platform/audit-logs";
+    private static final String ACCESS_GRANTS  = "/api/platform/access-grants";
+    private static final String CONFIG         = "/api/platform/config";
 
     @Autowired
     private MockMvc mockMvc;

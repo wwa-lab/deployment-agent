@@ -1,15 +1,13 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.agents.build.web;
 
+import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.UploadResponseDto;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.fileimport.ImportService;
-import com.wwa.deploymentagent.domain.fileimport.UploadTemplateService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -18,51 +16,34 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 /**
- * Upload controller – accepts an XLSX file + stage, runs the full import.
+ * Build Agent upload controller (BA-T21).
  *
  * <pre>
- *   POST /api/deployment-agent/upload   (multipart: file + stage + optional releaseId)
+ *   POST /api/build-agent/upload   (multipart: file + optional releaseId + optional scope)
  * </pre>
  *
- * <p>Authorization: DEVELOPER, TL, or DEVOPS_ADMIN role.
+ * <p>PL-6 / BA-1 boundary: agent is forced to {@link AgentId#BUILD_AGENT} and stage is
+ * forced to {@code "DEV"}, regardless of client-supplied params.
  */
 @RestController
-@RequestMapping("/api/deployment-agent/upload")
+@RequestMapping("/api/build-agent/upload")
 @RequiredArgsConstructor
-public class UploadController {
+public class BuildUploadController {
+
+    private static final String FORCED_STAGE = "DEV";
 
     private final ImportService importService;
-    private final UploadTemplateService uploadTemplateService;
-
-    @GetMapping("/template")
-    public ResponseEntity<byte[]> downloadTemplate(@AuthenticationPrincipal UserContext user) throws IOException {
-        validateUploadRole(user);
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"request-template.xlsx\"")
-                .body(uploadTemplateService.generateTemplate());
-    }
 
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<UploadResponseDto> upload(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("stage") String stageParam,
+            @RequestParam(value = "stage", required = false) String stageParam, // ignored
             @RequestParam(value = "releaseId", required = false) String releaseId,
             @RequestParam(value = "snowGroup", required = false) String snowGroup,
             @RequestParam(value = "application", required = false) String application,
-            @RequestParam(value = "agent", required = false) String agent,
+            @RequestParam(value = "agent", required = false) String agent, // ignored
             @AuthenticationPrincipal UserContext user) throws IOException {
         validateUploadRole(user);
-
-        // Validate stage before touching the file
-        String stage = stageParam.trim().toUpperCase();
-        if (!java.util.Set.of("SIT", "UAT", "PROD").contains(stage)) {
-            throw new ValidationAppException(
-                    "Invalid stage: '" + stageParam + "'. Must be SIT, UAT, or PROD.");
-        }
 
         if (file.isEmpty()) {
             throw new ValidationAppException("Uploaded file is empty");
@@ -70,12 +51,12 @@ public class UploadController {
 
         ImportResult result = importService.importFile(
                 file.getBytes(),
-                stage,
+                FORCED_STAGE,
                 user,
                 releaseId,
                 snowGroup,
                 application,
-                agent);
+                AgentId.BUILD_AGENT);
         return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 

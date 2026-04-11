@@ -1,7 +1,8 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.agents.testing.web;
 
 import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.dto.*;
+import com.wwa.deploymentagent.platform.web.security.AgentBoundaryGuard;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowFilter;
@@ -36,10 +37,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/testing-agent/release-flows")
 @RequiredArgsConstructor
-public class TestingAgentReleaseFlowController {
+public class TestingReleaseFlowController {
 
     private final ReleaseFlowService releaseFlowService;
     private final TemplateRundownCreationService templateRundownCreationService;
+    private final AgentBoundaryGuard boundaryGuard;
 
     @GetMapping
     public ResponseEntity<PaginatedResponseDto<ReleaseFlowListItemDto>> list(
@@ -92,6 +94,7 @@ public class TestingAgentReleaseFlowController {
             @RequestParam(defaultValue = "false") boolean includeArchived,
             @AuthenticationPrincipal UserContext user) {
         validateArchivedViewer(includeArchived, user);
+        boundaryGuard.assertFlowBelongsToAgent(id, AgentId.TESTING_AGENT);
         // Testing Agent is UAT-only; linked-flow stitching is not supported — ignore the param.
 
         ReleaseFlow rf = releaseFlowService.getById(id, includeArchived);
@@ -138,6 +141,7 @@ public class TestingAgentReleaseFlowController {
             @RequestBody RequestRundownUpdateDto body,
             @AuthenticationPrincipal UserContext user) {
         validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
         Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
         validateRequestScope(user, requestForValidation, "update_rundown");
         validateOwnerEdit(user, body);
@@ -155,6 +159,7 @@ public class TestingAgentReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
         validateRequestScope(
                 user,
                 findRequestForScopeValidation(flowId, requestId, false),
@@ -168,6 +173,7 @@ public class TestingAgentReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateAdmin(user, "restore_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
         validateRequestScope(
                 user,
                 findRequestForScopeValidation(flowId, requestId, true),
@@ -181,6 +187,7 @@ public class TestingAgentReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateAdmin(user, "purge_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
         validateRequestScope(
                 user,
                 findRequestForScopeValidation(flowId, requestId, true),
@@ -193,6 +200,7 @@ public class TestingAgentReleaseFlowController {
             @PathVariable String flowId,
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
         Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
         validateRequestScope(user, requestForValidation, "start_deployment");
         validateRundownOperator(user, requestForValidation, "start_deployment");
@@ -209,6 +217,7 @@ public class TestingAgentReleaseFlowController {
             @PathVariable String flowId,
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
         Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
         validateRequestScope(user, requestForValidation, "mark_request_failed");
         validateRundownOperator(user, requestForValidation, "mark_request_failed");

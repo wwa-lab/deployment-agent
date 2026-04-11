@@ -35,7 +35,7 @@ class AuthControllerTest {
     void login_validCredentials_returnsOk() throws Exception {
         LoginRequestDto body = new LoginRequestDto("emp-002", "password");
 
-        mockMvc.perform(post("/api/deployment-agent/auth/login")
+        mockMvc.perform(post("/api/platform/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
@@ -53,7 +53,7 @@ class AuthControllerTest {
     void login_invalidCredentials_returns401() throws Exception {
         LoginRequestDto body = new LoginRequestDto("unknown-user", "password");
 
-        mockMvc.perform(post("/api/deployment-agent/auth/login")
+        mockMvc.perform(post("/api/platform/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
@@ -69,7 +69,7 @@ class AuthControllerTest {
         try {
             LoginRequestDto body = new LoginRequestDto("emp-005", "password");
 
-            mockMvc.perform(post("/api/deployment-agent/auth/login")
+            mockMvc.perform(post("/api/platform/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(body)))
                     .andExpect(status().isForbidden())
@@ -90,7 +90,7 @@ class AuthControllerTest {
         try {
             LoginRequestDto body = new LoginRequestDto("emp-004", "password");
 
-            mockMvc.perform(post("/api/deployment-agent/auth/login")
+            mockMvc.perform(post("/api/platform/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(body)))
                     .andExpect(status().isForbidden())
@@ -105,7 +105,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("GET /auth/me without session → 401")
     void me_noSession_returns401() throws Exception {
-        mockMvc.perform(get("/api/deployment-agent/auth/me"))
+        mockMvc.perform(get("/api/platform/auth/me"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -114,7 +114,7 @@ class AuthControllerTest {
     void me_withSession_returnsOk() throws Exception {
         // Login first to establish session
         LoginRequestDto body = new LoginRequestDto("emp-003", "password");
-        MvcResult loginResult = mockMvc.perform(post("/api/deployment-agent/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/platform/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
@@ -123,7 +123,7 @@ class AuthControllerTest {
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
 
         // Check /me with the session
-        mockMvc.perform(get("/api/deployment-agent/auth/me")
+        mockMvc.perform(get("/api/platform/auth/me")
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("emp-003"))
@@ -139,7 +139,7 @@ class AuthControllerTest {
     void logout_invalidatesSession() throws Exception {
         // Login first
         LoginRequestDto body = new LoginRequestDto("emp-001", "password");
-        MvcResult loginResult = mockMvc.perform(post("/api/deployment-agent/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/platform/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
@@ -148,13 +148,13 @@ class AuthControllerTest {
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
 
         // Logout
-        mockMvc.perform(post("/api/deployment-agent/auth/logout")
+        mockMvc.perform(post("/api/platform/auth/logout")
                         .session(session))
                 .andExpect(status().isOk());
 
         // Session should be invalidated - /me should now fail
         // Need a new session since old one is invalidated
-        mockMvc.perform(get("/api/deployment-agent/auth/me"))
+        mockMvc.perform(get("/api/platform/auth/me"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -165,7 +165,7 @@ class AuthControllerTest {
         // the endpoint processes the request rather than blocking at the filter level)
         LoginRequestDto body = new LoginRequestDto("emp-001", "password");
 
-        mockMvc.perform(post("/api/deployment-agent/auth/login")
+        mockMvc.perform(post("/api/platform/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());

@@ -33,7 +33,7 @@ public class SecurityConfig {
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/deployment-agent/auth/login").permitAll()
+                    .requestMatchers("/api/platform/auth/login").permitAll()
                     .anyRequest().authenticated())
             .exceptionHandling(ex -> ex
                     .authenticationEntryPoint((request, response, authException) ->

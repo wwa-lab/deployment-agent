@@ -1,16 +1,13 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.agents.testing.web;
 
 import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.UploadResponseDto;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.fileimport.ImportService;
-import com.wwa.deploymentagent.domain.fileimport.UploadTemplateService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -23,8 +20,9 @@ import java.io.IOException;
  *
  * <pre>
  *   POST /api/testing-agent/upload   (multipart: file + stage + optional releaseId)
- *   GET  /api/testing-agent/upload/template
  * </pre>
+ *
+ * <p>Template download moved to {@code GET /api/platform/upload/template} in BA-T15.
  *
  * <p>Authorization: DEVELOPER, TL, or DEVOPS_ADMIN role.
  * <p>Agent is always forced to {@link AgentId#TESTING_AGENT} regardless of client-supplied param.
@@ -32,22 +30,9 @@ import java.io.IOException;
 @RestController
 @RequestMapping("/api/testing-agent/upload")
 @RequiredArgsConstructor
-public class TestingAgentUploadController {
+public class TestingUploadController {
 
     private final ImportService importService;
-    private final UploadTemplateService uploadTemplateService;
-
-    @GetMapping("/template")
-    public ResponseEntity<byte[]> downloadTemplate(@AuthenticationPrincipal UserContext user) throws IOException {
-        validateUploadRole(user);
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"testing-request-template.xlsx\"")
-                .body(uploadTemplateService.generateTemplate());
-    }
 
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<UploadResponseDto> upload(

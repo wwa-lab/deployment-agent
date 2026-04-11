@@ -84,22 +84,12 @@ function statusLabel(status: string) {
   return labelMap[status] ?? status.replaceAll('_', ' ')
 }
 
-function stageStatus(flow: { sitStatus: RequestStatus; uatStatus: RequestStatus; prodStatus: RequestStatus }, stage: Stage) {
-  const stageMap: Record<Stage, RequestStatus> = {
-    SIT: flow.sitStatus,
-    UAT: flow.uatStatus,
-    PROD: flow.prodStatus,
-  }
-  return stageMap[stage]
+function stageStatus(flow: ReleaseFlowListItem, stage: Stage): RequestStatus {
+  return flow.stageStatuses?.[stage] ?? 'Pending'
 }
 
 function stagePresent(flow: ReleaseFlowListItem, stage: Stage) {
-  const stageMap: Record<Stage, boolean> = {
-    SIT: flow.sitPresent,
-    UAT: flow.uatPresent,
-    PROD: flow.prodPresent,
-  }
-  return stageMap[stage]
+  return flow.stagesPresent?.includes(stage) ?? false
 }
 
 const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size)))

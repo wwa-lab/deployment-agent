@@ -1,4 +1,4 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.platform.web.shared;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.AuthResponseDto;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
  * AuthController – login/logout/session check endpoints.
  */
 @RestController
-@RequestMapping("/api/deployment-agent/auth")
+@RequestMapping("/api/platform/auth")
 @RequiredArgsConstructor
 public class AuthController {
 

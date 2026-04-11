@@ -1,4 +1,4 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.platform.web.shared;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.AccessGrantDirectoryCandidateDto;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/deployment-agent/access-grants")
+@RequestMapping("/api/platform/access-grants")
 @RequiredArgsConstructor
 public class AccessGrantController {
 

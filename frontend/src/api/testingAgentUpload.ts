@@ -1,4 +1,5 @@
 import apiClient from './testingAgentClient'
+import platformClient from './platformClient'
 import type { Stage, UploadResponse } from '../types'
 
 export interface UploadOptions {
@@ -30,7 +31,7 @@ export async function uploadFile(
 }
 
 export async function downloadTemplate(): Promise<Blob> {
-  const response = await apiClient.get('/upload/template', {
+  const response = await platformClient.get('/upload/template', {
     responseType: 'blob',
   })
   return response.data

@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("T13.3 - ConfigurationController API contract")
 class ConfigurationControllerTest {
 
-    private static final String BASE = "/api/deployment-agent/config";
+    private static final String BASE = "/api/platform/config";
 
     @Autowired
     private MockMvc mockMvc;

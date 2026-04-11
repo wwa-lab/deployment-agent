@@ -1,5 +1,6 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.agents.testing.web;
 
+import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.RecordResultRequestDto;
 import com.wwa.deploymentagent.contracts.dto.TaskDto;
@@ -9,6 +10,7 @@ import com.wwa.deploymentagent.domain.task.RecordResultService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
 import com.wwa.deploymentagent.domain.task.TaskService;
 import com.wwa.deploymentagent.errors.ValidationAppException;
+import com.wwa.deploymentagent.platform.web.security.AgentBoundaryGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,27 +20,35 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Task controller – REST endpoints for Task lifecycle.
+ * Testing Agent task controller (BA-T20).
  *
  * <pre>
- *   GET  /api/deployment-agent/tasks?requestId=X   – list tasks for a request
- *   GET  /api/deployment-agent/tasks/:id            – single task detail
- *   PUT  /api/deployment-agent/tasks/:id/input      – edit task input (owner or DEVOPS_ADMIN)
- *   GET  /api/deployment-agent/tasks/:id/executions – execution history
+ *   GET  /api/testing-agent/tasks?requestId=X   – list tasks for a request
+ *   GET  /api/testing-agent/tasks/:id            – single task detail
+ *   PUT  /api/testing-agent/tasks/:id/input      – edit task input (owner or DEVOPS_ADMIN)
+ *   GET  /api/testing-agent/tasks/:id/executions – execution history
+ *   POST /api/testing-agent/tasks/:id/record-result  – record manual task result
+ *   POST /api/testing-agent/tasks/:id/start-manual   – start manual task execution
+ *   POST /api/testing-agent/tasks/:id/submit-auto    – submit AUTO task for external execution
  * </pre>
+ *
+ * <p>Every ID-bearing endpoint calls {@link AgentBoundaryGuard} — closing v2 R-08
+ * (cross-agent task probe leak).
  */
 @RestController
-@RequestMapping("/api/deployment-agent/tasks")
+@RequestMapping("/api/testing-agent/tasks")
 @RequiredArgsConstructor
-public class TaskController {
+public class TestingTaskController {
 
     private final TaskService taskService;
     private final TaskExecutionHistoryService executionHistoryService;
     private final RecordResultService recordResultService;
     private final AutoExecutionService autoExecutionService;
+    private final AgentBoundaryGuard boundaryGuard;
 
     @GetMapping
     public ResponseEntity<List<TaskDto>> listByRequest(@RequestParam String requestId) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
         List<TaskDto> dtos = taskService.listByRequestId(requestId)
                 .stream()
                 .map(TaskDto::from)
@@ -48,6 +58,7 @@ public class TaskController {
 
     @GetMapping("/{id}")
     public ResponseEntity<TaskDto> getById(@PathVariable String id) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
         return ResponseEntity.ok(TaskDto.from(taskService.getById(id)));
     }
 
@@ -59,12 +70,13 @@ public class TaskController {
         if (newInput == null) {
             throw new ValidationAppException("Request body must not be null");
         }
-
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
         return ResponseEntity.ok(TaskDto.from(taskService.editInput(id, newInput, user)));
     }
 
     @GetMapping("/{id}/executions")
     public ResponseEntity<List<TaskExecutionHistoryDto>> getExecutions(@PathVariable String id) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
         List<TaskExecutionHistoryDto> dtos = executionHistoryService.findByTaskId(id)
                 .stream()
                 .map(TaskExecutionHistoryDto::from)
@@ -72,39 +84,30 @@ public class TaskController {
         return ResponseEntity.ok(dtos);
     }
 
-    /**
-     * Record the result of a MANUAL task (owner or DEVOPS_ADMIN only).
-     * Guards: task must be MANUAL + in Ready_For_Execution or Executing state.
-     */
     @PostMapping("/{id}/record-result")
     public ResponseEntity<TaskDto> recordResult(
             @PathVariable String id,
             @RequestBody RecordResultRequestDto body,
             @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
         return ResponseEntity.ok(
                 TaskDto.from(recordResultService.recordResult(
                         id, body.resultSummary(), body.resultLogs(), user)));
     }
 
-    /**
-     * Start a MANUAL task execution (owner or DEVOPS_ADMIN only).
-     * Guards: task must be MANUAL + in Ready_For_Execution state.
-     */
     @PostMapping("/{id}/start-manual")
     public ResponseEntity<TaskDto> startManualExecution(
             @PathVariable String id,
             @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
         return ResponseEntity.ok(TaskDto.from(taskService.startManualExecution(id, user)));
     }
 
-    /**
-     * Submit an AUTO task for external execution (owner or DEVOPS_ADMIN only).
-     * Guards: task must be AUTO + in Ready_For_Execution state.
-     */
     @PostMapping("/{id}/submit-auto")
     public ResponseEntity<TaskDto> submitAutoExecution(
             @PathVariable String id,
             @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
         return ResponseEntity.ok(
                 TaskDto.from(autoExecutionService.submitAutoExecution(id, user)));
     }

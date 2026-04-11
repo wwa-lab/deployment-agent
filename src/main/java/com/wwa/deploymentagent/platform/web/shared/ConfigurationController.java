@@ -1,4 +1,4 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.platform.web.shared;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.ConfigurationComponentDto;
@@ -17,12 +17,12 @@ import java.util.List;
  * Configuration controller.
  *
  * <pre>
- *   GET  /api/deployment-agent/config  – retrieve all config items
- *   POST /api/deployment-agent/config  – create/update a config item (DevOps Admin only)
+ *   GET  /api/platform/config  – retrieve all config items
+ *   POST /api/platform/config  – create/update a config item (DevOps Admin only)
  * </pre>
  */
 @RestController
-@RequestMapping("/api/deployment-agent/config")
+@RequestMapping("/api/platform/config")
 @RequiredArgsConstructor
 public class ConfigurationController {
 

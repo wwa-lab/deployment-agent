@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("T13.3 - AuditLogController API contract")
 class AuditLogControllerTest {
 
-    private static final String BASE = "/api/deployment-agent/audit-logs";
+    private static final String BASE = "/api/platform/audit-logs";
 
     @Autowired
     private MockMvc mockMvc;

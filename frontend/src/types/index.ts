@@ -117,7 +117,7 @@ export interface ReleaseFlowListItem {
   projectName: string
   releaseId: string
   normalizedReleaseId?: string
-  currentStage: Stage
+  currentStage: string
   flowStatus: FlowStatus
   reviewStatus: ReviewStatus
   archivedAt?: string
@@ -126,12 +126,10 @@ export interface ReleaseFlowListItem {
   application?: string
   agent?: string
   owner?: string
-  sitStatus: RequestStatus
-  uatStatus: RequestStatus
-  prodStatus: RequestStatus
-  sitPresent: boolean
-  uatPresent: boolean
-  prodPresent: boolean
+  /** Per-stage aggregated status keyed by stage string (BA-T08). */
+  stageStatuses: Record<string, RequestStatus>
+  /** Set of stage strings with at least one request (BA-T08). */
+  stagesPresent: string[]
   stitched: boolean
   linkedReleaseCount: number
   linkedReleaseIds: string[]

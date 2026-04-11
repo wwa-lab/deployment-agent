@@ -123,11 +123,13 @@ class ReleaseFlowControllerTest {
     @Test
     @DisplayName("list_filtersByScopeFields_andReturnsScopeSummary")
     void list_filtersByScopeFields_andReturnsScopeSummary() throws Exception {
+        // Post-BA-T19 the Deployment Agent list is always scoped to agent='deployment-agent'
+        // (PL-6). Two flows tagged with DEPLOYMENT_AGENT differing by application/snowGroup
+        // verify that scope filters still narrow within the agent boundary.
         ReleaseFlow releaseFlow = helper.seedReleaseFlow();
         Request matchingRequest = helper.seedRequest(releaseFlow);
         matchingRequest.setApplication("AMH HCC");
         matchingRequest.setSnowGroup("HTSA-CSI-HCC-AMH-PRJ");
-        matchingRequest.setAgent("Deployment Agent");
         matchingRequest.setOwner("alice");
         requestRepository.save(matchingRequest);
 
@@ -136,20 +138,18 @@ class ReleaseFlowControllerTest {
         Request otherRequest = helper.seedRequest(otherFlow);
         otherRequest.setApplication("PowerCARD");
         otherRequest.setSnowGroup("HTSA-CSI-CARD-PRD");
-        otherRequest.setAgent("PowerCARD Agent");
         requestRepository.save(otherRequest);
 
         mockMvc.perform(get(BASE)
                         .param("application", "AMH")
                         .param("snowGroup", "HTSA-CSI-HCC")
-                        .param("agent", "Deployment")
                         .header("X-User-Id", "user1")
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].application").value("AMH HCC"))
                 .andExpect(jsonPath("$.data[0].snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
-                .andExpect(jsonPath("$.data[0].agent").value("Deployment Agent"))
+                .andExpect(jsonPath("$.data[0].agent").value("deployment-agent"))
                 .andExpect(jsonPath("$.data[0].owner").value("alice"));
     }
 
@@ -309,7 +309,7 @@ class ReleaseFlowControllerTest {
                                   "releaseId": "amh-hcc-sit-01",
                                   "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
                                   "application": "AMH HCC",
-                                  "agent": "Deployment Agent",
+                                  "agent": "deployment-agent",
                                   "site": "HK",
                                   "owner": "Carol Lee",
                                   "tasks": [
@@ -344,7 +344,7 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.taskCount").value(2))
                 .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
                 .andExpect(jsonPath("$.application").value("AMH HCC"))
-                .andExpect(jsonPath("$.agent").value("Deployment Agent"))
+                .andExpect(jsonPath("$.agent").value("deployment-agent"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -509,7 +509,7 @@ class ReleaseFlowControllerTest {
                                 {
                                   "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
                                   "application": "AMH HCC",
-                                  "agent": "Deployment Agent",
+                                  "agent": "deployment-agent",
                                   "site": "HK",
                                   "estimatedRemainingMinutes": 120
                                 }
@@ -520,7 +520,7 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.id").value(req.getId()))
                 .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
                 .andExpect(jsonPath("$.application").value("AMH HCC"))
-                .andExpect(jsonPath("$.agent").value("Deployment Agent"))
+                .andExpect(jsonPath("$.agent").value("deployment-agent"))
                 .andExpect(jsonPath("$.site").value("HK"))
                 .andExpect(jsonPath("$.estimatedRemainingMinutes").value(120));
     }

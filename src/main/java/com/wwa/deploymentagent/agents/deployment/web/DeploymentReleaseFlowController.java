@@ -1,16 +1,19 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.agents.deployment.web;
 
 import com.wwa.deploymentagent.agents.deployment.domain.DeploymentStitchingService;
+import com.wwa.deploymentagent.contracts.AgentId;
+import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.*;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowFilter;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
-import com.wwa.deploymentagent.domain.releaseflow.TemplateRundownCreationService;
-import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
+import com.wwa.deploymentagent.domain.releaseflow.TemplateRundownCreationService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
+import com.wwa.deploymentagent.platform.web.security.AgentBoundaryGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,11 +36,12 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/deployment-agent/release-flows")
 @RequiredArgsConstructor
-public class ReleaseFlowController {
+public class DeploymentReleaseFlowController {
 
     private final ReleaseFlowService releaseFlowService;
     private final DeploymentStitchingService deploymentStitchingService;
     private final TemplateRundownCreationService templateRundownCreationService;
+    private final AgentBoundaryGuard boundaryGuard;
 
     @GetMapping
     public ResponseEntity<PaginatedResponseDto<ReleaseFlowListItemDto>> list(
@@ -61,10 +65,14 @@ public class ReleaseFlowController {
         validateViewMode(view);
         validateAttemptView(attemptView);
 
+        // Security boundary: PL-6 forces agent = deployment-agent server-side; the client
+        // param is ignored.
+        final String effectiveAgent = AgentId.DEPLOYMENT_AGENT;
+
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
         if ("stitched".equalsIgnoreCase(view)) {
             Page<ReleaseFlowListItemDto> stitchedResult = deploymentStitchingService.listStitchedSummaries(
-                    project, status, stage, application, snowGroup, agent, user, attemptView, pageable, includeArchived);
+                    project, status, stage, application, snowGroup, effectiveAgent, user, attemptView, pageable, includeArchived);
             return ResponseEntity.ok(new PaginatedResponseDto<>(
                     stitchedResult.getContent(),
                     stitchedResult.getTotalElements(),
@@ -72,8 +80,9 @@ public class ReleaseFlowController {
                     stitchedResult.getSize()));
         }
 
-        Page<ReleaseFlow> result = releaseFlowService.list(
-                project, status, stage, application, snowGroup, agent, user, pageable, includeArchived);
+        ReleaseFlowFilter filter = new ReleaseFlowFilter(
+                project, status, stage, application, snowGroup, user, includeArchived);
+        Page<ReleaseFlow> result = releaseFlowService.listByAgent(effectiveAgent, filter, pageable);
         Map<String, List<Request>> requestsByReleaseFlowId = releaseFlowService.findRequestsByReleaseFlowIds(
                 result.getContent().stream().map(ReleaseFlow::getId).toList(),
                 includeArchived);
@@ -96,6 +105,7 @@ public class ReleaseFlowController {
             @RequestParam(defaultValue = "false") boolean includeArchived,
             @AuthenticationPrincipal UserContext user) {
         validateArchivedViewer(includeArchived, user);
+        boundaryGuard.assertFlowBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
         List<String> linkedFlowIds = parseLinkedFlowIds(linked);
         if (!linkedFlowIds.isEmpty()) {
             return ResponseEntity.ok(deploymentStitchingService.getStitchedDetail(id, linkedFlowIds, includeArchived, user));
@@ -145,6 +155,7 @@ public class ReleaseFlowController {
             @RequestBody RequestRundownUpdateDto body,
             @AuthenticationPrincipal UserContext user) {
         validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.DEPLOYMENT_AGENT);
         Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
         validateRequestScope(user, requestForValidation, "update_rundown");
         validateOwnerEdit(user, body);
@@ -162,6 +173,7 @@ public class ReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.DEPLOYMENT_AGENT);
         validateRequestScope(
                 user,
                 findRequestForScopeValidation(flowId, requestId, false),
@@ -175,6 +187,7 @@ public class ReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateAdmin(user, "restore_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.DEPLOYMENT_AGENT);
         validateRequestScope(
                 user,
                 findRequestForScopeValidation(flowId, requestId, true),
@@ -188,6 +201,7 @@ public class ReleaseFlowController {
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
         validateAdmin(user, "purge_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.DEPLOYMENT_AGENT);
         validateRequestScope(
                 user,
                 findRequestForScopeValidation(flowId, requestId, true),
@@ -200,6 +214,7 @@ public class ReleaseFlowController {
             @PathVariable String flowId,
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.DEPLOYMENT_AGENT);
         Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
         validateRequestScope(user, requestForValidation, "start_deployment");
         validateRundownOperator(user, requestForValidation, "start_deployment");
@@ -216,6 +231,7 @@ public class ReleaseFlowController {
             @PathVariable String flowId,
             @PathVariable String requestId,
             @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.DEPLOYMENT_AGENT);
         Request requestForValidation = findRequestForScopeValidation(flowId, requestId, false);
         validateRequestScope(user, requestForValidation, "mark_request_failed");
         validateRundownOperator(user, requestForValidation, "mark_request_failed");

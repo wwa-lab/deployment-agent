@@ -30,7 +30,7 @@ class UploadControllerTest {
     @Test
     @DisplayName("GET /upload/template with developer auth returns downloadable xlsx")
     void downloadTemplate_returnsWorkbook() throws Exception {
-        mockMvc.perform(get("/api/deployment-agent/upload/template")
+        mockMvc.perform(get("/api/platform/upload/template")
                         .header("X-User-Id", "emp-001")
                         .header("X-User-Role", "DEVELOPER"))
                 .andExpect(status().isOk())
@@ -43,7 +43,7 @@ class UploadControllerTest {
     @Test
     @DisplayName("GET /upload/template with DevOps Admin auth returns downloadable xlsx")
     void downloadTemplate_devOpsAdminCanDownloadTemplate() throws Exception {
-        mockMvc.perform(get("/api/deployment-agent/upload/template")
+        mockMvc.perform(get("/api/platform/upload/template")
                         .header("X-User-Id", "emp-003")
                         .header("X-User-Role", "DEVOPS_ADMIN"))
                 .andExpect(status().isOk())
@@ -75,6 +75,8 @@ class UploadControllerTest {
                 .andExpect(jsonPath("$.releaseId").value("WFPROJ-20260327-01"))
                 .andExpect(jsonPath("$.application").value("AMH HCC"))
                 .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
-                .andExpect(jsonPath("$.agent").value("Deployment Agent"));
+                // Post-BA-T19 Deployment Upload forces agent = "deployment-agent"
+                // server-side (PL-6), overriding any client-supplied value.
+                .andExpect(jsonPath("$.agent").value("deployment-agent"));
     }
 }

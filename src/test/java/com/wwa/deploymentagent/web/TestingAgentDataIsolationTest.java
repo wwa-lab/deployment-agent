@@ -42,8 +42,11 @@ class TestingAgentDataIsolationTest {
     }
 
     @Test
-    @DisplayName("deployment-agent list shows all flows regardless of agent")
-    void deploymentAgent_showsAllFlows() throws Exception {
+    @DisplayName("deployment-agent list is scoped to agent=deployment-agent (PL-6)")
+    void deploymentAgent_scopedToDeploymentAgent() throws Exception {
+        // Post-BA-T19 the Deployment Agent list excludes flows owned solely by other
+        // agents. A flow whose only request is tagged testing-agent must NOT appear in
+        // the deployment-agent list.
         ReleaseFlow rf = helper.seedReleaseFlow();
         helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
@@ -51,7 +54,7 @@ class TestingAgentDataIsolationTest {
                         .header("X-User-Id", "user1")
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total").value(1));
+                .andExpect(jsonPath("$.total").value(0));
     }
 
     @Test

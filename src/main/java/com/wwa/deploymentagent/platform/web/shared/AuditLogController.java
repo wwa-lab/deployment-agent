@@ -1,4 +1,4 @@
-package com.wwa.deploymentagent.web.controller;
+package com.wwa.deploymentagent.platform.web.shared;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.AuditLogEntryDto;
@@ -21,11 +21,11 @@ import java.util.List;
  * Audit Log controller.
  *
  * <pre>
- *   GET /api/deployment-agent/audit-logs  – paginated list for any authenticated user
+ *   GET /api/platform/audit-logs  – paginated list for any authenticated user
  * </pre>
  */
 @RestController
-@RequestMapping("/api/deployment-agent/audit-logs")
+@RequestMapping("/api/platform/audit-logs")
 @RequiredArgsConstructor
 public class AuditLogController {
 

@@ -1,4 +1,4 @@
-import apiClient from './client'
+import platformClient from './platformClient'
 import type { ConfigComponent, ConfigItem } from '../types'
 
 interface ConfigApiItem {
@@ -82,14 +82,14 @@ function mapConfigComponent(component: ConfigApiComponent): ConfigComponent {
 }
 
 export async function listConfig(): Promise<{ data: ConfigItem[] }> {
-  const response = await apiClient.get('/config')
+  const response = await platformClient.get('/config')
   return {
     data: (response.data as ConfigApiItem[]).map(mapConfigItem),
   }
 }
 
 export async function listConfigComponents(): Promise<{ data: ConfigComponent[] }> {
-  const response = await apiClient.get('/config/components')
+  const response = await platformClient.get('/config/components')
   return {
     data: (response.data as ConfigApiComponent[]).map(mapConfigComponent),
   }
@@ -102,7 +102,7 @@ export async function updateConfig(item: {
   value: string
   description?: string
 }): Promise<ConfigItem> {
-  const response = await apiClient.post('/config', item)
+  const response = await platformClient.post('/config', item)
   return mapConfigItem(response.data as ConfigApiItem)
 }
 
@@ -119,10 +119,10 @@ export async function updateConfigComponent(component: {
   credentialValue?: string
   description?: string
 }): Promise<ConfigComponent> {
-  const response = await apiClient.post('/config/components', component)
+  const response = await platformClient.post('/config/components', component)
   return mapConfigComponent(response.data as ConfigApiComponent)
 }
 
 export async function deleteConfigComponent(componentInstanceId: string): Promise<void> {
-  await apiClient.delete(`/config/components/${componentInstanceId}`)
+  await platformClient.delete(`/config/components/${componentInstanceId}`)
 }
