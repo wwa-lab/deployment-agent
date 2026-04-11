@@ -27,15 +27,23 @@
 - Spec Delta — see architecture §Spec Delta
 - Per-task effort breakdown — see `build-agent-tasks.md`
 
+### 1.3 File-path convention
+
+All file paths in this document use the **post-refactor target location** under `com.wwa.deploymentagent.platform.*` for Platform Core code and `com.wwa.deploymentagent.agents.<name>.*` for Agent Module code. Before this delivery's Phase H migration, Platform Core code currently lives under flat packages (`com.wwa.deploymentagent.domain.*`, `com.wwa.deploymentagent.contracts.*`, `com.wwa.deploymentagent.web.*`). When a path in this document is prefixed with `platform/` or `agents/`, read it as "the location after Phase H has landed". Where the pre-refactor location matters for a specific line edit (e.g. `ReleaseFlowProgressionService.java:72` which is the current `domain/decision/` location), it is stated explicitly alongside the target path.
+
 ---
 
 ## 2. Module Design — Platform Core
 
 Eleven platform-level modules (M1–M11) constitute Part A of the delivery. Each is presented with: **purpose**, **signature**, **call-site impact**, and **test matrix**.
 
-### M1. `StagePipeline` Interface
+### M1. `StagePipeline` Interface + `StagePipelineRegistry`
 
-**Purpose:** Per-agent stage ordering, injected into platform services as a method parameter. Owned by architecture PL-4.
+**Purpose:** Per-agent stage ordering, resolved at call time through a Platform Core registry keyed by `agentId`. Owned by architecture PL-4.
+
+**Why a registry, not a method parameter:** The v3 design originally proposed passing `StagePipeline` as a method parameter to `progressAfterDecision`. That approach does not survive contact with the real caller graph — `progressAfterDecision` is invoked from `RecordResultService`, `AutoExecutionService`, and `ExternalExecutionMonitorService` (the last of which runs on a Jenkins/Ansible callback thread with no HTTP context). Threading a per-agent pipeline through every intermediate service would push agent semantics deep into Platform Core and violate PL-2. The registry pattern resolves the pipeline exactly once at the point where it is needed (inside `progressAfterDecision`), derived from the task's parent request's `agent` column, and leaves every other Platform Core service agent-agnostic.
+
+#### M1.1 Interface
 
 **File:** `src/main/java/com/wwa/deploymentagent/platform/domain/StagePipeline.java`
 
@@ -46,34 +54,135 @@ import java.util.List;
 import java.util.Optional;
 
 public interface StagePipeline {
-    /** Next stage in this agent's ordering, or empty if terminal. */
+
+    /**
+     * The agent ID this pipeline belongs to. Used by {@link StagePipelineRegistry}
+     * to build the agent → pipeline map at application startup. Must be a stable
+     * string constant drawn from {@code AgentId}.
+     */
+    String agentId();
+
+    /**
+     * Returns the next stage after {@code currentStage}, or {@link Optional#empty()}
+     * if {@code currentStage} is the terminal stage in this pipeline.
+     *
+     * @throws IllegalArgumentException if {@code currentStage} is not a declared
+     *         member of this pipeline's {@link #orderedStages()}. Fail-loud
+     *         intentional: a mis-routed progression call (e.g. passing a "SIT" flow
+     *         through {@code BuildStagePipeline}) MUST crash visibly rather than
+     *         silently be treated as terminal. Silent terminal behavior was the
+     *         "unknown = terminal" design that an earlier draft proposed and that
+     *         reviewer feedback flagged as silent corruption.
+     */
     Optional<String> next(String currentStage);
 
-    /** True if the given stage has no successor in this agent's pipeline. */
+    /**
+     * True if {@code stage} is terminal (has no successor) in this pipeline.
+     *
+     * @throws IllegalArgumentException if {@code stage} is not a declared member
+     *         of this pipeline's {@link #orderedStages()}. Same fail-loud
+     *         rationale as {@link #next(String)}.
+     */
     boolean isTerminal(String stage);
 
-    /** All stages owned by this pipeline, in declared order. Must be non-empty. */
+    /** All stages owned by this pipeline, in declared order. Non-empty, no duplicates. */
     List<String> orderedStages();
 }
 ```
 
 **Design constraints:**
 - Stateless; `@Component` implementations are singletons.
-- Unknown-stage behavior: `next(unknownStage)` returns `Optional.empty()`; `isTerminal(unknownStage)` returns `true`. Rationale: fail-closed. A typo cannot route progression past a stage the pipeline does not declare.
-- `orderedStages()` is used only for introspection/testing; platform services do not iterate over it.
+- **Fail-loud on unknown stages:** `next(unknownStage)` and `isTerminal(unknownStage)` throw `IllegalArgumentException`. Passing a wrong-pipeline stage is a routing bug, not a terminal-state signal.
+- `agentId()` must return a value from `AgentId` constants and must be unique across all `@Component` implementations in the Spring context.
 
-**Test matrix (`StagePipelineContractTest`, parameterized):** each agent's implementation must satisfy all rows.
+#### M1.2 Registry
 
-| Case | Assertion |
-|---|---|
-| `next(firstStage)` | returns `Optional.of(secondStage)` OR `Optional.empty()` if single-stage pipeline |
-| `next(lastStage)` | returns `Optional.empty()` |
-| `next("")` | returns `Optional.empty()` |
-| `next(null)` | throws `NullPointerException` or returns `Optional.empty()` (impl decides; document the choice) |
-| `next("totally-unknown")` | returns `Optional.empty()` |
-| `isTerminal(lastStage)` | returns `true` |
-| `isTerminal("totally-unknown")` | returns `true` |
-| `orderedStages()` | non-empty, immutable, contains no duplicates |
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/StagePipelineRegistry.java`
+
+```java
+package com.wwa.deploymentagent.platform.domain;
+
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Platform-level registry that maps {@code agentId} to its {@link StagePipeline}.
+ * Spring auto-injects every {@code StagePipeline} @Component implementation at
+ * startup; the registry builds an immutable map from each pipeline's
+ * {@link StagePipeline#agentId()}.
+ *
+ * <p>Duplicate agentId detection and missing-agent lookup are fail-loud:
+ * startup fails with IllegalStateException on duplicate; runtime lookup throws
+ * on missing agent. This is the single source of truth that
+ * {@link com.wwa.deploymentagent.platform.domain.decision.ReleaseFlowProgressionService}
+ * uses to resolve the correct pipeline for a release flow.
+ */
+@Component
+public class StagePipelineRegistry {
+
+    private final Map<String, StagePipeline> byAgent;
+
+    public StagePipelineRegistry(List<StagePipeline> pipelines) {
+        this.byAgent = pipelines.stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        StagePipeline::agentId,
+                        p -> p,
+                        (a, b) -> {
+                            throw new IllegalStateException(
+                                    "Duplicate StagePipeline for agentId " + a.agentId()
+                                            + ": " + a.getClass().getName()
+                                            + " and " + b.getClass().getName());
+                        }));
+    }
+
+    /**
+     * Resolve the pipeline for a given agent.
+     *
+     * @throws IllegalStateException if no pipeline is registered for the given
+     *         agent. This indicates a configuration gap (a new agent was added
+     *         without a corresponding StagePipeline @Component) or a data-integrity
+     *         gap (a Request row carries an unrecognized agentId value).
+     */
+    public StagePipeline forAgent(String agentId) {
+        StagePipeline pipeline = byAgent.get(agentId);
+        if (pipeline == null) {
+            throw new IllegalStateException(
+                    "No StagePipeline registered for agentId: " + agentId);
+        }
+        return pipeline;
+    }
+}
+```
+
+#### M1.3 Test matrix
+
+**`StagePipelineContractTest`** (parameterized across all 3 implementations):
+
+| # | Case | Assertion |
+|---|---|---|
+| 1 | `next(firstStage)` where pipeline has ≥2 stages | returns `Optional.of(secondStage)` |
+| 2 | `next(firstStage)` where pipeline has 1 stage | returns `Optional.empty()` |
+| 3 | `next(lastStage)` | returns `Optional.empty()` |
+| 4 | `next("totally-unknown")` | **throws `IllegalArgumentException`** (fail-loud) |
+| 5 | `next("")` | throws `IllegalArgumentException` |
+| 6 | `next(null)` | throws `IllegalArgumentException` or `NullPointerException` — impl must pick one consistently |
+| 7 | `isTerminal(lastStage)` | returns `true` |
+| 8 | `isTerminal(firstStage)` where pipeline has ≥2 stages | returns `false` |
+| 9 | `isTerminal("totally-unknown")` | **throws `IllegalArgumentException`** |
+| 10 | `orderedStages()` | non-empty, immutable, no duplicates |
+| 11 | `agentId()` | returns the agent's `AgentId` constant, non-null, non-blank |
+
+**`StagePipelineRegistryTest`**:
+
+| # | Case | Assertion |
+|---|---|---|
+| 1 | 3 pipelines registered, `forAgent("deployment-agent")` | returns `DeploymentStagePipeline` instance |
+| 2 | `forAgent("build-agent")` | returns `BuildStagePipeline` instance |
+| 3 | `forAgent("totally-unknown")` | throws `IllegalStateException` |
+| 4 | Two `@Component` pipelines with same `agentId()` | Spring context startup fails with `IllegalStateException` (duplicate detection) |
 
 ---
 
@@ -165,9 +274,9 @@ public class AgentBoundaryGuard {
 
 ### M3. `ReleaseFlowService` Trim-Down
 
-**Purpose:** Platform `ReleaseFlowService` sheds stitching and switches all stage parameters from `Stage` enum to `String`. Architecture PL-3, PL-5.
+**Purpose:** Platform `ReleaseFlowService` sheds stitching and switches all stage parameters from `Stage` enum to `String`. `advanceStage(...)` internally uses `StagePipelineRegistry` (no signature change). Architecture PL-3, PL-5.
 
-**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/ReleaseFlowService.java`
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/ReleaseFlowService.java` (moves from current `domain/releaseflow/` under `platform/domain/releaseflow/` in Phase H)
 
 **Method signature changes:**
 
@@ -208,71 +317,109 @@ public record ReleaseFlowFilter(
 
 ---
 
-### M4. `ReleaseFlowProgressionService.progressAfterDecision(..., StagePipeline)`
+### M4. `ReleaseFlowProgressionService` — Registry Lookup (Body Change, Signature Unchanged)
 
-**Purpose:** Accept the caller's `StagePipeline` as a method parameter instead of relying on a shared `Stage.next()`. Architecture PL-4.
+**Purpose:** Replace the hardcoded `Stage.next()` call with a `StagePipelineRegistry` lookup. Architecture PL-4.
 
-**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/ReleaseFlowProgressionService.java`
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/decision/ReleaseFlowProgressionService.java` (current location: `domain/decision/ReleaseFlowProgressionService.java`; moves under `platform/domain/decision/` in Phase H of the implementation sequence).
 
-**Signature change:**
+**Current real signature (verified against `ReleaseFlowProgressionService.java:49`):**
+
+```java
+@Transactional
+public void progressAfterDecision(String taskId) { ... }
+```
+
+The method takes a single `taskId` and loads `task → request → releaseFlow` internally. There is no `releaseFlowId`, `DecisionOutcome`, or `UserContext` parameter; an earlier v3 draft misrepresented the signature.
+
+**Signature in v3: unchanged.** Five call sites — `DecisionController.java:41`, `TestingAgentTaskController.java:133`, `RecordResultService.java:98`, `AutoExecutionService.java:159`, `ExternalExecutionMonitorService.java:207` — stay exactly as they are. None of them need to know about `StagePipeline`.
+
+**Constructor change (adds `StagePipelineRegistry`):**
 
 ```java
 // Before
-public ProgressionResult progressAfterDecision(
-        String releaseFlowId,
-        DecisionOutcome outcome,
-        UserContext actor) { ... }
+public ReleaseFlowProgressionService(
+        TaskRepository taskRepository,
+        RequestRepository requestRepository,
+        ReleaseFlowService releaseFlowService,
+        ReleaseFlowRepository releaseFlowRepository) { ... }
 
 // After
-public ProgressionResult progressAfterDecision(
-        String releaseFlowId,
-        DecisionOutcome outcome,
-        UserContext actor,
-        StagePipeline stagePipeline) { ... }
+public ReleaseFlowProgressionService(
+        TaskRepository taskRepository,
+        RequestRepository requestRepository,
+        ReleaseFlowService releaseFlowService,
+        ReleaseFlowRepository releaseFlowRepository,
+        StagePipelineRegistry stagePipelineRegistry) { ... }   // ← new dependency
 ```
 
-**Algorithm diff (only the terminal-stage branch changes):**
+**Method body diff (only the terminal-stage check at `ReleaseFlowProgressionService.java:72` changes):**
 
 ```java
-// Before (v2)
-Stage currentStage = releaseFlow.getCurrentStage();
-Stage nextStage = currentStage.next();
-if (nextStage == null) {
-    releaseFlow.setFlowStatus(FlowStatus.Completed);
-} else {
-    releaseFlow.setCurrentStage(nextStage);
-    advanceToStage(releaseFlow, nextStage);
-}
+// Before (v2 — real code as of 2026-04-11)
+if (allTasksTerminal) {
+    request.setRequestStatus(RequestStatus.Completed);
+    requestRepository.save(request);
 
+    if (releaseFlow.getCurrentStage().next() == null) {
+        // PROD completed – mark flow as Completed
+        releaseFlowService.recomputeAndPersistStatus(releaseFlow.getId());
+    } else {
+        // Advance to next stage
+        releaseFlowService.advanceStage(releaseFlow.getId());
+    }
+}
+```
+
+```java
 // After (v3)
-String currentStage = releaseFlow.getCurrentStage();
-Optional<String> nextStage = stagePipeline.next(currentStage);
-if (nextStage.isEmpty()) {
-    releaseFlow.setFlowStatus(FlowStatus.Completed);
-} else {
-    releaseFlow.setCurrentStage(nextStage.get());
-    advanceToStage(releaseFlow, nextStage.get());
+if (allTasksTerminal) {
+    request.setRequestStatus(RequestStatus.Completed);
+    requestRepository.save(request);
+
+    // Resolve the correct pipeline from the request's agent column.
+    // Registry lookup is fail-loud: unknown agent throws IllegalStateException.
+    // Unknown current stage (i.e. pipeline does not recognize the flow's stage)
+    // throws IllegalArgumentException from the pipeline itself.
+    String agentId = request.getAgent();
+    StagePipeline pipeline = stagePipelineRegistry.forAgent(agentId);
+    String currentStage = releaseFlow.getCurrentStage();   // String, not Stage enum (PL-3)
+
+    if (pipeline.isTerminal(currentStage)) {
+        // Terminal stage in this agent's pipeline — mark flow Completed
+        releaseFlowService.recomputeAndPersistStatus(releaseFlow.getId());
+    } else {
+        // Advance to the pipeline's next stage
+        releaseFlowService.advanceStage(releaseFlow.getId());
+    }
 }
 ```
 
-**Caller update pattern** (in every Agent Module's decision controller):
+The `advanceStage(...)` call itself also internally needs the pipeline — it currently relies on `Stage.next()` somewhere in `releaseFlowService`. That call chain also migrates to the registry lookup; see M3 for `ReleaseFlowService` changes.
 
-```java
-releaseFlowProgressionService.progressAfterDecision(
-        flowId,
-        outcome,
-        userContext,
-        myAgentStagePipeline   // Build: buildStagePipeline, Deployment: deploymentStagePipeline, ...
-);
-```
+**Why the method signature does not change:** The alternative — passing `StagePipeline stagePipeline` as a method parameter — was rejected because `progressAfterDecision` is called from three Platform Core services (`RecordResultService`, `AutoExecutionService`, `ExternalExecutionMonitorService`) in addition to two controllers. Threading a per-agent pipeline through `RecordResultService.recordResult(...)` signatures would force RecordResultService and its callers to become agent-aware, which violates PL-2. The registry resolves the pipeline at exactly one point (inside `progressAfterDecision`), from the data that is already loaded (`request.getAgent()`), and leaves every other service agent-agnostic.
 
-**Test matrix additions:**
+**Call-site audit (verified against the current codebase):**
 
-| Test | Purpose |
+| Call site | File:line | Context | v3 change required |
+|---|---|---|---|
+| `DecisionController.applyDecision` | `DecisionController.java:41` | HTTP decision apply | **None** (signature unchanged) — controller moves to `agents/deployment/web/` in Phase H but the call itself is unchanged |
+| `TestingAgentTaskController` (decision endpoint) | `TestingAgentTaskController.java:133` | HTTP decision apply | **None** — controller moves to `agents/testing/web/` in Phase H |
+| `RecordResultService.recordResult` | `RecordResultService.java:98` | Manual result recording completes a task → triggers progression | **None** |
+| `AutoExecutionService.submitAutoExecution` | `AutoExecutionService.java:159` | Auto execution terminal sync | **None** |
+| `ExternalExecutionMonitorService.processCallback` | `ExternalExecutionMonitorService.java:207` | Jenkins/Ansible callback thread | **None** — critical: this path has no HTTP context, which is why the registry approach is mandatory rather than parameter-threading |
+
+**Test matrix:**
+
+| Test | Assertion |
 |---|---|
-| `ReleaseFlowProgressionServiceTest.terminalStage_marksCompleted` | Parameterized over three pipelines: PROD terminal, UAT terminal (testing), DEV terminal (build) |
-| `ReleaseFlowProgressionServiceTest.nonTerminalStage_advancesPerPipeline` | Deployment pipeline SIT → UAT → PROD |
-| `ReleaseFlowProgressionServiceTest.wrongPipeline_doesNotCrossAgents` | Passing `buildStagePipeline` to a flow currently at `"SIT"`: `next("SIT")` returns `Optional.empty()` so the flow is marked Completed (not auto-advanced into the Deployment pipeline) |
+| `ReleaseFlowProgressionServiceTest.terminalStage_marksCompleted_perAgent` | Parameterized over all 3 agents: PROD terminal for `deployment-agent`, UAT terminal for `testing-agent`, DEV terminal for `build-agent` — each marks flow Completed via `recomputeAndPersistStatus` |
+| `ReleaseFlowProgressionServiceTest.nonTerminalStage_advances` | `deployment-agent` flow at SIT → calls `advanceStage` |
+| `ReleaseFlowProgressionServiceTest.unknownAgent_failsLoud` | Request row with `agent = "ghost-agent"` → `IllegalStateException` from registry lookup, flow state unchanged, transaction rolls back |
+| `ReleaseFlowProgressionServiceTest.mismatchedStage_failsLoud` | Request with `agent = "build-agent"` but flow's `currentStage = "SIT"` (impossible under normal operation, but covered for data-integrity guarantees) → `IllegalArgumentException` from `pipeline.isTerminal("SIT")` because `BuildStagePipeline` does not declare `"SIT"` |
+| `ReleaseFlowProgressionServiceTest.allFiveCallSitesWork` | Integration test exercising each of the 5 callers (decision controller, testing controller, record result, auto execution, monitor callback) and verifying progression completes without a `StagePipeline` parameter anywhere |
+
+**Removed from this design:** The v3 draft's "caller update pattern" (Agent Module controllers threading their own pipeline into `progressAfterDecision`) is deleted. Controllers do NOT know about `StagePipeline`.
 
 ---
 
@@ -738,7 +885,7 @@ public class DeploymentStagePipeline implements StagePipeline {
 
 ### D2. `ReleaseFlowFamilyKey` (Relocated, Regex Unchanged)
 
-**File move:** `platform/domain/releaseflow/ReleaseFlowFamilyKey.java` → `agents/deployment/domain/ReleaseFlowFamilyKey.java`.
+**File move:** current `domain/releaseflow/ReleaseFlowFamilyKey.java` (pre-refactor) → target `agents/deployment/domain/ReleaseFlowFamilyKey.java` (post Phase D). Note: this file never lives under `platform/domain/releaseflow/` — it moves directly from its pre-refactor location into the Deployment Agent module.
 
 **Package declaration** updates. **No regex changes.** The existing `STAGE_PREFIX_WITH_SEPARATOR` pattern `^(sit|uat|prod)...` is kept as-is. No `dev` token added.
 
@@ -790,6 +937,8 @@ public class DeploymentStitchingService {
 | `DeploymentTaskController` | `/api/deployment-agent/tasks` | `web/controller/TaskController` |
 | `DeploymentDecisionController` | `/api/deployment-agent/tasks/{taskId}/decision` | `web/controller/DecisionController` |
 
+**Important:** Per M4, decision controllers do NOT inject a `StagePipeline`. `ReleaseFlowProgressionService.progressAfterDecision(taskId)` resolves the pipeline from the task's request agent via `StagePipelineRegistry`. Controller constructors include `ReleaseFlowProgressionService` but not `DeploymentStagePipeline`.
+
 **Controller skeleton (`DeploymentReleaseFlowController`):**
 
 ```java
@@ -801,7 +950,6 @@ public class DeploymentReleaseFlowController {
     private final ReleaseFlowService releaseFlowService;
     private final DeploymentStitchingService stitchingService;
     private final AgentBoundaryGuard boundaryGuard;
-    private final DeploymentStagePipeline stagePipeline;
 
     @GetMapping
     public Page<ReleaseFlowListItemDto> list(
@@ -884,7 +1032,7 @@ public class TestingStagePipeline implements StagePipeline {
 | `web/controller/TestingAgentReleaseFlowController` | `agents/testing/web/TestingReleaseFlowController` | Calls `releaseFlowService.listByAgent("testing-agent", ...)` instead of `listStitchedSummaries`. Invokes `AgentBoundaryGuard` on `getById` |
 | `web/controller/TestingAgentUploadController` | `agents/testing/web/TestingUploadController` | Unchanged behavior; forces `agent = "testing-agent"` |
 | `web/controller/TestingAgentTaskController` | `agents/testing/web/TestingTaskController` | **New:** invokes `AgentBoundaryGuard` on every task ID (closes v2 R-08) |
-| *(new)* | `agents/testing/web/TestingDecisionController` | Extracted from task controller; passes `testingStagePipeline` into progression |
+| *(new)* | `agents/testing/web/TestingDecisionController` | Extracted from task controller; calls `progressAfterDecision(taskId)` unchanged; pipeline resolution happens inside the service via `StagePipelineRegistry` |
 
 ### T3. Testing Agent Frontend `index.ts`
 
@@ -977,18 +1125,19 @@ public class BuildReleaseFlowController {
 public class BuildUploadController {
 
     private final ImportService importService;
-    private final BuildStagePipeline buildStagePipeline;
 
     @PostMapping
     public ImportResultDto upload(
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal UserContextAuthentication auth) {
         // Forced server-side: agent = build-agent, stage = DEV. Ignore any client params.
+        // ImportService itself is agent-agnostic; it receives agent and stage as
+        // String parameters. Stage pipeline resolution happens later inside
+        // ReleaseFlowProgressionService via StagePipelineRegistry, not here.
         return importService.importExcel(
                 file,
                 AgentId.BUILD_AGENT,
                 "DEV",
-                buildStagePipeline,
                 auth.getUserContext());
     }
 }
@@ -1047,7 +1196,6 @@ public class BuildDecisionController {
     private final DecisionEngine decisionEngine;
     private final ReleaseFlowProgressionService progressionService;
     private final AgentBoundaryGuard boundaryGuard;
-    private final BuildStagePipeline buildStagePipeline;
 
     @PostMapping
     public DecisionResultDto apply(
@@ -1056,15 +1204,16 @@ public class BuildDecisionController {
             @AuthenticationPrincipal UserContextAuthentication auth) {
         boundaryGuard.assertTaskBelongsToAgent(taskId, AgentId.BUILD_AGENT);
         DecisionOutcome outcome = decisionEngine.apply(taskId, body, auth.getUserContext());
-        ProgressionResult progression = progressionService.progressAfterDecision(
-                outcome.releaseFlowId(),
-                outcome,
-                auth.getUserContext(),
-                buildStagePipeline);                    // ← the critical PL-4 threading
-        return DecisionResultDto.from(outcome, progression);
+        // progressAfterDecision(taskId) signature is unchanged from v2. It
+        // internally resolves BuildStagePipeline via StagePipelineRegistry using
+        // request.getAgent() = "build-agent". See design M4.
+        progressionService.progressAfterDecision(taskId);
+        return DecisionResultDto.from(outcome);
     }
 }
 ```
+
+**Note:** `DecisionEngine.apply(...)` continues to return a `DecisionOutcome` (or similar — exact type is whatever the current `DecisionController` uses). The v3 change does not alter its return shape. `ReleaseFlowProgressionService.progressAfterDecision(taskId)` is `void` in the current codebase (`ReleaseFlowProgressionService.java:49`); the controller does not need its return value.
 
 ### B6. Build Agent Frontend `index.ts`
 
@@ -1110,11 +1259,15 @@ See M7 §3. The algorithm is structurally unchanged; only the iteration source m
 
 ### A3. `ReleaseFlowProgressionService.progressAfterDecision` Rewrite
 
-See M4 §3. The body changes in exactly two places:
-- The fetch of `nextStage` (now `stagePipeline.next(currentStage)` returning `Optional<String>`).
-- The terminal check (now `nextStage.isEmpty()` instead of `nextStage == null`).
+See M4 for the full body diff. The algorithm-level changes:
 
-All other logic (flow status updates, audit hooks, optimistic lock handling) is unchanged.
+- **Method signature unchanged:** `progressAfterDecision(String taskId)`. All five existing call sites continue working without modification.
+- **New constructor dependency:** `StagePipelineRegistry`.
+- **Terminal check replaces `currentStage.next() == null`** with `pipeline.isTerminal(currentStage)`, where `pipeline` is resolved via `stagePipelineRegistry.forAgent(request.getAgent())`.
+- **Fail-loud semantics on the resolution path:** if `request.getAgent()` is null or unknown → `IllegalStateException` from the registry; if the resolved pipeline does not recognize the flow's current stage → `IllegalArgumentException` from the pipeline. Both cases roll back the transaction and surface as HTTP 500 (not a silent data corruption).
+- **No method-parameter threading:** prior draft proposed passing `StagePipeline` as a parameter through `progressAfterDecision` and up through its callers (`RecordResultService`, `AutoExecutionService`, `ExternalExecutionMonitorService`); this was rejected because the monitor service runs on a Jenkins/Ansible callback thread with no HTTP or agent context.
+
+All other logic (flow status updates, bottom-up recompute, optimistic lock handling) is unchanged.
 
 ### A4. `createAgentWorkspace` Factory Internals
 
@@ -1303,8 +1456,8 @@ The commits must land in this order to keep `mvn test` and `cd frontend && npm r
 
 ### Phase B — Stage vocabulary migration (backend)
 3. **B1.** Create `DeploymentStage`, `TestingStage`, `BuildStage` enums in their respective agent domain packages. Not yet referenced. Tests: unit tests for each enum.
-4. **B2.** Create `DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline` `@Component` beans. Bind each test to `StagePipelineContractTest`. Tests: green.
-5. **B3.** Add `StagePipeline` parameter to `ReleaseFlowProgressionService.progressAfterDecision(...)`. Update the only existing caller (v2 `DecisionController`) to pass `deploymentStagePipeline`. Tests: update `ReleaseFlowProgressionServiceTest` to parameterize over pipelines.
+4. **B2.** Create `DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline` `@Component` beans. Each implements `String agentId()` returning its `AgentId` constant and `Optional<String> next(...)`/`isTerminal(...)` with fail-loud semantics for unknown stages. Also create `StagePipelineRegistry` @Component (Platform Core). Bind each pipeline to `StagePipelineContractTest` and add `StagePipelineRegistryTest`. Tests: green.
+5. **B3.** Add `StagePipelineRegistry` dependency to `ReleaseFlowProgressionService` constructor. Rewrite the terminal-check at `ReleaseFlowProgressionService.java:72` to use `pipeline.isTerminal(currentStage)` resolved via `registry.forAgent(request.getAgent())`. **No caller changes** — the method signature `progressAfterDecision(String taskId)` is unchanged. Tests: update `ReleaseFlowProgressionServiceTest` to cover the registry lookup path across all 3 agents plus the fail-loud paths (unknown agent, unknown stage).
 6. **B4.** Change `Request.stage` and `ReleaseFlow.currentStage` JPA attributes from `Stage` enum to `String`. Update all repository and service method signatures that passed `Stage`. This is the biggest mechanical commit; touch every file that imports `contracts.enums.Stage`. Tests: all existing JPA integration tests must continue to pass.
 7. **B5.** Delete `contracts/enums/Stage.java`. At this point nothing imports it; if it does, B4 missed a site.
 
@@ -1313,7 +1466,7 @@ The commits must land in this order to keep `mvn test` and `cd frontend && npm r
 9. **C2.** Rewrite `ReleaseFlowAggregation` to iterate over observed stages. Tests: existing `ReleaseFlowAggregationTest` must pass unchanged semantics.
 
 ### Phase D — Stitching relocation
-10. **D1.** Create `agents/deployment/domain/ReleaseFlowFamilyKey.java` (move from `platform/domain/releaseflow/`). Package change only.
+10. **D1.** Move `ReleaseFlowFamilyKey.java` from current `domain/releaseflow/` to target `agents/deployment/domain/`. Package declaration and imports change; regex body unchanged.
 11. **D2.** Create `agents/deployment/domain/DeploymentStitchingService.java`. Copy `listStitchedSummaries` and `getStitchedDetail` method bodies from platform `ReleaseFlowService`. Callers (`ReleaseFlowController`) switch to the new service.
 12. **D3.** Delete `listStitchedSummaries` and `getStitchedDetail` from platform `ReleaseFlowService`. Add the new `listByAgent(...)` method.
 

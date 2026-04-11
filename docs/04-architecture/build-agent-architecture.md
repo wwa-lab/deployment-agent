@@ -79,7 +79,8 @@ Build Agent is the first Agent Module delivered under this pattern. Deployment A
 - **Agent Module** — A self-contained package under `com.wwa.deploymentagent.agents.<name>/` (backend) and `frontend/src/agents/<name>/` (frontend) that owns an agent's controllers, Stage enum, `StagePipeline` bean, and UI. Agent Modules depend only on Platform Core; they do not depend on each other.
 - **Platform Core** — The stage-agnostic, agent-agnostic substrate: domain entities, task state machine, shared services (`TaskService`, `ReleaseFlowService`, `DecisionEngine`, `ReleaseFlowProgressionService`, `RecordResultService`, `ImportService`, `AutoExecutionService`, `AuditLoggerService`, `ConfigurationService`, `AuthService`), security filters, `AgentBoundaryGuard`, and frontend composables (`createAgentWorkspace`, shared `UploadDialog`).
 - **Stage Vocabulary** — The set of stage identifiers an Agent Module recognizes. Each Agent Module declares its own enum (e.g. `BuildStage { DEV }`). The persistent `Request.stage` column stores the stage as a String so the platform core never binds to a single closed enum.
-- **StagePipeline** — A per-agent bean that knows the stage ordering within that agent. `DeploymentStagePipeline` encodes `SIT → UAT → PROD`; `TestingStagePipeline` and `BuildStagePipeline` are single-stage terminal pipelines. Platform services that need to advance a flow accept the pipeline as a method parameter rather than calling a hard-coded `Stage.next()`.
+- **StagePipeline** — A per-agent `@Component` that knows the stage ordering within that agent and reports its `agentId()`. `DeploymentStagePipeline` encodes `SIT → UAT → PROD`; `TestingStagePipeline` and `BuildStagePipeline` are single-stage terminal pipelines. `ReleaseFlowProgressionService` resolves the right pipeline at call time via `StagePipelineRegistry` (keyed by `request.getAgent()`) rather than calling a hard-coded `Stage.next()`. Controllers never pass pipelines as method parameters. Unknown stages throw `IllegalArgumentException` (fail-loud).
+- **StagePipelineRegistry** — A Platform Core `@Component` that injects every `StagePipeline` at startup and builds an immutable `agentId → pipeline` map. `ReleaseFlowProgressionService.progressAfterDecision(taskId)` looks up the right pipeline from the task's parent request's agent column. Missing-agent lookup throws `IllegalStateException`; duplicate `agentId()` fails Spring context startup.
 - **Persisted Release Flow** — A single row in the `da_release_flow` table. It belongs to exactly one agent (all of its linked requests share the same `Request.agent` value) and has its own `currentStage` stored as a String.
 - **Stitched Summary / Stitched Detail** (*Deployment Agent only*) — In-memory grouping of Persisted Release Flows that share a normalized family key. This logic moves from the shared `ReleaseFlowService` into `agents/deployment/domain/DeploymentStitchingService`. Testing Agent and Build Agent do not stitch.
 
@@ -94,7 +95,7 @@ The architectural approach has two parts.
 ### Part A — Platform Core refactor (prerequisite)
 
 1. **Stage enum leaves `contracts/enums/`.** `contracts/enums/Stage.java` is removed. Each Agent Module declares its own stage enum inside its module (`DeploymentStage { SIT, UAT, PROD }`, `TestingStage { UAT }`, `BuildStage { DEV }`). `Request.stage` and `ReleaseFlow.currentStage` are persisted as `String`, so JPA never binds to a single closed enum.
-2. **`StagePipeline` is introduced** as a platform interface. Each Agent Module provides its own `@Component` implementation. `ReleaseFlowProgressionService.progressAfterDecision` accepts a `StagePipeline` as a method parameter instead of calling `currentStage.next()`. The platform service itself never knows what the next stage actually is.
+2. **`StagePipeline` + `StagePipelineRegistry` are introduced** as Platform Core components. Each Agent Module provides its own `@Component` `StagePipeline` implementation (reporting `agentId()`). `ReleaseFlowProgressionService.progressAfterDecision(String taskId)` keeps its signature unchanged and gains one new constructor dependency (`StagePipelineRegistry`) that it uses to resolve the right pipeline from `request.getAgent()`. The 5 existing callers (`DecisionController`, `TestingAgentTaskController`, `RecordResultService`, `AutoExecutionService`, `ExternalExecutionMonitorService`) are untouched. Unknown stages throw `IllegalArgumentException`; unknown agents throw `IllegalStateException`.
 3. **`ReleaseFlowFamilyKey` and the stitching methods** (`listStitchedSummaries`, `getStitchedDetail`) move out of platform `ReleaseFlowService` into `agents/deployment/domain/DeploymentStitchingService`. Platform `ReleaseFlowService` exposes only stage-agnostic list/get methods. Testing Agent and Build Agent never touch stitching.
 4. **`ReleaseFlowListItemDto` is generalized.** The fixed `sitStatus / uatStatus / prodStatus / *Present` fields are replaced with `Map<String, RequestStatus> stageStatuses` and `Set<String> stagesPresent`. Each agent's frontend reads only the stage keys it cares about; adding a new stage never touches the DTO.
 5. **Deployment Agent stops being the global view.** The current `ReleaseFlowController.list` default of "show all agents" is replaced with "show only `deployment-agent` flows" (Q1 = peer agents). A separate platform-level Global View endpoint/page is out of scope for this delivery and is tracked as a follow-up.
@@ -177,7 +178,7 @@ No changes. Same stack as Deployment Agent and Testing Agent:
 │  │  domain/                                                             │    │
 │  │    ReleaseFlowService (list/get by agent+stageString, no stitching) │    │
 │  │    TaskService · DecisionEngine · RecordResultService                │    │
-│  │    ReleaseFlowProgressionService (accepts StagePipeline parameter)   │    │
+│  │    ReleaseFlowProgressionService (resolves pipeline via Registry)    │    │
 │  │    ImportService · AutoExecutionService                              │    │
 │  │    TaskStateMachine · ReleaseFlowAggregation                         │    │
 │  │    AuditLoggerService (agentName from scope.agent())                 │    │
@@ -279,29 +280,43 @@ Platform Core services operate on `String stage` values. `Request.stage` and `Re
 
 ---
 
-### PL-4: StagePipeline as a Per-Agent Bean Passed into Platform Services
+### PL-4: StagePipeline as a Per-Agent Bean, Resolved via Platform Registry
 
-**Decision:** Introduce a platform interface:
+**Decision:** Introduce a platform interface and a platform registry:
+
 ```java
 public interface StagePipeline {
-    Optional<String> next(String currentStage);
-    boolean isTerminal(String stage);
+    String agentId();
+    Optional<String> next(String currentStage);    // throws on unknown stage
+    boolean isTerminal(String stage);               // throws on unknown stage
     List<String> orderedStages();
 }
 ```
-Each Agent Module provides its own `@Component` implementation (`DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline`). `ReleaseFlowProgressionService.progressAfterDecision` accepts a `StagePipeline` as a method parameter; controllers pass their own agent's pipeline in every call.
+
+Each Agent Module provides its own `@Component` implementation (`DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline`), each reporting its own `agentId()`. A Platform Core component `StagePipelineRegistry` injects every `@Component StagePipeline` at startup and builds an immutable `agentId → pipeline` map. `ReleaseFlowProgressionService` receives the registry as a constructor dependency and resolves the correct pipeline at call time via `registry.forAgent(request.getAgent())`. **The method signature `progressAfterDecision(String taskId)` is unchanged.**
 
 **Alternatives considered:**
-- **Inject `StagePipeline` as a field on `ReleaseFlowProgressionService`** — rejected. Would force the service to be agent-scoped and contradict its role as a shared platform service.
+- **Pass `StagePipeline` as a method parameter to `progressAfterDecision`** (this was an earlier v3 draft) — rejected. The method is called from five sites including `RecordResultService.recordResult`, `AutoExecutionService.submitAutoExecution`, and `ExternalExecutionMonitorService.processCallback`. The monitor service runs on a Jenkins/Ansible callback thread with no HTTP or agent ambient context. Parameter threading would force agent semantics deep into Platform Core services and violate PL-2.
+- **Inject a single `StagePipeline` as a field on `ReleaseFlowProgressionService`** — rejected. Would force the service to be agent-scoped and contradict its role as a shared platform service.
 - **Keep `Stage.next()` as an enum method** — rejected. Ordering is per-agent; per-agent enums cannot know cross-agent ordering.
-- **Pass the next stage directly from the controller** — rejected. Puts stage-progression logic in controllers, which is exactly the layer that should not own it.
+- **"Unknown stage returns `Optional.empty()` from `next(...)`" (fail-silent)** — rejected. A mis-routed progression call (e.g. a Deployment Agent flow at `"SIT"` accidentally resolved through `BuildStagePipeline`) would silently mark the flow `Completed` — silent data corruption. Pipelines throw `IllegalArgumentException` on unknown stages so routing bugs surface loudly.
 
-**Rationale:** Controllers own the agent context; they know which pipeline applies. Platform services stay agent-agnostic by receiving the pipeline as a parameter.
+**Rationale:**
+- Single resolution point. Pipeline is looked up exactly once, inside `progressAfterDecision`, from data that is already loaded (`request.getAgent()`).
+- Background-callback safe. `ExternalExecutionMonitorService` can call `progressAfterDecision(taskId)` from any thread; the registry lookup derives agent from the persistent data, not from ambient context.
+- Fail-loud. Unknown agent → `IllegalStateException` from registry. Unknown stage → `IllegalArgumentException` from pipeline. Both cases roll back the enclosing transaction.
 
 **Consequences:**
-- `ReleaseFlowProgressionService.progressAfterDecision(...)` signature gains a `StagePipeline` parameter.
+- `ReleaseFlowProgressionService.progressAfterDecision(String taskId)` signature is **unchanged**. All five existing call sites continue working without modification:
+  - `DecisionController.java:41`
+  - `TestingAgentTaskController.java:133` (migrates to Testing Agent Module in Phase H)
+  - `RecordResultService.java:98`
+  - `AutoExecutionService.java:159`
+  - `ExternalExecutionMonitorService.java:207`
+- `ReleaseFlowProgressionService` constructor gains one new dependency: `StagePipelineRegistry`.
 - Each Agent Module declares one `@Component` class implementing `StagePipeline`.
-- Controllers inject the agent-specific pipeline and pass it to every platform call that needs progression logic.
+- `StagePipelineRegistry` is introduced as a Platform Core component.
+- ArchUnit rule: Platform Core services other than `StagePipelineRegistry` and `ReleaseFlowProgressionService` must not reference any `StagePipeline` subtype by name; they work through the interface and registry only.
 
 ---
 
@@ -419,10 +434,9 @@ A mismatch throws a `NotFoundException` that the global exception handler maps t
 1. Force `agent` and, where applicable, `stage` server-side (ignore client-supplied values).
 2. Invoke `AgentBoundaryGuard` for ID-bearing calls.
 3. Convert between String stage values and the module-local Stage enum at the HTTP boundary.
-4. Pass the module's `StagePipeline` into platform calls that need progression.
-5. Delegate everything else to Platform Core services.
+4. Delegate everything else to Platform Core services. Controllers do NOT inject or pass `StagePipeline` — pipeline resolution happens inside `ReleaseFlowProgressionService` via `StagePipelineRegistry` (see PL-4).
 
-No business logic lives in controllers beyond these five responsibilities.
+No business logic lives in controllers beyond these four responsibilities.
 
 **Rationale:** Controllers are the one layer that knows both the agent context and the platform's String-based domain services; they are the natural translation boundary. Business logic in controllers is the single most common cause of divergence between agents and must be actively resisted.
 
@@ -486,7 +500,7 @@ No business logic lives in controllers beyond these five responsibilities.
 ### Inherited Decisions (carried forward from v2 without structural change)
 
 - **Shared Access Model** — Access grants are shared across all agents. An active grant allows access to any agent workspace. No `agent` dimension is added to `AccessScope`. Per-agent access control is out of scope.
-- **Agent Identity Constants** — Agent identity lives in `contracts/AgentId` (backend) and `frontend/src/platform/config/agentId.ts` (frontend). No string literals for agent identifiers in controllers, services, or views.
+- **Agent Identity Constants** — Agent identity lives in `platform/contracts/AgentId` (backend, after the Phase H package move) and `frontend/src/platform/config/agentId.ts` (frontend). No string literals for agent identifiers in controllers, services, or views.
 
 ---
 
@@ -516,7 +530,8 @@ This section lists components by module. Platform Core is the agent-agnostic sub
 ### Backend — Platform Core
 
 **New components**
-- `platform/domain/StagePipeline` — interface (PL-4). Each Agent Module provides its own `@Component` implementation.
+- `platform/domain/StagePipeline` — interface (PL-4). Each Agent Module provides its own `@Component` implementation. Pipelines expose `agentId()` for registry lookup and throw `IllegalArgumentException` on unknown stages.
+- `platform/domain/StagePipelineRegistry` — Platform Core `@Component` (PL-4). Auto-injects every `StagePipeline` at startup, builds an immutable `agentId → pipeline` map, and serves runtime lookups from `ReleaseFlowProgressionService`. Fail-loud on duplicate `agentId()` at startup and on missing agent at runtime.
 - `platform/web/security/AgentBoundaryGuard` — promoted from "Build Agent-only helper" (v2) to a Platform Core component used by every Agent Module (PL-9). Provides `assertTaskBelongsToAgent`, `assertRequestBelongsToAgent`, `assertFlowBelongsToAgent`.
 - `platform/web/shared/` — new subpackage for capability controllers that are not agent-specific. **New API prefix `/api/platform/`** replaces the current historical mounting under `/api/deployment-agent/*`:
 
@@ -536,7 +551,7 @@ This section lists components by module. Platform Core is the agent-agnostic sub
 
 **Modified components**
 - `ReleaseFlowService` — stitching methods (`listStitchedSummaries`, `getStitchedDetail`) and the `ReleaseFlowFamilyKey` dependency are **removed** (PL-5). Surviving signature: `listByAgent(String agentId, filters, Pageable)` + `getById(...)` + `findRequestsForFlow(...)`. All stage-aware logic operates on `String stage`.
-- `ReleaseFlowProgressionService.progressAfterDecision(...)` — signature gains a `StagePipeline` parameter (PL-4). The method no longer calls `currentStage.next()`; it calls `stagePipeline.next(currentStage)`.
+- `ReleaseFlowProgressionService.progressAfterDecision(String taskId)` — **signature unchanged** (verified against `ReleaseFlowProgressionService.java:49`). Constructor gains one new dependency: `StagePipelineRegistry`. The terminal-check at `ReleaseFlowProgressionService.java:72` changes from `releaseFlow.getCurrentStage().next() == null` to `pipeline.isTerminal(flow.getCurrentStage())` with `pipeline = stagePipelineRegistry.forAgent(request.getAgent())`. All five call sites (`DecisionController:41`, `TestingAgentTaskController:133`, `RecordResultService:98`, `AutoExecutionService:159`, `ExternalExecutionMonitorService:207`) continue working unchanged.
 - `ReleaseFlowAggregation` — iteration over `Stage.values()` is replaced with iteration over the distinct stage strings present on the requests being aggregated.
 - `ReleaseFlow` entity — `currentStage` attribute type changes from `Stage` to `String`. `@Enumerated(EnumType.STRING)` removed.
 - `Request` entity — `stage` attribute type changes from `Stage` to `String`. `@Enumerated(EnumType.STRING)` removed.
@@ -572,7 +587,7 @@ This section lists components by module. Platform Core is the agent-agnostic sub
 - `web/controller/ReleaseFlowController` → `agents/deployment/web/DeploymentReleaseFlowController`. Summary list now forces `agent = "deployment-agent"` (PL-6). Detail endpoint delegates to `DeploymentStitchingService` when `?linked=` is supplied.
 - `web/controller/UploadController` → `agents/deployment/web/DeploymentUploadController`. Forces `agent = "deployment-agent"` server-side.
 - `web/controller/TaskController` → `agents/deployment/web/DeploymentTaskController`. Invokes `AgentBoundaryGuard` before every ID-bearing call (PL-9).
-- `web/controller/DecisionController` → `agents/deployment/web/DeploymentDecisionController`. Passes `DeploymentStagePipeline` into progression calls.
+- `web/controller/DecisionController` → `agents/deployment/web/DeploymentDecisionController`. Calls `progressAfterDecision(taskId)` unchanged; pipeline resolution happens inside the service via `StagePipelineRegistry`.
 
 **Behavioral change**
 - Summary list no longer returns flows from other agents or from legacy null-agent rows (PL-6). Existing integration tests that asserted "all flows visible regardless of agent" are updated.
@@ -603,9 +618,9 @@ Testing Agent has not been publicly released; it is still in internal testing. T
 - `domain/BuildStage { DEV }` — single-value enum.
 - `domain/BuildStagePipeline` — `next("DEV") == Optional.empty()`, `isTerminal("DEV") == true`, `orderedStages() == List.of("DEV")` (BA-1).
 - `web/BuildReleaseFlowController` — thin wrapper around platform `listByAgent` / `getById` / `findRequestsForFlow`. Does not accept `?linked=`. Never calls `DeploymentStitchingService` (BA-2).
-- `web/BuildUploadController` — forces `agent = "build-agent"` and `stage = "DEV"` server-side. Passes `BuildStagePipeline` into `ImportService` where stage ordering is needed.
+- `web/BuildUploadController` — forces `agent = "build-agent"` and `stage = "DEV"` server-side. Calls platform `ImportService` with `(file, agentId, stage, userContext)` — `ImportService` is agent-agnostic and does not take a pipeline.
 - `web/BuildTaskController` — invokes `AgentBoundaryGuard` on every task ID, then delegates to platform `TaskService`.
-- `web/BuildDecisionController` — invokes `AgentBoundaryGuard`, then passes `BuildStagePipeline` into `ReleaseFlowProgressionService.progressAfterDecision`.
+- `web/BuildDecisionController` — invokes `AgentBoundaryGuard`, then calls `ReleaseFlowProgressionService.progressAfterDecision(taskId)` with the unchanged signature. Pipeline resolution happens inside the service.
 
 ---
 
@@ -833,7 +848,7 @@ Every agent controller method on an ID-bearing endpoint performs the five-step s
 1. Force `agent` (and stage where applicable) server-side.
 2. Invoke `AgentBoundaryGuard.assertXxx(...)`.
 3. Convert incoming stage String to the module-local Stage enum (if the endpoint accepts a stage parameter).
-4. Delegate to a platform service, passing the agent's `StagePipeline` where progression logic is involved.
+4. Delegate to a Platform Core service. Controllers do NOT pass `StagePipeline` anywhere — `ReleaseFlowProgressionService` resolves pipelines internally via `StagePipelineRegistry` (see PL-4).
 5. Translate the platform response back into the agent's view shape.
 
 ---
@@ -920,7 +935,7 @@ No change to baseline capacity targets. The system's hot paths (decision applica
 | C1 | No new database tables. No new columns. No Flyway migration. JPA attribute type changes for `Request.stage` and `ReleaseFlow.currentStage` from enum to String are backward-compatible because the DB column is already `VARCHAR`. | PL-3 |
 | C2 | Agent Modules depend only on Platform Core. They do not import from each other. | PL-2 |
 | C3 | Platform Core does not reference any individual `AgentId` constant by value; branches on specific agents are forbidden outside controllers. | PL-2 |
-| C4 | Each Agent Module declares its own Stage enum and its own `StagePipeline` bean. | PL-3, PL-4 |
+| C4 | Each Agent Module declares its own Stage enum and its own `StagePipeline` `@Component` reporting its own `agentId()`. Platform Core resolves pipelines via `StagePipelineRegistry` — controllers never pass pipelines as method parameters. | PL-3, PL-4 |
 | C5 | Stitching is implemented only inside Deployment Agent Module. | PL-5 |
 | C6 | Deployment Agent summary is scoped by `agent = "deployment-agent"`. No global view at the Deployment Agent layer. | PL-6 |
 | C7 | Legacy `Request` rows with `agent IS NULL` are invisible from every agent workspace until the Global View ships. No backfill migration. | PL-6 |
@@ -941,7 +956,8 @@ No change to baseline capacity targets. The system's hot paths (decision applica
 ### Platform Core Refactor (Part A)
 
 **Create:**
-- `platform/domain/StagePipeline.java` interface.
+- `platform/domain/StagePipeline.java` interface (with `agentId()` routing key; throws on unknown stages).
+- `platform/domain/StagePipelineRegistry.java` @Component (Platform Core; auto-injects all pipelines, maps by `agentId()`, fail-loud on duplicate / missing).
 - `platform/web/security/AgentBoundaryGuard.java` (promoted from Build-Agent-only helper).
 - `platform/web/shared/` package housing `AuthController`, `AuditLogController`, `ConfigurationController`, `AccessGrantController`, `TemplateDownloadController` at their new `/api/platform/*` routes.
 - Frontend `platform/api/platformClient.ts` and 5 capability API modules bound to it.
@@ -951,7 +967,7 @@ No change to baseline capacity targets. The system's hot paths (decision applica
 
 **Modify:**
 - `ReleaseFlowService` — remove stitching methods; change signatures to `String stage`.
-- `ReleaseFlowProgressionService.progressAfterDecision(...)` — add `StagePipeline` parameter.
+- `ReleaseFlowProgressionService.progressAfterDecision(String taskId)` — **signature unchanged** (ref: `ReleaseFlowProgressionService.java:49`). Constructor gains `StagePipelineRegistry` dependency; body at line 72 replaces `currentStage.next() == null` with `pipeline.isTerminal(currentStage)` via registry lookup. No caller changes across 5 call sites.
 - `ReleaseFlowAggregation` — iterate over observed stage strings instead of `Stage.values()`.
 - `ReleaseFlow` entity — `currentStage` attribute `Stage` → `String`.
 - `Request` entity — `stage` attribute `Stage` → `String`.
@@ -1029,7 +1045,7 @@ v3 replaces the v2 risk list in full. Obsolete v2 risks are listed at the end fo
 - **R-02** — **Breaking route change to platform capabilities.** Moving `/api/deployment-agent/auth/*` / `/audit-logs` / `/config` / `/access-grants` / `/templates/*` to `/api/platform/*` invalidates any external consumer or bookmark pointing at the v2 routes. Mitigation: for this delivery the only known consumers are the frontend and the `SecurityConfig` whitelist (both updated in the same commit). Any external integration discovered later becomes an additional migration task.
 - **R-03** — **`SecurityConfig.java:36` whitelist forgot-to-update risk.** If the commit that moves `AuthController` does not also update the `permitAll()` matcher, login becomes unreachable. Mitigation: an integration test that POSTs to `/api/platform/auth/login` as an unauthenticated user and asserts a 2xx response blocks the commit if the whitelist is wrong.
 - **R-04** — **Legacy null-agent data becomes invisible** (PL-6 consequence). Users of the v2 Deployment Agent summary who rely on seeing pre-agent-column historical rows lose that visibility until the Global View ships. Mitigation: document the gap in the release notes; schedule the Global View as a near-term follow-up (replaces v2's R-13).
-- **R-05** — **`StagePipeline` parameter threading.** Every controller method that eventually reaches `ReleaseFlowProgressionService.progressAfterDecision` must pass the correct `StagePipeline`. Mitigation: make the parameter mandatory (no default); add a controller-test that verifies each controller's progression calls pass its own pipeline.
+- **R-05** — **`StagePipelineRegistry` missing-agent lookup at runtime.** If a `Request` row carries an `agent` value with no corresponding `StagePipeline` @Component (configuration drift: new agent added without a pipeline, or data-integrity drift: a stale test fixture writes an unrecognized agent string), `progressAfterDecision` throws `IllegalStateException` and the transaction rolls back, preventing progression for that flow. Mitigation: (a) ArchUnit fitness test asserting every `AgentId` constant has a matching `StagePipeline` implementation; (b) integration test that writes each `AgentId` to a `Request` row and exercises `progressAfterDecision`; (c) Spring Boot startup check in `StagePipelineRegistry` constructor verifying at least one pipeline is registered. Startup is fail-loud on duplicate `agentId()` values.
 - **R-06** — **String-typed stages weaken type safety in platform services.** A typo in a stage String passed from a controller into a platform service will not be caught at compile time. Mitigation: controllers are the only layer that constructs stage Strings, and they always derive them from the module's Stage enum via `.name()`; enum-based construction catches typos at the controller layer. An ArchUnit test forbids string literals of stage names in platform code.
 - **R-07** — **Testing Agent migration has zero shipping users** (Q4), so no runtime regression risk. But the Testing Agent codebase is still live in development; any other branch carrying changes to `TestingAgent*Controller` will have merge conflicts with the file moves. Mitigation: coordinate merge order with any active Testing Agent branches.
 - **R-08** — **`AuditLoggerService` `agentName` historical rows** (carried forward from v2 R-12). Pre-refactor audit rows keep their incorrect `agentName` values. Forward-only fix.

@@ -101,7 +101,8 @@ All terms from the Deployment Agent and Testing Agent specs apply. Additional te
 - **Agent Identifier**: A String value (`"deployment-agent"`, `"testing-agent"`, `"build-agent"`) stored on the `Request.agent` column that determines which Agent Module owns the row. Defined by `AgentId` constants (backend) and `platform/config/agentId.ts` (frontend).
 - **DEV Stage**: The SDLC stage preceding SIT, where developers write, build, and locally validate code. Owned exclusively by Build Agent and defined as `agents/build/domain/BuildStage.DEV`. DEV is terminal because `BuildStagePipeline.next("DEV")` returns `Optional.empty()`.
 - **Stage Vocabulary**: The set of stage identifiers an Agent Module recognizes. Each Agent Module declares its own Stage enum (`DeploymentStage`, `TestingStage`, `BuildStage`). Platform Core never binds to a single closed Stage enum and stores `Request.stage` as a `String` at the persistence layer.
-- **StagePipeline**: A per-agent bean implementing a common Platform Core interface. Encodes the stage ordering within one agent (e.g. `DeploymentStagePipeline` → `SIT → UAT → PROD`). Platform services that need to advance a flow receive the pipeline as a method parameter.
+- **StagePipeline**: A per-agent `@Component` implementing a common Platform Core interface. Encodes the stage ordering within one agent (e.g. `DeploymentStagePipeline` → `SIT → UAT → PROD`) and reports its `agentId()`. Platform Core resolves the right pipeline at call time via `StagePipelineRegistry`; controllers never pass pipelines as method parameters. Unknown stages throw `IllegalArgumentException` (fail-loud).
+- **StagePipelineRegistry**: A Platform Core `@Component` that injects every `StagePipeline` at startup and builds an immutable `agentId → pipeline` map. `ReleaseFlowProgressionService` uses it to resolve the right pipeline from `request.getAgent()`. Missing-agent lookup throws `IllegalStateException`.
 - **Agent-Scoped Filtering**: The mechanism by which list and summary operations return only data matching the current agent's identifier. In v3, this applies uniformly to Deployment Agent, Testing Agent, and Build Agent — Deployment Agent is no longer an implicit global view.
 - **Agent Boundary Enforcement**: Platform Core component (`AgentBoundaryGuard`) invoked by every Agent Module's controllers on ID-bearing endpoints. Rejects operations when the target task, request, or flow does not belong to the current agent. Returns HTTP 404 (not 403) to avoid leaking IDs across namespaces.
 - **Stitched Summary / Stitched Detail** (Deployment Agent only): In-memory grouping of Persisted Release Flows that share a normalized family key. Implemented in `agents/deployment/domain/DeploymentStitchingService`. Testing Agent and Build Agent do not stitch.
@@ -141,26 +142,29 @@ Platform Core services operate on `String stage` values. Each Agent Module's con
 
 `BuildStage.DEV` is the only stage value Build Agent ever writes, and the only stage value it ever reads from the database (its queries are agent-scoped).
 
-### 5.4 StagePipeline (Per-Agent Bean)
-Stage ordering is encoded in a per-agent `@Component` implementing the Platform Core interface:
+### 5.4 StagePipeline + StagePipelineRegistry
+Stage ordering is encoded in per-agent `@Component` beans implementing the Platform Core interface:
 
 ```java
 public interface StagePipeline {
-    Optional<String> next(String currentStage);
-    boolean isTerminal(String stage);
+    String agentId();                          // fail-loud routing key
+    Optional<String> next(String currentStage); // throws IllegalArgumentException on unknown stage
+    boolean isTerminal(String stage);            // throws IllegalArgumentException on unknown stage
     List<String> orderedStages();
 }
 ```
 
 Each Agent Module provides its own implementation:
 
-- `DeploymentStagePipeline`: `SIT → UAT → PROD` (PROD terminal)
-- `TestingStagePipeline`: `UAT` only (UAT terminal for Testing Agent)
-- `BuildStagePipeline`: `DEV` only (DEV terminal). `next("DEV")` returns `Optional.empty()`; `isTerminal("DEV")` returns `true`.
+- `DeploymentStagePipeline`: `agentId() = "deployment-agent"`, `SIT → UAT → PROD` (PROD terminal)
+- `TestingStagePipeline`: `agentId() = "testing-agent"`, `UAT` only (UAT terminal)
+- `BuildStagePipeline`: `agentId() = "build-agent"`, `DEV` only (DEV terminal)
 
-`ReleaseFlowProgressionService.progressAfterDecision(...)` accepts a `StagePipeline` as a **method parameter**, not as a constructor-injected field. Controllers pass their own agent's pipeline into every progression call. This is how a single shared Platform Core service can progress flows belonging to any agent without coupling to that agent.
+A new Platform Core component `StagePipelineRegistry` injects every `StagePipeline` `@Component` at startup and builds an immutable `agentId → pipeline` map. It throws at startup on duplicate `agentId()` values and throws `IllegalStateException` from `forAgent(...)` on missing-agent lookup.
 
-A Build Agent release flow completing its last task is marked `Completed` by the existing `ReleaseFlowProgressionService` branch that already handles terminal stages (the same branch that terminates Deployment Agent flows at PROD). No new progression logic is required.
+**`ReleaseFlowProgressionService.progressAfterDecision(String taskId)` signature is unchanged from v2.** The method gains one new constructor dependency (`StagePipelineRegistry`) and resolves the pipeline internally from `request.getAgent()`. All five existing call sites — `DecisionController`, `TestingAgentTaskController`, `RecordResultService`, `AutoExecutionService`, `ExternalExecutionMonitorService` — continue working without modification. An earlier v3 draft proposed threading `StagePipeline` as a method parameter through `progressAfterDecision` and up through its callers; that approach was rejected because `ExternalExecutionMonitorService` runs on a Jenkins/Ansible callback thread with no HTTP or agent ambient context. See `build-agent-architecture.md` PL-4 for the full rationale.
+
+A Build Agent release flow completing its last task is marked `Completed` by the existing terminal-stage branch, which now uses `pipeline.isTerminal(currentStage)` instead of `currentStage.next() == null`. No other logic changes.
 
 ### 5.5 Stitching Is Deployment Agent's Business Logic (Not a Platform Capability)
 `ReleaseFlowFamilyKey`, `listStitchedSummaries`, and `getStitchedDetail` move out of Platform Core and into `agents/deployment/domain/DeploymentStitchingService`. The family-key regex recognizes only Deployment Agent's stage tokens (`sit`, `uat`, `prod`); it is not extended to recognize `dev` or any future stage token.
@@ -257,7 +261,7 @@ The following Platform Core services keep their business logic unchanged (only S
 
 - `TaskService`, `RecordResultService`, `AutoExecutionService`, `DecisionEngine`, `ImportService`, `TaskExecutionHistoryService`
 - `ReleaseFlowService` (reduced: its stitching methods move out; its list/get methods stay)
-- `ReleaseFlowProgressionService` (signature change: `progressAfterDecision` gains a `StagePipeline` parameter)
+- `ReleaseFlowProgressionService` (signature UNCHANGED; constructor gains `StagePipelineRegistry` dependency; body at line 72 replaces `currentStage.next() == null` with pipeline-registry lookup)
 - `TaskStateMachine` and `ReleaseFlowAggregation` (pure functions)
 - `ConfigurationService`, `AuthService`, `AuditLoggerService`
 
@@ -454,7 +458,7 @@ All Build Agent endpoints are served by `com.wwa.deploymentagent.agents.build.we
 |---|---|---|---|
 | `/api/build-agent/release-flows` | GET | `BuildReleaseFlowController` | Forces `agent = "build-agent"`; delegates to Platform `ReleaseFlowService.listByAgent(...)`; response DTOs use generic `stageStatuses` Map |
 | `/api/build-agent/release-flows/{id}` | GET | `BuildReleaseFlowController` | `assertFlowBelongsToAgent(flowId, BUILD_AGENT)`; does not accept `?linked=` (BA-2); delegates to Platform `ReleaseFlowService.getById` + `findRequestsForFlow` |
-| `/api/build-agent/upload` | POST | `BuildUploadController` | Forces `agent = "build-agent"` and `stage = "DEV"` server-side; delegates to Platform `ImportService` with `BuildStagePipeline` |
+| `/api/build-agent/upload` | POST | `BuildUploadController` | Forces `agent = "build-agent"` and `stage = "DEV"` server-side; delegates to Platform `ImportService` (agent-agnostic; pipeline resolution happens later inside `progressAfterDecision` via `StagePipelineRegistry`) |
 | `/api/build-agent/upload/template` | GET | `BuildUploadController` | Delegates to platform `TemplateDownloadController`; Content-Disposition file name `build-request-template.xlsx` |
 | `/api/build-agent/tasks?requestId=X` | GET | `BuildTaskController` | `assertRequestBelongsToAgent(requestId, BUILD_AGENT)`; delegates to Platform `TaskService.findByRequestId` |
 | `/api/build-agent/tasks/{id}` | GET | `BuildTaskController` | `assertTaskBelongsToAgent(taskId, BUILD_AGENT)`; delegates to Platform `TaskService.findById` |
@@ -463,7 +467,7 @@ All Build Agent endpoints are served by `com.wwa.deploymentagent.agents.build.we
 | `/api/build-agent/tasks/{id}/record-result` | POST | `BuildTaskController` | Guard + `RecordResultService.recordResult`; audit tagged `build-agent` via `scope.agent()` |
 | `/api/build-agent/tasks/{id}/start-manual` | POST | `BuildTaskController` | Guard + `TaskService.startManualExecution` |
 | `/api/build-agent/tasks/{id}/submit-auto` | POST | `BuildTaskController` | Guard + `AutoExecutionService.submitAutoExecution` |
-| `/api/build-agent/tasks/{id}/decision` | POST | `BuildDecisionController` | Guard + `DecisionEngine` + `ReleaseFlowProgressionService.progressAfterDecision(..., BuildStagePipeline)` |
+| `/api/build-agent/tasks/{id}/decision` | POST | `BuildDecisionController` | Guard + `DecisionEngine` + `ReleaseFlowProgressionService.progressAfterDecision(taskId)` (unchanged signature; internal pipeline lookup via registry) |
 
 ### 10.3 Backend Implementation Strategy
 
@@ -472,7 +476,7 @@ Build Agent controllers are **thin Agent Module wrappers**. Each controller meth
 1. **Force agent (and stage, for upload)** server-side, ignoring any client-supplied values.
 2. **Invoke `AgentBoundaryGuard`** on every ID-bearing path (`assertTaskBelongsToAgent`, `assertRequestBelongsToAgent`, `assertFlowBelongsToAgent`).
 3. **Convert the incoming stage String to `BuildStage`** where the endpoint accepts a stage parameter (e.g. upload).
-4. **Delegate to a Platform Core service**, passing `BuildStagePipeline` where the platform service signature requires a pipeline (e.g. `progressAfterDecision`).
+4. **Delegate to a Platform Core service**. Controllers do NOT pass `StagePipeline` anywhere. Pipeline resolution for progression happens inside `ReleaseFlowProgressionService` via `StagePipelineRegistry.forAgent(request.getAgent())`.
 5. **Translate the platform response** back into the Build Agent's view shape (no business logic in this step — only DTO mapping).
 
 No business logic in controllers beyond these five responsibilities. Platform Core services remain agent-agnostic.
@@ -595,7 +599,7 @@ Same as Deployment Agent spec section 12. Build Agent reuses the same Jenkins, A
 
 1. The `agent` string value `"build-agent"` must be consistent across backend controllers, frontend API calls, and audit log entries — use `AgentId.BUILD_AGENT` backend constant and the corresponding `platform/config/agentId.ts` frontend constant.
 2. Deployment Agent and Testing Agent runtime behavior must remain product-equivalent after migration into the Agent Module pattern (each user-visible capability continues to work, though file locations and API prefixes for platform capabilities change per §10.1).
-3. Legacy `Request` rows with `agent IS NULL` become invisible from every agent workspace under v3. They remain in the database untouched. No backfill migration is part of this delivery.
+3. Legacy `Request` rows with `agent IS NULL` become invisible from every agent workspace under v3. They remain in the database untouched. No backfill migration is part of this delivery. **This is a user-visible behavior change that requires explicit product sign-off before merge; tracked as P-01 (hard precondition) in `build-agent-tasks.md` §10. BA-T27 cannot be marked complete while P-01 is open.**
 4. All existing tests must continue to pass after the refactor, accounting for the type-signature changes that accompany `Stage` enum removal (`mvn test`, `cd frontend && npm run build`).
 5. `BuildUploadController` must force `stage = "DEV"` and `agent = "build-agent"` server-side and must not trust any client-supplied value.
 6. Every Agent Module's controllers must invoke `AgentBoundaryGuard` before delegating any ID-bearing call.
@@ -614,7 +618,7 @@ Same as Deployment Agent spec section 12. Build Agent reuses the same Jenkins, A
 | R-02 | **Breaking route change to platform capabilities.** 16 existing routes under `/api/deployment-agent/*` move to `/api/platform/*`. Any bookmark or external integration pointing at the v2 routes stops working. | MEDIUM | The only known consumers are the frontend and `SecurityConfig.java:36` whitelist, both updated in the same commit. No known external consumers. Any late-discovered external consumer becomes a one-off migration task |
 | R-03 | **`SecurityConfig.java:36` whitelist forgot-to-update risk.** If the commit that moves `AuthController` does not also update the `permitAll()` matcher, login becomes unreachable (Spring Security rejects the new login route before it can authenticate). | MEDIUM | Integration test that POSTs to `/api/platform/auth/login` as an unauthenticated user and asserts a 2xx response. Gates the commit |
 | R-04 | **Legacy null-agent data becomes invisible** (PL-6 consequence). Users who relied on v2 Deployment Agent's "global view" of pre-agent-column historical rows lose that visibility until the platform Global View ships. | MEDIUM | Document the gap in the release notes. Schedule Global View as a near-term follow-up. No backfill migration in this delivery (§1.6) |
-| R-05 | **`StagePipeline` parameter threading.** Every controller method reaching `ReleaseFlowProgressionService.progressAfterDecision` must pass the correct agent-specific `StagePipeline`. A mistake would route progression through the wrong agent's rules. | MEDIUM | Make the parameter mandatory (no default); add a controller test per agent that verifies each agent's progression calls pass its own pipeline |
+| R-05 | **`StagePipelineRegistry` missing-agent lookup.** A Request row with an `agent` value that has no corresponding `StagePipeline` @Component (configuration drift: new agent without pipeline; data-integrity drift: stale fixture) causes `progressAfterDecision` to throw `IllegalStateException`, rolling back the transaction and blocking progression for that flow. | LOW | ArchUnit rule asserting every `AgentId` constant has a matching pipeline @Component; integration test exercising each agent's progression path; Spring Boot startup fails loudly on duplicate `agentId()`. |
 | R-06 | **String-typed stages weaken compile-time safety in Platform Core services.** A typo in a stage String passed from a controller into a platform service will not be caught by `javac`. | LOW | Controllers are the only layer that constructs stage Strings, and they always derive them from the module's Stage enum via `.name()`. An ArchUnit test forbids string literals of stage names (`"SIT"`, `"UAT"`, `"PROD"`, `"DEV"`) in Platform Core code |
 | R-07 | **Testing Agent migration merge conflicts.** Testing Agent has no shipping users but the codebase is still under development; any other branch carrying changes to `TestingAgent*Controller` has file-move conflicts. | LOW | Coordinate merge order with active Testing Agent branches (currently only `Testing-Agent/Develop-leo` as of 2026-04-11) |
 | R-08 | **`AuditLoggerService` `agentName` historical rows.** Pre-refactor audit rows keep incorrect `agentName` values (`"deployment-agent"` for Testing Agent entries). | LOW | Forward-only fix by design; documented in release notes; no backfill |
@@ -694,7 +698,7 @@ Same as Deployment Agent spec section 12. Build Agent reuses the same Jenkins, A
 | Refactor Item | Architecture Decision | Implementation Component |
 |---|---|---|
 | Remove shared `Stage` enum | PL-3 | Delete `contracts/enums/Stage.java`; create per-agent enums under `agents/*/domain/` |
-| `StagePipeline` interface + per-agent beans | PL-4 | Create `platform/domain/StagePipeline.java`; create three `@Component` implementations |
+| `StagePipeline` interface + per-agent beans + `StagePipelineRegistry` | PL-4 | Create `platform/domain/StagePipeline.java`, `platform/domain/StagePipelineRegistry.java`; create three `@Component` pipeline implementations each reporting their own `agentId()` |
 | `Request.stage` / `ReleaseFlow.currentStage` as String | PL-3 | Update `Request.java`, `ReleaseFlow.java`; remove `@Enumerated` annotations |
 | Move stitching to Deployment Agent Module | PL-5 | Move `ReleaseFlowFamilyKey.java` and stitching methods into `agents/deployment/domain/DeploymentStitchingService` |
 | Deployment Agent peer-scoped summary | PL-6 | Update `DeploymentReleaseFlowController` to force `agent = "deployment-agent"` |

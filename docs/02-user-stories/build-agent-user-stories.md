@@ -374,7 +374,7 @@ so that I can execute the full build workflow without switching to another agent
 - The detail page structure, layout, and interaction patterns are driven by the generic `AgentDetailView` in Platform Core, configured via `createAgentWorkspace({ stages: ['DEV'], supportsStitching: false, ... })`. Build Agent does not author its own view components.
 - The only differences across agents are the config object passed into `createAgentWorkspace`: `key`, `name`, `apiBase`, `stages`, `supportsStitching`, `stageFilter`.
 - Task-level permission checks (owner or DEVOPS_ADMIN) apply identically, AND the platform-level `AgentBoundaryGuard` enforces `request.agent == "build-agent"` on every ID-bearing endpoint before delegating to Platform Core services.
-- Terminal-stage behavior for DEV is implemented by `BuildStagePipeline.next("DEV")` returning `Optional.empty()`. The shared `ReleaseFlowProgressionService.progressAfterDecision(...)` receives the pipeline as a method parameter and treats an empty `next(...)` as "flow terminal". This is the same code path that terminates Deployment Agent flows at PROD.
+- Terminal-stage behavior for DEV is implemented by `BuildStagePipeline.isTerminal("DEV")` returning `true`. The shared `ReleaseFlowProgressionService.progressAfterDecision(String taskId)` resolves the correct pipeline internally via a Platform Core `StagePipelineRegistry` (keyed by `request.getAgent()`) and treats a terminal stage as "flow Completed". This is the same code path that terminates Deployment Agent flows at PROD. The method signature is unchanged from v2; controllers do NOT pass `StagePipeline` as a parameter.
 
 **Dependencies**
 

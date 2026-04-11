@@ -110,30 +110,36 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
 - **Depends on:** BA-T02
 - **Blocks:** BA-T04
 
-#### BA-T04: Create per-agent `StagePipeline` implementations
+#### BA-T04: Create per-agent `StagePipeline` implementations + `StagePipelineRegistry`
 - **Phase:** B
-- **Design ref:** D1, T1, B1
+- **Design ref:** M1 (interface + registry), D1, T1, B1
 - **Architecture ref:** PL-4
-- **Effort:** S
-- **Description:** Create `DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline` `@Component` beans implementing `StagePipeline`. Each encodes its ordering per design §D1/T1/B1.
-- **Files created:** 3 pipeline files
+- **Effort:** M (medium)
+- **Description:** Create `DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline` `@Component` beans implementing `StagePipeline`. Each exposes `String agentId()` returning its `AgentId` constant; `next(...)` and `isTerminal(...)` throw `IllegalArgumentException` for stages not in `orderedStages()` (fail-loud — do NOT silently treat unknown stages as terminal). Also create `StagePipelineRegistry` `@Component` in Platform Core: injects `List<StagePipeline>`, builds an immutable `agentId → pipeline` map, throws at startup on duplicate `agentId()` values, throws `IllegalStateException` from `forAgent(...)` on missing agent.
+- **Files created:** 3 pipeline files + `StagePipelineRegistry.java`
 - **Acceptance criteria:**
-  - `StagePipelineContractTest` (parameterized for all 3 impls) passes all 8 rows per design §M1.
-  - Each concrete pipeline has a focused unit test with its specific ordering assertions.
+  - `StagePipelineContractTest` (parameterized for all 3 impls) passes all 11 rows per design §M1.3, including the **fail-loud rows**: `next("totally-unknown")` throws `IllegalArgumentException`, `isTerminal("totally-unknown")` throws `IllegalArgumentException`.
+  - `StagePipelineRegistryTest` passes 4 cases: known-agent lookup returns the right impl, unknown-agent lookup throws `IllegalStateException`, duplicate-`agentId()` registration fails at Spring context startup, non-empty registry invariant.
+  - Each concrete pipeline has a focused unit test with its specific ordering assertions (including `agentId()` returning the expected `AgentId` constant).
 - **Depends on:** BA-T01, BA-T03
 - **Blocks:** BA-T05
 
-#### BA-T05: Thread `StagePipeline` parameter through `ReleaseFlowProgressionService.progressAfterDecision`
+#### BA-T05: Rewrite `ReleaseFlowProgressionService` terminal check via `StagePipelineRegistry` (signature unchanged)
 - **Phase:** B
 - **Design ref:** M4
 - **Architecture ref:** PL-4
 - **Effort:** M (medium)
-- **Description:** Add `StagePipeline stagePipeline` as a method parameter to `progressAfterDecision`. Rewrite the terminal-stage branch to call `stagePipeline.next(currentStage)` instead of `currentStage.next()`. Update the single existing caller (the v2 `DecisionController`) to pass `deploymentStagePipeline`. This commit is still on the old flat controller layout.
-- **Files modified:** `ReleaseFlowProgressionService.java`, old `DecisionController.java` (temporary — will move in Phase H)
+- **Description:** Add `StagePipelineRegistry` as a constructor dependency on `ReleaseFlowProgressionService`. Rewrite the terminal-stage branch at `ReleaseFlowProgressionService.java:72` to resolve the pipeline from `request.getAgent()` via `stagePipelineRegistry.forAgent(...)`, then call `pipeline.isTerminal(releaseFlow.getCurrentStage())` instead of `releaseFlow.getCurrentStage().next() == null`. **Method signature `progressAfterDecision(String taskId)` is unchanged.** **No caller changes** — all 5 existing call sites continue working as-is.
+- **Critical constraint:** Do NOT thread `StagePipeline` as a method parameter through `progressAfterDecision`. An earlier v3 draft proposed this; it is impossible because the method is called from `RecordResultService.java:98`, `AutoExecutionService.java:159`, and `ExternalExecutionMonitorService.java:207` — the last of which runs on a Jenkins/Ansible callback thread with no HTTP or agent context. Parameter threading would push agent semantics deep into Platform Core services and violate PL-2.
+- **Files modified:** `ReleaseFlowProgressionService.java` (constructor adds `StagePipelineRegistry`; body at line 72 rewrites the terminal check)
+- **Files that MUST NOT be modified by this commit (grep verification gate):** `DecisionController.java`, `TestingAgentTaskController.java`, `RecordResultService.java`, `AutoExecutionService.java`, `ExternalExecutionMonitorService.java` — none of their call sites for `progressAfterDecision` should change in any way
 - **Acceptance criteria:**
-  - `ReleaseFlowProgressionServiceTest` parameterized over 3 pipelines; all existing assertions pass.
-  - New test: `progressAfterDecision` with `BuildStagePipeline` and `currentStage = "DEV"` results in `FlowStatus.Completed`.
-  - New test: `progressAfterDecision` with `BuildStagePipeline` and `currentStage = "SIT"` (wrong pipeline / wrong agent) also results in `FlowStatus.Completed` because `next("SIT")` returns empty — flow never auto-advances.
+  - `ReleaseFlowProgressionServiceTest.terminalStage_marksCompleted_perAgent` passes parameterized over all 3 agents (DeploymentStage PROD, TestingStage UAT, BuildStage DEV all resolve to `Completed`).
+  - `ReleaseFlowProgressionServiceTest.nonTerminalStage_advances` passes for Deployment Agent SIT → UAT → PROD via registry-resolved pipeline.
+  - `ReleaseFlowProgressionServiceTest.unknownAgent_failsLoud` — Request row with `agent = "ghost-agent"` triggers `IllegalStateException` from registry, transaction rolls back, flow state unchanged.
+  - `ReleaseFlowProgressionServiceTest.mismatchedStage_failsLoud` — data-integrity scenario where flow's `currentStage` is not declared in the resolved pipeline → `IllegalArgumentException` from the pipeline, transaction rolls back.
+  - `ReleaseFlowProgressionServiceAllCallersTest` — integration test exercising each of the 5 call sites (decision controller, testing controller, record result, auto execution, external monitor callback) through the `progressAfterDecision(taskId)` signature; all paths succeed.
+  - `git diff --stat` on this commit shows `ReleaseFlowProgressionService.java` modified but NONE of the 5 caller files modified.
 - **Depends on:** BA-T04
 - **Blocks:** BA-T06
 
@@ -354,7 +360,7 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
   - Forces `agent = "deployment-agent"` server-side.
   - Invokes `AgentBoundaryGuard` on every ID-bearing endpoint.
   - `DeploymentReleaseFlowController.list` scopes by `agent = "deployment-agent"` (PL-6 — removes the implicit global view).
-  - `DeploymentDecisionController` passes `DeploymentStagePipeline` into `progressAfterDecision`.
+  - `DeploymentDecisionController` calls `progressAfterDecision(taskId)` unchanged; pipeline resolution happens inside the service via `StagePipelineRegistry`.
   - Stitched linked detail is delegated to `DeploymentStitchingService`.
   Delete the old `web/controller/ReleaseFlowController`, `UploadController`, `TaskController`, `DecisionController`.
 - **Files created:** 4 new controllers
@@ -373,7 +379,7 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
 - **Design ref:** T2
 - **Architecture ref:** PL-2, PL-9
 - **Effort:** M
-- **Description:** Create `TestingReleaseFlowController`, `TestingUploadController`, `TestingTaskController`, `TestingDecisionController` under `agents/testing/web/`. Each invokes `AgentBoundaryGuard` (closes v2 R-08). `TestingReleaseFlowController.list` calls `releaseFlowService.listByAgent("testing-agent", ...)`. `TestingDecisionController` passes `TestingStagePipeline`. Delete old `TestingAgent*Controller` files.
+- **Description:** Create `TestingReleaseFlowController`, `TestingUploadController`, `TestingTaskController`, `TestingDecisionController` under `agents/testing/web/`. Each invokes `AgentBoundaryGuard` (closes v2 R-08). `TestingReleaseFlowController.list` calls `releaseFlowService.listByAgent("testing-agent", ...)`. `TestingDecisionController` calls `progressAfterDecision(taskId)` with the unchanged signature; pipeline resolution happens inside the service. Delete old `TestingAgent*Controller` files.
 - **Files created:** 4 new controllers
 - **Files deleted:** `TestingAgentReleaseFlowController.java`, `TestingAgentTaskController.java`, `TestingAgentUploadController.java`
 - **Acceptance criteria:**
@@ -388,7 +394,7 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
 - **Design ref:** B2, B3, B4, B5
 - **Architecture ref:** PL-10, BA-1, BA-2, BA-3
 - **Effort:** L
-- **Description:** Create `BuildReleaseFlowController`, `BuildUploadController`, `BuildTaskController`, `BuildDecisionController` per design §B2–B5 code skeletons. Every ID-bearing endpoint calls `AgentBoundaryGuard` with `AgentId.BUILD_AGENT`. `BuildReleaseFlowController.getById` does not read `?linked=`. `BuildUploadController` forces `agent = "build-agent"` and `stage = "DEV"`. `BuildDecisionController` passes `BuildStagePipeline` into progression.
+- **Description:** Create `BuildReleaseFlowController`, `BuildUploadController`, `BuildTaskController`, `BuildDecisionController` per design §B2–B5 code skeletons. Every ID-bearing endpoint calls `AgentBoundaryGuard` with `AgentId.BUILD_AGENT`. `BuildReleaseFlowController.getById` does not read `?linked=`. `BuildUploadController` forces `agent = "build-agent"` and `stage = "DEV"`. `BuildDecisionController` calls `progressAfterDecision(taskId)` unchanged; pipeline resolution happens inside the service.
 - **Files created:** 4 controllers
 - **Acceptance criteria (integration tests, ~25 cases across 4 test files):**
   - `BuildReleaseFlowControllerTest`: list scoped to build-agent (6 cases)
@@ -475,17 +481,18 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
 - **Depends on:** BA-T22, BA-T23, BA-T24, BA-T25
 - **Blocks:** BA-T27
 
-#### BA-T27: Frontend build + manual smoke of 13 critical scenarios
+#### BA-T27: Frontend build + manual smoke of 13 critical scenarios + P-01 gate check
 - **Phase:** J
 - **Design ref:** §9
-- **Architecture ref:** R-09 mitigation
+- **Architecture ref:** R-09 mitigation, P-01 (legacy null-agent visibility precondition)
 - **Effort:** M
-- **Description:** Run `cd frontend && npm run build` clean. Manually execute the 13 critical integration scenarios from design §9 against a running local instance (`mvn spring-boot:run -Dspring-boot.run.profiles=local`). Record any UX regressions.
+- **Description:** Run `cd frontend && npm run build` clean. Manually execute the 13 critical integration scenarios from design §9 against a running local instance (`mvn spring-boot:run -Dspring-boot.run.profiles=local`). Record any UX regressions. **Before marking this task complete, verify P-01 (§10 hard precondition) is resolved** — either via recorded product sign-off on the legacy null-agent visibility change, or via a landed backfill migration, or via Global View being pulled into scope. If P-01 is still open, this task cannot be marked complete and the delivery cannot merge to main.
 - **Acceptance criteria:**
   - Frontend build exits 0.
   - All 13 manual scenarios pass.
   - Session cookie preservation scenario (#11) verified end-to-end: login → access Deployment Agent → access Build Agent without re-login.
-- **Depends on:** BA-T26
+  - **P-01 is resolved** (§10 hard precondition). Resolution is recorded in either a linked decision document, a product-owner PR approval, or a landed backfill migration task before this gate.
+- **Depends on:** BA-T26, **P-01 resolution**
 - **Blocks:** BA-T28
 
 #### BA-T28: Release notes + follow-up ticket creation
@@ -647,11 +654,25 @@ The following items are intentionally out of scope for this delivery and are tra
 
 ---
 
-## 10. Open Questions
+## 10. Open Questions and Preconditions
+
+The first entry is a **hard precondition** that must be resolved before this delivery ships. The others are soft defaults that can proceed without explicit answers.
+
+### Hard precondition
+
+- **P-01. Product sign-off on legacy `agent IS NULL` visibility (BLOCKER).** Under PL-6, legacy `Request` rows with `agent IS NULL` become invisible from every agent workspace — Deployment Agent no longer shows them (it used to, in v2), Build Agent and Testing Agent never did. The rows remain in the database untouched; they become visible again only when the platform-level Global View ships (FU-01, not part of this delivery). This is a user-visible behavior change for anyone who currently relies on Deployment Agent's historical "global view" of pre-agent-column data.
+
+  This delivery **cannot merge to main** until one of the following is true:
+  1. Product and operations explicitly sign off that hiding null-agent rows until Global View ships is acceptable. Captured as a linked decision document or PR approval from a named product owner. Recorded in BA-T28 release notes.
+  2. OR a backfill migration task is added to this delivery (set `agent = "deployment-agent"` on all null rows) and landed before BA-T27. This changes the scope of the delivery and adds roughly one S-effort task.
+  3. OR Global View (FU-01) is pulled into this delivery's scope. This is a significant scope increase (new platform endpoint, new page, new query, new permission check) and is not recommended.
+
+  **Status:** OPEN. Not yet resolved. Owner: needs assignment to a named product owner. This entry is tracked as a merge-blocker for BA-T27 and BA-T28 — neither task can be marked complete until P-01 has an explicit resolution.
+
+### Soft defaults
 
 - **Q-01.** Phase H ordering: should BA-T19 (Deployment Agent migration) land before BA-T20 and BA-T21, or simultaneously? The critical path assumes they are independent; if the team prefers to land one agent at a time for confidence, BA-T20 and BA-T21 can wait until BA-T19's migration has been in main for a short soak period. **Default:** concurrent.
 - **Q-02.** BA-T28 release-notes audience: is this an internal engineering change-log or also a user-facing release note? The breaking route change (`/api/platform/*`) has no user-visible effect (login still works via the same URL from the user's perspective), but developers operating the system need to know. **Default:** internal engineering change-log only.
-- **Q-03.** Legacy `agent IS NULL` data visibility — do any production users currently rely on seeing those rows? If yes, the Global View follow-up (FU-01) becomes a hard dependency of this delivery's release. **Default:** no known dependency; ship.
-- **Q-04.** `AgentBoundaryGuard` performance benchmark (BA-T27 / architecture R-11) — is it a blocking gate or an informational measurement? **Default:** informational; ship if functional correctness is verified. Mitigation FU-03 is contingent on measured regression.
+- **Q-03.** `AgentBoundaryGuard` performance benchmark (BA-T27 / architecture R-11) — is it a blocking gate or an informational measurement? **Default:** informational; ship if functional correctness is verified. Mitigation FU-03 is contingent on measured regression.
 
-Answers to these feed directly into the final merge strategy. In the absence of an answer, the "**Default**" is taken.
+Answers to P-01 must be explicit. Answers to Q-01/Q-02/Q-03 can default.
