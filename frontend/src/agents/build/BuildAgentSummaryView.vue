@@ -5,6 +5,7 @@ import { uploadFile, downloadTemplate } from './api'
 import { useBuildAgentStore } from './index'
 import { useUserStore } from '../../stores/user'
 import UploadDialog from '../../components/UploadDialog.vue'
+import { getAgentDescriptor } from '../../config/agentRegistry'
 import type { FlowStatus, ReleaseFlowListItem, RequestStatus, Stage } from '../../types'
 
 const router = useRouter()
@@ -113,10 +114,11 @@ function toggleArchivedVisibility() {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size)))
 const showArchived = computed(() => store.filters.includeArchived === true)
-const uploadScope = computed(() => ({
-  application: store.filters.application,
-  snowGroup: store.filters.snowGroup,
-}))
+const uploadScope = computed(() => ({}))
+const buildAgentDescriptor = getAgentDescriptor('build-agent')
+const workspaceAgent = buildAgentDescriptor
+  ? { key: buildAgentDescriptor.key, name: buildAgentDescriptor.name }
+  : undefined
 </script>
 
 <template>
@@ -312,6 +314,7 @@ const uploadScope = computed(() => ({
     <UploadDialog
       v-if="showUpload"
       :initial-scope="uploadScope"
+      :workspace-agent="workspaceAgent"
       :allowed-stages="['DEV']"
       :upload-fn="uploadFile"
       :download-template-fn="downloadTemplate"

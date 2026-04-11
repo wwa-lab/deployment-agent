@@ -54,7 +54,7 @@ class UploadControllerTest {
     }
 
     @Test
-    @DisplayName("POST /upload persists and returns uploaded scope context plus explicit release identifier")
+    @DisplayName("POST /upload persists and returns uploaded scope context plus explicit release identifier without requiring a client agent param")
     void upload_returnsScopeContext() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -68,7 +68,6 @@ class UploadControllerTest {
                         .param("releaseId", "WFPROJ-20260327-01")
                         .param("application", "AMH HCC")
                         .param("snowGroup", "HTSA-CSI-HCC-AMH-PRJ")
-                        .param("agent", "Deployment Agent")
                         .header("X-User-Id", "emp-003")
                         .header("X-User-Role", "DEVOPS_ADMIN"))
                 .andExpect(status().isOk())

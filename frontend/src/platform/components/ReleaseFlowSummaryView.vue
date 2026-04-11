@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type { Store } from 'pinia'
 import { useUserStore } from '../../stores/user'
 import UploadDialog from '../../components/UploadDialog.vue'
+import { getAgentDescriptor } from '../../config/agentRegistry'
 import type { FlowStatus, ReleaseFlowListItem, RequestStatus, Stage, UploadResponse } from '../../types'
 
 export interface ReleaseFlowSummaryCopy {
@@ -126,11 +127,11 @@ function stagePresent(flow: ReleaseFlowListItem, stage: Stage) {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(store.total / store.size)))
 const showArchived = computed(() => store.filters.includeArchived === true)
-const uploadScope = computed(() => ({
-  application: store.filters.application,
-  snowGroup: store.filters.snowGroup,
-  agent: store.filters.agent,
-}))
+const uploadScope = computed(() => ({}))
+const workspaceAgent = computed(() => {
+  const descriptor = getAgentDescriptor(props.agentKey)
+  return descriptor ? { key: descriptor.key, name: descriptor.name } : undefined
+})
 const multiStage = computed(() => props.stages.length > 1)
 
 function scopeSummary(flow: {
@@ -377,6 +378,7 @@ function toggleArchivedVisibility() {
     <UploadDialog
       v-if="showUpload"
       :initial-scope="uploadScope"
+      :workspace-agent="workspaceAgent"
       :allowed-stages="allowedUploadStages"
       :upload-fn="uploadFn"
       :download-template-fn="downloadTemplateFn"

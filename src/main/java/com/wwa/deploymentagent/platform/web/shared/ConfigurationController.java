@@ -3,7 +3,9 @@ package com.wwa.deploymentagent.platform.web.shared;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.ConfigurationComponentDto;
 import com.wwa.deploymentagent.contracts.dto.ConfigurationItemDto;
+import com.wwa.deploymentagent.contracts.dto.ScopeDirectoryEntryDto;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
+import com.wwa.deploymentagent.domain.configuration.ScopeDirectoryService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ import java.util.List;
 public class ConfigurationController {
 
     private final ConfigurationComponentService configurationComponentService;
+    private final ScopeDirectoryService scopeDirectoryService;
 
     @GetMapping
     public ResponseEntity<List<ConfigurationItemDto>> listAll() {
@@ -74,6 +77,36 @@ public class ConfigurationController {
         }
 
         configurationComponentService.deleteComponent(componentInstanceId, user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/scopes")
+    public ResponseEntity<List<ScopeDirectoryEntryDto>> listScopes() {
+        return ResponseEntity.ok(scopeDirectoryService.listEntries().stream()
+                .map(ScopeDirectoryEntryDto::from)
+                .toList());
+    }
+
+    @PostMapping("/scopes")
+    public ResponseEntity<ScopeDirectoryEntryDto> upsertScope(
+            @Valid @RequestBody ScopeDirectoryEntryDto.UpsertRequest body,
+            @AuthenticationPrincipal UserContext user) {
+        if (!user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException("config:update");
+        }
+
+        return ResponseEntity.ok(ScopeDirectoryEntryDto.from(scopeDirectoryService.upsert(body, user)));
+    }
+
+    @DeleteMapping("/scopes/{id}")
+    public ResponseEntity<Void> deleteScope(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        if (!user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException("config:update");
+        }
+
+        scopeDirectoryService.delete(id, user);
         return ResponseEntity.noContent().build();
     }
 }

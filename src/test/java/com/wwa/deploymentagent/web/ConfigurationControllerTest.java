@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -133,6 +134,65 @@ class ConfigurationControllerTest {
         mockMvc.perform(delete(BASE + "/components/{componentInstanceId}", "missing-id")
                         .header("X-User-Id", "dev-user")
                         .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("scope directory can be created, listed, and deleted by DEVOPS_ADMIN")
+    void scopeDirectory_crudFlow() throws Exception {
+        String createResponse = mockMvc.perform(post(BASE + "/scopes")
+                        .header("X-User-Id", "admin-user")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "application": "AMH HCC",
+                                  "snowGroup": "HTSA-CSI-HCC-AMH-PRJ"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.application").value("AMH HCC"))
+                .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
+                .andExpect(jsonPath("$.scopeSource").value("SNOW Group Default"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String scopeId = objectMapper.readTree(createResponse).path("id").asText();
+
+        mockMvc.perform(get(BASE + "/scopes")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(scopeId))
+                .andExpect(jsonPath("$[0].application").value("AMH HCC"));
+
+        mockMvc.perform(delete(BASE + "/scopes/{id}", scopeId)
+                        .header("X-User-Id", "admin-user")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get(BASE + "/scopes")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("scope directory rejects non-admin writes")
+    void scopeDirectory_nonAdminReturnsForbidden() throws Exception {
+        mockMvc.perform(post(BASE + "/scopes")
+                        .header("X-User-Id", "dev-user")
+                        .header("X-User-Role", "DEVELOPER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "application": "AMH HCC"
+                                }
+                                """))
                 .andExpect(status().isForbidden());
     }
 }

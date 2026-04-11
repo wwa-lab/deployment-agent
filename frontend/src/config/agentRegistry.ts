@@ -58,6 +58,10 @@ export const agentRegistry: AgentDescriptor[] = [
   },
 ]
 
+export function getAgentDescriptor(key: string): AgentDescriptor | undefined {
+  return agentRegistry.find((agent) => agent.key === key)
+}
+
 /** Platform-owned shared capability nav items. Not agent workspaces. */
 export type PlatformCapabilityDescriptor = {
   key: string

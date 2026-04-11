@@ -230,6 +230,15 @@ export interface ConfigComponentDraft {
   description?: string
 }
 
+export interface ScopeDirectoryEntry {
+  id: string
+  application: string
+  snowGroup?: string
+  scopeSource: 'Application Default' | 'SNOW Group Default'
+  updatedBy?: string
+  updatedAt?: string
+}
+
 // AuditLogEntry
 export interface AuditLogEntry {
   id: string

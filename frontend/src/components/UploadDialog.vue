@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { agentRegistry } from '../config/agentRegistry'
+import { useScopeDirectoryStore } from '../stores/scopeDirectory'
 import { useUserStore } from '../stores/user'
 import type { Stage, UploadResponse } from '../types'
 
@@ -10,12 +12,18 @@ interface UploadOptions {
   agent?: string
 }
 
+interface WorkspaceAgentContext {
+  key: string
+  name: string
+}
+
 const props = defineProps<{
   initialScope?: {
     application?: string
     snowGroup?: string
     agent?: string
   }
+  workspaceAgent?: WorkspaceAgentContext
   allowedStages?: Stage[]
   uploadFn: (file: File, stage: Stage, options?: UploadOptions) => Promise<UploadResponse>
   downloadTemplateFn: () => Promise<Blob>
@@ -25,9 +33,12 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const userStore = useUserStore()
+const scopeDirectoryStore = useScopeDirectoryStore()
 
 const ALL_STAGES: Stage[] = ['SIT', 'UAT', 'PROD']
 const availableStages = computed(() => props.allowedStages ?? ALL_STAGES)
+const availableAgents = computed(() => agentRegistry.filter((agent) => agent.enabled))
+const workspaceAgent = computed(() => props.workspaceAgent)
 const stage = ref<Stage | ''>(availableStages.value.length === 1 ? availableStages.value[0] : '')
 const file = ref<File | null>(null)
 const releaseIdentifier = ref('')
@@ -38,12 +49,58 @@ const successResult = ref<UploadResponse | null>(null)
 const scopeForm = reactive({
   application: props.initialScope?.application ?? '',
   snowGroup: props.initialScope?.snowGroup ?? '',
-  agent: props.initialScope?.agent ?? '',
+  agent: props.workspaceAgent?.key ?? props.initialScope?.agent ?? '',
+})
+const applicationOptions = computed(() => {
+  const values = new Set(
+    scopeDirectoryStore.entries
+      .map((entry) => entry.application)
+      .concat(scopeForm.application ? [scopeForm.application] : []),
+  )
+
+  return [...values].filter(Boolean).sort((left, right) => left.localeCompare(right))
+})
+const snowGroupOptions = computed(() => {
+  if (!scopeForm.application.trim()) {
+    return scopeForm.snowGroup ? [scopeForm.snowGroup] : []
+  }
+
+  const values = new Set(
+    scopeDirectoryStore.entries
+      .filter((entry) => entry.application === scopeForm.application)
+      .map((entry) => entry.snowGroup)
+      .filter((value): value is string => Boolean(value))
+      .concat(scopeForm.snowGroup ? [scopeForm.snowGroup] : []),
+  )
+
+  return [...values].sort((left, right) => left.localeCompare(right))
 })
 
 const canUseUpload = computed(() => userStore.canUploadRelease)
 const canSubmit = computed(() =>
   canUseUpload.value && stage.value !== '' && file.value !== null && !uploading.value,
+)
+
+onMounted(() => {
+  void scopeDirectoryStore.fetchEntries().catch(() => undefined)
+})
+
+watch(
+  () => scopeForm.application,
+  (nextApplication, previousApplication) => {
+    if (nextApplication === previousApplication) {
+      return
+    }
+
+    if (!nextApplication.trim()) {
+      scopeForm.snowGroup = ''
+      return
+    }
+
+    if (!snowGroupOptions.value.includes(scopeForm.snowGroup)) {
+      scopeForm.snowGroup = ''
+    }
+  },
 )
 
 function onFileChange(event: Event) {
@@ -57,11 +114,12 @@ async function submit() {
   uploading.value = true
   error.value = ''
   try {
+    const selectedAgent = props.workspaceAgent?.key ?? (scopeForm.agent.trim() || undefined)
     successResult.value = await props.uploadFn(file.value, stage.value as Stage, {
       releaseId: releaseIdentifier.value.trim() || undefined,
       application: scopeForm.application.trim() || undefined,
       snowGroup: scopeForm.snowGroup.trim() || undefined,
-      agent: scopeForm.agent.trim() || undefined,
+      agent: selectedAgent,
     })
     await props.onUploadSuccess()
   } catch (e: unknown) {
@@ -154,36 +212,90 @@ function close() {
           </div>
 
           <div class="form-group">
-            <label class="form-label">Application</label>
-            <input
+            <label class="form-label">Application <span class="optional">(Optional)</span></label>
+            <select
               v-model="scopeForm.application"
-              type="text"
               class="form-control"
-              placeholder="e.g. AMH HCC"
-              :disabled="!canUseUpload"
-            />
+              :disabled="!canUseUpload || scopeDirectoryStore.loading || applicationOptions.length === 0"
+            >
+              <option value="">
+                {{ scopeDirectoryStore.loading ? 'Loading applications...' : 'Not specified' }}
+              </option>
+              <option
+                v-for="application in applicationOptions"
+                :key="application"
+                :value="application"
+              >
+                {{ application }}
+              </option>
+            </select>
+            <div class="field-hint">
+              Choose from the maintained scope directory in Configuration Management.
+            </div>
+            <div v-if="scopeDirectoryStore.error" class="field-hint field-error">
+              {{ scopeDirectoryStore.error }}
+            </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">SNOW Group</label>
-            <input
+            <label class="form-label">SNOW Group <span class="optional">(Optional)</span></label>
+            <select
               v-model="scopeForm.snowGroup"
-              type="text"
               class="form-control"
-              placeholder="e.g. HTSA-CSI-HCC-AMH-PRJ"
-              :disabled="!canUseUpload"
-            />
+              :disabled="!canUseUpload || !scopeForm.application || scopeDirectoryStore.loading"
+            >
+              <option value="">
+                {{
+                  !scopeForm.application
+                    ? 'Select an application first'
+                    : snowGroupOptions.length === 0
+                      ? 'Not specified'
+                      : 'Not specified'
+                }}
+              </option>
+              <option
+                v-for="snowGroup in snowGroupOptions"
+                :key="snowGroup"
+                :value="snowGroup"
+              >
+                {{ snowGroup }}
+              </option>
+            </select>
+            <div class="field-hint">
+              {{
+                scopeForm.application
+                  ? 'Only SNOW Groups maintained under the selected application are shown here.'
+                  : 'Choose an application first to narrow SNOW Group choices.'
+              }}
+            </div>
+            <div
+              v-if="scopeForm.application && snowGroupOptions.length === 0 && !scopeDirectoryStore.loading"
+              class="field-hint"
+            >
+              No maintained SNOW Group values were found for this application yet.
+            </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">Agent</label>
-            <input
-              v-model="scopeForm.agent"
-              type="text"
-              class="form-control"
-              placeholder="e.g. Build Agent, Testing Agent, or Deployment Agent"
-              :disabled="!canUseUpload"
-            />
+            <template v-if="workspaceAgent">
+              <div class="readonly-field">{{ workspaceAgent.name }}</div>
+              <div class="field-hint">
+                Automatically assigned from the current workspace, so uploaders do not need to
+                maintain this field by hand.
+              </div>
+            </template>
+            <template v-else>
+              <select v-model="scopeForm.agent" class="form-control" :disabled="!canUseUpload">
+                <option value="">Not specified</option>
+                <option v-for="agent in availableAgents" :key="agent.key" :value="agent.key">
+                  {{ agent.name }}
+                </option>
+              </select>
+              <div class="field-hint">
+                Optional. Leave blank when the upload should not stamp a specific agent.
+              </div>
+            </template>
           </div>
 
           <div class="form-group">
@@ -234,6 +346,11 @@ function close() {
   color: #ef4444;
 }
 
+.optional {
+  color: #64748b;
+  font-weight: 400;
+}
+
 .file-name {
   font-size: 12px;
   color: #64748b;
@@ -248,5 +365,20 @@ function close() {
   font-size: 12px;
   color: #64748b;
   line-height: 1.4;
+}
+
+.field-error {
+  color: #b91c1c;
+}
+
+.readonly-field {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
 }
 </style>

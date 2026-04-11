@@ -1,5 +1,5 @@
 import platformClient from './platformClient'
-import type { ConfigComponent, ConfigItem } from '../types'
+import type { ConfigComponent, ConfigItem, ScopeDirectoryEntry } from '../types'
 
 interface ConfigApiItem {
   componentInstanceId?: string
@@ -35,6 +35,15 @@ interface ConfigApiComponent {
   serviceUser?: string
   credentialConfigured: boolean
   description?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+interface ScopeDirectoryApiEntry {
+  id: string
+  application: string
+  snowGroup?: string
+  scopeSource: ScopeDirectoryEntry['scopeSource']
   updatedBy?: string
   updatedAt?: string
 }
@@ -78,6 +87,17 @@ function mapConfigComponent(component: ConfigApiComponent): ConfigComponent {
     description: component.description,
     updatedBy: component.updatedBy,
     updatedAt: component.updatedAt,
+  }
+}
+
+function mapScopeDirectoryEntry(entry: ScopeDirectoryApiEntry): ScopeDirectoryEntry {
+  return {
+    id: entry.id,
+    application: entry.application,
+    snowGroup: entry.snowGroup,
+    scopeSource: entry.scopeSource,
+    updatedBy: entry.updatedBy,
+    updatedAt: entry.updatedAt,
   }
 }
 
@@ -125,4 +145,24 @@ export async function updateConfigComponent(component: {
 
 export async function deleteConfigComponent(componentInstanceId: string): Promise<void> {
   await platformClient.delete(`/config/components/${componentInstanceId}`)
+}
+
+export async function listScopeDirectoryEntries(): Promise<{ data: ScopeDirectoryEntry[] }> {
+  const response = await platformClient.get('/config/scopes')
+  return {
+    data: (response.data as ScopeDirectoryApiEntry[]).map(mapScopeDirectoryEntry),
+  }
+}
+
+export async function saveScopeDirectoryEntry(entry: {
+  id?: string
+  application: string
+  snowGroup?: string
+}): Promise<ScopeDirectoryEntry> {
+  const response = await platformClient.post('/config/scopes', entry)
+  return mapScopeDirectoryEntry(response.data as ScopeDirectoryApiEntry)
+}
+
+export async function deleteScopeDirectoryEntry(id: string): Promise<void> {
+  await platformClient.delete(`/config/scopes/${id}`)
 }
