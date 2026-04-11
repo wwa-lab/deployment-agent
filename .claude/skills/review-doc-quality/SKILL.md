@@ -44,6 +44,34 @@ the start of the review.
 - Check whether expected sections are present (see reference below)
 - Flag missing, thin, or misplaced sections
 
+### Step 2.5 — Codebase Grounding Cross-Check (MANDATORY)
+
+Before assessing content quality, run the 7-failure-mode check from `../_shared/grounding-rules.md` against the document:
+
+**F1 · Code reference drift** — For every method/class/file/annotation the document cites, grep the real codebase and verify it exists with the stated signature. Flag any mismatch as a drift finding.
+
+**F2 · False assumption about existing behavior** — For every claim like "the existing X supports Y" / "the current code already does Z" / "no changes needed to W", verify against the actual implementation. Flag any wrong assumption as a Critical finding.
+
+**F3 · Phase drift** — Check whether the document contains content that belongs to a different stage:
+- Architecture doc with code bodies, file paths, LOC estimates, test class names → phase drift
+- Design doc with task IDs, sprint assignments, PR decomposition → phase drift
+- Tasks doc with product decisions, architectural tradeoffs, module-level design → phase drift
+
+**F4 · Internal contradictions** — Re-read every pair of sections that could potentially conflict. Common hot spots:
+- Scope vs. Out of Scope
+- Assumptions vs. Success Criteria
+- "existing behavior" claims vs. "what must not happen" constraints
+- Requirements vs. Testing Considerations
+- Rule definitions vs. rule test expectations
+
+**F5 · Rule self-collision** — For every new rule introduced (regex, ordering, algorithm branch, enum), trace the rule against at least 3 concrete edge cases. If a cited edge case contradicts the rule, flag it.
+
+**F6 · Deferred decisions** — Search for "implementation will decide", "grep later", "TBD", "to be determined". Any of these in a non-trivial location is a finding.
+
+**F7 · Phantom inheritance** — If the document inherited claims from an upstream doc (spec, architecture, design), spot-check those claims against the codebase. Flag any that should have been re-verified but weren't.
+
+Include each finding in the Issues Found section at the appropriate severity.
+
 ### Step 3 — Content quality analysis
 
 Assess each of the following dimensions:
