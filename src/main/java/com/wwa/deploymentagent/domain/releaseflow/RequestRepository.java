@@ -1,6 +1,5 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -41,10 +40,10 @@ public interface RequestRepository extends JpaRepository<Request, String> {
                                        @Param("includeArchived") boolean includeArchived);
 
     Optional<Request> findTopByReleaseFlowIdAndStageAndArchivedAtIsNullOrderByAttemptNumberDescUpdatedAtDesc(
-            String releaseFlowId, Stage stage);
+            String releaseFlowId, String stage);
 
     Optional<Request> findTopByReleaseFlowIdAndStageOrderByAttemptNumberDescUpdatedAtDesc(
-            String releaseFlowId, Stage stage);
+            String releaseFlowId, String stage);
 
     @Query("""
             SELECT COALESCE(MAX(r.attemptNumber), 0) FROM Request r
@@ -52,7 +51,7 @@ public interface RequestRepository extends JpaRepository<Request, String> {
               AND r.stage = :stage
             """)
     int findMaxAttemptNumberByReleaseFlowIdAndStage(@Param("releaseFlowId") String releaseFlowId,
-                                                     @Param("stage") Stage stage);
+                                                     @Param("stage") String stage);
 
     Optional<Request> findByIdAndReleaseFlowId(String id, String releaseFlowId);
 

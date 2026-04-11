@@ -1,7 +1,6 @@
 package com.wwa.deploymentagent.workflow;
 
 import com.wwa.deploymentagent.contracts.UserContext;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.fileimport.ImportService;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
@@ -61,10 +60,10 @@ class ExcelImportWorkflowTest {
     void importFile_createsReleaseFlowWithTasks() throws IOException {
         byte[] xlsx = buildValidXlsx("WF-PROJ-100", "Workflow Project 100", 3);
 
-        ImportResult result = importService.importFile(xlsx, Stage.SIT, developer);
+        ImportResult result = importService.importFile(xlsx, "SIT", developer);
 
         assertThat(result.releaseFlowId()).isNotNull();
-        assertThat(result.stage()).isEqualTo(Stage.SIT);
+        assertThat(result.stage()).isEqualTo("SIT");
         assertThat(result.taskCount()).isEqualTo(3);
 
         // Verify tasks are persisted in the hierarchy
@@ -77,7 +76,7 @@ class ExcelImportWorkflowTest {
     @DisplayName("re-uploading the same project+stage upserts tasks without duplication")
     void importFile_reUpload_upsertsTasks() throws IOException {
         byte[] firstUpload = buildValidXlsx("WF-PROJ-200", "Workflow Project 200", 2);
-        ImportResult firstResult = importService.importFile(firstUpload, Stage.SIT, developer);
+        ImportResult firstResult = importService.importFile(firstUpload, "SIT", developer);
 
         String requestId = requestRepository
                 .findByReleaseFlowId(firstResult.releaseFlowId())
@@ -87,7 +86,7 @@ class ExcelImportWorkflowTest {
 
         // Second upload: same project, same stage → should upsert, not duplicate
         byte[] secondUpload = buildValidXlsx("WF-PROJ-200", "Workflow Project 200", 2);
-        importService.importFile(secondUpload, Stage.SIT, developer);
+        importService.importFile(secondUpload, "SIT", developer);
 
         long taskCountAfter = taskRepository
                 .findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(requestId).size();
@@ -99,10 +98,10 @@ class ExcelImportWorkflowTest {
     @DisplayName("importing same project as a different stage adds a new Request to the same Release Flow")
     void importFile_secondStage_addsNewRequest() throws IOException {
         byte[] sitXlsx = buildValidXlsx("WF-PROJ-300", "Workflow Project 300", 2);
-        ImportResult sitResult = importService.importFile(sitXlsx, Stage.SIT, developer);
+        ImportResult sitResult = importService.importFile(sitXlsx, "SIT", developer);
 
         byte[] uatXlsx = buildValidXlsx("WF-PROJ-300", "Workflow Project 300", 2);
-        ImportResult uatResult = importService.importFile(uatXlsx, Stage.UAT, developer);
+        ImportResult uatResult = importService.importFile(uatXlsx, "UAT", developer);
 
         // Both imports belong to the same Release Flow
         assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());

@@ -3,10 +3,9 @@ package com.wwa.deploymentagent.domain.fileimport;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
+import com.wwa.deploymentagent.agents.deployment.domain.ReleaseFlowFamilyKey;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
-import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowFamilyKey;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
@@ -52,14 +51,14 @@ public class ImportService {
     private final AuditLoggerService auditLogger;
 
     @Transactional
-    public ImportResult importFile(byte[] fileBytes, Stage stage, UserContext user) throws IOException {
+    public ImportResult importFile(byte[] fileBytes, String stage, UserContext user) throws IOException {
         return importFile(fileBytes, stage, user, null, null, null, null);
     }
 
     @Transactional
     public ImportResult importFile(
             byte[] fileBytes,
-            Stage stage,
+            String stage,
             UserContext user,
             String snowGroup,
             String application,
@@ -70,7 +69,7 @@ public class ImportService {
     @Transactional
     public ImportResult importFile(
             byte[] fileBytes,
-            Stage stage,
+            String stage,
             UserContext user,
             String requestedReleaseId,
             String snowGroup,
@@ -114,7 +113,7 @@ public class ImportService {
 
         auditLogger.log(user, AuditActionType.upload, lastReleaseFlowId, null, null,
                 Map.of(
-                        "stage", stage.name(),
+                        "stage", stage,
                         "taskCount", totalTaskCount,
                         "snowGroup", normalizeBlank(snowGroup) != null ? normalizeBlank(snowGroup) : "",
                         "application", normalizeBlank(application) != null ? normalizeBlank(application) : "",
@@ -135,7 +134,7 @@ public class ImportService {
     private ReleaseFlow findOrCreateReleaseFlow(
             String projectId,
             String projectName,
-            Stage stage,
+            String stage,
             String requestedReleaseId) {
         String explicitReleaseId = normalizeBlank(requestedReleaseId);
         if (explicitReleaseId != null) {
@@ -155,7 +154,7 @@ public class ImportService {
     private ReleaseFlow findOrCreateReleaseFlowByIdentifier(
             String projectId,
             String projectName,
-            Stage stage,
+            String stage,
             String explicitReleaseId) {
         String normalizedReleaseId = normalizeReleaseIdentifier(explicitReleaseId);
         Optional<ReleaseFlow> existing = findExistingReleaseFlowByIdentifier(
@@ -176,10 +175,10 @@ public class ImportService {
         return releaseFlowService.create(projectId, projectName, explicitReleaseId, normalizedReleaseId, stage);
     }
 
-    private ReleaseFlow createReleaseFlow(String projectId, String projectName, Stage stage) {
+    private ReleaseFlow createReleaseFlow(String projectId, String projectName, String stage) {
         String normalized    = normalizeId(projectId);
         long count           = releaseFlowRepository.countByProjectId(projectId);
-        String genReleaseId  = stage.name().toLowerCase() + "-" + normalized
+        String genReleaseId  = stage.toLowerCase() + "-" + normalized
                 + "-" + String.format("%04d", count + 1);
         return releaseFlowService.create(
                 projectId,
@@ -191,7 +190,7 @@ public class ImportService {
 
     private Request createRequestAttempt(
             ReleaseFlow rf,
-            Stage stage,
+            String stage,
             UserContext user,
             String snowGroup,
             String application,

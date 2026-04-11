@@ -1,4 +1,4 @@
-package com.wwa.deploymentagent.domain.releaseflow;
+package com.wwa.deploymentagent.agents.deployment.domain;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

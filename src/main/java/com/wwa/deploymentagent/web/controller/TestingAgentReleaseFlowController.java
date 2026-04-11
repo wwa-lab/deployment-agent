@@ -3,8 +3,8 @@ package com.wwa.deploymentagent.web.controller;
 import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.dto.*;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
+import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowFilter;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 import com.wwa.deploymentagent.domain.releaseflow.TemplateRundownCreationService;
@@ -45,7 +45,7 @@ public class TestingAgentReleaseFlowController {
     public ResponseEntity<PaginatedResponseDto<ReleaseFlowListItemDto>> list(
             @RequestParam(required = false) String project,
             @RequestParam(required = false) FlowStatus status,
-            @RequestParam(required = false) Stage stage,
+            @RequestParam(required = false) String stage,
             @RequestParam(required = false) String application,
             @RequestParam(required = false) String snowGroup,
             @RequestParam(required = false) String agent, // accepted but ignored — overridden server-side
@@ -67,18 +67,9 @@ public class TestingAgentReleaseFlowController {
         final String effectiveAgent = AgentId.TESTING_AGENT;
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
-        if ("stitched".equalsIgnoreCase(view)) {
-            Page<ReleaseFlowListItemDto> stitchedResult = releaseFlowService.listStitchedSummaries(
-                    project, status, stage, application, snowGroup, effectiveAgent, user, attemptView, pageable, includeArchived);
-            return ResponseEntity.ok(new PaginatedResponseDto<>(
-                    stitchedResult.getContent(),
-                    stitchedResult.getTotalElements(),
-                    stitchedResult.getNumber(),
-                    stitchedResult.getSize()));
-        }
-
-        Page<ReleaseFlow> result = releaseFlowService.list(
-                project, status, stage, application, snowGroup, effectiveAgent, user, pageable, includeArchived);
+        ReleaseFlowFilter filter = new ReleaseFlowFilter(
+                project, status, stage, application, snowGroup, user, includeArchived);
+        Page<ReleaseFlow> result = releaseFlowService.listByAgent(effectiveAgent, filter, pageable);
         Map<String, List<Request>> requestsByReleaseFlowId = releaseFlowService.findRequestsByReleaseFlowIds(
                 result.getContent().stream().map(ReleaseFlow::getId).toList(),
                 includeArchived);
@@ -101,10 +92,7 @@ public class TestingAgentReleaseFlowController {
             @RequestParam(defaultValue = "false") boolean includeArchived,
             @AuthenticationPrincipal UserContext user) {
         validateArchivedViewer(includeArchived, user);
-        List<String> linkedFlowIds = parseLinkedFlowIds(linked);
-        if (!linkedFlowIds.isEmpty()) {
-            return ResponseEntity.ok(releaseFlowService.getStitchedDetail(id, linkedFlowIds, includeArchived, user));
-        }
+        // Testing Agent is UAT-only; linked-flow stitching is not supported — ignore the param.
 
         ReleaseFlow rf = releaseFlowService.getById(id, includeArchived);
         List<Request> visibleRequests = filterVisibleRequests(

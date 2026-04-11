@@ -1,8 +1,8 @@
 package com.wwa.deploymentagent.web.controller;
 
+import com.wwa.deploymentagent.agents.deployment.domain.DeploymentStitchingService;
 import com.wwa.deploymentagent.contracts.dto.*;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
@@ -36,13 +36,14 @@ import java.util.Map;
 public class ReleaseFlowController {
 
     private final ReleaseFlowService releaseFlowService;
+    private final DeploymentStitchingService deploymentStitchingService;
     private final TemplateRundownCreationService templateRundownCreationService;
 
     @GetMapping
     public ResponseEntity<PaginatedResponseDto<ReleaseFlowListItemDto>> list(
             @RequestParam(required = false) String project,
             @RequestParam(required = false) FlowStatus status,
-            @RequestParam(required = false) Stage stage,
+            @RequestParam(required = false) String stage,
             @RequestParam(required = false) String application,
             @RequestParam(required = false) String snowGroup,
             @RequestParam(required = false) String agent,
@@ -62,7 +63,7 @@ public class ReleaseFlowController {
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
         if ("stitched".equalsIgnoreCase(view)) {
-            Page<ReleaseFlowListItemDto> stitchedResult = releaseFlowService.listStitchedSummaries(
+            Page<ReleaseFlowListItemDto> stitchedResult = deploymentStitchingService.listStitchedSummaries(
                     project, status, stage, application, snowGroup, agent, user, attemptView, pageable, includeArchived);
             return ResponseEntity.ok(new PaginatedResponseDto<>(
                     stitchedResult.getContent(),
@@ -97,7 +98,7 @@ public class ReleaseFlowController {
         validateArchivedViewer(includeArchived, user);
         List<String> linkedFlowIds = parseLinkedFlowIds(linked);
         if (!linkedFlowIds.isEmpty()) {
-            return ResponseEntity.ok(releaseFlowService.getStitchedDetail(id, linkedFlowIds, includeArchived, user));
+            return ResponseEntity.ok(deploymentStitchingService.getStitchedDetail(id, linkedFlowIds, includeArchived, user));
         }
 
         ReleaseFlow rf = releaseFlowService.getById(id, includeArchived);

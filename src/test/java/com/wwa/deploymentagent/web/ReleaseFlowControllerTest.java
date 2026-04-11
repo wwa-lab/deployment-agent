@@ -2,7 +2,6 @@ package com.wwa.deploymentagent.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import org.springframework.http.MediaType;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
@@ -20,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -83,24 +84,24 @@ class ReleaseFlowControllerTest {
     @DisplayName("list_returnsStageStatuses_forAllEnvironments - GET /release-flows includes SIT/UAT/PROD request statuses")
     void list_returnsStageStatuses_forAllEnvironments() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, com.wwa.deploymentagent.contracts.enums.Stage.SIT, RequestStatus.Completed);
-        helper.seedRequest(rf, com.wwa.deploymentagent.contracts.enums.Stage.UAT, RequestStatus.Running);
+        helper.seedRequest(rf, "SIT", RequestStatus.Completed);
+        helper.seedRequest(rf, "UAT", RequestStatus.Running);
 
         mockMvc.perform(get(BASE)
                         .header("X-User-Id", "user1")
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].sitStatus").value("Completed"))
-                .andExpect(jsonPath("$.data[0].uatStatus").value("Running"))
-                .andExpect(jsonPath("$.data[0].prodStatus").value("Pending"));
+                .andExpect(jsonPath("$.data[0].stageStatuses.SIT").value("Completed"))
+                .andExpect(jsonPath("$.data[0].stageStatuses.UAT").value("Running"))
+                .andExpect(jsonPath("$.data[0].stageStatuses.PROD").doesNotExist());
     }
 
     @Test
     @DisplayName("list_viewStitched_attemptViewSwitchesBetweenLatestAndHistoryForRepeatedStageAttempts")
     void list_viewStitched_attemptViewSwitchesBetweenLatestAndHistoryForRepeatedStageAttempts() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
-        helper.seedRequest(rf, Stage.SIT, RequestStatus.Completed);
+        helper.seedRequest(rf, "SIT", RequestStatus.Failed);
+        helper.seedRequest(rf, "SIT", RequestStatus.Completed);
 
         mockMvc.perform(get(BASE)
                         .param("view", "stitched")
@@ -108,7 +109,7 @@ class ReleaseFlowControllerTest {
                         .header("X-User-Id", "user1")
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].sitStatus").value("Completed"));
+                .andExpect(jsonPath("$.data[0].stageStatuses.SIT").value("Completed"));
 
         mockMvc.perform(get(BASE)
                         .param("view", "stitched")
@@ -116,7 +117,7 @@ class ReleaseFlowControllerTest {
                         .header("X-User-Id", "user1")
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].sitStatus").value("Failed"));
+                .andExpect(jsonPath("$.data[0].stageStatuses.SIT").value("Failed"));
     }
 
     @Test
@@ -131,7 +132,7 @@ class ReleaseFlowControllerTest {
         requestRepository.save(matchingRequest);
 
         ReleaseFlow otherFlow = releaseFlowService.create(
-                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", Stage.SIT);
+                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", "SIT");
         Request otherRequest = helper.seedRequest(otherFlow);
         otherRequest.setApplication("PowerCARD");
         otherRequest.setSnowGroup("HTSA-CSI-CARD-PRD");
@@ -155,14 +156,14 @@ class ReleaseFlowControllerTest {
     @Test
     @DisplayName("list_viewStitched_groupsStagePrefixedReleaseFamilyIntoOneSummary")
     void list_viewStitched_groupsStagePrefixedReleaseFamilyIntoOneSummary() throws Exception {
-        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "sit-01", "sit-01", Stage.SIT);
-        Request sitRequest = helper.seedRequest(sitFlow, Stage.SIT, RequestStatus.Completed);
+        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "sit-01", "sit-01", "SIT");
+        Request sitRequest = helper.seedRequest(sitFlow, "SIT", RequestStatus.Completed);
         sitRequest.setApplication("AMH HCC");
         sitRequest.setOwner("alice");
         requestRepository.save(sitRequest);
 
-        ReleaseFlow uatFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "uat-01", "uat-01", Stage.UAT);
-        Request uatRequest = helper.seedRequest(uatFlow, Stage.UAT, RequestStatus.Pending);
+        ReleaseFlow uatFlow = releaseFlowService.create("PROJ-STITCH", "Stitched Project", "uat-01", "uat-01", "UAT");
+        Request uatRequest = helper.seedRequest(uatFlow, "UAT", RequestStatus.Pending);
         uatRequest.setApplication("AMH HCC");
         uatRequest.setOwner("alice");
         requestRepository.save(uatRequest);
@@ -176,9 +177,9 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.data[0].stitched").value(true))
                 .andExpect(jsonPath("$.data[0].linkedReleaseCount").value(2))
                 .andExpect(jsonPath("$.data[0].currentStage").value("UAT"))
-                .andExpect(jsonPath("$.data[0].sitPresent").value(true))
-                .andExpect(jsonPath("$.data[0].uatPresent").value(true))
-                .andExpect(jsonPath("$.data[0].prodPresent").value(false));
+                .andExpect(jsonPath("$.data[0].stagesPresent", hasItem("SIT")))
+                .andExpect(jsonPath("$.data[0].stagesPresent", hasItem("UAT")))
+                .andExpect(jsonPath("$.data[0].stagesPresent", not(hasItem("PROD"))));
     }
 
     @Test
@@ -189,8 +190,8 @@ class ReleaseFlowControllerTest {
                 "Infix Project",
                 "leo-sit-01",
                 "leo-sit-01",
-                Stage.SIT);
-        Request sitAttemptOne = helper.seedRequest(sitAttemptOneFlow, Stage.SIT, RequestStatus.Completed);
+                "SIT");
+        Request sitAttemptOne = helper.seedRequest(sitAttemptOneFlow, "SIT", RequestStatus.Completed);
         sitAttemptOne.setAttemptNumber(1);
         requestRepository.save(sitAttemptOne);
 
@@ -199,8 +200,8 @@ class ReleaseFlowControllerTest {
                 "Infix Project",
                 "leo-sit-02",
                 "leo-sit-02",
-                Stage.SIT);
-        Request sitAttemptTwo = helper.seedRequest(sitAttemptTwoFlow, Stage.SIT, RequestStatus.Pending);
+                "SIT");
+        Request sitAttemptTwo = helper.seedRequest(sitAttemptTwoFlow, "SIT", RequestStatus.Pending);
         sitAttemptTwo.setAttemptNumber(2);
         requestRepository.save(sitAttemptTwo);
 
@@ -209,16 +210,16 @@ class ReleaseFlowControllerTest {
                 "Infix Project",
                 "leo-uat-01",
                 "leo-uat-01",
-                Stage.UAT);
-        helper.seedRequest(uatFlow, Stage.UAT, RequestStatus.Pending);
+                "UAT");
+        helper.seedRequest(uatFlow, "UAT", RequestStatus.Pending);
 
         ReleaseFlow prodFlow = releaseFlowService.create(
                 "PROJ-STITCH-INFIX",
                 "Infix Project",
                 "leo-prod-01",
                 "leo-prod-01",
-                Stage.PROD);
-        helper.seedRequest(prodFlow, Stage.PROD, RequestStatus.Pending);
+                "PROD");
+        helper.seedRequest(prodFlow, "PROD", RequestStatus.Pending);
 
         mockMvc.perform(get(BASE)
                         .param("view", "stitched")
@@ -230,9 +231,9 @@ class ReleaseFlowControllerTest {
                 .andExpect(jsonPath("$.data[0].stitched").value(true))
                 .andExpect(jsonPath("$.data[0].linkedReleaseCount").value(4))
                 .andExpect(jsonPath("$.data[0].currentStage").value("PROD"))
-                .andExpect(jsonPath("$.data[0].sitStatus").value("Pending"))
-                .andExpect(jsonPath("$.data[0].uatPresent").value(true))
-                .andExpect(jsonPath("$.data[0].prodPresent").value(true));
+                .andExpect(jsonPath("$.data[0].stageStatuses.SIT").value("Pending"))
+                .andExpect(jsonPath("$.data[0].stagesPresent", hasItem("UAT")))
+                .andExpect(jsonPath("$.data[0].stagesPresent", hasItem("PROD")));
     }
 
     // ─── getById ─────────────────────────────────────────────────────────────
@@ -257,8 +258,8 @@ class ReleaseFlowControllerTest {
     @DisplayName("getById_returnsAttemptNumbers_forRepeatedStageRequests")
     void getById_returnsAttemptNumbers_forRepeatedStageRequests() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request first = helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
-        Request second = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
+        Request first = helper.seedRequest(rf, "SIT", RequestStatus.Failed);
+        Request second = helper.seedRequest(rf, "SIT", RequestStatus.Pending);
         helper.seedTask(first);
         helper.seedTask(second);
 
@@ -273,12 +274,12 @@ class ReleaseFlowControllerTest {
     @Test
     @DisplayName("getById_withLinkedReleaseIds_returnsStitchedDetail")
     void getById_withLinkedReleaseIds_returnsStitchedDetail() throws Exception {
-        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "sit-01", "sit-01", Stage.SIT);
-        Request sitRequest = helper.seedRequest(sitFlow, Stage.SIT, RequestStatus.Pending);
+        ReleaseFlow sitFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "sit-01", "sit-01", "SIT");
+        Request sitRequest = helper.seedRequest(sitFlow, "SIT", RequestStatus.Pending);
         helper.seedTask(sitRequest);
 
-        ReleaseFlow prodFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "prod-01", "prod-01", Stage.PROD);
-        Request prodRequest = helper.seedRequest(prodFlow, Stage.PROD, RequestStatus.Pending);
+        ReleaseFlow prodFlow = releaseFlowService.create("PROJ-LINK", "Linked Project", "prod-01", "prod-01", "PROD");
+        Request prodRequest = helper.seedRequest(prodFlow, "PROD", RequestStatus.Pending);
         helper.seedTask(prodRequest);
 
         mockMvc.perform(get(BASE + "/" + prodFlow.getId())
@@ -642,8 +643,8 @@ class ReleaseFlowControllerTest {
     @DisplayName("archiveRequestRundown_keepsFlow_andMovesCurrentStage_whenOtherStagesRemain")
     void archiveRequestRundown_keepsFlow_andMovesCurrentStage_whenOtherStagesRemain() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request sit = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
-        Request uat = helper.seedRequest(rf, Stage.UAT, RequestStatus.Pending);
+        Request sit = helper.seedRequest(rf, "SIT", RequestStatus.Pending);
+        Request uat = helper.seedRequest(rf, "UAT", RequestStatus.Pending);
 
         mockMvc.perform(post(BASE + "/" + rf.getId() + "/requests/" + sit.getId() + "/archive")
                         .header("X-User-Id", "emp-001")

@@ -1,10 +1,10 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
+import com.wwa.deploymentagent.agents.deployment.domain.ReleaseFlowFamilyKey;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.CreateRundownFromTemplateDto;
 import com.wwa.deploymentagent.contracts.dto.CreateRundownFromTemplateTaskDto;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
@@ -42,7 +42,7 @@ public class TemplateRundownCreationService {
         }
 
         String projectName = requireValue(draft.projectName(), "Project name is required.");
-        Stage stage = requireStage(draft.stage());
+        String stage = requireStage(draft.stage());
         List<CreateRundownFromTemplateTaskDto> tasks = normalizeTasks(draft.tasks());
         String releaseIdentifier = validateReleaseIdentifier(draft.releaseId(), stage);
 
@@ -97,7 +97,7 @@ public class TemplateRundownCreationService {
     private ReleaseFlow findOrCreateReleaseFlowByIdentifier(
             String projectId,
             String projectName,
-            Stage stage,
+            String stage,
             String explicitReleaseId) {
         String normalizedReleaseId = normalizeReleaseIdentifier(explicitReleaseId);
         Optional<ReleaseFlow> existing = findExistingReleaseFlowByIdentifier(
@@ -153,7 +153,7 @@ public class TemplateRundownCreationService {
 
     private Request createRequestAttempt(
             ReleaseFlow releaseFlow,
-            Stage stage,
+            String stage,
             UserContext user,
             String snowGroup,
             String application,
@@ -232,10 +232,10 @@ public class TemplateRundownCreationService {
 
     private Map<String, Object> buildAuditContext(
             CreateRundownFromTemplateDto draft,
-            Stage stage,
+            String stage,
             int taskCount) {
         Map<String, Object> auditContext = new LinkedHashMap<>();
-        auditContext.put("stage", stage.name());
+        auditContext.put("stage", stage);
         auditContext.put("taskCount", taskCount);
         auditContext.put("source", "template");
         auditContext.put("templateId", normalizeBlank(draft.templateId()) != null ? normalizeBlank(draft.templateId()) : "");
@@ -248,7 +248,7 @@ public class TemplateRundownCreationService {
         return auditContext;
     }
 
-    private Stage requireStage(Stage stage) {
+    private String requireStage(String stage) {
         if (stage == null) {
             throw new ValidationAppException("Stage is required.");
         }
@@ -303,7 +303,7 @@ public class TemplateRundownCreationService {
         return totalMinutes > 0 ? totalMinutes : null;
     }
 
-    private String validateReleaseIdentifier(String releaseIdentifier, Stage stage) {
+    private String validateReleaseIdentifier(String releaseIdentifier, String stage) {
         String normalized = requireValue(releaseIdentifier, "Release identifier is required.");
         var matcher = RELEASE_IDENTIFIER_PATTERN.matcher(normalized);
         if (!matcher.matches()) {
@@ -312,9 +312,9 @@ public class TemplateRundownCreationService {
         }
 
         String releaseStage = matcher.group("stage");
-        if (!stage.name().equalsIgnoreCase(releaseStage)) {
+        if (!stage.equalsIgnoreCase(releaseStage)) {
             throw new ValidationAppException(
-                    "Release identifier stage segment must match the selected stage '" + stage.name() + "'.");
+                    "Release identifier stage segment must match the selected stage '" + stage + "'.");
         }
 
         return normalized;

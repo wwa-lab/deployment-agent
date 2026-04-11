@@ -1,7 +1,6 @@
 package com.wwa.deploymentagent.contracts.dto;
 
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 
 import java.util.List;
@@ -9,7 +8,7 @@ import java.util.List;
 public record RequestDto(
         String id,
         String releaseFlowId,
-        Stage stage,
+        String stage,
         Integer attemptNumber,
         RequestStatus requestStatus,
         String snowGroup,

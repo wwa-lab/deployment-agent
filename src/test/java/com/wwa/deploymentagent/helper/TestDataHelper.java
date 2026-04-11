@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.helper;
 
+import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.enums.*;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
@@ -30,7 +31,7 @@ public class TestDataHelper {
         rf.setProjectName("Test Project");
         rf.setReleaseId("SIT-test-project-001");
         rf.setNormalizedReleaseId("sit-test-project-001");
-        rf.setCurrentStage(Stage.SIT);
+        rf.setCurrentStage("SIT");
         rf.setFlowStatus(FlowStatus.Pending);
         rf.setReviewStatus(ReviewStatus.Pending_Review);
         return releaseFlowRepository.save(rf);
@@ -38,21 +39,23 @@ public class TestDataHelper {
 
     @Transactional
     public Request seedRequest(ReleaseFlow releaseFlow) {
-        return seedRequest(releaseFlow, Stage.SIT);
+        return seedRequest(releaseFlow, "SIT");
     }
 
     @Transactional
-    public Request seedRequest(ReleaseFlow releaseFlow, Stage stage) {
+    public Request seedRequest(ReleaseFlow releaseFlow, String stage) {
         return seedRequest(releaseFlow, stage, RequestStatus.Pending);
     }
 
     @Transactional
-    public Request seedRequest(ReleaseFlow releaseFlow, Stage stage, RequestStatus status) {
-        return seedRequest(releaseFlow, stage, status, null);
+    public Request seedRequest(ReleaseFlow releaseFlow, String stage, RequestStatus status) {
+        // Default agent to DEPLOYMENT_AGENT so that audit-aware code paths (BA-T14 null-agent
+        // guard) work with legacy test fixtures that do not explicitly set an agent.
+        return seedRequest(releaseFlow, stage, status, AgentId.DEPLOYMENT_AGENT);
     }
 
     @Transactional
-    public Request seedRequest(ReleaseFlow releaseFlow, Stage stage, RequestStatus status, String agent) {
+    public Request seedRequest(ReleaseFlow releaseFlow, String stage, RequestStatus status, String agent) {
         Request req = new Request();
         req.setReleaseFlow(releaseFlow);
         req.setStage(stage);
@@ -66,8 +69,8 @@ public class TestDataHelper {
     }
 
     @Transactional
-    public Request seedRequest(ReleaseFlow releaseFlow, String agent) {
-        return seedRequest(releaseFlow, Stage.SIT, RequestStatus.Pending, agent);
+    public Request seedRequestWithAgent(ReleaseFlow releaseFlow, String agent) {
+        return seedRequest(releaseFlow, "SIT", RequestStatus.Pending, agent);
     }
 
     @Transactional

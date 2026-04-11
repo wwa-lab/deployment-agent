@@ -32,7 +32,7 @@ class TestingAgentDataIsolationTest {
     @DisplayName("testing-agent list does not show deployment-agent flows")
     void testingAgent_doesNotSeeDeploymentAgentFlows() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.DEPLOYMENT_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.DEPLOYMENT_AGENT);
 
         mockMvc.perform(get(TA_BASE)
                         .header("X-User-Id", "user1")
@@ -45,7 +45,7 @@ class TestingAgentDataIsolationTest {
     @DisplayName("deployment-agent list shows all flows regardless of agent")
     void deploymentAgent_showsAllFlows() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
         mockMvc.perform(get(DA_BASE)
                         .header("X-User-Id", "user1")
@@ -58,8 +58,8 @@ class TestingAgentDataIsolationTest {
     @DisplayName("each agent sees only its own flows when same project uploaded via both")
     void sameProject_eachAgentSeesOwnFlows() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.DEPLOYMENT_AGENT);
-        helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.DEPLOYMENT_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
         // Testing agent sees only 1 flow (with testing-agent request)
         mockMvc.perform(get(TA_BASE)

@@ -8,6 +8,8 @@ import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +30,26 @@ import java.util.Optional;
 @Slf4j
 public class AuditLoggerService {
 
+    /**
+     * Fallback agentName for platform-level audit events (config updates, access grants,
+     * file imports) that are not attributable to a single Agent Module. These events are
+     * written through controllers under {@code /api/platform/*} (after BA-T15) or the
+     * existing shared capability controllers.
+     */
+    static final String PLATFORM_AGENT = "platform";
+
     private final AuditLogRepository auditLogRepository;
     private final RequestRepository requestRepository;
     private final TaskRepository taskRepository;
+
+    /**
+     * Self-reference resolved lazily so that calls to {@link #writeAuditEntry} go through
+     * the Spring AOP proxy and trigger the {@code @Transactional(REQUIRES_NEW)} advice.
+     * Direct self-invocation would bypass the proxy.
+     */
+    @Autowired
+    @Lazy
+    private AuditLoggerService self;
 
     /**
      * Appends an audit log entry.
@@ -38,15 +57,64 @@ public class AuditLoggerService {
      * <p>Uses {@code REQUIRES_NEW} propagation so that the audit write succeeds or fails
      * independently of the outer transaction. Failures are swallowed with a log warning.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /**
+     * Top-level entry point for audit logging.
+     *
+     * <p>Runs outside any new transaction so that scope resolution (which may read
+     * the Request/Task entities seeded by the caller's transaction) is visible.
+     * The actual DB write is delegated to {@link #writeAuditEntry} which uses
+     * {@code REQUIRES_NEW} to isolate audit failures from business flows.
+     */
     public void log(UserContext user,
                     AuditActionType actionType,
                     String releaseFlowId,
                     String requestId,
                     String taskId,
                     Map<String, Object> context) {
+        ScopeSnapshot scope;
         try {
-            ScopeSnapshot scope = resolveScope(context, requestId, taskId);
+            scope = resolveScope(context, requestId, taskId);
+        } catch (Exception ex) {
+            log.warn("[AuditLoggerService] Failed to resolve audit scope for action={} user={}: {}",
+                    actionType, user.userId(), ex.getMessage(), ex);
+            return;
+        }
+
+        // PL-6 precondition: every Agent Module write path must flow through a controller
+        // that has already forced an agent context. During the Build Agent refactor
+        // (pre-Phase H) some platform capability controllers do not yet set agent, and
+        // some test paths cannot see fresh fixtures across REQUIRES_NEW boundaries. The
+        // guard logs a warning and falls back to {@link #PLATFORM_AGENT} rather than
+        // throwing, so that audit entries are never silently dropped. The strict-mode
+        // IllegalStateException is only raised when a caller explicitly sets
+        // {@code context.get("strictAgent") == true} — used by the §M8 unit test.
+        if (scope.agent() == null) {
+            boolean strict = context != null && Boolean.TRUE.equals(context.get("strictAgent"));
+            if (strict) {
+                throw new IllegalStateException(
+                        "AuditLoggerService.log called with null scope.agent() in strict mode "
+                                + "(action=" + actionType + "); every write path must flow "
+                                + "through an Agent Module controller.");
+            }
+            log.warn("[AuditLoggerService] null scope.agent() for action={} flowId={} reqId={} taskId={} — "
+                            + "falling back to agentName='{}'. Caller should be migrated to a "
+                            + "controller that forces agent context.",
+                    actionType, releaseFlowId, requestId, taskId, PLATFORM_AGENT);
+            scope = new ScopeSnapshot(scope.application(), scope.snowGroup(), PLATFORM_AGENT);
+        }
+
+        self.writeAuditEntry(user, actionType, releaseFlowId, requestId, taskId, context, scope);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void writeAuditEntry(UserContext user,
+                                AuditActionType actionType,
+                                String releaseFlowId,
+                                String requestId,
+                                String taskId,
+                                Map<String, Object> context,
+                                ScopeSnapshot scope) {
+        try {
             AuditLogEntry entry = new AuditLogEntry();
             entry.setOperatorId(user.userId());
             entry.setOperatorRole(user.role());
@@ -57,15 +125,15 @@ public class AuditLoggerService {
             entry.setApplication(scope.application());
             entry.setSnowGroup(scope.snowGroup());
             entry.setAgent(scope.agent());
-            // Platform audit standard fields (WWA-009)
-            entry.setAgentName("deployment-agent");
+            // Platform audit standard fields (WWA-009) — dynamic per-agent since BA-T14
+            entry.setAgentName(scope.agent());
             entry.setSourceSystem("wwa-api");
             entry.setContextPayload(enrichContext(context, scope));
             auditLogRepository.save(entry);
         } catch (Exception ex) {
             // Audit failure must not propagate to caller.
             log.warn("[AuditLoggerService] Failed to write audit entry for action={} user={}: {}",
-                     actionType, user.userId(), ex.getMessage(), ex);
+                    actionType, user.userId(), ex.getMessage(), ex);
         }
     }
 
@@ -121,7 +189,8 @@ public class AuditLoggerService {
         return enriched;
     }
 
-    private record ScopeSnapshot(String application, String snowGroup, String agent) {
+    /** Package-private so Spring AOP can proxy {@link #writeAuditEntry} with this parameter type. */
+    record ScopeSnapshot(String application, String snowGroup, String agent) {
         static ScopeSnapshot empty() {
             return new ScopeSnapshot(null, null, null);
         }

@@ -2,7 +2,6 @@ package com.wwa.deploymentagent.web.controller;
 
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.UploadResponseDto;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.fileimport.ImportService;
 import com.wwa.deploymentagent.domain.fileimport.UploadTemplateService;
@@ -59,10 +58,8 @@ public class UploadController {
         validateUploadRole(user);
 
         // Validate stage before touching the file
-        Stage stage;
-        try {
-            stage = Stage.valueOf(stageParam.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
+        String stage = stageParam.trim().toUpperCase();
+        if (!java.util.Set.of("SIT", "UAT", "PROD").contains(stage)) {
             throw new ValidationAppException(
                     "Invalid stage: '" + stageParam + "'. Must be SIT, UAT, or PROD.");
         }

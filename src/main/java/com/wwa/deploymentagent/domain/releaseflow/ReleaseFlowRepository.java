@@ -1,7 +1,6 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -34,7 +33,7 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
             """)
     Page<ReleaseFlow> search(@Param("projectId") String projectId,
                              @Param("flowStatus") FlowStatus flowStatus,
-                             @Param("stage") Stage stage,
+                             @Param("stage") String stage,
                              @Param("includeArchived") boolean includeArchived,
                              Pageable pageable);
 
@@ -56,7 +55,7 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
             ORDER BY rf.createdAt DESC
             """)
     List<ReleaseFlow> findActiveByProjectIdWithoutStageOrderByCreatedAtDesc(@Param("projectId") String projectId,
-                                                                             @Param("stage") Stage stage);
+                                                                             @Param("stage") String stage);
 
     default Optional<ReleaseFlow> findFirstByProjectId(String projectId) {
         return findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId);
