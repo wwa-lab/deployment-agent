@@ -139,7 +139,7 @@ These rules are enforced by an ArchUnit fitness-function test class (`AgentModul
 1. A Stage enum at `agents/<name>/domain/<Agent>Stage.java` declaring the agent's stage vocabulary. Any number of values (typically 1 for single-stage agents, up to 3 for multi-stage agents). Module-private to the agent's package.
 2. A `StagePipeline` `@Component` at `agents/<name>/domain/<Agent>StagePipeline.java` implementing the Platform Core interface. Encodes the agent's stage ordering. Terminal stages return `Optional.empty()` from `next(...)`.
 3. One or more `@RestController` classes in `agents/<name>/web/` under a unique `/api/<agent-key>/*` prefix. Each ID-bearing endpoint must invoke `AgentBoundaryGuard.assertXxxBelongsToAgent(id, AgentId.<AGENT>)` before delegating. Each write endpoint must force `agent = "<agent-key>"` server-side, ignoring any client-supplied value.
-4. Controllers pass the agent's own `StagePipeline` bean into any Platform Core service method that needs progression (currently only `ReleaseFlowProgressionService.progressAfterDecision`).
+4. Controllers do **not** pass `StagePipeline` as a method parameter. They delegate to Platform Core services with the existing signatures; `ReleaseFlowProgressionService.progressAfterDecision(String taskId)` resolves the correct pipeline internally via `StagePipelineRegistry` using `request.getAgent()`.
 
 **Frontend contract:**
 
@@ -177,7 +177,7 @@ To add the 4th, 5th, ..., Nth agent:
 3. Create `agents/<name>/web/<Agent>ReleaseFlowController.java` — scoped list + guarded detail.
 4. Create `agents/<name>/web/<Agent>UploadController.java` — force `agent` (and stage if applicable) server-side.
 5. Create `agents/<name>/web/<Agent>TaskController.java` — `AgentBoundaryGuard` on every endpoint.
-6. Create `agents/<name>/web/<Agent>DecisionController.java` — passes `StagePipeline` into progression.
+6. Create `agents/<name>/web/<Agent>DecisionController.java` — applies the decision, then calls `progressAfterDecision(taskId)` with the unchanged signature; pipeline resolution happens inside `ReleaseFlowProgressionService` via `StagePipelineRegistry`.
 7. Add `<AGENT>` constant to `platform/contracts/AgentId.java`.
 
 **Frontend (~1 new file + 3 small edits):**

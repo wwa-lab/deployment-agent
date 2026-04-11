@@ -416,7 +416,7 @@ flowchart TD
 14. Release Flow progresses, repeats, or terminates within DEV (no auto-advance to SIT)
 
 ### 8.3 Decision Effects
-Same as Deployment Agent spec section 8.4, with one clarification: when the last task in a Build Agent Release Flow is approved, `BuildDecisionController` passes `BuildStagePipeline` into `ReleaseFlowProgressionService.progressAfterDecision(...)`. The progression service calls `buildStagePipeline.next("DEV")`, which returns `Optional.empty()`, so the flow is marked `Completed`. This uses the same terminal-stage code path that terminates Deployment Agent flows at PROD; no new branching is required.
+Same as Deployment Agent spec section 8.4, with one clarification: when the last task in a Build Agent Release Flow is approved, `BuildDecisionController` calls `ReleaseFlowProgressionService.progressAfterDecision(String taskId)` with the unchanged v2 signature. The progression service resolves `BuildStagePipeline` internally via `StagePipelineRegistry` using `request.getAgent() = "build-agent"`, then calls `buildStagePipeline.isTerminal("DEV")`, which returns `true`, so the flow is marked `Completed`. This uses the same terminal-stage code path that terminates Deployment Agent flows at PROD; no new branching is required.
 
 ---
 
