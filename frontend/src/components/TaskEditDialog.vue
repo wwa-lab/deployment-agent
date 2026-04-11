@@ -1,26 +1,18 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import {
-  editTask as editTaskApi,
-  recordResult as recordResultApi,
-  startManualExecution as startManualExecutionApi,
-} from '../agents/deployment/api'
 import type { Task } from '../types'
 
 const props = withDefaults(defineProps<{
   task: Task
-  mode?: 'edit' | 'run'
-  editTaskFn?: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
-  recordResultFn?: (
+  editTaskFn: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  recordResultFn: (
     taskId: string,
     body: { resultSummary: Record<string, unknown>; resultLogs?: string }
   ) => Promise<Task>
-  startManualExecutionFn?: (taskId: string) => Promise<Task>
+  startManualExecutionFn: (taskId: string) => Promise<Task>
+  mode?: 'edit' | 'run'
 }>(), {
   mode: 'edit',
-  editTaskFn: editTaskApi,
-  recordResultFn: recordResultApi,
-  startManualExecutionFn: startManualExecutionApi,
 })
 const emit = defineEmits<{ saved: []; close: [] }>()
 

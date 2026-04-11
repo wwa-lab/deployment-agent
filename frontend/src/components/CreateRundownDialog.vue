@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { createRundownFromTemplate } from '../agents/deployment/api'
 import { useUserStore } from '../stores/user'
-import type { Stage, TemplateRecord, UploadResponse } from '../types'
+import type {
+  CreateRundownFromTemplateInput,
+  Stage,
+  TemplateRecord,
+  UploadResponse,
+} from '../types'
 
 const RELEASE_IDENTIFIER_PATTERN = /^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>sit|uat|prod)-(?<sequence>0[1-9]|[1-9][0-9])$/i
 
-const props = defineProps<{ template: TemplateRecord }>()
+const props = defineProps<{
+  template: TemplateRecord
+  createRundownFromTemplateFn: (input: CreateRundownFromTemplateInput) => Promise<UploadResponse>
+}>()
 
 const emit = defineEmits<{
   close: []
@@ -108,7 +115,7 @@ async function submit() {
   saving.value = true
 
   try {
-    const result = await createRundownFromTemplate({
+    const result = await props.createRundownFromTemplateFn({
       templateId: props.template.id,
       templateName: props.template.name,
       projectId: deriveProjectId(form.projectName),

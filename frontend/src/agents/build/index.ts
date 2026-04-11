@@ -4,10 +4,12 @@ import { AGENT_ID } from '../../config/agentId'
 /**
  * Build Agent workspace — DEV-stage build and packaging.
  *
- * <p>Created via the platform {@code createAgentWorkspace} factory so that no
- * bespoke per-agent code exists. Consumes the generic
- * {@link AgentSummaryView} / {@link AgentDetailView} components registered in
- * the router.
+ * <p>Created via the platform {@code createAgentWorkspace} factory so all
+ * shared plumbing (client, store, API) stays consistent across agents. The
+ * Build Agent keeps its own bespoke views (`BuildAgentSummaryView` /
+ * `BuildAgentDetailView`) because its DEV-stage UI is simpler than the
+ * shared `platform/components/ReleaseFlow{Summary,Detail}View.vue` used by
+ * Deployment and Testing agents.
  */
 export const buildAgent = createAgentWorkspace({
   agentKey: AGENT_ID.BUILD,

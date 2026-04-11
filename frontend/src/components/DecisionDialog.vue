@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { submitDecision as submitDecisionApi } from '../agents/deployment/api'
 import type { Task } from '../types'
 
 const props = withDefaults(defineProps<{
   task: Task
+  submitDecisionFn: (taskId: string, decision: string) => Promise<Task>
   initialDecision?: Decision | null
   allowedDecisions?: Decision[]
-  submitDecisionFn?: (taskId: string, decision: string) => Promise<Task>
 }>(), {
   initialDecision: null,
   allowedDecisions: () => ['Approve', 'Reject', 'Rerun', 'Skip'],
-  submitDecisionFn: submitDecisionApi,
 })
 const emit = defineEmits<{ decided: []; close: [] }>()
 

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { listAuditLogs } from '../api/audit'
-import { listTaskExecutions } from '../agents/deployment/api'
 import type { AuditLogEntry, Task, TaskExecutionHistory } from '../types'
 
 type ActivityTone = 'success' | 'fail' | 'neutral'
@@ -22,12 +21,10 @@ type ActivityRow = {
   rawType: string
 }
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   task: Task
-  listTaskExecutionsFn?: (taskId: string) => Promise<TaskExecutionHistory[]>
-}>(), {
-  listTaskExecutionsFn: listTaskExecutions,
-})
+  listTaskExecutionsFn: (taskId: string) => Promise<TaskExecutionHistory[]>
+}>()
 const emit = defineEmits<{ close: [] }>()
 
 const loading = ref(false)

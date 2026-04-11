@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import CreateRundownDialog from '../components/CreateRundownDialog.vue'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
+import { createRundownFromTemplate as createDeploymentRundownFromTemplate } from '../agents/deployment/api'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
 import TemplateTaskDialog from '../components/TemplateTaskDialog.vue'
 import { agentRegistry } from '../config/agentRegistry'
@@ -1424,6 +1425,7 @@ onBeforeUnmount(() => {
     <CreateRundownDialog
       v-if="creatingRundownTemplate"
       :template="creatingRundownTemplate"
+      :create-rundown-from-template-fn="createDeploymentRundownFromTemplate"
       @close="closeCreateRundownDialog"
       @created="handleRundownCreated"
     />
