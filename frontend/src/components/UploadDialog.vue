@@ -181,7 +181,7 @@ function close() {
               v-model="scopeForm.agent"
               type="text"
               class="form-control"
-              placeholder="e.g. Testing Agent or Deployment Agent"
+              placeholder="e.g. Build Agent, Testing Agent, or Deployment Agent"
               :disabled="!canUseUpload"
             />
           </div>

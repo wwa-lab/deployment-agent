@@ -1,4 +1,5 @@
 import { createAgentWorkspace } from '../../platform/composables/createAgentWorkspace'
+import { AGENT_ID } from '../../config/agentId'
 
 /**
  * Build Agent workspace — DEV-stage build and packaging.
@@ -9,11 +10,12 @@ import { createAgentWorkspace } from '../../platform/composables/createAgentWork
  * the router.
  */
 export const buildAgent = createAgentWorkspace({
-  agentKey: 'build-agent',
+  agentKey: AGENT_ID.BUILD,
   agentName: 'Build Agent',
   stages: ['DEV'],
   supportsStitching: false,
   defaultStage: 'DEV',
 })
 
+export const buildClient = buildAgent.client
 export const useBuildAgentStore = buildAgent.useStore

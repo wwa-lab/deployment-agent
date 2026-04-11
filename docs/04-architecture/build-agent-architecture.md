@@ -49,7 +49,7 @@ v3 architecture intentionally reverses several statements in `build-agent-spec.m
 | §6.1 Capability Domains, "Shared domain changes required by Build Agent" list | Lists the four surgical shared-contract changes | **Superseded.** The entire bullet list is replaced by PL-1/PL-2/PL-3/PL-5/PL-7 and the corresponding Impact Analysis in this document. | PL-1 |
 | §7.3 Release Flow Summary with Agent-Scoped Filtering | Implicitly preserves Deployment Agent global visibility | **Superseded.** PL-6 applies the same agent-scoped filter to Deployment Agent. | PL-6 |
 | §7.8 Agent Boundary Enforcement | Presents `AgentBoundaryGuard` as Build Agent-only | **Extended.** The guard is promoted to a Platform Core component invoked by every Agent Module's controllers, including Deployment Agent and Testing Agent. Testing Agent's pre-existing gap (v2 R-08) is closed as a side effect. | PL-9 |
-| §10.1 API Prefix | "`/api/build-agent/` only" | **Extended.** A new `/api/platform/*` prefix is added for platform capability routes (`/auth/*`, `/audit-logs`, `/config`, `/access-grants`, `/templates/*`). 16 existing routes currently mounted under `/api/deployment-agent/*` migrate to the new prefix — see §API Boundaries for the full mapping. | PL-2, §API Boundaries |
+| §10.1 API Prefix | "`/api/build-agent/` only" | **Extended.** A new `/api/platform/*` prefix is added for platform capability routes (`/auth/*`, `/audit-logs`, `/config`, `/access-grants`, `/upload/template`). 16 existing routes currently mounted under `/api/deployment-agent/*` migrate to the new prefix — see §API Boundaries for the full mapping. | PL-2, §API Boundaries |
 
 **Functional Requirements (BFR-*) traceability:** Task #2 will produce an updated spec with BFR-level supersessions. Until then, BFRs referenced from §7 of the spec that depend on the shared `Stage` enum (e.g. BFR-14 stage forcing, BFR-18 legacy data visibility) are re-grounded against PL-3 / PL-6 in this document. No BFR loses its product intent; only the mechanism changes.
 
@@ -100,12 +100,12 @@ The architectural approach has two parts.
 4. **`ReleaseFlowListItemDto` is generalized.** The fixed `sitStatus / uatStatus / prodStatus / *Present` fields are replaced with `Map<String, RequestStatus> stageStatuses` and `Set<String> stagesPresent`. Each agent's frontend reads only the stage keys it cares about; adding a new stage never touches the DTO.
 5. **Deployment Agent stops being the global view.** The current `ReleaseFlowController.list` default of "show all agents" is replaced with "show only `deployment-agent` flows" (Q1 = peer agents). A separate platform-level Global View endpoint/page is out of scope for this delivery and is tracked as a follow-up.
 6. **Package structure.** All agent-specific code moves into `com.wwa.deploymentagent.agents.<name>/` (backend) and `frontend/src/agents/<name>/` (frontend). The existing `web/controller/*`, `frontend/src/api/`, `frontend/src/stores/`, and `frontend/src/views/` directories are purged of agent-specific files; only platform-level shared code remains there.
-7. **Frontend `createAgentWorkspace(config)` factory.** New composable that returns `{ client, api, store, SummaryView, DetailView, routes }` given an agent configuration object. Each Agent Module's `index.ts` is roughly twenty lines of config. This replaces the current copy-paste scaling model for stores, API modules, and views.
+7. **Frontend `createAgentWorkspace(config)` factory.** New composable that returns shared workspace plumbing (`{ config, client, api, useStore, routes }`) given an agent configuration object. Each Agent Module's `index.ts` stays small while dedicated agent views and API wrappers layer on top of the shared store/client foundation.
 
 ### Part B — Build Agent Module
 
 1. **Backend `agents/build/`** — `BuildStage { DEV }`, `BuildStagePipeline` (single-stage terminal), `BuildReleaseFlowController`, `BuildUploadController`, `BuildTaskController`, `BuildDecisionController`. All controllers force `agent = "build-agent"` server-side and invoke the platform-level `AgentBoundaryGuard` before delegating any ID-bearing call.
-2. **Frontend `agents/build/`** — `index.ts` calls `createAgentWorkspace({ key: 'build-agent', apiBase: '/api/build-agent', stages: ['DEV'], supportsStitching: false })` and registers the result in `agentRegistry.ts` and the router.
+2. **Frontend `agents/build/`** — `index.ts` calls `createAgentWorkspace({ agentKey: 'build-agent', stages: ['DEV'], supportsStitching: false, defaultStage: 'DEV' })`, while `api.ts`, `BuildAgentSummaryView.vue`, and `BuildAgentDetailView.vue` provide the Build-specific UI and action wiring.
 3. **No new entities, no new tables.** The only schema effect is that `Request.stage` and `ReleaseFlow.currentStage` change their JPA attribute type from `Stage` enum to `String`; the underlying DB column is already `VARCHAR` in both Oracle and H2, so no Flyway migration is required.
 
 ### End state
@@ -376,18 +376,17 @@ Only stages that actually have requests on a given flow appear in the map and se
 
 ### PL-8: Frontend createAgentWorkspace Factory
 
-**Decision:** Introduce a composable `createAgentWorkspace(config)` in `frontend/src/platform/composables/`. It takes an agent configuration and returns a fully wired `{ client, api, store, SummaryView, DetailView, routes }`. Each Agent Module's `index.ts` reduces to roughly:
+**Decision:** Introduce a composable `createAgentWorkspace(config)` in `frontend/src/platform/composables/`. It takes an agent configuration and returns shared workspace plumbing (`{ config, client, api, useStore, routes }`). Each Agent Module's `index.ts` reduces to roughly:
 
 ```ts
 import { createAgentWorkspace } from '@/platform/composables/createAgentWorkspace'
 
 export const buildAgentWorkspace = createAgentWorkspace({
-  key: 'build-agent',
-  name: 'Build Agent',
-  apiBase: '/api/build-agent',
+  agentKey: 'build-agent',
+  agentName: 'Build Agent',
   stages: ['DEV'],
   supportsStitching: false,
-  stageFilter: 'disabled-input',
+  defaultStage: 'DEV',
 })
 ```
 
@@ -449,7 +448,7 @@ No business logic lives in controllers beyond these four responsibilities.
 
 ### PL-11: Dynamic agentName in AuditLoggerService
 
-**Decision:** `AuditLoggerService.log` derives `agentName` from `scope.agent()` rather than the current hardcoded `"deployment-agent"` literal. The null fallback from v2 is removed — under the Agent Module pattern every write operation flows through an Agent Module controller that has already forced an agent context, so `scope.agent()` is never null on the write path.
+**Decision:** `AuditLoggerService.log` derives `agentName` from `scope.agent()` rather than the current hardcoded `"deployment-agent"` literal. The current implementation keeps a guarded fallback to `agentName = "platform"` for platform-scoped capability events whose audit scope is not attributable to a single agent module.
 
 **Context:** `AuditLoggerService.java:61` currently hardcodes `entry.setAgentName("deployment-agent")`, so every audit entry from every agent is tagged as Deployment Agent regardless of the actual workspace. This is a pre-existing defect affecting Testing Agent today and would affect Build Agent if left unfixed.
 
@@ -500,7 +499,7 @@ No business logic lives in controllers beyond these four responsibilities.
 ### Inherited Decisions (carried forward from v2 without structural change)
 
 - **Shared Access Model** — Access grants are shared across all agents. An active grant allows access to any agent workspace. No `agent` dimension is added to `AccessScope`. Per-agent access control is out of scope.
-- **Agent Identity Constants** — Agent identity lives in `platform/contracts/AgentId` (backend, after the Phase H package move) and `frontend/src/platform/config/agentId.ts` (frontend). No string literals for agent identifiers in controllers, services, or views.
+- **Agent Identity Constants** — Agent identity lives in `platform/contracts/AgentId` (backend, after the Phase H package move) and `frontend/src/config/agentId.ts` (frontend). No string literals for agent identifiers in controllers, services, or views.
 
 ---
 
@@ -541,7 +540,7 @@ This section lists components by module. Platform Core is the agent-agnostic sub
   | `AuditLogController` | `/api/deployment-agent/audit-logs` | `/api/platform/audit-logs` |
   | `ConfigurationController` | `/api/deployment-agent/config` | `/api/platform/config` |
   | `AccessGrantController` | `/api/deployment-agent/access-grants` | `/api/platform/access-grants` |
-  | `TemplateDownloadController` (shared Excel template) | `/api/deployment-agent/templates/*` | `/api/platform/templates/*` |
+  | `TemplateDownloadController` (shared Excel template) | `/api/deployment-agent/templates/*` | `/api/platform/upload/template` |
 
   This is a **breaking change to existing routes**. The following constraints ensure the migration is safe at runtime:
 
@@ -556,7 +555,7 @@ This section lists components by module. Platform Core is the agent-agnostic sub
 - `ReleaseFlow` entity — `currentStage` attribute type changes from `Stage` to `String`. `@Enumerated(EnumType.STRING)` removed.
 - `Request` entity — `stage` attribute type changes from `Stage` to `String`. `@Enumerated(EnumType.STRING)` removed.
 - `ReleaseFlowListItemDto` — positional fixed stage fields are replaced by `Map<String, RequestStatus> stageStatuses` and `Set<String> stagesPresent` (PL-7). Record constructor and `from()` factory methods are updated at every call site.
-- `AuditLoggerService.log` — `agentName` derived from `scope.agent()` without null fallback (PL-11).
+- `AuditLoggerService.log` — `agentName` derived from `scope.agent()` with a guarded `platform` fallback for platform-scoped events (PL-11).
 - `AgentId` — add `BUILD_AGENT` constant.
 
 **Deleted components**
@@ -630,15 +629,14 @@ Testing Agent has not been publicly released; it is still in internal testing. T
 
 **New components**
 - `api/platformClient.ts` — Axios instance with `baseURL: '/api/platform'`. Shared 401 interceptor redirects to `/login`. Used by every platform capability API module.
-- `api/auth.ts`, `api/audit.ts`, `api/config.ts`, `api/accessGrants.ts`, `api/templates.ts` — platform capability API modules, migrated from their current location in `frontend/src/api/` and rebound to `platformClient`.
+- `api/auth.ts`, `api/audit.ts`, `api/config.ts`, `api/accessGrants.ts` — platform capability API modules, migrated from their current location in `frontend/src/api/` and rebound to `platformClient`.
 - `stores/user.ts`, `stores/audit.ts`, `stores/config.ts`, `stores/accessGrants.ts` — platform capability Pinia stores, migrated from `frontend/src/stores/`.
-- `composables/createAgentWorkspace.ts` — factory from PL-8. Returns `{ client, api, store, SummaryView, DetailView, routes }` from a config object. Internally creates an Axios client whose `baseURL` is the agent's `apiBase`.
+- `composables/createAgentWorkspace.ts` — factory from PL-8. Returns shared workspace plumbing (`{ config, client, api, useStore, routes }`) from a config object. Dedicated agent views consume that shared store/client foundation.
 - `composables/createReleaseFlowStore.ts` — generic Pinia store factory parameterized by agent config.
 - `composables/createReleaseFlowApi.ts` — generic API module factory (agent Axios client + CRUD methods).
-- `components/AgentSummaryView.vue` — generic summary view that reads `stageStatuses` / `stagesPresent` from the DTO (PL-7) and renders only the agent's known stages. Uniform across all agents — no agent-specific slot overrides.
-- `components/AgentDetailView.vue` — generic detail view that renders stage tabs from the agent's config. Passes through `?linked=` to the backend API when present. The backend decides whether to honor `?linked=` (Deployment Agent does, Build Agent and Testing Agent ignore it); the frontend renders whatever `ReleaseFlowDetailDto` comes back, without knowing about "stitching" as a concept.
+- `components/AgentSummaryView.vue` / `components/AgentDetailView.vue` — generic read-only building blocks used during the refactor and still available as shared foundations, while the shipping agents now keep dedicated summary/detail views for richer upload and task workflows.
 - `config/agentRegistry.ts` — existing file moves here; grows a Build Agent entry.
-- `config/agentId.ts` — grows `BUILD_AGENT` constant.
+- `frontend/src/config/agentId.ts` — grows `BUILD_AGENT` constant.
 - `views/LoginView.vue`, `views/WwaHomeView.vue`, `views/WorkspaceLayout.vue`, `views/TemplateManagementView.vue`, `views/ConfigAdminView.vue`, `views/AuditLogView.vue`, `views/AccessManagementView.vue` — platform-owned shell and capability views, migrated from `frontend/src/views/`.
 
 **Moved components**
@@ -651,14 +649,14 @@ Testing Agent has not been publicly released; it is still in internal testing. T
 **New location:** `frontend/src/agents/deployment/`
 
 **Contents**
-- `index.ts` — ~20 lines calling `createAgentWorkspace({ key: 'deployment-agent', name: 'Deployment Agent', apiBase: '/api/deployment-agent', stages: ['SIT', 'UAT', 'PROD'], supportsStitching: true })`.
+- `index.ts` — ~20 lines calling `createAgentWorkspace({ agentKey: 'deployment-agent', agentName: 'Deployment Agent', stages: ['SIT', 'UAT', 'PROD'], supportsStitching: true })`.
 
-No slot overrides. Deployment Agent uses the same `AgentSummaryView` and `AgentDetailView` as every other agent (Q3 = standardized, no special treatment). The stitched linked-detail behavior is implemented entirely at the backend layer — when a Deployment Agent detail URL carries `?linked=<ids>`, the frontend passes the query parameter through, and `DeploymentStitchingService` returns a `ReleaseFlowDetailDto` populated with the stitched requests. The generic `AgentDetailView` renders that DTO without being aware that stitching occurred.
+Deployment Agent keeps dedicated summary/detail views on top of the shared workspace plumbing. The stitched linked-detail behavior remains implemented entirely at the backend layer — when a Deployment Agent detail URL carries `?linked=<ids>`, the frontend passes the query parameter through, and `DeploymentStitchingService` returns a `ReleaseFlowDetailDto` populated with the stitched requests.
 
 **Deleted**
-- `frontend/src/api/client.ts`, `releaseFlows.ts`, `tasks.ts`, `upload.ts` — absorbed into the workspace factory output.
+- Legacy shared frontend API wrappers are removed in favor of `frontend/src/api/platformClient.ts`, agent-local `frontend/src/agents/*/api.ts`, and the shared workspace factory output.
 - `frontend/src/stores/releaseFlow.ts`, `task.ts` — absorbed into the factory store.
-- `frontend/src/views/ReleaseFlowSummaryView.vue`, `ReleaseFlowDetailView.vue` — replaced by factory-generated views.
+- `frontend/src/views/ReleaseFlowSummaryView.vue`, `ReleaseFlowDetailView.vue` — superseded by `frontend/src/agents/deployment/ReleaseFlowSummaryView.vue` and `ReleaseFlowDetailView.vue`.
 
 ---
 
@@ -667,7 +665,7 @@ No slot overrides. Deployment Agent uses the same `AgentSummaryView` and `AgentD
 **New location:** `frontend/src/agents/testing/`
 
 **Contents**
-- `index.ts` — `createAgentWorkspace({ key: 'testing-agent', name: 'Testing Agent', apiBase: '/api/testing-agent', stages: ['UAT'], supportsStitching: false, stageFilter: 'disabled-input' })`.
+- `index.ts` — `createAgentWorkspace({ agentKey: 'testing-agent', agentName: 'Testing Agent', stages: ['UAT'], supportsStitching: false, defaultStage: 'UAT' })`.
 
 **Deleted**
 - `frontend/src/api/testingAgentClient.ts`, `testingAgentReleaseFlows.ts`, `testingAgentTasks.ts`, `testingAgentUpload.ts`.
@@ -681,9 +679,10 @@ No slot overrides. Deployment Agent uses the same `AgentSummaryView` and `AgentD
 **New location:** `frontend/src/agents/build/`
 
 **All new**
-- `index.ts` — `createAgentWorkspace({ key: 'build-agent', name: 'Build Agent', apiBase: '/api/build-agent', stages: ['DEV'], supportsStitching: false, stageFilter: 'disabled-input' })`.
-
-No additional files unless a DEV-specific UI variation emerges that cannot be expressed via config. At MVP, there is none.
+- `index.ts` — `createAgentWorkspace({ agentKey: 'build-agent', agentName: 'Build Agent', stages: ['DEV'], supportsStitching: false, defaultStage: 'DEV' })`.
+- `api.ts` — Build-specific release-flow, task, decision, upload, and template wrappers bound to `/api/build-agent/*` and `/api/platform/upload/template`.
+- `BuildAgentSummaryView.vue` — DEV-only summary page with upload dialog, filters, and list table.
+- `BuildAgentDetailView.vue` — DEV-only detail page with request tabs plus task edit/run/result/activity/decision actions.
 
 ---
 
@@ -752,7 +751,7 @@ Two agents may legitimately persist the same stage String (`"UAT"`) — they are
 
 Stitching (`listStitchedSummaries`, `getStitchedDetail`, `ReleaseFlowFamilyKey`) lives entirely inside the Deployment Agent Module (PL-5) and operates only on Deployment Agent Persisted Release Flows. There is no notion of "Build Agent stitching" or "cross-agent stitching" in the v3 architecture:
 
-- Two Build Agent uploads sharing a release identifier (e.g. both `DEV-1234`) appear as two separate rows in Build Agent's summary. Any "deduplicate repeated uploads" feature would be a Build-Agent-internal concern and is not part of this delivery.
+- Two Build Agent uploads sharing a release identifier (e.g. both `DEV-1234`) upsert into the same `ReleaseFlow` row via `ImportService`; the Build summary stays grouped at the workflow level and repeated DEV attempts are exposed in the detail page.
 - A user who wants to see `DEV → SIT → UAT → PROD` for a single release either switches between agent workspaces manually, or waits for the platform-level Global View (R-13).
 - `ReleaseFlowFamilyKey` never sees `DEV` or any non-Deployment stage token, so the v2 "conservative DEV stripping" regex logic is deleted rather than extended.
 
@@ -777,7 +776,7 @@ Internal wiring change: the Jenkins and Ansible adapters are platform components
 
 | Prefix | Owner | Contents |
 |---|---|---|
-| `/api/platform/*` | Platform Core (**new in v3**) | `/auth/{login,logout,me}`, `/audit-logs`, `/config`, `/config/components`, `/access-grants`, `/access-grants/*`, `/templates/*` |
+| `/api/platform/*` | Platform Core (**new in v3**) | `/auth/{login,logout,me}`, `/audit-logs`, `/config`, `/config/components`, `/access-grants`, `/access-grants/*`, `/upload/template` |
 | `/api/deployment-agent/*` | Deployment Agent Module | Release flows, upload, tasks, decisions (all existing domain endpoints, scoped to `agent = "deployment-agent"`) |
 | `/api/testing-agent/*` | Testing Agent Module | Release flows, upload, tasks, decisions (scoped to `agent = "testing-agent"`) |
 | `/api/build-agent/*` | Build Agent Module (**new in v3**) | Release flows, upload, tasks, decisions (scoped to `agent = "build-agent"`) |
@@ -801,7 +800,7 @@ Internal wiring change: the Jenkins and Ansible adapters are platform components
 | `POST /api/deployment-agent/access-grants/{employeeId}/suspend` | `POST /api/platform/access-grants/{employeeId}/suspend` | Same |
 | `POST /api/deployment-agent/access-grants/{employeeId}/reactivate` | `POST /api/platform/access-grants/{employeeId}/reactivate` | Same |
 | `GET /api/deployment-agent/access-grants/directory` | `GET /api/platform/access-grants/directory` | Same |
-| `GET /api/deployment-agent/templates/*` | `GET /api/platform/templates/*` | Same |
+| `GET /api/deployment-agent/templates/*` | `GET /api/platform/upload/template` | Same |
 
 Session cookies (`JSESSIONID`) are preserved across the route move because the cookie `Path` attribute is `/` (ref: `application.properties:15` and the absence of any `server.servlet.session.cookie.path` override).
 
@@ -809,7 +808,7 @@ Session cookies (`JSESSIONID`) are preserved across the route move because the c
 
 ### Cutover Strategy: Hard Cutover (no route aliases)
 
-**Decision:** The v2 → v3 route migration is a **hard cutover**. Old routes under `/api/deployment-agent/auth/*`, `/api/deployment-agent/audit-logs`, `/api/deployment-agent/config`, `/api/deployment-agent/access-grants`, and `/api/deployment-agent/templates/*` are **removed in the same commit** that adds the corresponding `/api/platform/*` routes. There is no deprecation window and no dual-mounting.
+**Decision:** The v2 → v3 route migration is a **hard cutover**. Old routes under `/api/deployment-agent/auth/*`, `/api/deployment-agent/audit-logs`, `/api/deployment-agent/config`, `/api/deployment-agent/access-grants`, and `/api/deployment-agent/templates/*` are **removed in the same commit** that adds the corresponding `/api/platform/*` routes. The shared template download now lives at `/api/platform/upload/template`. There is no deprecation window and no dual-mounting.
 
 **Alternatives considered:**
 - **Soft cutover with route aliases** (controllers mounted at both the v2 and v3 paths for N releases, old paths return a deprecation header) — rejected. The only known external consumers of the v2 routes are (a) the frontend in this same repository and (b) the `SecurityConfig.java:36` whitelist. Both update in the same commit. There is no external client base to protect with a deprecation window.
@@ -858,7 +857,7 @@ Every agent controller method on an ID-bearing endpoint performs the five-step s
 ### Changes in v3
 
 1. **`AgentBoundaryGuard` becomes a Platform Core component (PL-9).** Used by every Agent Module's controllers on every ID-bearing endpoint. A mismatch throws a `NotFoundException` mapped to HTTP 404.
-2. **`AuditLoggerService.log` derives `agentName` dynamically (PL-11).** No null fallback.
+2. **`AuditLoggerService.log` derives `agentName` dynamically (PL-11).** Platform-scoped capability events may still fall back to `platform`.
 3. **`SecurityConfig.java:36` whitelist updates** to `.requestMatchers("/api/platform/auth/login").permitAll()`.
 4. **Deployment Agent loses its implicit global scope (PL-6).** Its summary list query is scoped by `agent = "deployment-agent"`; legacy null-agent rows become invisible until the Global View ships (R-13).
 
@@ -946,7 +945,7 @@ No change to baseline capacity targets. The system's hot paths (decision applica
 | C12 | Build Agent does not call `DeploymentStitchingService`. `?linked=` is silently ignored. | BA-2 |
 | C13 | Platform capability routes move to `/api/platform/*`. `SecurityConfig.java` whitelist for the login route updates in the same commit. | PL-2, API Boundaries |
 | C14 | Access grants are shared across agents; `AccessScope` does not gain an `agent` dimension. | Inherited |
-| C15 | Agent identity strings are defined as constants at backend (`AgentId`) and frontend (`platform/config/agentId.ts`). No string literals in controllers, services, or views. | Inherited |
+| C15 | Agent identity strings are defined as constants at backend (`AgentId`) and frontend (`frontend/src/config/agentId.ts`). No string literals in controllers, services, or views. | Inherited |
 | C16 | Authorization style is imperative validation inside controller methods. No `@PreAuthorize`. | PL-9 |
 
 ---
@@ -972,7 +971,7 @@ No change to baseline capacity targets. The system's hot paths (decision applica
 - `ReleaseFlow` entity — `currentStage` attribute `Stage` → `String`.
 - `Request` entity — `stage` attribute `Stage` → `String`.
 - `ReleaseFlowListItemDto` — positional stage fields → `Map<String, RequestStatus> stageStatuses` + `Set<String> stagesPresent`.
-- `AuditLoggerService.log` — derive `agentName` from `scope.agent()`; drop null fallback.
+- `AuditLoggerService.log` — derive `agentName` from `scope.agent()`; retain guarded `platform` fallback for platform-scoped events.
 - `AgentId` — add `BUILD_AGENT` constant.
 - `SecurityConfig.java:36` — change whitelist to `/api/platform/auth/login`.
 - Frontend `LoginView.vue` and all hard-coded auth URL references.
@@ -993,7 +992,7 @@ No change to baseline capacity targets. The system's hot paths (decision applica
 
 **Delete:**
 - `web/controller/ReleaseFlowController`, `UploadController`, `TaskController`, `DecisionController` (replaced by agent-module versions).
-- `frontend/src/api/client.ts`, `releaseFlows.ts`, `tasks.ts`, `upload.ts`.
+- Legacy shared frontend API wrappers (`frontend/src/api/client.ts`, `releaseFlows.ts`, `tasks.ts`, `upload.ts`) removed in favor of `frontend/src/api/platformClient.ts`, `frontend/src/agents/*/api.ts`, and the shared workspace factory.
 - `frontend/src/stores/releaseFlow.ts`, `task.ts`.
 - `frontend/src/views/ReleaseFlowSummaryView.vue`, `ReleaseFlowDetailView.vue`.
 
@@ -1042,7 +1041,7 @@ No new external dependencies introduced by v3. Existing dependencies unchanged:
 v3 replaces the v2 risk list in full. Obsolete v2 risks are listed at the end for traceability.
 
 - **R-01** — **Platform refactor scope is large.** Part A touches many files across backend domain, backend web, frontend composables, and frontend views. Mitigation: land Platform Core changes on their own commits before any Agent Module migration; keep tests green after each step; use ArchUnit fitness functions to catch boundary regressions immediately.
-- **R-02** — **Breaking route change to platform capabilities.** Moving `/api/deployment-agent/auth/*` / `/audit-logs` / `/config` / `/access-grants` / `/templates/*` to `/api/platform/*` invalidates any external consumer or bookmark pointing at the v2 routes. Mitigation: for this delivery the only known consumers are the frontend and the `SecurityConfig` whitelist (both updated in the same commit). Any external integration discovered later becomes an additional migration task.
+- **R-02** — **Breaking route change to platform capabilities.** Moving `/api/deployment-agent/auth/*` / `/audit-logs` / `/config` / `/access-grants` / `/templates/*` to `/api/platform/*` (with shared template download now at `/api/platform/upload/template`) invalidates any external consumer or bookmark pointing at the v2 routes. Mitigation: for this delivery the only known consumers are the frontend and the `SecurityConfig` whitelist (both updated in the same commit). Any external integration discovered later becomes an additional migration task.
 - **R-03** — **`SecurityConfig.java:36` whitelist forgot-to-update risk.** If the commit that moves `AuthController` does not also update the `permitAll()` matcher, login becomes unreachable. Mitigation: an integration test that POSTs to `/api/platform/auth/login` as an unauthenticated user and asserts a 2xx response blocks the commit if the whitelist is wrong.
 - **R-04** — **Legacy null-agent data becomes invisible** (PL-6 consequence). Users of the v2 Deployment Agent summary who rely on seeing pre-agent-column historical rows lose that visibility until the Global View ships. Mitigation: document the gap in the release notes; schedule the Global View as a near-term follow-up (replaces v2's R-13).
 - **R-05** — **`StagePipelineRegistry` missing-agent lookup at runtime.** If a `Request` row carries an `agent` value with no corresponding `StagePipeline` @Component (configuration drift: new agent added without a pipeline, or data-integrity drift: a stale test fixture writes an unrecognized agent string), `progressAfterDecision` throws `IllegalStateException` and the transaction rolls back, preventing progression for that flow. Mitigation: (a) ArchUnit fitness test asserting every `AgentId` constant has a matching `StagePipeline` implementation; (b) integration test that writes each `AgentId` to a `Request` row and exercises `progressAfterDecision`; (c) Spring Boot startup check in `StagePipelineRegistry` constructor verifying at least one pipeline is registered. Startup is fail-loud on duplicate `agentId()` values.

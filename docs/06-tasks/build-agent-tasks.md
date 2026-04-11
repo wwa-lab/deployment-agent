@@ -455,9 +455,9 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
 - **Design ref:** B6
 - **Architecture ref:** PL-8
 - **Effort:** S
-- **Description:** Create `frontend/src/agents/build/index.ts` (~20 lines). Add a Build Agent entry to `platform/config/agentRegistry.ts`. Extend `AgentCategory` type to include `'build'`. Wire the factory-returned routes into the platform router at `/wwa/build-agent` and `/wwa/build-agent/release-flows/:id`. Add `AgentId.BUILD_AGENT` to frontend constants file.
-- **Files created:** `index.ts`
-- **Files modified:** `agentRegistry.ts`, router config, `agentId.ts`
+- **Description:** Create `frontend/src/agents/build/index.ts` plus the Build-specific `api.ts`, `BuildAgentSummaryView.vue`, and `BuildAgentDetailView.vue`. Add a Build Agent entry to `frontend/src/config/agentRegistry.ts`. Extend `AgentCategory` type to include `'build'`. Wire routes into the platform router at `/wwa/build-agent` and `/wwa/build-agent/release-flows/:id`. Add `AGENT_ID.BUILD` to the frontend constants file.
+- **Files created:** `index.ts`, `api.ts`, `BuildAgentSummaryView.vue`, `BuildAgentDetailView.vue`
+- **Files modified:** `agentRegistry.ts`, router config, `agentId.ts`, shared upload/task dialog wiring as needed
 - **Acceptance criteria:**
   - `cd frontend && npm run build` green.
   - Manual smoke: Build Agent card appears on home page; clicking it lands on `/wwa/build-agent`; upload dialog shows DEV as disabled input; summary shows the DEV column.

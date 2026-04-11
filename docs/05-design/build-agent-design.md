@@ -600,7 +600,7 @@ public static FlowStatus aggregateFlowStatus(List<Request> requests) {
 
 ### M8. `AuditLoggerService` Dynamic `agentName`
 
-**Purpose:** Remove hardcoded `"deployment-agent"` literal and the v2 null fallback. Architecture PL-11.
+**Purpose:** Remove the hardcoded `"deployment-agent"` literal while keeping a guarded `platform` fallback for platform-scoped capability events. Architecture PL-11.
 
 **File:** `src/main/java/com/wwa/deploymentagent/platform/domain/audit/AuditLoggerService.java`
 
@@ -614,7 +614,7 @@ entry.setSourceSystem("wwa-api");
 
 // After
 entry.setAgent(scope.agent());
-entry.setAgentName(scope.agent());   // null fallback removed; PL-6 guarantees non-null
+entry.setAgentName(scope.agent());   // dynamic per-scope agent; caller may still resolve to "platform"
 entry.setSourceSystem("wwa-api");
 ```
 
@@ -662,7 +662,7 @@ if (scope.agent() == null) {
 | `AuditLogController` | `/api/deployment-agent/audit-logs` | `/api/platform/audit-logs` |
 | `ConfigurationController` | `/api/deployment-agent/config` | `/api/platform/config` |
 | `AccessGrantController` | `/api/deployment-agent/access-grants` | `/api/platform/access-grants` |
-| `TemplateDownloadController` | *(currently lives under upload paths)* | `/api/platform/templates` |
+| `TemplateDownloadController` | *(currently lives under upload paths)* | `/api/platform/upload` (`GET /template`) |
 
 **Required `SecurityConfig.java:36` edit:**
 
@@ -698,19 +698,19 @@ if (scope.agent() == null) {
 | `api/audit.ts` | `listAuditLogs` bound to `platformClient` |
 | `api/config.ts` | `listConfig`, `listConfigComponents`, `updateConfig`, `updateConfigComponent`, `deleteConfigComponent` bound to `platformClient` |
 | `api/accessGrants.ts` | All 6 access grant methods bound to `platformClient` |
-| `api/templates.ts` | `downloadTemplate(agentKey)` → `GET /api/platform/templates/{templateId}` |
+| `api/platformClient.ts` + agent-local `agents/*/api.ts` | Shared template download uses `GET /api/platform/upload/template` |
 | `stores/user.ts` | Moved from `frontend/src/stores/` |
 | `stores/audit.ts` | Moved from `frontend/src/stores/` |
 | `stores/config.ts` | Moved from `frontend/src/stores/` |
 | `stores/accessGrants.ts` | Moved from `frontend/src/stores/` |
 | `components/UploadDialog.vue` | Moved from `frontend/src/components/` (already agent-agnostic) |
-| `components/AgentSummaryView.vue` | **New** — generic summary view; reads `stageStatuses` from DTO |
-| `components/AgentDetailView.vue` | **New** — generic detail view; passes through `?linked=` query param |
+| `components/AgentSummaryView.vue` | **New** — generic read-only summary foundation used during the refactor, but Build Agent now ships a dedicated `BuildAgentSummaryView.vue` for upload/filter/task wiring |
+| `components/AgentDetailView.vue` | **New** — generic read-only detail foundation; Build Agent now ships a dedicated `BuildAgentDetailView.vue` for DEV-only task controls |
 | `composables/createAgentWorkspace.ts` | **New** — factory (see M11) |
 | `composables/createReleaseFlowStore.ts` | **New** — Pinia store factory |
 | `composables/createReleaseFlowApi.ts` | **New** — Axios + CRUD factory |
 | `config/agentRegistry.ts` | Moved from `frontend/src/config/` |
-| `config/agentId.ts` | Moved from `frontend/src/config/` (add `BUILD_AGENT`) |
+| `frontend/src/config/agentId.ts` | Moved from `frontend/src/config/` (add `BUILD_AGENT`) |
 | `views/LoginView.vue` | Moved from `frontend/src/views/` |
 | `views/WwaHomeView.vue` | Moved |
 | `views/WorkspaceLayout.vue` | Moved |
@@ -768,22 +768,18 @@ import type { DefineStoreOptions, StoreDefinition } from 'pinia'
 import type { Component, RouteRecordRaw } from 'vue-router'
 
 export interface AgentWorkspaceConfig {
-  key: string                     // e.g. 'build-agent'
-  name: string                    // e.g. 'Build Agent'
-  apiBase: string                 // e.g. '/api/build-agent'
+  agentKey: string                // e.g. 'build-agent'
+  agentName: string               // e.g. 'Build Agent'
   stages: string[]                // e.g. ['DEV']
   supportsStitching: boolean      // false for Build / Testing, true for Deployment
-  stageFilter?: 'dropdown' | 'disabled-input'   // default 'dropdown'
+  defaultStage?: string           // e.g. 'DEV' for Build Agent
 }
 
 export interface AgentWorkspace {
-  key: string
-  name: string
+  config: AgentWorkspaceConfig
   client: AxiosInstance
   api: AgentReleaseFlowApi
-  store: StoreDefinition
-  SummaryView: Component
-  DetailView: Component
+  useStore: StoreDefinition
   routes: RouteRecordRaw[]
 }
 
@@ -791,13 +787,11 @@ export function createAgentWorkspace(config: AgentWorkspaceConfig): AgentWorkspa
   const client = createClient(config)
   const api = createReleaseFlowApi(client, config)
   const store = createReleaseFlowStore(config, api)
-  const SummaryView = createSummaryView(config, store)
-  const DetailView = createDetailView(config, store)
   const routes: RouteRecordRaw[] = [
-    { path: `/wwa/${config.key}`, component: SummaryView, name: `${config.key}-summary` },
-    { path: `/wwa/${config.key}/release-flows/:id`, component: DetailView, name: `${config.key}-detail`, props: true },
+    { path: `/wwa/${config.agentKey}`, name: `${config.agentKey}-summary` },
+    { path: `/wwa/${config.agentKey}/release-flows/:id`, name: `${config.agentKey}-detail`, props: true },
   ]
-  return { key: config.key, name: config.name, client, api, store, SummaryView, DetailView, routes }
+  return { config, client, api, useStore, routes }
 }
 ```
 
@@ -806,10 +800,10 @@ export function createAgentWorkspace(config: AgentWorkspaceConfig): AgentWorkspa
 | Helper | Location | Job |
 |---|---|---|
 | `createClient` | inline in `createAgentWorkspace.ts` | Returns `axios.create({ baseURL: config.apiBase, withCredentials: true, ... })` with the same 401 interceptor as `platformClient` |
-| `createReleaseFlowApi` | `composables/createReleaseFlowApi.ts` | Returns `{ list, getById, uploadExcel, downloadTemplate, listTasks, getTask, editInput, startManual, submitAuto, recordResult, getExecutions, applyDecision }` — each delegates to `client` with the appropriate URL |
-| `createReleaseFlowStore` | `composables/createReleaseFlowStore.ts` | Returns `defineStore(\`${config.key}-release-flow\`, ...)` with state: `list`, `detail`, `loading`, `error`; actions: `fetchList`, `fetchDetail`, `uploadFile` |
-| `createSummaryView` | inline | Returns a Vue component that wraps `AgentSummaryView` with config-bound props (`stages`, `stageFilter`, `api`, `store`) |
-| `createDetailView` | inline | Returns a Vue component that wraps `AgentDetailView`; reads `route.params.id` and optionally `route.query.linked` if `supportsStitching` is true |
+| `createReleaseFlowApi` | `composables/createReleaseFlowApi.ts` | Returns the shared release-flow list/get/request-action wrapper used by agent stores; task/upload actions live in each agent's local `api.ts` |
+| `createReleaseFlowStore` | `composables/createReleaseFlowStore.ts` | Returns `defineStore(\`${config.agentKey}-releaseFlow\`, ...)` with shared list/detail/filter/polling state |
+| `BuildAgentSummaryView` | `agents/build/BuildAgentSummaryView.vue` | Dedicated DEV summary page that consumes the shared store plus Build upload/download APIs |
+| `BuildAgentDetailView` | `agents/build/BuildAgentDetailView.vue` | Dedicated DEV detail page that wires shared dialogs to Build task/decision APIs |
 
 **Critical design note:** `supportsStitching` only affects *whether the DetailView reads `?linked=` and passes it through*. The backend decides what to do with the parameter. The frontend does not know what "stitching" means.
 
@@ -820,7 +814,7 @@ export function createAgentWorkspace(config: AgentWorkspaceConfig): AgentWorkspa
 | Build Agent config → `workspace.client.defaults.baseURL` | `'/api/build-agent'` |
 | Build Agent config → `workspace.routes.length` | `2` |
 | Build Agent config → `workspace.routes[0].path` | `'/wwa/build-agent'` |
-| Build Agent config → `workspace.SummaryView` props | `stages: ['DEV']`, `stageFilter: 'disabled-input'` |
+| Build Agent config → `workspace.config.defaultStage` | `'DEV'` |
 | Build Agent DetailView with `?linked=abc` in route | query param **not** passed to API (because `supportsStitching: false`) |
 | Deployment Agent DetailView with `?linked=abc` | query param **is** passed to API (because `supportsStitching: true`) |
 | Two workspaces with different keys | `store` instances are distinct (Pinia store IDs differ) |
@@ -1012,12 +1006,10 @@ Testing Agent and Build Agent controller skeletons are presented in §4 and §5 
 import { createAgentWorkspace } from '@/platform/composables/createAgentWorkspace'
 
 export const deploymentAgentWorkspace = createAgentWorkspace({
-  key: 'deployment-agent',
-  name: 'Deployment Agent',
-  apiBase: '/api/deployment-agent',
+  agentKey: 'deployment-agent',
+  agentName: 'Deployment Agent',
   stages: ['SIT', 'UAT', 'PROD'],
   supportsStitching: true,
-  stageFilter: 'dropdown',
 })
 ```
 
@@ -1098,12 +1090,11 @@ public class TestingStagePipeline implements StagePipeline {
 import { createAgentWorkspace } from '@/platform/composables/createAgentWorkspace'
 
 export const testingAgentWorkspace = createAgentWorkspace({
-  key: 'testing-agent',
-  name: 'Testing Agent',
-  apiBase: '/api/testing-agent',
+  agentKey: 'testing-agent',
+  agentName: 'Testing Agent',
   stages: ['UAT'],
   supportsStitching: false,
-  stageFilter: 'disabled-input',
+  defaultStage: 'UAT',
 })
 ```
 
@@ -1238,7 +1229,7 @@ public class BuildUploadController {
 }
 ```
 
-Template download is served by platform `TemplateDownloadController` at `/api/platform/templates/*`; Build Agent does not own its own template endpoint.
+Template download is served by platform `TemplateDownloadController` at `GET /api/platform/upload/template`; Build Agent does not own its own template endpoint.
 
 ### B4. `BuildTaskController`
 
@@ -1317,16 +1308,15 @@ public class BuildDecisionController {
 import { createAgentWorkspace } from '@/platform/composables/createAgentWorkspace'
 
 export const buildAgentWorkspace = createAgentWorkspace({
-  key: 'build-agent',
-  name: 'Build Agent',
-  apiBase: '/api/build-agent',
+  agentKey: 'build-agent',
+  agentName: 'Build Agent',
   stages: ['DEV'],
   supportsStitching: false,
-  stageFilter: 'disabled-input',
+  defaultStage: 'DEV',
 })
 ```
 
-Total Build Agent frontend code: this single ~20-line file plus a one-line import into the platform router and a one-entry addition to `agentRegistry.ts`.
+Current Build Agent frontend code includes this shared workspace entry point plus dedicated `api.ts`, `BuildAgentSummaryView.vue`, and `BuildAgentDetailView.vue` files layered on top of the shared infrastructure.
 
 ---
 
@@ -1377,20 +1367,11 @@ createReleaseFlowApi(client, config):
   return {
     list(params): client.get('/release-flows', {params})
     getById(id, query={}): client.get('/release-flows/${id}', {params: query})
-    uploadExcel(file): multipart POST '/upload'
-    downloadTemplate(): platformClient.get('/templates/${config.key}')
-    listTasks(requestId): client.get('/tasks', {params: {requestId}})
-    getTask(taskId): client.get('/tasks/${taskId}')
-    editInput(taskId, body): client.put('/tasks/${taskId}/input', body)
-    startManual(taskId, body): client.post('/tasks/${taskId}/start-manual', body)
-    submitAuto(taskId, body): client.post('/tasks/${taskId}/submit-auto', body)
-    recordResult(taskId, body): client.post('/tasks/${taskId}/record-result', body)
-    getExecutions(taskId): client.get('/tasks/${taskId}/executions')
-    applyDecision(taskId, body): client.post('/tasks/${taskId}/decision', body)
+    // task/upload APIs live in each agent's local api.ts
   }
 
 createReleaseFlowStore(config, api):
-  return defineStore(`${config.key}-release-flow`, {
+  return defineStore(`${config.agentKey}-release-flow`, {
     state: () => ({ list: [], detail: null, loading: false, error: null, filters: {}, pagination: {page: 0, size: 20} }),
     actions: {
       async fetchList() { this.loading = true; try { ... api.list({...this.filters, ...this.pagination}) ... } finally { this.loading = false } }
@@ -1398,31 +1379,19 @@ createReleaseFlowStore(config, api):
         const query = (config.supportsStitching && linkedIds?.length) ? {linked: linkedIds} : {}
         this.detail = await api.getById(id, query)
       }
-      async uploadFile(file) { await api.uploadExcel(file); await this.fetchList() }
     }
   })
 
-createSummaryView(config, store):
-  return defineComponent({
-    render: () => h(AgentSummaryView, {
-      agentKey: config.key,
-      agentName: config.name,
-      stages: config.stages,
-      stageFilter: config.stageFilter || 'dropdown',
-      store,
-    })
-  })
+BuildAgentSummaryView.vue:
+  uses useBuildAgentStore()
+  calls build/api.ts for upload + template download
+  renders Build-specific filters and a disabled DEV stage input
 
-createDetailView(config, store):
-  return defineComponent({
-    setup() {
-      const route = useRoute()
-      const id = route.params.id
-      const linkedIds = config.supportsStitching ? parseLinkedQueryParam(route.query.linked) : []
-      onMounted(() => store.fetchDetail(id, linkedIds))
-    },
-    render: () => h(AgentDetailView, { agentKey: config.key, agentName: config.name, stages: config.stages, store })
-  })
+BuildAgentDetailView.vue:
+  uses useBuildAgentStore()
+  reads route.params.id and route.query.archived
+  calls build/api.ts for task edit/run/result/activity/decision actions
+  does not forward ?linked= because supportsStitching is false
 ```
 
 ---

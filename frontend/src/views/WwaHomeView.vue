@@ -32,13 +32,14 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 
           <section class="wwa-intro-card home-intro-card" aria-labelledby="wwa-home-intro-title">
             <div class="wwa-intro-kicker">WWA Today</div>
-            <h2 id="wwa-home-intro-title" class="wwa-intro-title">A shared workflow automation workspace</h2>
-            <p class="wwa-intro-text">
-              WWA currently serves controlled workflow operations, including Testing Agent,
-              Deployment Agent, and shared platform capabilities. Use this hub to enter the active
-              workspaces today, while AI-assisted capabilities are introduced in later phases.
-            </p>
-          </section>
+              <h2 id="wwa-home-intro-title" class="wwa-intro-title">A shared workflow automation workspace</h2>
+              <p class="wwa-intro-text">
+              WWA currently serves controlled workflow operations, including Build Agent,
+              Testing Agent, Deployment Agent, and shared platform capabilities. Use this hub to
+              enter the active workspaces today, while AI-assisted capabilities are introduced in
+              later phases.
+              </p>
+            </section>
         </div>
 
         <aside class="home-console" aria-label="WWA control summary">
@@ -51,7 +52,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
             <article class="home-console-panel">
               <span class="home-console-panel-label">Current Focus</span>
               <strong class="home-console-panel-value">Agent Workflows</strong>
-              <p class="home-console-panel-copy">Testing and deployment workspaces with human checkpoints.</p>
+              <p class="home-console-panel-copy">Build, testing, and deployment workspaces with human checkpoints.</p>
             </article>
             <article class="home-console-panel">
               <span class="home-console-panel-label">Shared Controls</span>
@@ -68,6 +69,8 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           <div class="home-console-track">
             <div class="home-console-track-label">Active Workspaces</div>
             <div class="home-console-track-row">
+              <span class="home-console-node is-active">Build</span>
+              <span class="home-console-line"></span>
               <span class="home-console-node is-active">Testing</span>
               <span class="home-console-line"></span>
               <span class="home-console-node is-active">Deploy</span>
@@ -79,7 +82,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           <div class="home-console-stream">
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
-              <span>Testing and deployment workspaces stay available from one shared hub.</span>
+              <span>Build, testing, and deployment workspaces stay available from one shared hub.</span>
             </div>
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
