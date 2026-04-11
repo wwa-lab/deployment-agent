@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Task } from '../types'
+import AiSuggestionPanel from './AiSuggestionPanel.vue'
+import { AI_ASSIST_PREVIEW_ENABLED } from '../config/platformConfig'
 
 const props = withDefaults(defineProps<{
   task: Task
@@ -113,6 +115,12 @@ function statusBadgeClass(status: string): string {
           <span class="info-label">Status:</span>
           <span class="badge" :class="statusBadgeClass(task.taskStatus)">{{ task.taskStatus }}</span>
         </div>
+
+        <AiSuggestionPanel
+          v-if="AI_ASSIST_PREVIEW_ENABLED"
+          context="decision"
+          :task-name="task.taskName"
+        />
 
         <div class="decision-list">
           <label

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import type { Task } from '../types'
+import AiSuggestionPanel from './AiSuggestionPanel.vue'
+import { AI_ASSIST_PREVIEW_ENABLED } from '../config/platformConfig'
 
 const props = withDefaults(defineProps<{
   task: Task
@@ -169,6 +171,12 @@ async function submit() {
 
       <div class="modal-body">
         <div v-if="error" class="alert alert-error">{{ error }}</div>
+
+        <AiSuggestionPanel
+          v-if="AI_ASSIST_PREVIEW_ENABLED"
+          context="task-edit"
+          :task-name="task.taskName"
+        />
 
         <div class="form-group">
           <label class="form-label">Script</label>
