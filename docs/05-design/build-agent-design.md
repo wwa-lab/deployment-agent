@@ -1,342 +1,96 @@
 # Detailed Design: Build Agent
 
 **Date:** 2026-04-11
-**Status:** Draft (v2, post-review)
-**Source:** `docs/04-architecture/build-agent-architecture.md` (primary), `docs/03-spec/build-agent-spec.md`, `docs/05-design/testing-agent-design.md` (baseline), `docs/05-design/design.md` (platform baseline)
+**Status:** Draft (v3, aligned with `build-agent-architecture.md` v3)
+**Scope:** This document carries the **implementation-level specifics** that `build-agent-architecture.md` deliberately deferred per its §Document Scope. It does not re-derive any architectural decision. If a statement here appears to conflict with an architecture PL-*/BA-* decision, architecture wins.
+**Source:** `build-agent-architecture.md` (primary, structural decisions), `build-agent-spec.md` (product intent), `build-agent-tasks.md` (downstream).
+**Supersedes:** v2 (2026-04-11). v2 was structured around the four v2-era surgical shared-contract changes. v3 replaces it with code skeletons and test matrices for the Agent Module refactor.
 
 ---
 
-## Overview
+## 1. Scope Contract
 
-This document translates the Build Agent architecture (v2) into implementation-facing design guidance. Build Agent reuses the existing domain services, repositories, and shared capabilities. Unlike Testing Agent, Build Agent requires:
+### 1.1 What this document contains
+- Full class signatures for every new class
+- JPA attribute-level diffs for every modified entity
+- Record signatures for every modified DTO
+- Algorithm specifications for migrated or signature-changed services
+- Per-module unit and integration test matrices
+- ArchUnit fitness test specifications
+- Commit-ordered implementation sequence
+- LOC estimates per module
 
-1. **Five surgical additive changes** to the shared contract / service layer
-2. **One new controller-layer component** (`AgentBoundaryGuard`)
-3. **Four new Build Agent controllers** (release-flow, upload, task, decision)
-4. **One parallel frontend workspace** (client, API modules, store, two views)
-
-All existing Deployment Agent and Testing Agent backend code remains untouched except for the additive shared-contract updates and the one-line shared `AuditLoggerService` fix.
-
-```mermaid
-flowchart LR
-    User[Workspace User] --> Login[Login Provider]
-    Login --> Authz[Access Grant Resolution]
-    Authz -->|Authorized| Home[WWA Home Page]
-    Authz -->|Denied| Denied[Access Denied State]
-
-    Home --> DA[Deployment Agent Views + Store]
-    Home --> TA[Testing Agent Views + Store]
-    Home --> BA[Build Agent Views + Store]
-
-    DA --> DA_API[/api/deployment-agent/]
-    TA --> TA_API[/api/testing-agent/]
-    BA --> BA_API[/api/build-agent/]
-
-    BA_API --> Guard[AgentBoundaryGuard]
-    Guard --> SharedServices[Shared Domain Services]
-
-    DA_API --> SharedServices
-    TA_API --> SharedServices
-
-    SharedServices --> Contracts[Shared Contracts<br/>Stage · FamilyKey · ListItemDto · AgentId]
-    SharedServices --> AuditSvc[AuditLoggerService<br/>agentName from scope]
-    SharedServices --> Oracle[(Oracle)]
-    SharedServices --> Jenkins[Jenkins]
-    SharedServices --> Ansible[Ansible Tower]
-```
-
-### Design Objective
-
-- Add Build Agent as the third agent workspace with minimal impact on existing agents
-- Achieve data isolation through `Request.agent` filtering plus a new `AgentBoundaryGuard` on task and flow operations
-- Introduce `DEV` as a first-class terminal stage without changing any progression logic
-- Fix the pre-existing `AuditLoggerService` `agentName` hardcoding as a shared side effect
-
-### Relationship to Existing Design Documents
-
-- `design.md` (Deployment Agent) defines all module designs, state models, validation rules, and integration patterns. Where this document is silent, those designs apply unchanged
-- `testing-agent-design.md` defines the thin-controller-delegation pattern. Build Agent follows the same pattern plus the guard and the audit fix
-- This document covers only Build Agent-specific additions and the enumerated shared-contract/service changes
+### 1.2 What this document does NOT contain
+- Architectural rationale for any decision — see `build-agent-architecture.md` §Architecture Decisions
+- Product intent — see `build-agent-spec.md`
+- Route prefix inventory and breaking-change mapping — see architecture §API Boundaries
+- Spec Delta — see architecture §Spec Delta
+- Per-task effort breakdown — see `build-agent-tasks.md`
 
 ---
 
-## Design Assumptions
+## 2. Module Design — Platform Core
 
-- All Deployment Agent and Testing Agent design assumptions carry forward unchanged
-- `Request.agent` column plus a controller-layer boundary guard is sufficient for data isolation
-- `Stage` enum additive change does not break any existing test (no external code does `Stage.ordinal()` math; `Stage.values()` iterations are filter-based)
-- `ReleaseFlowListItemDto` is a positional record constructed at two call sites (the `from` factory in `ReleaseFlowListItemDto.java:52` and `ReleaseFlowService.buildStitchedSummary` at `ReleaseFlowService.java:675`). Both call sites will be updated to pass the two new appended arguments
-- `AuditLoggerService` is the single writer of audit rows (all call sites go through its `log(...)` overloads); a one-line change inside its `log` method takes effect for every caller
-- `ReleaseFlowService.listStitchedSummaries` pre-filters by agent, so Build Agent summary stitching is **within-agent only**. Cross-agent stitching is out of scope
-- Deployment Agent summary continues its "global view" semantics unchanged
+Eleven platform-level modules (M1–M11) constitute Part A of the delivery. Each is presented with: **purpose**, **signature**, **call-site impact**, and **test matrix**.
 
----
+### M1. `StagePipeline` Interface
 
-## Design Scope
+**Purpose:** Per-agent stage ordering, injected into platform services as a method parameter. Owned by architecture PL-4.
 
-### In Scope
-
-1. Shared contract modifications: `Stage`, `ReleaseFlowFamilyKey`, `ReleaseFlowListItemDto`, `AgentId`
-2. Shared service fix: `AuditLoggerService.log` dynamic `agentName`
-3. New `AgentBoundaryGuard` component with task / request / flow assertion methods
-4. Four Build Agent backend controllers (release-flow, upload, task, decision)
-5. Frontend API client, API modules, Pinia store, and two views
-6. `agentRegistry.ts` and router updates
-7. Test coverage for shared contracts, audit fix, guard, and Build Agent endpoints
-
-### Out of Scope
-
-- All items listed as out of scope in the Deployment Agent and Testing Agent designs
-- Build-specific domain logic, task types, or execution adapters
-- Back-patching Testing Agent task-mutation agent boundary (still tracked as R-08)
-- Extracting shared `AgentSummaryView` / `AgentDetailView` components (R-03)
-- Stitched linked detail in Build Agent (AD-10)
-- Cross-agent stitching at the summary layer (R-14)
-- Changing Deployment Agent summary visibility to exclude build-only flows (AD-12)
-- Backfilling historical Testing Agent audit rows whose `agentName` was previously hardcoded (R-12)
-
-### Design Boundaries
-
-- Build Agent controllers delegate to shared services — no business logic in controllers
-- Agent boundary is enforced at the controller layer, not inside domain services
-- Shared contract changes are all additive — no removal, no rename, no signature break
-- `AuditLoggerService` fix is a single one-line change inside an existing method; no caller signatures change
-
----
-
-## Module Design
-
-### Module 1: Shared Contract Modifications
-
-#### 1.1 Stage Enum
-
-**File:** `src/main/java/com/wwa/deploymentagent/contracts/enums/Stage.java`
-
-**Change:** Add `DEV` as the first enum value. Replace the ordinal-based `next()` with an explicit switch so DEV does not auto-advance to SIT.
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/StagePipeline.java`
 
 ```java
-package com.wwa.deploymentagent.contracts.enums;
+package com.wwa.deploymentagent.platform.domain;
 
-public enum Stage {
-    DEV,
-    SIT,
-    UAT,
-    PROD;
+import java.util.List;
+import java.util.Optional;
 
-    public Stage next() {
-        return switch (this) {
-            case DEV -> null;
-            case SIT -> UAT;
-            case UAT -> PROD;
-            case PROD -> null;
-        };
-    }
+public interface StagePipeline {
+    /** Next stage in this agent's ordering, or empty if terminal. */
+    Optional<String> next(String currentStage);
+
+    /** True if the given stage has no successor in this agent's pipeline. */
+    boolean isTerminal(String stage);
+
+    /** All stages owned by this pipeline, in declared order. Must be non-empty. */
+    List<String> orderedStages();
 }
 ```
 
-**Test expectations (new cases in `StageTest`):**
+**Design constraints:**
+- Stateless; `@Component` implementations are singletons.
+- Unknown-stage behavior: `next(unknownStage)` returns `Optional.empty()`; `isTerminal(unknownStage)` returns `true`. Rationale: fail-closed. A typo cannot route progression past a stage the pipeline does not declare.
+- `orderedStages()` is used only for introspection/testing; platform services do not iterate over it.
 
-| Input | Expected |
+**Test matrix (`StagePipelineContractTest`, parameterized):** each agent's implementation must satisfy all rows.
+
+| Case | Assertion |
 |---|---|
-| `Stage.DEV.next()` | `null` |
-| `Stage.SIT.next()` | `Stage.UAT` |
-| `Stage.UAT.next()` | `Stage.PROD` |
-| `Stage.PROD.next()` | `null` |
-| `Stage.values().length` | `4` |
-| `Stage.valueOf("DEV")` | `Stage.DEV` |
-
-#### 1.2 ReleaseFlowFamilyKey — Conservative DEV Recognition
-
-**File:** `src/main/java/com/wwa/deploymentagent/domain/releaseflow/ReleaseFlowFamilyKey.java`
-
-**Design rule (binding):** `dev` is recognized as a stage token only in narrow cases. It is NOT added to the existing aggressive `STAGE_PREFIX_WITH_SEPARATOR` regex, because that would strip legitimate project identifiers like `dev-tools`.
-
-**Specific changes:**
-
-1. **Extend `STAGE_PREFIX_WITH_DIGITS`** to include `dev` — handles `dev1234`:
-   ```java
-   private static final Pattern STAGE_PREFIX_WITH_DIGITS = Pattern.compile(
-           "^(dev|sit|uat|prod)(\\d.+)$",
-           Pattern.CASE_INSENSITIVE);
-   ```
-
-2. **Add a new `DEV_PREFIX_WITH_DIGIT_SEPARATOR`** pattern — handles `DEV-1234` but not `dev-tools`:
-   ```java
-   private static final Pattern DEV_PREFIX_WITH_DIGIT_SEPARATOR = Pattern.compile(
-           "^(dev)([^a-z0-9]+)(\\d.+)$",
-           Pattern.CASE_INSENSITIVE);
-   ```
-
-3. **Extend `isStageToken`** to recognize `dev` (used by `stripInfixStageToken`):
-   ```java
-   private static boolean isStageToken(String token) {
-       return "dev".equals(token)
-               || "sit".equals(token)
-               || "uat".equals(token)
-               || "prod".equals(token);
-   }
-   ```
-
-4. **Update `stripStageToken` method body** to try the new DEV-specific pattern in addition to the existing two. Order of attempts:
-   - `stripInfixStageToken` (unchanged; now recognizes `dev` via the extended `isStageToken`)
-   - `STAGE_PREFIX_WITH_SEPARATOR` (unchanged — sit/uat/prod only)
-   - `DEV_PREFIX_WITH_DIGIT_SEPARATOR` (NEW — DEV + separator + digits only)
-   - `STAGE_PREFIX_WITH_DIGITS` (extended — now also matches dev-prefix-digits)
-
-5. **`stripStagePrefixFromNormalized`** does NOT need a DEV branch. The only callers are paths where the normalized form has already been alpha-numerically stripped; adding a `dev` branch there could strip `devtools` → `tools`, which is the exact regression we want to avoid.
-
-6. **Do NOT modify** `STAGE_PREFIX_WITH_SEPARATOR`. This preserves the asymmetry: SIT/UAT/PROD strip aggressively (existing behavior), DEV strips conservatively.
-
-**Test expectations (new/updated cases in `ReleaseFlowFamilyKeyTest`):**
-
-| Input | Expected family key | Rationale |
-|---|---|---|
-| `"DEV-1234"` | `"1234"` | DEV + separator + digits → match `DEV_PREFIX_WITH_DIGIT_SEPARATOR` |
-| `"dev1234"` | `"1234"` | DEV + digits → match `STAGE_PREFIX_WITH_DIGITS` |
-| `"DEV_HCC_AMH_1234"` | identical to `"SIT_HCC_AMH_1234"` after normalization | Infix stage token path via `stripInfixStageToken` |
-| `"dev-tools"` | `"devtools"` | Falls through all patterns; returns normalized input unchanged |
-| `"dev-portal"` | `"devportal"` | Same as above |
-| `"dev-kit-v2"` | `"devkitv2"` | Same as above |
-| `"DEV-1234"` and `"dev1234"` | same key (`"1234"`) | Two Build Agent uploads with different punctuation stitch within-agent |
-| `"SIT-builder"` | `"builder"` | Unchanged existing behavior — SIT still strips aggressively |
-
-**Within-agent stitching only:** Because `ReleaseFlowService.listStitchedSummaries` pre-filters by agent, a Build Agent `DEV-1234` upload and a Deployment Agent `SIT-1234` upload will never be stitched into the same summary row. They appear as separate rows in their respective agent summaries. This is tracked as R-14.
-
-#### 1.3 ReleaseFlowListItemDto — Appended Fields
-
-**File:** `src/main/java/com/wwa/deploymentagent/contracts/dto/ReleaseFlowListItemDto.java`
-
-**Change:** Append `devStatus` and `devPresent` to the end of the existing stage groups. Two positional call sites must be updated in lockstep.
-
-**Record signature change (append-only):**
-
-```java
-public record ReleaseFlowListItemDto(
-        // ... existing fields through prodStatus ...
-        RequestStatus sitStatus,
-        RequestStatus uatStatus,
-        RequestStatus prodStatus,
-        RequestStatus devStatus,      // ← NEW (appended after prodStatus)
-        boolean sitPresent,
-        boolean uatPresent,
-        boolean prodPresent,
-        boolean devPresent,           // ← NEW (appended after prodPresent)
-        boolean stitched,
-        int linkedReleaseCount,
-        List<String> linkedReleaseIds,
-        List<String> linkedReleaseFlowIds
-) {
-    // ...
-}
-```
-
-**Call site 1:** `ReleaseFlowListItemDto.from(...)` factory at `ReleaseFlowListItemDto.java:52` — add two arguments after the existing stage populators:
-
-```java
-return new ReleaseFlowListItemDto(
-        // ... unchanged arguments ...
-        requestStatusFor(requests, Stage.SIT, attemptView),
-        requestStatusFor(requests, Stage.UAT, attemptView),
-        requestStatusFor(requests, Stage.PROD, attemptView),
-        requestStatusFor(requests, Stage.DEV, attemptView),   // ← NEW
-        hasStage(requests, Stage.SIT),
-        hasStage(requests, Stage.UAT),
-        hasStage(requests, Stage.PROD),
-        hasStage(requests, Stage.DEV),                         // ← NEW
-        // ... unchanged arguments ...
-);
-```
-
-**Call site 2:** `ReleaseFlowService.buildStitchedSummary(...)` at `ReleaseFlowService.java:675` — same pattern: append two new arguments after the existing `stageStatusFor(...Stage.PROD...)` / `hasStage(...Stage.PROD)` lines.
-
-**Why append, not prepend:** Appending is the minimal-delta change. Prepending to match enum declaration order would shift every existing positional argument and increases the risk of silent miswiring.
-
-**Test expectations (new cases in `ReleaseFlowListItemDtoTest`):**
-
-| Scenario | Assertions |
-|---|---|
-| Flow with only DEV requests | `devStatus != null`, `devPresent == true`, `sitPresent == false`, `sitStatus == Pending` |
-| Flow with DEV + SIT requests | Both `devPresent` and `sitPresent` are true; statuses derived per stage |
-| Flow with only SIT/UAT/PROD (legacy) | `devPresent == false`, `devStatus == Pending` |
-
-#### 1.4 AgentId
-
-**File:** `src/main/java/com/wwa/deploymentagent/contracts/AgentId.java`
-
-**Change:** Add `BUILD_AGENT` constant.
-
-```java
-public final class AgentId {
-    public static final String DEPLOYMENT_AGENT = "deployment-agent";
-    public static final String TESTING_AGENT = "testing-agent";
-    public static final String BUILD_AGENT = "build-agent";   // ← NEW
-
-    private AgentId() {}
-}
-```
-
-#### 1.5 AuditLoggerService — Dynamic agentName (Shared Fix)
-
-**File:** `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLoggerService.java`
-
-**Current state (`AuditLoggerService.java:59-62`):**
-```java
-entry.setAgent(scope.agent());
-// Platform audit standard fields (WWA-009)
-entry.setAgentName("deployment-agent");  // ← hardcoded defect
-entry.setSourceSystem("wwa-api");
-```
-
-**Required change:** Replace the hardcoded literal with a derivation from `scope.agent()` with a legacy fallback.
-
-```java
-entry.setAgent(scope.agent());
-// Platform audit standard fields (WWA-009)
-entry.setAgentName(scope.agent() != null ? scope.agent() : AgentId.DEPLOYMENT_AGENT);
-entry.setSourceSystem("wwa-api");
-```
-
-**Justification:**
-- Single-line diff inside the existing `log` method
-- Zero caller signature changes — every existing Deployment Agent, Testing Agent, and new Build Agent call site benefits automatically
-- `scope.agent()` is already populated correctly from `ScopeSnapshot.from(request)` and the context resolution path
-- Legacy rows (null agent) continue to produce `"deployment-agent"`, matching historical behavior
-
-**Side effect (intended):** Testing Agent audit entries created after this change will have `agentName = "testing-agent"` instead of the incorrect `"deployment-agent"` they have today. This is a forward-only fix tracked as R-12. Historical rows are not backfilled.
-
-**Test expectations:**
-
-| Scenario | `agentName` value |
-|---|---|
-| Build Agent request → `log(...)` with scope containing `agent = "build-agent"` | `"build-agent"` |
-| Testing Agent request → `log(...)` with scope containing `agent = "testing-agent"` | `"testing-agent"` |
-| Deployment Agent request → `log(...)` with scope containing `agent = "deployment-agent"` | `"deployment-agent"` |
-| Legacy request with `agent = null` | `"deployment-agent"` (fallback) |
-
-Add these assertions to the existing `AuditLoggerServiceTest` class. Also add a regression assertion that existing Deployment Agent tests continue to see `agentName = "deployment-agent"`.
+| `next(firstStage)` | returns `Optional.of(secondStage)` OR `Optional.empty()` if single-stage pipeline |
+| `next(lastStage)` | returns `Optional.empty()` |
+| `next("")` | returns `Optional.empty()` |
+| `next(null)` | throws `NullPointerException` or returns `Optional.empty()` (impl decides; document the choice) |
+| `next("totally-unknown")` | returns `Optional.empty()` |
+| `isTerminal(lastStage)` | returns `true` |
+| `isTerminal("totally-unknown")` | returns `true` |
+| `orderedStages()` | non-empty, immutable, contains no duplicates |
 
 ---
 
-### Module 2: AgentBoundaryGuard
+### M2. `AgentBoundaryGuard` (Platform-Level)
 
-**Responsibilities**
-- Validate that a task-level operation targets a task whose parent request belongs to the expected agent
-- Validate that a request-level operation targets a request that belongs to the expected agent
-- Validate that a flow-level operation targets a Persisted Release Flow with at least one request from the expected agent
-- Reject violations with HTTP 404 to avoid leaking namespace membership
+**Purpose:** Controller-layer data isolation (architecture PL-9). Promoted from v2's Build-Agent-only helper.
 
-**File:** `src/main/java/com/wwa/deploymentagent/web/security/AgentBoundaryGuard.java`
-
-**Component contract:**
+**File:** `src/main/java/com/wwa/deploymentagent/platform/web/security/AgentBoundaryGuard.java`
 
 ```java
-package com.wwa.deploymentagent.web.security;
+package com.wwa.deploymentagent.platform.web.security;
 
-import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
-import com.wwa.deploymentagent.domain.releaseflow.Request;
-import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
-import com.wwa.deploymentagent.domain.task.Task;
-import com.wwa.deploymentagent.domain.task.TaskRepository;
+import com.wwa.deploymentagent.platform.domain.releaseflow.ReleaseFlowRepository;
+import com.wwa.deploymentagent.platform.domain.releaseflow.Request;
+import com.wwa.deploymentagent.platform.domain.releaseflow.RequestRepository;
+import com.wwa.deploymentagent.platform.domain.task.Task;
+import com.wwa.deploymentagent.platform.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -373,10 +127,8 @@ public class AgentBoundaryGuard {
 
     @Transactional(readOnly = true)
     public void assertFlowBelongsToAgent(String flowId, String expectedAgent) {
-        // Ensure the flow exists; 404 if not
         releaseFlowRepository.findById(flowId)
                 .orElseThrow(() -> new NotFoundAppException("ReleaseFlow", flowId));
-        // Check that at least one request under this flow carries the expected agent
         List<Request> requests = requestRepository.findByReleaseFlowIds(List.of(flowId), true);
         boolean hasAgentRequest = requests.stream()
                 .anyMatch(r -> expectedAgent.equals(r.getAgent()));
@@ -387,445 +139,1247 @@ public class AgentBoundaryGuard {
 }
 ```
 
-**Design notes (binding):**
+**Design notes:**
+- `@Transactional(readOnly = true)` on each assertion method is mandatory. Without it, each call opens its own Hibernate session (OSIV is disabled per `application.properties:7`), and lazy `task.getRequest()` navigation would fail.
+- Mismatches throw `NotFoundAppException`, mapped to HTTP 404 by the existing `GlobalExceptionHandler`. No new exception type.
+- Flow-level guard uses `findByReleaseFlowIds(..., includeArchived=true)` so that archived-but-agent-owned flows are not mistaken as "not owned by this agent". Archived visibility is a separate concern enforced by the controller.
 
-- **Exception type:** Reuse `NotFoundAppException` (already maps to HTTP 404 via `GlobalExceptionHandler`). No new exception type.
-- **Repository method for flow check:** Use the existing `requestRepository.findByReleaseFlowIds(List.of(flowId), includeArchived=true)`, which is known to exist from `ReleaseFlowService.findRequestsByReleaseFlowIds`. Passing `includeArchived=true` ensures we do not miss archived build-agent requests when checking agent ownership.
-- **Why independent lookup for flow:** The guard performs an independent flow + request lookup rather than sharing the subsequent `releaseFlowService.getById(...)` call in the controller. Both lookups happen within the same transaction, so the Hibernate first-level cache absorbs the cost. Keeping the guard self-contained makes it safe to invoke from any handler.
-- **Why `includeArchived=true` in the guard:** A Build Agent user trying to access an archived Build Agent flow should get the correct 404-or-not decision based on agent ownership, not accidentally pass because archived requests were filtered out. Visibility and archived-viewer checks happen separately in the controller's existing helpers.
+**Test matrix (`AgentBoundaryGuardTest`):**
 
-**Test expectations (new `AgentBoundaryGuardTest`):**
-
-| Scenario | Expected |
-|---|---|
-| Task exists, parent request `agent == expectedAgent` | Returns normally |
-| Task exists, parent request `agent != expectedAgent` | `NotFoundAppException` |
-| Task exists, parent request `agent == null` (legacy) | `NotFoundAppException` |
-| Task does not exist | `NotFoundAppException` |
-| Request exists, `agent == expectedAgent` | Returns normally |
-| Request exists, `agent != expectedAgent` | `NotFoundAppException` |
-| Request does not exist | `NotFoundAppException` |
-| Flow exists with one or more matching-agent requests | Returns normally |
-| Flow exists with zero matching-agent requests | `NotFoundAppException` |
-| Flow exists with only archived matching-agent requests | Returns normally (guard passes, archived-visibility is enforced elsewhere) |
-| Flow does not exist | `NotFoundAppException` |
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Task exists, `request.agent == expectedAgent` | Returns normally |
+| 2 | Task exists, `request.agent != expectedAgent` | `NotFoundAppException` |
+| 3 | Task exists, `request == null` | `NotFoundAppException` |
+| 4 | Task exists, `request.agent == null` (legacy) | `NotFoundAppException` |
+| 5 | Task does not exist | `NotFoundAppException` |
+| 6 | Request exists, `agent == expectedAgent` | Returns normally |
+| 7 | Request exists, `agent != expectedAgent` | `NotFoundAppException` |
+| 8 | Request does not exist | `NotFoundAppException` |
+| 9 | Flow exists with ≥1 matching-agent request | Returns normally |
+| 10 | Flow exists with 0 matching-agent requests | `NotFoundAppException` |
+| 11 | Flow exists with only archived matching-agent requests | Returns normally |
+| 12 | Flow does not exist | `NotFoundAppException` |
 
 ---
 
-### Module 3: Build Agent Backend Controllers
+### M3. `ReleaseFlowService` Trim-Down
 
-**Responsibilities**
-- Expose REST endpoints under `/api/build-agent/`
-- Force `agent = "build-agent"` on writes and list filters server-side
-- Force `stage = "DEV"` on uploads server-side
-- Invoke `AgentBoundaryGuard` before delegating any task/request/flow operation
-- Apply the same imperative authorization helpers as Deployment and Testing Agent (no `@PreAuthorize`)
-- Do not support `?linked=` (AD-10)
+**Purpose:** Platform `ReleaseFlowService` sheds stitching and switches all stage parameters from `Stage` enum to `String`. Architecture PL-3, PL-5.
 
-All four controllers follow the thin-wrapper pattern. Each holds references to domain services and the `AgentBoundaryGuard`. Each method calls the guard before delegating.
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/ReleaseFlowService.java`
 
-#### 3.1 BuildAgentReleaseFlowController
+**Method signature changes:**
 
-**File:** `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentReleaseFlowController.java`
+| Before (v2) | After (v3) | Notes |
+|---|---|---|
+| `Page<ReleaseFlowListItemDto> listStitchedSummaries(String projectId, String releaseId, Stage stage, ..., String agent, Pageable pageable)` | **removed** — moves to `DeploymentStitchingService.listStitchedSummaries` (M12) | Only Deployment Agent's controllers called this |
+| `ReleaseFlowDetailDto getStitchedDetail(String releaseFlowId, List<String> linkedFlowIds, ...)` | **removed** — moves to `DeploymentStitchingService.getStitchedDetail` | Same |
+| *(new)* | `Page<ReleaseFlow> listByAgent(String agentId, ReleaseFlowFilter filter, Pageable pageable)` | Agent-scoped list, no stitching |
+| `ReleaseFlow getById(String id, boolean includeArchived)` | unchanged | |
+| `List<Request> findRequestsForFlow(String releaseFlowId, boolean includeArchived)` | unchanged | |
+| `ReleaseFlow create(String projectId, String projectName, String releaseId, String normalizedReleaseId, Stage stage)` | `ReleaseFlow create(String projectId, String projectName, String releaseId, String normalizedReleaseId, String stage)` | `Stage` → `String` |
+| any other method that accepted `Stage stage` | now accepts `String stage` | Mechanical |
 
-**Class mapping:** `@RestController` + `@RequestMapping("/api/build-agent/release-flows")`
-
-| HTTP | Path | Delegates To | Guard / Notes |
-|---|---|---|---|
-| GET | `""` | `releaseFlowService.listStitchedSummaries(..., effectiveAgent = BUILD_AGENT, ...)` | `effectiveAgent` forced server-side via `final String effectiveAgent = AgentId.BUILD_AGENT;` (mirroring the Testing Agent controller pattern). Client `agent` query param is ignored |
-| GET | `/{id}` | `releaseFlowService.getById(id, includeArchived)` + `findRequestsForFlow(...)` + same DTO assembly as Deployment/Testing Agent | Call `agentBoundaryGuard.assertFlowBelongsToAgent(id, BUILD_AGENT)` before loading. **Ignore `?linked=` per AD-10** — the controller method does not declare a `linked` parameter |
-
-**Method skeleton for `getById`:**
+**`ReleaseFlowFilter` value class (new):**
 
 ```java
-@GetMapping("/{id}")
-public ResponseEntity<ReleaseFlowDetailDto> getById(
-        @PathVariable String id,
-        @RequestParam(defaultValue = "false") boolean includeArchived,
-        @AuthenticationPrincipal UserContext user) {
-    validateArchivedViewer(includeArchived, user);
-    agentBoundaryGuard.assertFlowBelongsToAgent(id, AgentId.BUILD_AGENT);
+public record ReleaseFlowFilter(
+    String projectId,
+    String releaseId,
+    String stage,          // String, not Stage enum
+    FlowStatus flowStatus,
+    boolean includeArchived
+) {}
+```
 
-    ReleaseFlow rf = releaseFlowService.getById(id, includeArchived);
-    List<Request> visibleRequests = filterVisibleRequests(
-            releaseFlowService.findRequestsForFlow(id, includeArchived),
-            user);
-    if (visibleRequests.isEmpty()) {
-        throw new ForbiddenAppException("view_release_flow");
-    }
-    // DTO assembly identical to Deployment/Testing Agent controllers
+**Call-site impact:** All Deployment Agent, Testing Agent, and Build Agent controllers that previously called `listStitchedSummaries(...)` must choose:
+- Deployment Agent: call `deploymentStitchingService.listStitchedSummaries(...)` (wraps `listByAgent` and applies family-key grouping).
+- Testing Agent and Build Agent: call `releaseFlowService.listByAgent(...)` directly.
+
+**Test matrix additions:**
+
+| Test | Purpose |
+|---|---|
+| `ReleaseFlowServiceTest.listByAgent_scopesByAgentColumn` | `listByAgent("deployment-agent")` returns only deployment-agent flows |
+| `ReleaseFlowServiceTest.listByAgent_excludesNullAgent` | Legacy `agent IS NULL` rows are invisible |
+| `ReleaseFlowServiceTest.listByAgent_filtersByStageString` | `filter.stage = "UAT"` restricts by String column value |
+| `ReleaseFlowServiceTest.getById_worksForAnyAgent` | `getById` is agent-agnostic; controllers layer on the guard |
+
+---
+
+### M4. `ReleaseFlowProgressionService.progressAfterDecision(..., StagePipeline)`
+
+**Purpose:** Accept the caller's `StagePipeline` as a method parameter instead of relying on a shared `Stage.next()`. Architecture PL-4.
+
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/ReleaseFlowProgressionService.java`
+
+**Signature change:**
+
+```java
+// Before
+public ProgressionResult progressAfterDecision(
+        String releaseFlowId,
+        DecisionOutcome outcome,
+        UserContext actor) { ... }
+
+// After
+public ProgressionResult progressAfterDecision(
+        String releaseFlowId,
+        DecisionOutcome outcome,
+        UserContext actor,
+        StagePipeline stagePipeline) { ... }
+```
+
+**Algorithm diff (only the terminal-stage branch changes):**
+
+```java
+// Before (v2)
+Stage currentStage = releaseFlow.getCurrentStage();
+Stage nextStage = currentStage.next();
+if (nextStage == null) {
+    releaseFlow.setFlowStatus(FlowStatus.Completed);
+} else {
+    releaseFlow.setCurrentStage(nextStage);
+    advanceToStage(releaseFlow, nextStage);
+}
+
+// After (v3)
+String currentStage = releaseFlow.getCurrentStage();
+Optional<String> nextStage = stagePipeline.next(currentStage);
+if (nextStage.isEmpty()) {
+    releaseFlow.setFlowStatus(FlowStatus.Completed);
+} else {
+    releaseFlow.setCurrentStage(nextStage.get());
+    advanceToStage(releaseFlow, nextStage.get());
 }
 ```
 
-**Intentional omission of `linked`:** The controller method does not declare `@RequestParam linked`. A client passing `?linked=1,2` is silently ignored. If a future requirement wants explicit rejection with 400, add a parameter and throw `ValidationAppException`.
+**Caller update pattern** (in every Agent Module's decision controller):
 
-#### 3.2 BuildAgentUploadController
+```java
+releaseFlowProgressionService.progressAfterDecision(
+        flowId,
+        outcome,
+        userContext,
+        myAgentStagePipeline   // Build: buildStagePipeline, Deployment: deploymentStagePipeline, ...
+);
+```
 
-**File:** `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentUploadController.java`
+**Test matrix additions:**
 
-**Class mapping:** `@RestController` + `@RequestMapping("/api/build-agent/upload")`
-
-| HTTP | Path | Delegates To | Guard / Notes |
-|---|---|---|---|
-| POST | `""` | `importService.importFile(fileBytes, Stage.DEV, user, ..., AgentId.BUILD_AGENT)` | Client-supplied stage and agent parameters are discarded; the controller passes `Stage.DEV` and `AgentId.BUILD_AGENT` explicitly to the existing `importFile` overload |
-| GET | `/template` | Invokes the shared `uploadTemplateService.generateTemplate()` backend generator (same content as Deployment/Testing Agent) and returns it with `Content-Disposition: attachment; filename="build-request-template.xlsx"`, following the per-agent naming pattern already used by Testing Agent (`testing-request-template.xlsx`). | — |
-
-**Binding decision:** No new `ImportService` overload is needed. The existing `importFile(byte[], Stage, UserContext, ..., String agent)` signature already accepts both the stage and the agent as explicit parameters (ref: `ImportService.java:60`). The Build Agent upload controller passes `Stage.DEV` and `AgentId.BUILD_AGENT` directly.
-
-#### 3.3 BuildAgentTaskController
-
-**File:** `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentTaskController.java`
-
-**Class mapping:** `@RestController` + `@RequestMapping("/api/build-agent/tasks")`
-
-| HTTP | Path | Delegates To | Guard |
-|---|---|---|---|
-| GET | `""?requestId=X` | `TaskService.listByRequestId(requestId)` | `assertRequestBelongsToAgent(requestId, BUILD_AGENT)` |
-| GET | `/{id}` | `TaskService.getById(id)` | `assertTaskBelongsToAgent(id, BUILD_AGENT)` |
-| PUT | `/{id}/input` | `TaskService.editInput(id, newInput, user)` | `assertTaskBelongsToAgent(id, BUILD_AGENT)` |
-| GET | `/{id}/executions` | `TaskExecutionHistoryService.findByTaskId(id)` | `assertTaskBelongsToAgent(id, BUILD_AGENT)` |
-| POST | `/{id}/start-manual` | `TaskService.startManualExecution(id, user)` | `assertTaskBelongsToAgent(id, BUILD_AGENT)` |
-| POST | `/{id}/record-result` | `RecordResultService.recordResult(id, summary, logs, user)` | `assertTaskBelongsToAgent(id, BUILD_AGENT)` |
-| POST | `/{id}/submit-auto` | `AutoExecutionService.submitAutoExecution(id, user)` | `assertTaskBelongsToAgent(id, BUILD_AGENT)` |
-
-**List-by-request guard note:** `GET /tasks?requestId=X` may return zero tasks for a valid but empty request. The guard loads the parent request (not a task) and checks its `agent`. This is why `AgentBoundaryGuard` exposes `assertRequestBelongsToAgent` as a distinct method.
-
-#### 3.4 BuildAgentDecisionController
-
-**File:** `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentDecisionController.java`
-
-**Class mapping:** `@RestController` + `@RequestMapping("/api/build-agent/tasks")`
-
-| HTTP | Path | Delegates To | Guard |
-|---|---|---|---|
-| POST | `/{id}/decision` | `DecisionEngine.applyDecision(id, decision, user, comment)` then `ReleaseFlowProgressionService.progressAfterDecision(id)` | `assertTaskBelongsToAgent(id, BUILD_AGENT)` before either call |
-
-Mirror of `DecisionController` exactly: call the guard first, then apply the decision, then progress the flow. Both domain calls execute in the same request handler.
-
-**Internal Design Concerns for all Build Agent controllers**
-- No business logic inside controllers — pure delegation with the guard wrapping each protected call
-- Authorization follows the existing imperative-validation pattern: reuse `validateArchivedViewer`, `validateRequestScope`, `validateRundownOperator`, `validateAdmin`, etc. as helpers
-- `UserContext` resolution via `@AuthenticationPrincipal` matches Deployment Agent
-- Optimistic locking (`@Version`) applies transparently through the shared entities
-- Error responses (400, 403, 404, 409, 422) follow the same patterns via `GlobalExceptionHandler`
-- Audit entries are produced by the domain services; because of the `AuditLoggerService` fix (Module 1.5), audit entries for Build Agent actions carry `agentName = "build-agent"` automatically without any controller-level audit plumbing
+| Test | Purpose |
+|---|---|
+| `ReleaseFlowProgressionServiceTest.terminalStage_marksCompleted` | Parameterized over three pipelines: PROD terminal, UAT terminal (testing), DEV terminal (build) |
+| `ReleaseFlowProgressionServiceTest.nonTerminalStage_advancesPerPipeline` | Deployment pipeline SIT → UAT → PROD |
+| `ReleaseFlowProgressionServiceTest.wrongPipeline_doesNotCrossAgents` | Passing `buildStagePipeline` to a flow currently at `"SIT"`: `next("SIT")` returns `Optional.empty()` so the flow is marked Completed (not auto-advanced into the Deployment pipeline) |
 
 ---
 
-### Module 4: Frontend API Client and Modules
+### M5. `ReleaseFlow` and `Request` Entity Attribute Changes
 
-**File:** `frontend/src/api/buildAgentClient.ts`
+**Purpose:** JPA attribute type change from `Stage` enum to `String`. Architecture PL-3.
 
-```typescript
+**Files:**
+- `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/ReleaseFlow.java`
+- `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/Request.java`
+
+**`ReleaseFlow` diff:**
+
+```java
+// Before
+@Enumerated(EnumType.STRING)
+@Column(name = "current_stage", length = 10, nullable = false)
+private Stage currentStage;
+
+// After
+@Column(name = "current_stage", length = 10, nullable = false)
+private String currentStage;
+```
+
+**`Request` diff:**
+
+```java
+// Before
+@Enumerated(EnumType.STRING)
+@Column(name = "stage", length = 10, nullable = false)
+private Stage stage;
+
+// After
+@Column(name = "stage", length = 10, nullable = false)
+private String stage;
+```
+
+**Schema impact:** None. DB column is `VARCHAR(10)` on Oracle and H2 already; existing persisted values (`"SIT"`, `"UAT"`, `"PROD"`) remain valid.
+
+**Import impact:** Any import statement referencing `com.wwa.deploymentagent.contracts.enums.Stage` is removed throughout Platform Core. Agent Modules import their own per-agent Stage enum at their controller layer only.
+
+**Test regression:** The existing `ReleaseFlowRepositoryIntegrationTest` and `RequestRepositoryIntegrationTest` must continue to pass after changing `.setStage(Stage.SIT)` to `.setStage("SIT")`. A one-time mechanical refactor.
+
+---
+
+### M6. `ReleaseFlowListItemDto` Generic Stage Map
+
+**Purpose:** Replace fixed positional stage fields with a generic Map. Architecture PL-7.
+
+**File:** `src/main/java/com/wwa/deploymentagent/platform/contracts/dto/ReleaseFlowListItemDto.java`
+
+**New record signature:**
+
+```java
+public record ReleaseFlowListItemDto(
+        String id,
+        String projectId,
+        String projectName,
+        String releaseId,
+        String normalizedReleaseId,
+        String currentStage,                        // ← was Stage enum
+        FlowStatus flowStatus,
+        ReviewStatus reviewStatus,
+        Instant archivedAt,
+        String archivedBy,
+        String application,
+        String snowGroup,
+        String agent,
+        String owner,
+        Map<String, RequestStatus> stageStatuses,   // ← new
+        Set<String> stagesPresent,                  // ← new
+        boolean stitched,
+        int linkedReleaseCount,
+        List<String> linkedReleaseIds,
+        List<String> linkedReleaseFlowIds
+) {
+    public static final String ATTEMPT_VIEW_LATEST = "latest";
+    public static final String ATTEMPT_VIEW_HISTORY = "history";
+
+    public static ReleaseFlowListItemDto from(ReleaseFlow rf, List<Request> requests) {
+        return from(rf, requests, ATTEMPT_VIEW_LATEST);
+    }
+
+    public static ReleaseFlowListItemDto from(ReleaseFlow rf, List<Request> requests, String attemptView) {
+        Request scopeRequest = scopeRequestFor(rf, requests);
+        Set<String> observedStages = requests.stream()
+                .filter(r -> r.getArchivedAt() == null)
+                .map(Request::getStage)
+                .collect(Collectors.toUnmodifiableSet());
+        Map<String, RequestStatus> stageStatuses = observedStages.stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        stage -> stage,
+                        stage -> requestStatusFor(requests, stage, attemptView)));
+        return new ReleaseFlowListItemDto(
+                rf.getId(),
+                rf.getProjectId(),
+                rf.getProjectName(),
+                rf.getReleaseId(),
+                rf.getNormalizedReleaseId(),
+                rf.getCurrentStage(),
+                rf.getFlowStatus(),
+                rf.getReviewStatus(),
+                rf.getArchivedAt(),
+                rf.getArchivedBy(),
+                scopeRequest != null && scopeRequest.getApplication() != null
+                        ? scopeRequest.getApplication()
+                        : rf.getProjectName(),
+                scopeRequest != null ? scopeRequest.getSnowGroup() : null,
+                scopeRequest != null ? scopeRequest.getAgent() : null,
+                scopeRequest != null ? scopeRequest.getOwner() : null,
+                stageStatuses,
+                observedStages,
+                false,
+                1,
+                List.of(rf.getReleaseId()),
+                List.of(rf.getId())
+        );
+    }
+
+    // requestStatusFor(...) is parameterized on String stage instead of Stage enum.
+    // scopeRequestFor(...) uses String.equals instead of enum reference equality.
+    // Helper bodies otherwise identical to v2.
+}
+```
+
+**Test matrix (`ReleaseFlowListItemDtoTest`):**
+
+| Input flow | Assertions |
+|---|---|
+| DEV-only requests | `stageStatuses.keySet() == {"DEV"}`, `stagesPresent == {"DEV"}` |
+| SIT + UAT requests | `stageStatuses.keySet() == {"SIT", "UAT"}`, `stagesPresent == {"SIT", "UAT"}` |
+| Single PROD request | `stageStatuses == {"PROD" → derived status}`, `stagesPresent == {"PROD"}` |
+| Empty requests | `stageStatuses.isEmpty()`, `stagesPresent.isEmpty()` |
+| Flow with archived DEV requests only | `stagesPresent` excludes archived (current filter on `archivedAt == null`) |
+
+**Breaking change traceability:** All v2 test assertions referencing `item.sitStatus()`, `item.devPresent()`, etc. must be migrated to `item.stageStatuses().get("SIT")` and `item.stagesPresent().contains("DEV")`.
+
+---
+
+### M7. `ReleaseFlowAggregation` with Observed-Stage Iteration
+
+**Purpose:** Replace `Stage.values()` iteration with iteration over observed stage strings. Architecture PL-3 consequence.
+
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/releaseflow/ReleaseFlowAggregation.java`
+
+**Algorithm diff (conceptual):**
+
+```java
+// Before
+public static FlowStatus aggregateFlowStatus(List<Request> requests) {
+    for (Stage stage : Stage.values()) {
+        List<Request> stageRequests = requests.stream()
+                .filter(r -> r.getStage() == stage)
+                .toList();
+        // ... aggregate per stage ...
+    }
+}
+
+// After
+public static FlowStatus aggregateFlowStatus(List<Request> requests) {
+    Set<String> observedStages = requests.stream()
+            .map(Request::getStage)
+            .collect(Collectors.toUnmodifiableSet());
+    for (String stage : observedStages) {
+        List<Request> stageRequests = requests.stream()
+                .filter(r -> stage.equals(r.getStage()))
+                .toList();
+        // ... aggregate per stage ...
+    }
+}
+```
+
+**Semantic equivalence proof:** The v2 loop iterated over `Stage.values()` and skipped empty buckets; the v3 loop iterates only over non-empty buckets. These are the same set. No observable behavior change.
+
+**Test regression:** `ReleaseFlowAggregationTest` must pass unchanged after the method is rewritten.
+
+---
+
+### M8. `AuditLoggerService` Dynamic `agentName`
+
+**Purpose:** Remove hardcoded `"deployment-agent"` literal and the v2 null fallback. Architecture PL-11.
+
+**File:** `src/main/java/com/wwa/deploymentagent/platform/domain/audit/AuditLoggerService.java`
+
+**Diff (line ~61):**
+
+```java
+// Before
+entry.setAgent(scope.agent());
+entry.setAgentName("deployment-agent");
+entry.setSourceSystem("wwa-api");
+
+// After
+entry.setAgent(scope.agent());
+entry.setAgentName(scope.agent());   // null fallback removed; PL-6 guarantees non-null
+entry.setSourceSystem("wwa-api");
+```
+
+**Precondition:** Under PL-6, every write path flows through an Agent Module controller that has already forced an agent context. If a test or future path ever calls `AuditLoggerService.log(...)` with `scope.agent() == null`, it is a contract violation. Add an assertion:
+
+```java
+if (scope.agent() == null) {
+    throw new IllegalStateException(
+            "AuditLoggerService.log called with null scope.agent(); "
+                    + "every write path must flow through an Agent Module controller. "
+                    + "Check that the caller is not bypassing the agent module layer.");
+}
+```
+
+**Test matrix (`AuditLoggerServiceTest`):**
+
+| Scenario | Expected `agentName` |
+|---|---|
+| Build Agent request scope (`agent = "build-agent"`) | `"build-agent"` |
+| Testing Agent request scope | `"testing-agent"` |
+| Deployment Agent request scope | `"deployment-agent"` |
+| Null scope agent | `IllegalStateException` |
+
+---
+
+### M9. Platform Capability Controllers at `/api/platform/*`
+
+**Purpose:** Move 5 capability controllers out of the Deployment Agent prefix. Architecture §API Boundaries.
+
+**Files moved to `src/main/java/com/wwa/deploymentagent/platform/web/shared/`:**
+
+| Old location | New location | New class name (unchanged) |
+|---|---|---|
+| `web/controller/AuthController` | `platform/web/shared/AuthController` | `AuthController` |
+| `web/controller/AuditLogController` | `platform/web/shared/AuditLogController` | `AuditLogController` |
+| `web/controller/ConfigurationController` | `platform/web/shared/ConfigurationController` | `ConfigurationController` |
+| `web/controller/AccessGrantController` | `platform/web/shared/AccessGrantController` | `AccessGrantController` |
+| *(from `UploadController`'s template methods)* | `platform/web/shared/TemplateDownloadController` | **new class**, extracted from current Upload controller |
+
+**`@RequestMapping` prefix changes:**
+
+| Class | Old | New |
+|---|---|---|
+| `AuthController` | `/api/deployment-agent/auth` | `/api/platform/auth` |
+| `AuditLogController` | `/api/deployment-agent/audit-logs` | `/api/platform/audit-logs` |
+| `ConfigurationController` | `/api/deployment-agent/config` | `/api/platform/config` |
+| `AccessGrantController` | `/api/deployment-agent/access-grants` | `/api/platform/access-grants` |
+| `TemplateDownloadController` | *(currently lives under upload paths)* | `/api/platform/templates` |
+
+**Required `SecurityConfig.java:36` edit:**
+
+```java
+// Before
+.requestMatchers("/api/deployment-agent/auth/login").permitAll()
+
+// After
+.requestMatchers("/api/platform/auth/login").permitAll()
+```
+
+**Gate test (`PlatformRouteMigrationTest`):**
+
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Unauthenticated `POST /api/platform/auth/login` with valid credentials | 2xx |
+| 2 | Unauthenticated `POST /api/deployment-agent/auth/login` | 401 (old route no longer exists) |
+| 3 | Log in at `/api/platform/auth/login`, then `GET /api/deployment-agent/release-flows` with the returned cookie | 2xx (cookie works across prefixes) |
+| 4 | Log in at `/api/platform/auth/login`, then `GET /api/build-agent/release-flows` with the same cookie | 2xx |
+
+---
+
+### M10. Frontend Platform Core
+
+**Location:** `frontend/src/platform/`
+
+**New files:**
+
+| File | Responsibility |
+|---|---|
+| `api/platformClient.ts` | Axios instance with `baseURL: '/api/platform'`; 401 interceptor |
+| `api/auth.ts` | `login`, `logout`, `checkSession` bound to `platformClient` |
+| `api/audit.ts` | `listAuditLogs` bound to `platformClient` |
+| `api/config.ts` | `listConfig`, `listConfigComponents`, `updateConfig`, `updateConfigComponent`, `deleteConfigComponent` bound to `platformClient` |
+| `api/accessGrants.ts` | All 6 access grant methods bound to `platformClient` |
+| `api/templates.ts` | `downloadTemplate(agentKey)` → `GET /api/platform/templates/{templateId}` |
+| `stores/user.ts` | Moved from `frontend/src/stores/` |
+| `stores/audit.ts` | Moved from `frontend/src/stores/` |
+| `stores/config.ts` | Moved from `frontend/src/stores/` |
+| `stores/accessGrants.ts` | Moved from `frontend/src/stores/` |
+| `components/UploadDialog.vue` | Moved from `frontend/src/components/` (already agent-agnostic) |
+| `components/AgentSummaryView.vue` | **New** — generic summary view; reads `stageStatuses` from DTO |
+| `components/AgentDetailView.vue` | **New** — generic detail view; passes through `?linked=` query param |
+| `composables/createAgentWorkspace.ts` | **New** — factory (see M11) |
+| `composables/createReleaseFlowStore.ts` | **New** — Pinia store factory |
+| `composables/createReleaseFlowApi.ts` | **New** — Axios + CRUD factory |
+| `config/agentRegistry.ts` | Moved from `frontend/src/config/` |
+| `config/agentId.ts` | Moved from `frontend/src/config/` (add `BUILD_AGENT`) |
+| `views/LoginView.vue` | Moved from `frontend/src/views/` |
+| `views/WwaHomeView.vue` | Moved |
+| `views/WorkspaceLayout.vue` | Moved |
+| `views/AuditLogView.vue` | Moved |
+| `views/ConfigAdminView.vue` | Moved |
+| `views/AccessManagementView.vue` | Moved |
+| `views/TemplateManagementView.vue` | Moved |
+
+**`platformClient.ts` full content:**
+
+```ts
 import axios from 'axios'
+import router from '@/router'
 
-const buildAgentClient = axios.create({
-  baseURL: '/api/build-agent',
+const platformClient = axios.create({
+  baseURL: '/api/platform',
+  headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
 
-buildAgentClient.interceptors.response.use(
-  response => response,
-  error => {
+platformClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
     if (error.response?.status === 401) {
-      window.location.href = '/login'
+      const currentPath = window.location.pathname
+      if (currentPath !== '/login') {
+        router.push('/login')
+      }
     }
-    return Promise.reject(error)
-  }
+    const message =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      'An unexpected error occurred'
+    return Promise.reject(new Error(message))
+  },
 )
 
-export default buildAgentClient
+export default platformClient
 ```
 
-**Duplicated API modules** (duplicate-first, extract-later):
+---
 
-| New File | Duplicated From | Changes |
+### M11. `createAgentWorkspace` Factory
+
+**Purpose:** Eliminate per-agent copy-paste of store/api/view boilerplate. Architecture PL-8.
+
+**File:** `frontend/src/platform/composables/createAgentWorkspace.ts`
+
+**Public signature:**
+
+```ts
+import axios, { type AxiosInstance } from 'axios'
+import type { DefineStoreOptions, StoreDefinition } from 'pinia'
+import type { Component, RouteRecordRaw } from 'vue-router'
+
+export interface AgentWorkspaceConfig {
+  key: string                     // e.g. 'build-agent'
+  name: string                    // e.g. 'Build Agent'
+  apiBase: string                 // e.g. '/api/build-agent'
+  stages: string[]                // e.g. ['DEV']
+  supportsStitching: boolean      // false for Build / Testing, true for Deployment
+  stageFilter?: 'dropdown' | 'disabled-input'   // default 'dropdown'
+}
+
+export interface AgentWorkspace {
+  key: string
+  name: string
+  client: AxiosInstance
+  api: AgentReleaseFlowApi
+  store: StoreDefinition
+  SummaryView: Component
+  DetailView: Component
+  routes: RouteRecordRaw[]
+}
+
+export function createAgentWorkspace(config: AgentWorkspaceConfig): AgentWorkspace {
+  const client = createClient(config)
+  const api = createReleaseFlowApi(client, config)
+  const store = createReleaseFlowStore(config, api)
+  const SummaryView = createSummaryView(config, store)
+  const DetailView = createDetailView(config, store)
+  const routes: RouteRecordRaw[] = [
+    { path: `/wwa/${config.key}`, component: SummaryView, name: `${config.key}-summary` },
+    { path: `/wwa/${config.key}/release-flows/:id`, component: DetailView, name: `${config.key}-detail`, props: true },
+  ]
+  return { key: config.key, name: config.name, client, api, store, SummaryView, DetailView, routes }
+}
+```
+
+**Sub-factory responsibilities:**
+
+| Helper | Location | Job |
 |---|---|---|
-| `frontend/src/api/buildAgentReleaseFlows.ts` | `testingAgentReleaseFlows.ts` | `import client from './buildAgentClient'`; **remove** any `linked` parameter from `getById` |
-| `frontend/src/api/buildAgentUpload.ts` | `testingAgentUpload.ts` | `import client from './buildAgentClient'`; upload function does not send `stage` (server forces DEV) |
-| `frontend/src/api/buildAgentTasks.ts` | `testingAgentTasks.ts` | `import client from './buildAgentClient'` |
+| `createClient` | inline in `createAgentWorkspace.ts` | Returns `axios.create({ baseURL: config.apiBase, withCredentials: true, ... })` with the same 401 interceptor as `platformClient` |
+| `createReleaseFlowApi` | `composables/createReleaseFlowApi.ts` | Returns `{ list, getById, uploadExcel, downloadTemplate, listTasks, getTask, editInput, startManual, submitAuto, recordResult, getExecutions, applyDecision }` — each delegates to `client` with the appropriate URL |
+| `createReleaseFlowStore` | `composables/createReleaseFlowStore.ts` | Returns `defineStore(\`${config.key}-release-flow\`, ...)` with state: `list`, `detail`, `loading`, `error`; actions: `fetchList`, `fetchDetail`, `uploadFile` |
+| `createSummaryView` | inline | Returns a Vue component that wraps `AgentSummaryView` with config-bound props (`stages`, `stageFilter`, `api`, `store`) |
+| `createDetailView` | inline | Returns a Vue component that wraps `AgentDetailView`; reads `route.params.id` and optionally `route.query.linked` if `supportsStitching` is true |
 
-**Agent ID constants file:** `frontend/src/config/agentId.ts` (create if not present); extend with `BUILD: 'build-agent'`.
+**Critical design note:** `supportsStitching` only affects *whether the DetailView reads `?linked=` and passes it through*. The backend decides what to do with the parameter. The frontend does not know what "stitching" means.
 
----
+**Test matrix (`createAgentWorkspace.test.ts`):**
 
-### Module 5: Frontend Store
-
-**File:** `frontend/src/stores/buildAgentReleaseFlow.ts`
-
-Duplicate `testingAgentReleaseFlow.ts` with:
-
-- Store ID: `'buildAgentReleaseFlow'`
-- API imports: `buildAgentReleaseFlows`, `buildAgentUpload`, `buildAgentTasks`
-- **Remove** any code path that handles a `linked` query parameter
-
----
-
-### Module 6: Frontend Views
-
-#### 6.1 BuildAgentSummaryView.vue
-
-Duplicate `TestingAgentSummaryView.vue` with:
-
-- Store: `useBuildAgentReleaseFlowStore`
-- API imports: `buildAgentReleaseFlows`, `buildAgentUpload`
-- Page title: `"Build Agent"`; description references DEV phase only
-- `const stages = ['DEV']`
-- `UploadDialog` prop: `:allowed-stages="['DEV']"`
-- Stage filter: disabled input showing `DEV`
-- Summary row renderer reads `row.devStatus` / `row.devPresent` for the single DEV stage column
-- Detail route path: `/wwa/build-agent/release-flows/`
-
-#### 6.2 BuildAgentDetailView.vue
-
-Duplicate `TestingAgentDetailView.vue` with:
-
-- Store: `useBuildAgentReleaseFlowStore`
-- API imports: `buildAgentReleaseFlows`, `buildAgentTasks`
-- Page title / breadcrumb: `"Build Agent"`
-- Summary route path: `/wwa/build-agent`
-- Stage tabs: only the `DEV` tab
-- **Remove** the `linkedFlowQuery` computed and any `route.query.linked` usage (AD-10)
-
-**Deployment/Testing Agent views remain untouched.**
+| Test | Assertion |
+|---|---|
+| Build Agent config → `workspace.client.defaults.baseURL` | `'/api/build-agent'` |
+| Build Agent config → `workspace.routes.length` | `2` |
+| Build Agent config → `workspace.routes[0].path` | `'/wwa/build-agent'` |
+| Build Agent config → `workspace.SummaryView` props | `stages: ['DEV']`, `stageFilter: 'disabled-input'` |
+| Build Agent DetailView with `?linked=abc` in route | query param **not** passed to API (because `supportsStitching: false`) |
+| Deployment Agent DetailView with `?linked=abc` | query param **is** passed to API (because `supportsStitching: true`) |
+| Two workspaces with different keys | `store` instances are distinct (Pinia store IDs differ) |
 
 ---
 
-### Module 7: Agent Registry and Router
+## 3. Module Design — Deployment Agent Module
 
-**File:** `frontend/src/config/agentRegistry.ts`
+**Location:** `com.wwa.deploymentagent.agents.deployment.*` (backend), `frontend/src/agents/deployment/` (frontend)
 
-- Extend `AgentCategory` type: `'deployment' | 'testing' | 'build' | 'platform' | 'other'`
-- Add Build Agent entry with icon `🔨`, description referencing the DEV phase, `enabled: true`, `category: 'build'`
+### D1. `DeploymentStage` + `DeploymentStagePipeline`
 
-**File:** `frontend/src/router/index.ts`
+```java
+// agents/deployment/domain/DeploymentStage.java
+package com.wwa.deploymentagent.agents.deployment.domain;
 
-- Add two child routes under `/wwa`:
-  - `build-agent` → `BuildAgentSummaryView`
-  - `build-agent/release-flows/:id` → `BuildAgentDetailView`
+public enum DeploymentStage {
+    SIT, UAT, PROD;
 
----
+    public static DeploymentStage fromString(String s) {
+        return DeploymentStage.valueOf(s);
+    }
+}
+```
 
-## API / Interface Design
+```java
+// agents/deployment/domain/DeploymentStagePipeline.java
+package com.wwa.deploymentagent.agents.deployment.domain;
 
-### Build Agent API Contracts
+import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import org.springframework.stereotype.Component;
 
-All Build Agent endpoints mirror the actual Deployment Agent routes. Request/response shapes are identical. The only differences are:
+import java.util.List;
+import java.util.Optional;
 
-1. **URL prefix** `/api/build-agent/`
-2. **Server-side forcing** of `agent = "build-agent"` and (on upload only) `stage = "DEV"`
-3. **Agent boundary guard** applied before any delegation to domain services
-4. **No `?linked=` support** on the detail endpoint (AD-10)
+@Component
+public class DeploymentStagePipeline implements StagePipeline {
 
-### Full Endpoint List
+    private static final List<String> ORDER = List.of("SIT", "UAT", "PROD");
 
-| Method | Endpoint | Guard |
+    @Override
+    public Optional<String> next(String currentStage) {
+        int idx = ORDER.indexOf(currentStage);
+        if (idx < 0 || idx == ORDER.size() - 1) {
+            return Optional.empty();
+        }
+        return Optional.of(ORDER.get(idx + 1));
+    }
+
+    @Override
+    public boolean isTerminal(String stage) {
+        int idx = ORDER.indexOf(stage);
+        return idx < 0 || idx == ORDER.size() - 1;
+    }
+
+    @Override
+    public List<String> orderedStages() {
+        return ORDER;
+    }
+}
+```
+
+### D2. `ReleaseFlowFamilyKey` (Relocated, Regex Unchanged)
+
+**File move:** `platform/domain/releaseflow/ReleaseFlowFamilyKey.java` → `agents/deployment/domain/ReleaseFlowFamilyKey.java`.
+
+**Package declaration** updates. **No regex changes.** The existing `STAGE_PREFIX_WITH_SEPARATOR` pattern `^(sit|uat|prod)...` is kept as-is. No `dev` token added.
+
+**Visibility:** The class becomes package-private; only `DeploymentStitchingService` in the same package calls it. Existing public methods become package-private.
+
+### D3. `DeploymentStitchingService`
+
+**File:** `agents/deployment/domain/DeploymentStitchingService.java`
+
+**Purpose:** Owns the stitching algorithm that v2 `ReleaseFlowService.listStitchedSummaries` and `getStitchedDetail` implemented. Migrated verbatim with:
+- Package path updated
+- Stage parameters that were `Stage` enum → `String`
+- Calls `ReleaseFlowService.listByAgent(...)` to fetch the base flows before grouping
+
+**Public surface:**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class DeploymentStitchingService {
+
+    private final ReleaseFlowService releaseFlowService;
+    private final RequestRepository requestRepository;
+
+    public Page<ReleaseFlowListItemDto> listStitchedSummaries(
+            ReleaseFlowFilter filter,
+            String attemptView,
+            Pageable pageable,
+            UserContext user) { ... }
+
+    public ReleaseFlowDetailDto getStitchedDetail(
+            String releaseFlowId,
+            List<String> linkedFlowIds,
+            boolean includeArchived,
+            UserContext user) { ... }
+}
+```
+
+**Algorithm references:** The body of `listStitchedSummaries` and `getStitchedDetail` is copied from the current `ReleaseFlowService.java:172–300` with the refactor steps described in §4 Algorithms.
+
+### D4. Deployment Agent Backend Controllers
+
+**Files under `agents/deployment/web/`:**
+
+| Class | `@RequestMapping` | Replaces |
 |---|---|---|
-| GET | `/api/build-agent/release-flows` | agent filter in query forced to `BUILD_AGENT` |
-| GET | `/api/build-agent/release-flows/{id}` | `assertFlowBelongsToAgent` |
-| POST | `/api/build-agent/upload` | stage + agent forced server-side |
-| GET | `/api/build-agent/upload/template` | — |
-| GET | `/api/build-agent/tasks?requestId=X` | `assertRequestBelongsToAgent` |
-| GET | `/api/build-agent/tasks/{id}` | `assertTaskBelongsToAgent` |
-| PUT | `/api/build-agent/tasks/{id}/input` | `assertTaskBelongsToAgent` |
-| GET | `/api/build-agent/tasks/{id}/executions` | `assertTaskBelongsToAgent` |
-| POST | `/api/build-agent/tasks/{id}/start-manual` | `assertTaskBelongsToAgent` |
-| POST | `/api/build-agent/tasks/{id}/record-result` | `assertTaskBelongsToAgent` |
-| POST | `/api/build-agent/tasks/{id}/submit-auto` | `assertTaskBelongsToAgent` |
-| POST | `/api/build-agent/tasks/{id}/decision` | `assertTaskBelongsToAgent` |
+| `DeploymentReleaseFlowController` | `/api/deployment-agent/release-flows` | `web/controller/ReleaseFlowController` |
+| `DeploymentUploadController` | `/api/deployment-agent/upload` | `web/controller/UploadController` |
+| `DeploymentTaskController` | `/api/deployment-agent/tasks` | `web/controller/TaskController` |
+| `DeploymentDecisionController` | `/api/deployment-agent/tasks/{taskId}/decision` | `web/controller/DecisionController` |
 
-### Error Behavior
+**Controller skeleton (`DeploymentReleaseFlowController`):**
 
-Same HTTP codes as Deployment Agent (400, 401, 403, 404, 409, 422). Agent boundary violations return HTTP 404 with the standard `NotFoundAppException` body to avoid leaking task/flow IDs across namespaces.
+```java
+@RestController
+@RequestMapping("/api/deployment-agent/release-flows")
+@RequiredArgsConstructor
+public class DeploymentReleaseFlowController {
 
----
+    private final ReleaseFlowService releaseFlowService;
+    private final DeploymentStitchingService stitchingService;
+    private final AgentBoundaryGuard boundaryGuard;
+    private final DeploymentStagePipeline stagePipeline;
 
-## Data Design
+    @GetMapping
+    public Page<ReleaseFlowListItemDto> list(
+            @RequestParam(required = false) String projectId,
+            @RequestParam(required = false) String releaseId,
+            @RequestParam(required = false) String stage,
+            @RequestParam(required = false) FlowStatus flowStatus,
+            @RequestParam(defaultValue = "false") boolean includeArchived,
+            @RequestParam(defaultValue = "latest") String attemptView,
+            Pageable pageable,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+        ReleaseFlowFilter filter = new ReleaseFlowFilter(
+                projectId, releaseId, stage, flowStatus, includeArchived);
+        return stitchingService.listStitchedSummaries(filter, attemptView, pageable, auth.getUserContext());
+    }
 
-### No Schema Changes
+    @GetMapping("/{id}")
+    public ReleaseFlowDetailDto getById(
+            @PathVariable String id,
+            @RequestParam(required = false) List<String> linked,
+            @RequestParam(defaultValue = "false") boolean includeArchived,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+        boundaryGuard.assertFlowBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
+        if (linked != null && !linked.isEmpty()) {
+            linked.forEach(linkedId -> boundaryGuard.assertFlowBelongsToAgent(linkedId, AgentId.DEPLOYMENT_AGENT));
+            return stitchingService.getStitchedDetail(id, linked, includeArchived, auth.getUserContext());
+        }
+        ReleaseFlow flow = releaseFlowService.getById(id, includeArchived);
+        List<Request> requests = releaseFlowService.findRequestsForFlow(id, includeArchived);
+        return ReleaseFlowDetailDto.from(flow, requests);
+    }
+}
+```
 
-No new tables, columns, or Flyway migrations. The `stage` column accepts the new `'DEV'` string value because both H2 and Oracle store enum values as VARCHAR without enumerated-type constraints.
+Testing Agent and Build Agent controller skeletons are presented in §4 and §5 with the same shape.
 
-### Agent Column and Visibility
+### D5. Deployment Agent Frontend `index.ts`
 
-| Agent Workspace | Upload Behavior | List Visibility | Detail Behavior |
-|---|---|---|---|
-| Deployment Agent | `agent = "deployment-agent"` | **Global view** — shows all persisted flows regardless of agent (build-only rows appear with empty SIT/UAT/PROD columns) | Supports stitched linked view (existing behavior) |
-| Testing Agent | `agent = "testing-agent"` | Agent-scoped — shows only flows with at least one testing-agent request | Supports stitched linked view (existing behavior; R-08 limitation) |
-| Build Agent | `agent = "build-agent"`, `stage = "DEV"` forced | Agent-scoped — shows only flows with at least one build-agent request | Single-flow only; `?linked=` ignored; `assertFlowBelongsToAgent` enforced |
+```ts
+// frontend/src/agents/deployment/index.ts
+import { createAgentWorkspace } from '@/platform/composables/createAgentWorkspace'
 
-### Stitched Summary with DEV (Within-Agent Only)
-
-Because `ReleaseFlowService.listStitchedSummaries` pre-filters by agent:
-
-- Two Build Agent uploads of `DEV-1234` → one stitched summary row in Build Agent
-- A Build Agent `DEV-1234` and a Deployment Agent `SIT-1234` → **separate** summary rows in their respective agents (no cross-agent stitching, tracked as R-14)
-- `linkedReleaseFlowIds` on a Build Agent summary row only contains build-agent flow IDs
-
-The `ReleaseFlowFamilyKey` DEV extension is still required for within-agent deduplication of DEV uploads and for the conservative stripping behavior (never strip `dev-tools`).
-
-### State Models
-
-All Deployment Agent state models apply unchanged. For Build Agent flows, `currentStage = DEV` and `DEV.next() == null` means the progression service's terminal branch marks the flow `Completed` without advancing.
-
----
-
-## UI / User Flow Design
-
-### 1. WWA Home Page
-
-- Build Agent card appears alongside Deployment Agent and Testing Agent cards
-- Card icon: `🔨`; driven by `agentRegistry.ts`
-
-### 2. Sidebar Flyout
-
-- Build Agent as level-2 entry under WWA; driven by `agentRegistry.ts`
-
-### 3. Build Agent Summary
-
-- Page title: "Build Agent"; description references the DEV phase
-- Stage filter: disabled input showing `DEV`
-- Table: single DEV column per row
-- Upload dialog: `:allowed-stages="['DEV']"`; stage selector disabled
-
-### 4. Build Agent Detail
-
-- Single DEV stage tab
-- `?linked=` query parameter is not read
-- Breadcrumb: `WWA > Build Agent > Release Flow`
-
-### 5. Deployment Agent Summary (Observed Change)
-
-Deployment Agent visibility is unchanged by this MVP, but build-only flows uploaded via Build Agent will appear in the Deployment Agent summary as rows with empty SIT/UAT/PROD columns (per AD-12 and R-13). No code change in Deployment Agent frontend; this is the natural consequence of Deployment Agent's existing global-view behavior.
+export const deploymentAgentWorkspace = createAgentWorkspace({
+  key: 'deployment-agent',
+  name: 'Deployment Agent',
+  apiBase: '/api/deployment-agent',
+  stages: ['SIT', 'UAT', 'PROD'],
+  supportsStitching: true,
+  stageFilter: 'dropdown',
+})
+```
 
 ---
 
-## Workflow / Execution Design
+## 4. Module Design — Testing Agent Module
 
-Build Agent workflow is identical to Deployment/Testing Agent workflows except:
+### T1. `TestingStage` + `TestingStagePipeline`
 
-1. Upload forces `stage = DEV`
-2. Flows terminate at the end of DEV (no auto-advance)
-3. Task and flow operations enforce the agent boundary
+```java
+// agents/testing/domain/TestingStage.java
+public enum TestingStage {
+    UAT;
+}
+```
 
-All flows defined in `design.md` sections 1–7 apply without modification otherwise.
+```java
+// agents/testing/domain/TestingStagePipeline.java
+@Component
+public class TestingStagePipeline implements StagePipeline {
+    @Override public Optional<String> next(String currentStage) { return Optional.empty(); }
+    @Override public boolean isTerminal(String stage) { return true; }
+    @Override public List<String> orderedStages() { return List.of("UAT"); }
+}
+```
 
----
+### T2. Testing Agent Backend Controllers
 
-## Security / Audit / Reliability Design
+| Old class | New class | Behavioral change |
+|---|---|---|
+| `web/controller/TestingAgentReleaseFlowController` | `agents/testing/web/TestingReleaseFlowController` | Calls `releaseFlowService.listByAgent("testing-agent", ...)` instead of `listStitchedSummaries`. Invokes `AgentBoundaryGuard` on `getById` |
+| `web/controller/TestingAgentUploadController` | `agents/testing/web/TestingUploadController` | Unchanged behavior; forces `agent = "testing-agent"` |
+| `web/controller/TestingAgentTaskController` | `agents/testing/web/TestingTaskController` | **New:** invokes `AgentBoundaryGuard` on every task ID (closes v2 R-08) |
+| *(new)* | `agents/testing/web/TestingDecisionController` | Extracted from task controller; passes `testingStagePipeline` into progression |
 
-### Access Control
+### T3. Testing Agent Frontend `index.ts`
 
-- Same session-based authentication
-- Same deny-by-default Access Grants
-- Same scope-based visibility (`Application + SNOW Group`)
-- Build Agent controllers use imperative validation helpers, consistent with Deployment/Testing Agent (no `@PreAuthorize`)
+```ts
+// frontend/src/agents/testing/index.ts
+import { createAgentWorkspace } from '@/platform/composables/createAgentWorkspace'
 
-### Agent Isolation Security
-
-- Build Agent list forces `effectiveAgent = BUILD_AGENT`
-- Build Agent upload forces `agent` and `stage` server-side
-- Task-level endpoints invoke `assertTaskBelongsToAgent` before any domain call
-- Request-scoped task listing invokes `assertRequestBelongsToAgent`
-- Flow detail endpoint invokes `assertFlowBelongsToAgent`
-- Boundary violations return HTTP 404
-
-### Audit Design (Shared Fix)
-
-`AuditLoggerService.log` derives `agentName` from `scope.agent()` with a fallback to `"deployment-agent"` for null. This is a single one-line change inside the existing `log` method. It benefits Build Agent, Testing Agent, and Deployment Agent simultaneously:
-
-- New Build Agent audit entries: `agentName = "build-agent"`
-- New Testing Agent audit entries: `agentName = "testing-agent"` (corrects pre-existing hardcoding defect)
-- Deployment Agent audit entries: `agentName = "deployment-agent"` (unchanged)
-- Legacy null-agent rows: `agentName = "deployment-agent"` (fallback)
-
-No controller-level audit plumbing changes. Historical Testing Agent rows with the old hardcoded value are not backfilled (R-12).
-
-### Reliability
-
-- Same optimistic locking, atomic import, bounded network timeouts
-- Guard's extra lookups share the transaction with subsequent domain calls; Hibernate L1 cache absorbs the cost
-
----
-
-## Validation and Error Handling
-
-All existing validation and error handling applies. Build Agent adds:
-
-1. Upload override — `agent` and `stage` forced server-side
-2. Task/request/flow boundary — 404 on cross-agent access
-3. `?linked=` silently ignored on Build Agent detail endpoint
+export const testingAgentWorkspace = createAgentWorkspace({
+  key: 'testing-agent',
+  name: 'Testing Agent',
+  apiBase: '/api/testing-agent',
+  stages: ['UAT'],
+  supportsStitching: false,
+  stageFilter: 'disabled-input',
+})
+```
 
 ---
 
-## Testing Considerations
+## 5. Module Design — Build Agent Module
 
-### Shared-Contract Regression
+### B1. `BuildStage` + `BuildStagePipeline`
 
-| Test File | Additions |
+```java
+// agents/build/domain/BuildStage.java
+public enum BuildStage {
+    DEV;
+}
+```
+
+```java
+// agents/build/domain/BuildStagePipeline.java
+@Component
+public class BuildStagePipeline implements StagePipeline {
+    @Override public Optional<String> next(String currentStage) { return Optional.empty(); }
+    @Override public boolean isTerminal(String stage) { return true; }
+    @Override public List<String> orderedStages() { return List.of("DEV"); }
+}
+```
+
+### B2. `BuildReleaseFlowController`
+
+```java
+@RestController
+@RequestMapping("/api/build-agent/release-flows")
+@RequiredArgsConstructor
+public class BuildReleaseFlowController {
+
+    private final ReleaseFlowService releaseFlowService;
+    private final AgentBoundaryGuard boundaryGuard;
+
+    @GetMapping
+    public Page<ReleaseFlowListItemDto> list(
+            @RequestParam(required = false) String projectId,
+            @RequestParam(required = false) String releaseId,
+            @RequestParam(defaultValue = "false") boolean includeArchived,
+            @RequestParam(defaultValue = "latest") String attemptView,
+            Pageable pageable,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+        // Stage is always "DEV" for Build Agent; do not accept a client-supplied stage filter.
+        ReleaseFlowFilter filter = new ReleaseFlowFilter(
+                projectId, releaseId, "DEV", null, includeArchived);
+        Page<ReleaseFlow> flows = releaseFlowService.listByAgent(AgentId.BUILD_AGENT, filter, pageable);
+        return flows.map(flow -> {
+            List<Request> requests = releaseFlowService.findRequestsForFlow(flow.getId(), includeArchived);
+            return ReleaseFlowListItemDto.from(flow, requests, attemptView);
+        });
+    }
+
+    @GetMapping("/{id}")
+    public ReleaseFlowDetailDto getById(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "false") boolean includeArchived,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+        // BA-2: Build Agent does not honor ?linked= — not even read from the request.
+        boundaryGuard.assertFlowBelongsToAgent(id, AgentId.BUILD_AGENT);
+        ReleaseFlow flow = releaseFlowService.getById(id, includeArchived);
+        List<Request> requests = releaseFlowService.findRequestsForFlow(id, includeArchived);
+        return ReleaseFlowDetailDto.from(flow, requests);
+    }
+}
+```
+
+### B3. `BuildUploadController`
+
+```java
+@RestController
+@RequestMapping("/api/build-agent/upload")
+@RequiredArgsConstructor
+public class BuildUploadController {
+
+    private final ImportService importService;
+    private final BuildStagePipeline buildStagePipeline;
+
+    @PostMapping
+    public ImportResultDto upload(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+        // Forced server-side: agent = build-agent, stage = DEV. Ignore any client params.
+        return importService.importExcel(
+                file,
+                AgentId.BUILD_AGENT,
+                "DEV",
+                buildStagePipeline,
+                auth.getUserContext());
+    }
+}
+```
+
+Template download is served by platform `TemplateDownloadController` at `/api/platform/templates/*`; Build Agent does not own its own template endpoint.
+
+### B4. `BuildTaskController`
+
+```java
+@RestController
+@RequestMapping("/api/build-agent/tasks")
+@RequiredArgsConstructor
+public class BuildTaskController {
+
+    private final TaskService taskService;
+    private final TaskExecutionHistoryService historyService;
+    private final RecordResultService recordResultService;
+    private final AutoExecutionService autoExecutionService;
+    private final AgentBoundaryGuard boundaryGuard;
+
+    @GetMapping
+    public List<TaskDto> listByRequest(
+            @RequestParam String requestId,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        return taskService.findByRequestId(requestId).stream().map(TaskDto::from).toList();
+    }
+
+    @GetMapping("/{id}")
+    public TaskDto getById(@PathVariable String id, @AuthenticationPrincipal UserContextAuthentication auth) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+        return TaskDto.from(taskService.findById(id));
+    }
+
+    @PutMapping("/{id}/input")
+    public TaskDto editInput(@PathVariable String id, @RequestBody EditInputRequest body,
+                             @AuthenticationPrincipal UserContextAuthentication auth) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+        return TaskDto.from(taskService.editInput(id, body, auth.getUserContext()));
+    }
+
+    // /executions, /start-manual, /submit-auto, /record-result — same pattern:
+    // boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT) → delegate
+}
+```
+
+### B5. `BuildDecisionController`
+
+```java
+@RestController
+@RequestMapping("/api/build-agent/tasks/{taskId}/decision")
+@RequiredArgsConstructor
+public class BuildDecisionController {
+
+    private final DecisionEngine decisionEngine;
+    private final ReleaseFlowProgressionService progressionService;
+    private final AgentBoundaryGuard boundaryGuard;
+    private final BuildStagePipeline buildStagePipeline;
+
+    @PostMapping
+    public DecisionResultDto apply(
+            @PathVariable String taskId,
+            @RequestBody DecisionRequest body,
+            @AuthenticationPrincipal UserContextAuthentication auth) {
+        boundaryGuard.assertTaskBelongsToAgent(taskId, AgentId.BUILD_AGENT);
+        DecisionOutcome outcome = decisionEngine.apply(taskId, body, auth.getUserContext());
+        ProgressionResult progression = progressionService.progressAfterDecision(
+                outcome.releaseFlowId(),
+                outcome,
+                auth.getUserContext(),
+                buildStagePipeline);                    // ← the critical PL-4 threading
+        return DecisionResultDto.from(outcome, progression);
+    }
+}
+```
+
+### B6. Build Agent Frontend `index.ts`
+
+```ts
+// frontend/src/agents/build/index.ts
+import { createAgentWorkspace } from '@/platform/composables/createAgentWorkspace'
+
+export const buildAgentWorkspace = createAgentWorkspace({
+  key: 'build-agent',
+  name: 'Build Agent',
+  apiBase: '/api/build-agent',
+  stages: ['DEV'],
+  supportsStitching: false,
+  stageFilter: 'disabled-input',
+})
+```
+
+Total Build Agent frontend code: this single ~20-line file plus a one-line import into the platform router and a one-entry addition to `agentRegistry.ts`.
+
+---
+
+## 6. Algorithm Specifications
+
+### A1. `DeploymentStitchingService.listStitchedSummaries` (Migrated)
+
+The body ports from `ReleaseFlowService.java:172–221` with three mechanical changes:
+
+1. Replace `Stage stage` parameters with `String stage`.
+2. Replace `Stage.values()` iterations inside `buildStitchedSummary` with the observed-stage-set iteration pattern from M7.
+3. Populate `stageStatuses` map instead of positional stage fields (M6).
+
+**Input → output:**
+
+| Input | Behavior |
 |---|---|
-| `StageTest` | DEV terminal behavior and the new switch implementation |
-| `ReleaseFlowFamilyKeyTest` | `DEV-1234` stripping, `dev-tools` preservation, infix stripping, asymmetric DEV-vs-SIT behavior |
-| `ReleaseFlowListItemDtoTest` | Populating `devStatus`/`devPresent` under DEV-only, cross-stage, and legacy inputs |
-| `ReleaseFlowServiceTest` | `listStitchedSummaries` with `agent = BUILD_AGENT`; `buildStitchedSummary` populates DEV fields; stitched row has correct DEV column and no cross-agent linked IDs |
-| `ReleaseFlowProgressionServiceTest` | Last DEV task approved → flow Completed, no `advanceStage` call |
-| `AuditLoggerServiceTest` | `agentName` derived from scope; Build Agent / Testing Agent / Deployment Agent / legacy null cases |
+| `filter = {projectId: null, stage: null, ...}`, 5 SIT flows + 3 UAT flows in DB (all `agent = "deployment-agent"`) | Returns 1 page; each summary row is a stitched group by family key |
+| `filter.stage = "UAT"` | Only base flows with `currentStage = "UAT"` are used as grouping roots; stitched rows may still span multiple stages via family key |
+| No deployment-agent flows in DB | Empty page |
 
-### Regression Gate: Existing Deployment Agent and Testing Agent Tests
+### A2. `ReleaseFlowAggregation.aggregateFlowStatus` Rewrite
 
-All existing tests must continue to pass. Specific regression checks:
+See M7 §3. The algorithm is structurally unchanged; only the iteration source moves from `Stage.values()` to `observedStages`.
 
-- Deployment Agent summary renders only SIT/UAT/PROD columns
-- Testing Agent summary renders only SIT/UAT/PROD columns (existing behavior; TA has its own stage scoping)
-- Deployment Agent progression for SIT→UAT→PROD unchanged
-- Deployment Agent summary tests that asserted Testing Agent flows are filtered out should be re-verified against the new global-view behavior
+### A3. `ReleaseFlowProgressionService.progressAfterDecision` Rewrite
 
-### AgentBoundaryGuard Unit Tests
+See M4 §3. The body changes in exactly two places:
+- The fetch of `nextStage` (now `stagePipeline.next(currentStage)` returning `Optional<String>`).
+- The terminal check (now `nextStage.isEmpty()` instead of `nextStage == null`).
 
-New file: `AgentBoundaryGuardTest`. Coverage per Module 2 matrix.
+All other logic (flow status updates, audit hooks, optimistic lock handling) is unchanged.
 
-### Build Agent Controller Integration Tests
+### A4. `createAgentWorkspace` Factory Internals
 
-| File | Coverage |
-|---|---|
-| `BuildAgentReleaseFlowControllerTest` | List filters by agent; detail rejects non-build-agent flows with 404; detail ignores `?linked=`; happy path DTO |
-| `BuildAgentUploadControllerTest` | Upload forces `agent=build-agent`, `stage=DEV`; template download returns shared template; validation errors → 422 |
-| `BuildAgentTaskControllerTest` | Each task endpoint returns 404 on cross-agent task; happy path delegates; legacy null-agent tasks → 404 |
-| `BuildAgentDecisionControllerTest` | Decision endpoint 404 on cross-agent task; happy path applies decision and calls progression |
-| `BuildAgentDataIsolationTest` | End-to-end: upload via Build Agent → only Build Agent summary shows it; Testing Agent does not show it; Deployment Agent (global view) does show it with empty SIT/UAT/PROD columns |
-| `BuildAgentProgressionTest` | Complete all tasks in a DEV flow → flow transitions to Completed without advancing |
+**Pseudocode for the 5 sub-factories:**
 
-### Frontend Tests
+```
+createClient(config):
+  return axios.create(baseURL=config.apiBase, withCredentials=true)
+    + 401-interceptor (redirect to /login if not already there)
 
-- `BuildAgentSummaryView` snapshot: only DEV column; disabled stage filter
-- `BuildAgentDetailView`: only DEV stage tab; `route.query.linked` not read
-- Deployment Agent summary renderer regression: does not render `devStatus`/`devPresent`
-- Testing Agent summary renderer regression: does not render `devStatus`/`devPresent`
+createReleaseFlowApi(client, config):
+  return {
+    list(params): client.get('/release-flows', {params})
+    getById(id, query={}): client.get('/release-flows/${id}', {params: query})
+    uploadExcel(file): multipart POST '/upload'
+    downloadTemplate(): platformClient.get('/templates/${config.key}')
+    listTasks(requestId): client.get('/tasks', {params: {requestId}})
+    getTask(taskId): client.get('/tasks/${taskId}')
+    editInput(taskId, body): client.put('/tasks/${taskId}/input', body)
+    startManual(taskId, body): client.post('/tasks/${taskId}/start-manual', body)
+    submitAuto(taskId, body): client.post('/tasks/${taskId}/submit-auto', body)
+    recordResult(taskId, body): client.post('/tasks/${taskId}/record-result', body)
+    getExecutions(taskId): client.get('/tasks/${taskId}/executions')
+    applyDecision(taskId, body): client.post('/tasks/${taskId}/decision', body)
+  }
 
-### Critical Integration Test Scenarios
+createReleaseFlowStore(config, api):
+  return defineStore(`${config.key}-release-flow`, {
+    state: () => ({ list: [], detail: null, loading: false, error: null, filters: {}, pagination: {page: 0, size: 20} }),
+    actions: {
+      async fetchList() { this.loading = true; try { ... api.list({...this.filters, ...this.pagination}) ... } finally { this.loading = false } }
+      async fetchDetail(id, linkedIds) {
+        const query = (config.supportsStitching && linkedIds?.length) ? {linked: linkedIds} : {}
+        this.detail = await api.getById(id, query)
+      }
+      async uploadFile(file) { await api.uploadExcel(file); await this.fetchList() }
+    }
+  })
 
-1. Upload via Build Agent → Build Agent summary shows the flow with DEV column
-2. Upload via Build Agent → Deployment Agent summary shows the flow (global view) with empty SIT/UAT/PROD columns
-3. Upload via Build Agent → Testing Agent summary does NOT show the flow
-4. Two uploads of `DEV-1234` via Build Agent → single stitched row within Build Agent
-5. Build Agent `DEV-1234` + Deployment Agent `SIT-1234` → two separate rows in Build Agent (within-agent only)
-6. Cross-agent task probe: `GET /api/build-agent/tasks/{deployment-agent-task-id}` → 404
-7. Cross-agent decision probe: `POST /api/build-agent/tasks/{testing-agent-task-id}/decision` → 404; task not modified
-8. DEV flow completion: approve all tasks → Completed, no advance
-9. `?linked=` on Build Agent detail: returns single-flow response; does not call `getStitchedDetail`
-10. Audit: Build Agent action writes `agentName = "build-agent"`; Testing Agent action writes `agentName = "testing-agent"` (forward-only correction)
+createSummaryView(config, store):
+  return defineComponent({
+    render: () => h(AgentSummaryView, {
+      agentKey: config.key,
+      agentName: config.name,
+      stages: config.stages,
+      stageFilter: config.stageFilter || 'dropdown',
+      store,
+    })
+  })
+
+createDetailView(config, store):
+  return defineComponent({
+    setup() {
+      const route = useRoute()
+      const id = route.params.id
+      const linkedIds = config.supportsStitching ? parseLinkedQueryParam(route.query.linked) : []
+      onMounted(() => store.fetchDetail(id, linkedIds))
+    },
+    render: () => h(AgentDetailView, { agentKey: config.key, agentName: config.name, stages: config.stages, store })
+  })
+```
 
 ---
 
-## Implementation Sequence (High-Level)
+## 7. ArchUnit Fitness Tests
 
-Recommended ordering — detailed phases and gates belong in the tasks document.
+**File:** `src/test/java/com/wwa/deploymentagent/architecture/AgentModuleBoundaryTest.java`
 
-1. **Shared contracts and audit fix** first — `Stage`, `ReleaseFlowFamilyKey`, `ReleaseFlowListItemDto`, `AgentId`, `AuditLoggerService`. Verify existing test suite remains green
-2. **`AgentBoundaryGuard`** — new component + unit tests
-3. **Build Agent backend controllers** — four controllers + integration tests + data isolation test
-4. **Frontend infrastructure** — client, API modules, store, agent ID constants
-5. **Build Agent views and routing** — two views, registry, router
-6. **Full verification** — `mvn test` + `cd frontend && npm run build` + manual smoke
+**Rules:**
 
-Rollout details, PR decomposition, follow-up refactors, and R-08 back-patch of Testing Agent are tracked in the tasks document.
+```java
+@AnalyzeClasses(packages = "com.wwa.deploymentagent")
+public class AgentModuleBoundaryTest {
+
+    @ArchTest
+    static final ArchRule agents_do_not_depend_on_each_other =
+            noClasses().that().resideInAPackage("..agents.deployment..")
+                    .should().dependOnClassesThat().resideInAnyPackage("..agents.testing..", "..agents.build..")
+                    .because("Agent Modules must not import each other (PL-2)")
+            .andShould() /* same for testing and build */;
+
+    @ArchTest
+    static final ArchRule platform_does_not_import_agent_code =
+            noClasses().that().resideInAPackage("..platform..")
+                    .should().dependOnClassesThat().resideInAnyPackage("..agents..")
+                    .because("Platform Core must not depend on any Agent Module (PL-2)");
+
+    @ArchTest
+    static final ArchRule platform_does_not_reference_stage_enums =
+            noClasses().that().resideInAPackage("..platform..")
+                    .should().dependOnClassesThat().haveSimpleNameEndingWith("Stage")
+                    .andShould().dependOnClassesThat().resideInAnyPackage("..agents..domain..")
+                    .because("Platform Core must not bind to any per-agent Stage enum (PL-3)");
+
+    @ArchTest
+    static final ArchRule no_hardcoded_stage_literals_in_platform =
+            noClasses().that().resideInAPackage("..platform..")
+                    .should().containStringLiterals("\"SIT\"", "\"UAT\"", "\"PROD\"", "\"DEV\"")
+                    .because("Stage string literals must live in Agent Modules, not Platform Core (PL-3 / R-06)");
+
+    @ArchTest
+    static final ArchRule platform_does_not_branch_on_agent_id =
+            noClasses().that().resideInAPackage("..platform..")
+                    .should().accessField(AgentId.class, "DEPLOYMENT_AGENT")
+                    .orShould().accessField(AgentId.class, "TESTING_AGENT")
+                    .orShould().accessField(AgentId.class, "BUILD_AGENT")
+                    .because("Platform Core must not branch on specific agents (PL-2)");
+
+    @ArchTest
+    static final ArchRule controllers_in_agent_modules_only =
+            classes().that().areAnnotatedWith(RestController.class)
+                    .should().resideInAnyPackage("..platform.web.shared..", "..agents..web..")
+                    .because("All REST controllers belong either to platform shared capabilities or an Agent Module");
+}
+```
+
+---
+
+## 8. Test Matrix Summary
+
+### 8.1 Backend Unit / Integration
+
+| Test file | Scope | Count (estimate) |
+|---|---|---|
+| `StagePipelineContractTest` (parameterized for 3 impls) | M1 contract | 8 × 3 = 24 |
+| `AgentBoundaryGuardTest` | M2 | 12 |
+| `ReleaseFlowServiceTest` | M3 (new `listByAgent`, String stage) | +8 |
+| `ReleaseFlowProgressionServiceTest` | M4 (pipeline parameter threading) | +6 |
+| `ReleaseFlowListItemDtoTest` | M6 (generic stageStatuses) | 8 |
+| `ReleaseFlowAggregationTest` | M7 regression (must pass unchanged semantics) | existing |
+| `AuditLoggerServiceTest` | M8 (dynamic agentName + null assertion) | 4 |
+| `PlatformRouteMigrationTest` | M9 + SecurityConfig | 4 |
+| `DeploymentReleaseFlowControllerTest` | D4 | existing + agent-scope assertions |
+| `DeploymentStitchingServiceTest` | D3 migration | ported from v2 |
+| `TestingReleaseFlowControllerTest` | T2 | existing + guard assertions |
+| `TestingTaskControllerTest` | T2 (new guard invocations) | +4 |
+| `BuildReleaseFlowControllerTest` | B2 (list scoped, detail guarded, no ?linked) | 6 |
+| `BuildUploadControllerTest` | B3 | 5 |
+| `BuildTaskControllerTest` | B4 (guard on every endpoint) | 10 |
+| `BuildDecisionControllerTest` | B5 (guard + pipeline threading) | 4 |
+| `BuildDataIsolationTest` (end-to-end) | Cross-agent scenarios 1–10 in §9 | 10 |
+| `AgentModuleBoundaryTest` (ArchUnit) | §7 | 6 rules |
+
+### 8.2 Frontend Unit
+
+| Test file | Scope |
+|---|---|
+| `createAgentWorkspace.test.ts` | M11 factory (7 cases in §2.M11) |
+| `createReleaseFlowStore.test.ts` | Pinia store factory state/actions |
+| `createReleaseFlowApi.test.ts` | API factory URL correctness per config |
+| `AgentSummaryView.test.ts` | Reads `stageStatuses[...]` correctly per config |
+| `AgentDetailView.test.ts` | Passes `?linked=` only when `supportsStitching` is true |
+| `platformClient.test.ts` | 401 interceptor redirects to /login |
+
+---
+
+## 9. Critical Integration Test Scenarios
+
+These end-to-end scenarios anchor the `BuildDataIsolationTest` and cross-agent regression suites.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Upload via Build Agent → Build Agent summary | Row visible, `stageStatuses["DEV"]` populated |
+| 2 | Same upload → Deployment Agent summary | Row **not** visible (PL-6) |
+| 3 | Same upload → Testing Agent summary | Row not visible |
+| 4 | Upload `DEV-1234` twice through Build Agent | Single row; second upload upserts into first (§5.8) |
+| 5 | Build Agent `DEV-1234` + Deployment Agent `SIT-1234` | Two separate `DA_RELEASE_FLOW` rows; neither stitches into the other |
+| 6 | `GET /api/build-agent/tasks/{deployment-agent-task-id}` | HTTP 404 |
+| 7 | `POST /api/build-agent/tasks/{testing-agent-task-id}/decision` | HTTP 404; underlying task unmodified |
+| 8 | Approve all tasks in a Build Agent DEV flow | Flow becomes `Completed`, does not auto-advance |
+| 9 | `GET /api/build-agent/release-flows/{id}?linked=abc,def` | Build Agent ignores `linked`; returns single flow |
+| 10 | Audit trail after Build Agent action | `agentName = "build-agent"` in `AUDIT_LOG` |
+| 11 | Log in via `/api/platform/auth/login` → call any agent endpoint | Same JSESSIONID works across prefixes |
+| 12 | Log in via `/api/platform/auth/login` → `GET /api/deployment-agent/auth/login` | 404 (old route removed) |
+| 13 | Testing Agent cross-agent task probe (was R-08 in v2) | HTTP 404 (closed by PL-9) |
+
+---
+
+## 10. Implementation Sequence (Commit Order)
+
+The commits must land in this order to keep `mvn test` and `cd frontend && npm run build` green after each step.
+
+### Phase A — Platform scaffolding (no behavior change)
+1. **A1.** Create `platform/domain/StagePipeline.java` interface. No implementations yet. No callers. Tests: compile only.
+2. **A2.** Create `agents/deployment/`, `agents/testing/`, `agents/build/` empty package structures with package-info files. ArchUnit test `agents_do_not_depend_on_each_other` lands (trivially green since there is no code in these packages).
+
+### Phase B — Stage vocabulary migration (backend)
+3. **B1.** Create `DeploymentStage`, `TestingStage`, `BuildStage` enums in their respective agent domain packages. Not yet referenced. Tests: unit tests for each enum.
+4. **B2.** Create `DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline` `@Component` beans. Bind each test to `StagePipelineContractTest`. Tests: green.
+5. **B3.** Add `StagePipeline` parameter to `ReleaseFlowProgressionService.progressAfterDecision(...)`. Update the only existing caller (v2 `DecisionController`) to pass `deploymentStagePipeline`. Tests: update `ReleaseFlowProgressionServiceTest` to parameterize over pipelines.
+6. **B4.** Change `Request.stage` and `ReleaseFlow.currentStage` JPA attributes from `Stage` enum to `String`. Update all repository and service method signatures that passed `Stage`. This is the biggest mechanical commit; touch every file that imports `contracts.enums.Stage`. Tests: all existing JPA integration tests must continue to pass.
+7. **B5.** Delete `contracts/enums/Stage.java`. At this point nothing imports it; if it does, B4 missed a site.
+
+### Phase C — DTO and aggregation refactor
+8. **C1.** Rewrite `ReleaseFlowListItemDto` to use `Map<String, RequestStatus> stageStatuses` and `Set<String> stagesPresent`. Update all usages in `ReleaseFlowService`, `ReleaseFlowAggregation`, and existing controller tests. Tests: `ReleaseFlowListItemDtoTest` new cases.
+9. **C2.** Rewrite `ReleaseFlowAggregation` to iterate over observed stages. Tests: existing `ReleaseFlowAggregationTest` must pass unchanged semantics.
+
+### Phase D — Stitching relocation
+10. **D1.** Create `agents/deployment/domain/ReleaseFlowFamilyKey.java` (move from `platform/domain/releaseflow/`). Package change only.
+11. **D2.** Create `agents/deployment/domain/DeploymentStitchingService.java`. Copy `listStitchedSummaries` and `getStitchedDetail` method bodies from platform `ReleaseFlowService`. Callers (`ReleaseFlowController`) switch to the new service.
+12. **D3.** Delete `listStitchedSummaries` and `getStitchedDetail` from platform `ReleaseFlowService`. Add the new `listByAgent(...)` method.
+
+### Phase E — AgentBoundaryGuard and Audit
+13. **E1.** Create `platform/web/security/AgentBoundaryGuard.java`. Unit tests per M2 matrix. No controllers call it yet.
+14. **E2.** Update `AuditLoggerService.log` per M8. Unit test.
+
+### Phase F — Platform capability route migration
+15. **F1.** Move `AuthController`, `AuditLogController`, `ConfigurationController`, `AccessGrantController`, `TemplateDownloadController` to `platform/web/shared/` and update their `@RequestMapping` to `/api/platform/*`. Update `SecurityConfig.java:36` whitelist. Integration test: `PlatformRouteMigrationTest`.
+16. **F2.** Frontend: create `platform/api/platformClient.ts` and migrate the 5 capability API modules. Update `LoginView.vue` to call the new path. Update `config/agentId.ts`. Smoke: manual login still works in local profile.
+
+### Phase G — Frontend platform factory
+17. **G1.** Create `platform/composables/createAgentWorkspace.ts` and sub-factories. Unit tests.
+18. **G2.** Create `platform/components/AgentSummaryView.vue` and `AgentDetailView.vue`. Unit tests.
+
+### Phase H — Agent Module migrations (backend)
+19. **H1.** Create `agents/deployment/web/Deployment*Controller` files. Each invokes `AgentBoundaryGuard`. Update Deployment Agent tests to the new class names.
+20. **H2.** Delete old `web/controller/ReleaseFlowController`, `UploadController`, `TaskController`, `DecisionController`.
+21. **H3.** Same for Testing Agent (H1 + H2 replicated). Closes v2 R-08.
+22. **H4.** Create `agents/build/web/Build*Controller` files. New integration tests.
+
+### Phase I — Frontend migration
+23. **I1.** Create `frontend/src/agents/testing/index.ts`. Wire into the platform router. Delete the 7 `testingAgent*.ts` files and 2 testing views.
+24. **I2.** Create `frontend/src/agents/build/index.ts`. Wire into router and `agentRegistry.ts`.
+25. **I3.** Create `frontend/src/agents/deployment/index.ts`. Migrate any remaining Deployment-specific view behaviors. Delete the old flat `api/*`, `stores/*`, `views/ReleaseFlowSummaryView.vue`, `views/ReleaseFlowDetailView.vue`.
+
+### Phase J — Verification
+26. **J1.** Full `mvn test`. All ArchUnit rules pass.
+27. **J2.** `cd frontend && npm run build`.
+28. **J3.** Manual smoke of all 13 critical scenarios in §9.
+
+**Green-at-every-step invariant:** Each phase's commits must leave the build green. Phases B and H are the riskiest — if a phase cannot be decomposed into green-at-every-step commits, split the phase into smaller sub-commits.
+
+---
+
+## 11. LOC Estimates
+
+| Area | New LOC | Modified LOC | Deleted LOC | Net |
+|---|---|---|---|---|
+| Platform Core refactor (M1–M8) | ~400 | ~600 | ~150 | +850 |
+| Platform capability route move (M9) | ~20 | ~30 | 0 | +50 |
+| Frontend platform core (M10–M11) | ~700 | ~100 | ~400 | +400 |
+| Deployment Agent Module migration | ~600 | ~200 | ~1200 | −400 |
+| Testing Agent Module migration | ~400 | ~100 | ~700 | −200 |
+| Build Agent Module (backend) | ~400 | 0 | 0 | +400 |
+| Build Agent Module (frontend) | ~25 | ~20 | 0 | +45 |
+| ArchUnit tests | ~80 | 0 | 0 | +80 |
+| Integration tests | ~600 | ~200 | 0 | +800 |
+| **Totals** | **~3225** | **~1250** | **~2450** | **+2025** |
+
+These are rough planning numbers, not contracts. The tasks document (`build-agent-tasks.md`) decomposes them into effort-sized task items.
+
+---
+
+## 12. Design Validation Checklist
+
+Before implementation starts, verify:
+
+- [ ] Every PL-*/BA- decision in `build-agent-architecture.md` has a corresponding module or sub-section in this document
+- [ ] No module in this document contradicts an architectural decision
+- [ ] Every new class has a full skeleton (not just a name)
+- [ ] Every modified method has a signature diff (old → new)
+- [ ] Every new test file has a matrix with explicit assertions
+- [ ] `SecurityConfig.java:36` edit is explicit (M9)
+- [ ] ArchUnit rules cover PL-2 (no cross-agent imports), PL-3 (no Stage enum in platform), and PL-2 (no AgentId branching in platform)
+- [ ] Implementation sequence (§10) is decomposable into green-at-every-step commits
+- [ ] LOC estimates exist per module
+
+When all twelve checks pass, this design is ready for `build-agent-tasks.md` decomposition (Task #4 in the SDD pipeline).

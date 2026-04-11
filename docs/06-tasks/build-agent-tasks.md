@@ -1,550 +1,657 @@
 # Implementation Task Breakdown: Build Agent
 
-## Overview
-
-This document breaks the Build Agent design (v2) into implementation-ready tasks. Build Agent is the third agent workspace under WWA Agent Workspace Hub, scoped to the `DEV` stage of the SDLC.
-
-**Delivery approach: Duplicate First, Extract Later (for frontend); Surgical Additive Changes (for shared contracts)**
-
-Frontend modules are duplicated from Testing Agent rather than refactored into shared components — the shared extraction is deferred to a follow-up PR. Shared-contract modifications (Stage enum, FamilyKey, ListItemDto, AuditLoggerService) are surgical additive changes carried out up-front so Build Agent controllers can compile against them.
-
-**Delivery objective**
-- Add Build Agent as the third workspace under WWA Agent Workspace Hub, scoped to the `DEV` stage
-- Achieve data isolation via `Request.agent = "build-agent"` + a new `AgentBoundaryGuard` on task and flow operations
-- Introduce `DEV` as a first-class terminal stage (`Stage.DEV.next() == null`)
-- Fix the pre-existing `AuditLoggerService.agentName` hardcoding as a shared side effect (forward-only)
-- Zero behavioral regression in Deployment Agent and Testing Agent
-
-**Planning assumptions**
-- The `Request.agent` column already exists
-- `ReleaseFlowService.listStitchedSummaries` pre-filters by agent; Build Agent stitching is within-agent only (R-14)
-- `ImportService.importFile(byte[], Stage, UserContext, ..., String agent)` already accepts both stage and agent as parameters
-- Deployment Agent summary visibility is unchanged by this MVP (AD-12); build-only flows appear in it as rows with empty SIT/UAT/PROD columns
-- No database migrations are needed — the `stage` column stores enum names as VARCHAR and accepts the new `DEV` value
-- No new domain services or entities are needed
+**Date:** 2026-04-11
+**Status:** Draft (v3, aligned with `build-agent-design.md` v3 §10 Implementation Sequence)
+**Source:** `build-agent-design.md` (primary, module-level contracts), `build-agent-architecture.md` (structural decisions), `build-agent-spec.md` (product intent)
+**Supersedes:** v2 (2026-04-11). v2 broke down 20 tasks against the v2 "surgical shared-contract changes" model. v3 replaces them with 28 tasks against the Agent Module refactor, organized into the 10 phases defined in design §10.
 
 ---
 
-## Source Design
+## 1. Overview
 
-**System name:** Build Agent (third workspace under WWA Agent Workspace Hub)
+### 1.1 Delivery Model
 
-**Design scope summary**
-- 5 surgical shared-contract / service changes (`Stage`, `ReleaseFlowFamilyKey`, `ReleaseFlowListItemDto`, `AgentId`, `AuditLoggerService`)
-- 1 new controller-layer component (`AgentBoundaryGuard`)
-- 4 thin backend controllers (release-flow, upload, task, decision) — all guard-protected
-- Frontend API client, API modules, Pinia store (duplicated from Testing Agent)
-- 2 frontend views (summary + detail, single `DEV` stage)
-- Agent registry and router updates
-- Backend regression, guard, controller, isolation, progression, and audit tests
+v3 delivers Build Agent as the first consumer of a **Platform Core refactor** that introduces the Agent Module pattern. Deployment Agent and Testing Agent are migrated into the same pattern in the same delivery so the codebase lands in a consistent end state.
 
----
+This is structurally different from v2 ("four surgical shared-contract changes") — the total work is larger, but per-agent coupling drops to the minimum the shared release-flow domain model actually requires. See `build-agent-architecture.md` §"Why v3 Exists" for the full rationale.
 
-## Workstreams
+### 1.2 Delivery objectives
 
-### Major Implementation Streams
+- Deliver Build Agent as an Agent Module (`agents/build/` backend, `frontend/src/agents/build/` frontend) running on top of the new Platform Core pattern.
+- Refactor Platform Core so stage vocabulary, stage ordering, and stitching are per-agent concerns (architecture PL-1 through PL-11).
+- Migrate Deployment Agent and Testing Agent into the Agent Module pattern without runtime regression.
+- Move platform capability routes from `/api/deployment-agent/*` to `/api/platform/*` in a hard cutover.
+- Close pre-existing Testing Agent agent-boundary gap (v2 R-08) as a side effect of promoting `AgentBoundaryGuard` to Platform Core.
+- Keep `mvn test` and `cd frontend && npm run build` green at every commit.
 
-1. **Shared contracts & audit fix** — enum / regex / DTO / constant / audit one-liner
-2. **AgentBoundaryGuard** — new security component
-3. **Build Agent backend controllers** — 4 controllers + integration tests
-4. **Frontend infrastructure** — client, API modules, store (duplicated from TA)
-5. **Build Agent views & routing** — 2 views, registry, router
-6. **Testing & verification** — full regression + new test suites + manual smoke
+### 1.3 Planning Assumptions
 
-### Recommended Sequencing
-
-1. Shared-contract and audit changes first — keep all existing tests green
-2. `AgentBoundaryGuard` component + unit tests
-3. Build Agent backend controllers (4) + integration tests + data isolation test
-4. Frontend client, API modules, store
-5. Build Agent views + registry + routes
-6. Full backend test suite + frontend build + manual smoke
-
-### Parallel Work Opportunities
-
-- Shared-contract tasks (BA-TASK-001 through BA-TASK-005) can run in parallel once `Stage` enum lands
-- Backend work (BA-TASK-007 through BA-TASK-011b) can run in parallel with frontend infrastructure (BA-TASK-012 through BA-TASK-014)
-- Agent registry and routes (BA-TASK-017) can be done anytime
-- Test fixture prep can start alongside implementation
+- `Request.agent` column already exists on `DA_REQUEST`.
+- `DA_RELEASE_FLOW` unique key `(project_id, normalized_release_id)` is unchanged; no Flyway migration.
+- `spring.jpa.open-in-view=false` is set; each service method opens its own Hibernate session; `AgentBoundaryGuard` incurs real DB round trips (acceptable per architecture R-11).
+- `JSESSIONID` cookie `Path` is `/`, so moving auth routes does not invalidate sessions.
+- Testing Agent has no public users (internal testing only); migration does not require a behavior-preserving guarantee, only a code-correct one.
+- No backfill of legacy `agent IS NULL` data; those rows become invisible until the platform Global View ships (architecture R-04).
 
 ---
 
-## Task Details
+## 2. Source Design
 
-### BA-TASK-001: Extend `Stage` Enum with `DEV`
-
-- **Objective:** Add `DEV` as the first enum value and rewrite `Stage.next()` as an explicit switch so `DEV` is terminal (`DEV.next() == null`).
-- **Scope:**
-  - Modify `src/main/java/com/wwa/deploymentagent/contracts/enums/Stage.java`
-  - Declare `DEV, SIT, UAT, PROD` in that order
-  - Replace the ordinal-based `next()` with a switch: `DEV → null`, `SIT → UAT`, `UAT → PROD`, `PROD → null`
-  - Add `StageTest` assertions for all four values of `next()` and `Stage.valueOf("DEV")`
-- **Dependencies:** None
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** XS (~15 lines changed + ~20 test lines)
-- **Notes:** Run full `mvn test` immediately after this change. No external code uses `Stage.ordinal()` math (grep confirmed). `Stage.values()` iterations in `ReleaseFlowService` are filter-based and tolerate the additional enum value.
-  - **Regression surface to explicitly verify** (because `DEV` becomes ordinal 0 and `Stage` natural order changes from `[SIT, UAT, PROD]` to `[DEV, SIT, UAT, PROD]`):
-    - `ReleaseFlowService.highestPresentStage` (line 727) — uses `Comparator.naturalOrder()` to pick the max stage; behavior for pure Deployment Agent data is unchanged, but the semantics around mixed data must be re-read
-    - `ReleaseFlowService.sortRequests` (line 654) — uses `Comparator.comparing(Request::getStage)` ascending; DEV will sort before SIT
-    - `ReleaseFlowService.representativeFlow` (line 710) — picks a representative via `highestPresentStage`
-    - `ReleaseFlowService.determineCurrentStage` (line 617) — stage progression detection
-    - `ReleaseFlowService.aggregateFlowStatus` (line 600) — iterates `Stage.values()` via flatMap
-  - BA-TASK-019 (full regression) must assert Deployment Agent's representative-flow selection, stage sorting, and aggregate flow status remain identical to pre-change behavior.
-
-### BA-TASK-002: Extend `ReleaseFlowFamilyKey` Conservatively for `DEV`
-
-- **Objective:** Recognize `dev` as a stage token only in narrow, unambiguous cases. Preserve legitimate project identifiers like `dev-tools`.
-- **Scope:**
-  - Modify `src/main/java/com/wwa/deploymentagent/domain/releaseflow/ReleaseFlowFamilyKey.java`
-  - Extend `STAGE_PREFIX_WITH_DIGITS` to include `dev`
-  - Add a new `DEV_PREFIX_WITH_DIGIT_SEPARATOR` pattern: `^(dev)([^a-z0-9]+)(\\d.+)$`
-  - Extend `isStageToken()` to recognize `"dev"` (used inside `stripInfixStageToken`)
-  - Update `stripStageToken` to try the new DEV-specific pattern alongside existing patterns
-  - Do **NOT** add `dev` to the existing aggressive `STAGE_PREFIX_WITH_SEPARATOR` regex
-  - Add test cases for `DEV-1234`, `dev1234`, `DEV_HCC_AMH_1234` (infix), `dev-tools` (preserved), `dev-portal` (preserved), asymmetric DEV-vs-SIT behavior
-- **Dependencies:** None — `ReleaseFlowFamilyKey` is pure string processing; tests use string inputs, not `Stage` enum constants. Can run fully in parallel with BA-TASK-001.
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** S (~30 lines changed + ~40 test lines)
-- **Notes:** Tracked to design §1.2 binding rules. `dev` is a common project-name prefix; asymmetric treatment is intentional per spec BFR-22a.
-
-### BA-TASK-003: Append `devStatus` / `devPresent` Fields to `ReleaseFlowListItemDto`
-
-- **Objective:** Extend the DTO record with two additive fields and update both existing positional constructor call sites.
-- **Scope:**
-  - Modify `src/main/java/com/wwa/deploymentagent/contracts/dto/ReleaseFlowListItemDto.java`
-  - Append `RequestStatus devStatus` after `prodStatus` and `boolean devPresent` after `prodPresent` in the record header
-  - Update `ReleaseFlowListItemDto.from(...)` factory at `ReleaseFlowListItemDto.java:52` to populate the new fields via `requestStatusFor(requests, Stage.DEV, attemptView)` and `hasStage(requests, Stage.DEV)`
-  - Update `ReleaseFlowService.buildStitchedSummary(...)` at `ReleaseFlowService.java:675` to append the same two new arguments to its positional constructor call
-  - Add `ReleaseFlowListItemDtoTest` cases for DEV-only, DEV+SIT, and legacy (no DEV) inputs
-- **Dependencies:** BA-TASK-001
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** S (~30 lines changed across 2 source files + ~40 test lines)
-- **Notes:** Append-only per design decision. Prepending would shift all existing positional arguments and introduce a higher risk of silent miswiring. Deployment Agent and Testing Agent summary renderers must NOT read the new fields (verified by existing frontend regression).
-
-### BA-TASK-004: Add `AgentId.BUILD_AGENT` Constant
-
-- **Objective:** Add the new agent identity constant alongside the existing ones.
-- **Scope:**
-  - Modify `src/main/java/com/wwa/deploymentagent/contracts/AgentId.java`
-  - Add `public static final String BUILD_AGENT = "build-agent";`
-  - Frontend mirror: update `frontend/src/config/agentId.ts` (create if not present) to add `BUILD: 'build-agent'`
-- **Dependencies:** None
-- **Owner type:** backend + frontend
-- **Priority:** Must
-- **Estimated size:** XS (~5 lines total)
-
-### BA-TASK-005: Fix `AuditLoggerService.agentName` Hardcoding (Shared Fix)
-
-- **Objective:** Replace the hardcoded `entry.setAgentName("deployment-agent")` with a dynamic derivation from `scope.agent()`, with legacy fallback.
-- **Scope:**
-  - Modify `src/main/java/com/wwa/deploymentagent/domain/audit/AuditLoggerService.java`
-  - Line 61 (`entry.setAgentName("deployment-agent")`) → `entry.setAgentName(scope.agent() != null ? scope.agent() : AgentId.DEPLOYMENT_AGENT);`
-  - Update `AuditLoggerServiceTest` with four assertions:
-    - Build Agent action → `agentName = "build-agent"`
-    - Testing Agent action → `agentName = "testing-agent"` (forward-only correction)
-    - Deployment Agent action → `agentName = "deployment-agent"`
-    - Legacy null-agent request → `agentName = "deployment-agent"` (fallback)
-  - Verify existing Deployment Agent audit tests still pass unchanged
-- **Dependencies:** None — the `AgentId.DEPLOYMENT_AGENT` constant used in the fallback already exists today; this task does not need BA-TASK-004's new `BUILD_AGENT` constant to land first (though the full multi-agent test coverage in `AuditLoggerServiceTest` is easier to write once `BUILD_AGENT` exists).
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** XS (1-line change + ~25 test lines)
-- **Notes:** This is a shared fix that simultaneously repairs the pre-existing Testing Agent defect (R-12). Historical rows are not backfilled. Document the forward-only behavior in release notes.
-
-### BA-TASK-006: Create `AgentBoundaryGuard` Component + Unit Tests
-
-- **Objective:** Implement the controller-layer guard that validates agent ownership for task/request/flow operations.
-- **Scope:**
-  - Create `src/main/java/com/wwa/deploymentagent/web/security/AgentBoundaryGuard.java`
-  - Implement three methods:
-    - `assertTaskBelongsToAgent(String taskId, String expectedAgent)`
-    - `assertRequestBelongsToAgent(String requestId, String expectedAgent)`
-    - `assertFlowBelongsToAgent(String flowId, String expectedAgent)` — uses `requestRepository.findByReleaseFlowIds(List.of(flowId), true)` for the agent membership check
-  - On mismatch throw `NotFoundAppException` → HTTP 404
-  - Annotate methods `@Transactional(readOnly = true)`
-  - Create `AgentBoundaryGuardTest` with the full scenario matrix from design Module 2
-- **Dependencies:** BA-TASK-004
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** S (~60 lines component + ~120 test lines)
-- **Notes:** Uses the existing `requestRepository.findByReleaseFlowIds` to avoid adding a new repository method. `includeArchived = true` so archived requests still count toward agent ownership.
-
-### BA-TASK-007: Create `BuildAgentReleaseFlowController`
-
-- **Objective:** Expose `/api/build-agent/release-flows` endpoints that delegate to shared services with agent forcing and flow-level boundary guard.
-- **Scope:**
-  - Create `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentReleaseFlowController.java`
-  - `GET /` — force `effectiveAgent = AgentId.BUILD_AGENT`; delegate to `releaseFlowService.listStitchedSummaries(...)` mirroring the Testing Agent controller pattern
-  - `GET /{id}` — call `agentBoundaryGuard.assertFlowBelongsToAgent(id, BUILD_AGENT)` before loading; then delegate to `releaseFlowService.getById(id, includeArchived)` + `findRequestsForFlow(id, includeArchived)` and assemble the standard `ReleaseFlowDetailDto`
-  - **Do NOT declare** a `@RequestParam linked` — AD-10 disables stitched linked detail; any `?linked=` query parameter is silently ignored
-  - Reuse existing imperative validation helpers: `validateArchivedViewer`, `filterVisibleRequests`, `ForbiddenAppException`-on-empty
-- **Dependencies:** BA-TASK-001, BA-TASK-003, BA-TASK-004, BA-TASK-006
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** S (~80 lines)
-
-### BA-TASK-008: Create `BuildAgentUploadController`
-
-- **Objective:** Expose `/api/build-agent/upload` endpoints with server-side forced `stage = DEV` and `agent = BUILD_AGENT`.
-- **Scope:**
-  - Create `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentUploadController.java`
-  - `POST /` — delegate to `importService.importFile(fileBytes, Stage.DEV, user, ..., AgentId.BUILD_AGENT)` using the existing overload; discard any client-supplied stage/agent values
-  - `GET /template` — invoke the shared `uploadTemplateService.generateTemplate()` generator (same template content as Testing Agent) and return it with `Content-Disposition: attachment; filename="build-request-template.xlsx"`, matching Testing Agent's per-agent naming pattern (which uses `testing-request-template.xlsx`)
-  - Apply the same validation and role helpers as the Testing Agent upload controller
-- **Dependencies:** BA-TASK-001, BA-TASK-004
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** S (~60 lines)
-- **Notes:**
-  - No new `ImportService` overload needed — the existing signature already accepts both stage and agent.
-  - **Prerequisite verification (done):** `UploadTemplateService.generateTemplate()` at `src/main/java/com/wwa/deploymentagent/domain/fileimport/UploadTemplateService.java:28` exists and returns `byte[]`. Build Agent controller can inject it directly; no new resource-access strategy is needed.
-
-### BA-TASK-009: Create `BuildAgentTaskController`
-
-- **Objective:** Expose `/api/build-agent/tasks` endpoints for task read and mutation operations, each wrapped by the boundary guard.
-- **Scope:**
-  - Create `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentTaskController.java`
-  - Endpoints (all guard-protected):
-    - `GET /?requestId=X` → `assertRequestBelongsToAgent(requestId, BUILD_AGENT)` then `taskService.listByRequestId(requestId)`
-    - `GET /{id}` → `assertTaskBelongsToAgent` then `taskService.getById(id)`
-    - `PUT /{id}/input` → `assertTaskBelongsToAgent` then `taskService.editInput(id, newInput, user)`
-    - `GET /{id}/executions` → `assertTaskBelongsToAgent` then `taskExecutionHistoryService.findByTaskId(id)`
-    - `POST /{id}/start-manual` → `assertTaskBelongsToAgent` then `taskService.startManualExecution(id, user)`
-    - `POST /{id}/record-result` → `assertTaskBelongsToAgent` then `recordResultService.recordResult(...)`
-    - `POST /{id}/submit-auto` → `assertTaskBelongsToAgent` then `autoExecutionService.submitAutoExecution(id, user)`
-- **Dependencies:** BA-TASK-004, BA-TASK-006
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** M (~150 lines)
-- **Notes:** Body validation, DTO assembly, and error responses mirror the existing `TaskController` exactly.
-
-### BA-TASK-010: Create `BuildAgentDecisionController`
-
-- **Objective:** Expose `POST /api/build-agent/tasks/{id}/decision` with the boundary guard, mirroring the existing Deployment Agent `DecisionController`.
-- **Scope:**
-  - Create `src/main/java/com/wwa/deploymentagent/web/controller/BuildAgentDecisionController.java`
-  - `POST /{id}/decision` — call `assertTaskBelongsToAgent(id, BUILD_AGENT)` first; then `decisionEngine.applyDecision(id, decision, user, comment)`; then `progressionService.progressAfterDecision(id)`; return updated `TaskDto`
-- **Dependencies:** BA-TASK-004, BA-TASK-006
-- **Owner type:** backend
-- **Priority:** Must
-- **Estimated size:** XS (~50 lines)
-
-### BA-TASK-011a: Build Agent Controller Unit Integration Tests
-
-- **Objective:** Verify each Build Agent controller delegates correctly and enforces the agent boundary. One test file per controller.
-- **Scope:**
-  - `BuildAgentReleaseFlowControllerTest` — list forces agent filter; detail returns 404 for non-build-agent flows; detail ignores `?linked=`; happy path DTO shape
-  - `BuildAgentUploadControllerTest` — upload forces `agent=build-agent`, `stage=DEV`; template download returns shared content with `build-request-template.xlsx` Content-Disposition; invalid Excel → 422
-  - `BuildAgentTaskControllerTest` — each task endpoint returns 404 for cross-agent tasks; happy path delegates correctly; legacy null-agent tasks → 404
-  - `BuildAgentDecisionControllerTest` — 404 for cross-agent task; happy path applies decision then calls progression
-- **Dependencies:** BA-TASK-007, BA-TASK-008, BA-TASK-009, BA-TASK-010
-- **Owner type:** QA / backend
-- **Priority:** Must
-- **Estimated size:** M (~300 lines across 4 test files)
-- **Notes:** Follow existing `@SpringBootTest` + H2 patterns in `src/test/java/com/wwa/deploymentagent/web/`. Target 80%+ coverage on new controller code.
-
-### BA-TASK-011b: Build Agent Cross-Cutting Integration Tests
-
-- **Objective:** Verify end-to-end behavior that spans multiple controllers and services: cross-agent isolation, within-agent stitching, and DEV-stage progression.
-- **Scope:**
-  - `BuildAgentDataIsolationTest` — end-to-end cross-agent behavior:
-    1. Upload via Build Agent → only Build Agent summary shows it
-    2. Upload via Build Agent → Testing Agent summary does NOT show it
-    3. Upload via Build Agent → Deployment Agent summary DOES show it (global view) with empty SIT/UAT/PROD columns
-    4. Two `DEV-1234` uploads via Build Agent → single stitched row within Build Agent
-    5. Build Agent `DEV-1234` + Deployment Agent `SIT-1234` → separate rows in both agents (R-14 assertion)
-    6. Legacy null-agent request → not shown in Build Agent
-  - `BuildAgentProgressionTest` — approve all tasks in a DEV flow → flow `Completed` without advancing to SIT; verify `ReleaseFlowProgressionService.progressAfterDecision` takes the `next() == null` branch
-- **Dependencies:** BA-TASK-011a
-- **Owner type:** QA / backend
-- **Priority:** Must
-- **Estimated size:** M (~200 lines across 2 test files)
-- **Notes:** These tests are larger-scope scenarios that set up multi-agent state and assert cross-controller outcomes. Splitting them from BA-TASK-011a keeps PR review manageable.
-
-### BA-TASK-012: Create Frontend API Client + Duplicated API Modules
-
-- **Objective:** Set up the API infrastructure for Build Agent frontend.
-- **Scope:**
-  - Create `frontend/src/api/buildAgentClient.ts` — axios instance with `baseURL: '/api/build-agent'` and the same interceptors as Testing Agent
-  - Duplicate `testingAgentReleaseFlows.ts` → `buildAgentReleaseFlows.ts`; swap client import; **remove** any `linked` parameter from `getById`
-  - Duplicate `testingAgentUpload.ts` → `buildAgentUpload.ts`; swap client import; upload function does not send `stage`
-  - Duplicate `testingAgentTasks.ts` → `buildAgentTasks.ts`; swap client import
-- **Dependencies:** BA-TASK-004
-- **Owner type:** frontend
-- **Priority:** Must
-- **Estimated size:** S (~250 lines, mostly duplicated)
-
-### BA-TASK-013: Create Duplicated Build Agent Store
-
-- **Objective:** Set up a dedicated Pinia store for Build Agent release flow state.
-- **Scope:**
-  - Duplicate `testingAgentReleaseFlow.ts` → `buildAgentReleaseFlow.ts`
-  - Change store ID: `'buildAgentReleaseFlow'`
-  - Change API imports to `buildAgentReleaseFlows`, `buildAgentUpload`, `buildAgentTasks`
-  - **Remove** any code path that handles a `linked` query parameter
-  - Export `useBuildAgentReleaseFlowStore`
-- **Dependencies:** BA-TASK-012
-- **Owner type:** frontend
-- **Priority:** Must
-- **Estimated size:** S (~130 lines, duplicated)
-
-### BA-TASK-014: Create `BuildAgentSummaryView.vue`
-
-- **Objective:** Create the Build Agent summary page by duplicating `TestingAgentSummaryView.vue` and adapting it for the DEV-only stage scope.
-- **Scope:**
-  - Duplicate `frontend/src/views/TestingAgentSummaryView.vue` → `BuildAgentSummaryView.vue`
-  - Replace `useTestingAgentReleaseFlowStore` → `useBuildAgentReleaseFlowStore`
-  - Replace API imports → `buildAgentReleaseFlows`, `buildAgentUpload`
-  - Page title: `"Build Agent"`
-  - Page description and WWA Today text: reference the DEV phase only
-  - `const stages = ['DEV']`
-  - `UploadDialog` prop: `:allowed-stages="['DEV']"`
-  - Stage filter: disabled input showing `DEV`
-  - Summary row renderer: read `row.devStatus` / `row.devPresent` for the single DEV column (do NOT render SIT/UAT/PROD columns)
-  - Detail route path: `/wwa/build-agent/release-flows/`
-- **Dependencies:** BA-TASK-013
-- **Owner type:** frontend
-- **Priority:** Must
-- **Estimated size:** M (~500 lines, duplicated with modifications)
-- **Notes:** Existing Deployment Agent and Testing Agent views are NOT modified.
-
-### BA-TASK-015: Create `BuildAgentDetailView.vue`
-
-- **Objective:** Create the Build Agent detail page by duplicating `TestingAgentDetailView.vue` and restricting it to the DEV stage.
-- **Scope:**
-  - Duplicate `frontend/src/views/TestingAgentDetailView.vue` → `BuildAgentDetailView.vue`
-  - Replace store and API imports
-  - Page title / breadcrumb: `"Build Agent"`
-  - Summary route path: `/wwa/build-agent`
-  - Stage tabs: only render the DEV tab
-  - **Remove** the `linkedFlowQuery` computed and any `route.query.linked` usage per AD-10
-  - Fetch calls do not pass `linked` to the store or API
-- **Dependencies:** BA-TASK-013
-- **Owner type:** frontend
-- **Priority:** Must
-- **Estimated size:** L (~600 lines, duplicated with modifications)
-
-### BA-TASK-016: Extend `AgentCategory` and Register Build Agent
-
-- **Objective:** Register Build Agent so it appears on the WWA Home page and sidebar flyout.
-- **Scope:**
-  - Modify `frontend/src/config/agentRegistry.ts`
-  - Extend `AgentCategory` type: add `'build'` to the union
-  - Add Build Agent entry: `{ key: 'build-agent', name: 'Build Agent', description: '...DEV phase...', route: '/wwa/build-agent', icon: '🔨', enabled: true, category: 'build' }`
-- **Dependencies:** None
-- **Owner type:** frontend
-- **Priority:** Must
-- **Estimated size:** XS (~10 lines)
-
-### BA-TASK-017: Add Build Agent Routes
-
-- **Objective:** Register Build Agent routes in Vue Router.
-- **Scope:**
-  - Modify `frontend/src/router/index.ts`
-  - Add `path: 'build-agent'` → `BuildAgentSummaryView` (lazy import) with meta `{ section: 'build-agent', sectionTitle: 'Build Agent' }`
-  - Add `path: 'build-agent/release-flows/:id'` → `BuildAgentDetailView` (lazy import) with same meta
-- **Dependencies:** BA-TASK-014, BA-TASK-015
-- **Owner type:** frontend
-- **Priority:** Must
-- **Estimated size:** XS (~10 lines)
-
-### BA-TASK-018a: Frontend Component Tests
-
-- **Objective:** Add runtime component-level tests covering Build Agent views and regression-protecting Deployment/Testing Agent renderers from the additive DTO fields.
-- **Scope:**
-  - `BuildAgentSummaryView` snapshot / unit test: assert the stage filter is a disabled input showing `DEV`; assert the summary row renders only the DEV column (reads `row.devStatus` / `row.devPresent`) and does not emit SIT/UAT/PROD cells
-  - `BuildAgentDetailView` test: assert the stage tab set contains only `DEV`; assert the view does not read `route.query.linked` (no network call carries `linked`)
-  - **Regression** `ReleaseFlowSummaryView` (Deployment Agent): assert the summary row still renders only `sitStatus` / `uatStatus` / `prodStatus` columns and does NOT render `devStatus` / `devPresent`, even when the DTO contains those fields
-  - **Regression** `TestingAgentSummaryView`: same assertion as above — only SIT/UAT/PROD columns, no DEV
-  - Use the project's existing frontend test framework if present; otherwise add a minimal Vitest setup alongside the new tests
-- **Dependencies:** BA-TASK-014, BA-TASK-015
-- **Owner type:** frontend / QA
-- **Priority:** Must
-- **Estimated size:** S (~150 lines across 4 test files)
-- **Notes:** This task specifically guards against the R-09 risk (additive DTO fields accidentally rendering in other agents' views). BA-TASK-018 is only a build gate and will not catch runtime renderer behavior.
-
-### BA-TASK-018: Frontend Build and Type Check Verification
-
-- **Objective:** Verify the complete frontend builds and typechecks without errors.
-- **Scope:**
-  - Run `cd frontend && npm run build` — must succeed
-  - Run `cd frontend && npx vue-tsc --noEmit` — must succeed
-  - No TypeScript errors in new or existing files
-  - Verify Deployment Agent and Testing Agent views still render only their own stage columns
-- **Dependencies:** BA-TASK-014, BA-TASK-015, BA-TASK-016, BA-TASK-017
-- **Owner type:** frontend / QA
-- **Priority:** Must
-- **Estimated size:** XS
-
-### BA-TASK-019: Full Backend Test Regression
-
-- **Objective:** Verify the full backend test suite passes after all shared-contract, guard, and controller changes.
-- **Scope:**
-  - Run `mvn test` from the repository root
-  - All existing Deployment Agent and Testing Agent tests must pass unchanged
-  - All new tests from BA-TASK-001, 002, 003, 005, 006, 011a, 011b must pass
-  - **Explicitly verify enum-order regression surface** (per BA-TASK-001 Notes): Deployment Agent flow-level tests that exercise `ReleaseFlowService.representativeFlow`, `highestPresentStage`, `sortRequests`, `determineCurrentStage`, and `aggregateFlowStatus` must produce identical results to pre-change behavior for pure SIT/UAT/PROD data
-  - Investigate and fix any regression before proceeding
-- **Dependencies:** BA-TASK-001 through BA-TASK-011b
-- **Owner type:** QA / backend
-- **Priority:** Must
-- **Estimated size:** S
-
-### BA-TASK-020: End-to-End Manual Verification
-
-- **Objective:** Verify the complete Build Agent workflow works end-to-end and existing agents remain unaffected.
-- **Scope:**
-  - Start backend (`mvn spring-boot:run -Dspring-boot.run.profiles=local`)
-  - Start frontend (`cd frontend && npm run dev`)
-  - Verify:
-    1. Build Agent card appears on WWA Home page with icon `🔨`
-    2. Build Agent appears in sidebar flyout
-    3. Navigate to `/wwa/build-agent` — Build Agent summary loads with `DEV` stage filter disabled input
-    4. Upload Excel via Build Agent → request created with `agent = "build-agent"`, `stage = "DEV"`
-    5. Release flow appears in Build Agent summary with a single DEV column
-    6. Release flow DOES NOT appear in Testing Agent summary
-    7. Release flow DOES appear in Deployment Agent summary (global view) with empty SIT/UAT/PROD columns
-    8. Navigate to Build Agent detail page — only the DEV stage tab is shown; tasks visible
-    9. Task actions work (edit input, start manual, record result, submit auto, decision)
-    10. Audit log shows entries with `agentName = "build-agent"` (Testing Agent audit forward-only correction is covered by `AuditLoggerServiceTest` in BA-TASK-005, not manual verification)
-    11. Approve the final task in the DEV flow → flow transitions to `Completed` without advancing to SIT
-    12. Attempt cross-agent URL probing (e.g. `/api/build-agent/tasks/{deployment-agent-task-id}`) → 404
-    13. Attempt `?linked=` on Build Agent detail URL → behaves the same as without `linked`
-    14. Deployment Agent stage filter still shows only `SIT / UAT / PROD` (no `DEV`)
-    15. Testing Agent stage filter still shows only `UAT`
-    16. Deployment Agent and Testing Agent summary renderers do NOT show any DEV column
-    17. All existing Deployment Agent and Testing Agent workflows still work
-- **Dependencies:** All previous tasks
-- **Owner type:** QA
-- **Priority:** Must
-- **Estimated size:** M (manual testing)
-- **Notes:** This is the final acceptance gate before Build Agent is considered ready for review.
+**System name:** Build Agent (Agent Module) + Platform Core refactor
+**Design document:** `build-agent-design.md` v3
+**Task mapping:** Each task below references the design module (M1–M11, D1–D5, T1–T3, B1–B6) and the architecture decision (PL-*/BA-*) it implements.
 
 ---
 
-## Dependency Plan
+## 3. Phase Overview
 
-### Critical Path
+The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-phase dependencies are strict. Tasks within a phase may sometimes run in parallel — see §5 Parallel Work Opportunities.
+
+| Phase | Title | Tasks | Purpose |
+|---|---|---|---|
+| A | Platform scaffolding | BA-T01, BA-T02 | Empty packages, `StagePipeline` interface — no runtime behavior change |
+| B | Stage vocabulary migration | BA-T03, BA-T04, BA-T05, BA-T06, BA-T07 | Per-agent Stage enums; JPA attribute type change; delete shared `Stage` |
+| C | DTO and aggregation refactor | BA-T08, BA-T09 | Generic `stageStatuses` map; observed-stage iteration |
+| D | Stitching relocation | BA-T10, BA-T11, BA-T12 | `DeploymentStitchingService` + `listByAgent` |
+| E | Guard + Audit | BA-T13, BA-T14 | `AgentBoundaryGuard` platform component; `AuditLoggerService` dynamic agentName |
+| F | Platform capability routes | BA-T15, BA-T16 | `/api/platform/*` cutover + `SecurityConfig` + frontend platform client |
+| G | Frontend factory | BA-T17, BA-T18 | `createAgentWorkspace` factory; `AgentSummaryView` / `AgentDetailView` |
+| H | Agent Module migrations (backend) | BA-T19, BA-T20, BA-T21, BA-T22 | Deployment / Testing / Build Agent controllers |
+| I | Frontend migration | BA-T23, BA-T24, BA-T25 | Per-agent `index.ts` + delete old flat files |
+| J | Verification | BA-T26, BA-T27, BA-T28 | Full regression; manual smoke; release notes |
+
+---
+
+## 4. Task Details
+
+### Phase A — Platform scaffolding
+
+#### BA-T01: Create `platform/domain/StagePipeline.java` interface
+- **Phase:** A
+- **Design ref:** M1
+- **Architecture ref:** PL-4
+- **Effort:** S (small)
+- **Description:** Create the public `StagePipeline` interface with three methods (`next`, `isTerminal`, `orderedStages`). No implementations yet. No callers yet. The only file created.
+- **Files created:** `src/main/java/com/wwa/deploymentagent/platform/domain/StagePipeline.java`
+- **Acceptance criteria:**
+  - Interface compiles.
+  - `mvn test` still green (no tests touched).
+  - No existing code references the interface yet.
+- **Depends on:** —
+- **Blocks:** BA-T04, BA-T05
+
+#### BA-T02: Create empty agent-module package scaffolds
+- **Phase:** A
+- **Design ref:** M1 precondition
+- **Architecture ref:** PL-2
+- **Effort:** S
+- **Description:** Create empty package directories with `package-info.java` files for `com.wwa.deploymentagent.agents.deployment`, `.testing`, `.build` and their `domain/` / `web/` subpackages. Same for `com.wwa.deploymentagent.platform`. This gives ArchUnit rules targets to bind to before any real code lands.
+- **Files created:** 12 `package-info.java` files
+- **Acceptance criteria:**
+  - `mvn test` still green.
+  - ArchUnit rule `agents_do_not_depend_on_each_other` is added and passes trivially.
+- **Depends on:** —
+- **Blocks:** BA-T04 onwards (indirectly; every later task lands under these packages)
+
+---
+
+### Phase B — Stage vocabulary migration
+
+#### BA-T03: Create per-agent Stage enums
+- **Phase:** B
+- **Design ref:** D1, T1, B1
+- **Architecture ref:** PL-3
+- **Effort:** S
+- **Description:** Create `DeploymentStage { SIT, UAT, PROD }`, `TestingStage { UAT }`, `BuildStage { DEV }` enums in their respective agent domain packages. Each enum is a simple value enum with no methods beyond optional `fromString`.
+- **Files created:** `agents/deployment/domain/DeploymentStage.java`, `agents/testing/domain/TestingStage.java`, `agents/build/domain/BuildStage.java`
+- **Acceptance criteria:**
+  - Three unit test files, each asserting the enum's declared values and `fromString` round-trip.
+  - `mvn test` green.
+- **Depends on:** BA-T02
+- **Blocks:** BA-T04
+
+#### BA-T04: Create per-agent `StagePipeline` implementations
+- **Phase:** B
+- **Design ref:** D1, T1, B1
+- **Architecture ref:** PL-4
+- **Effort:** S
+- **Description:** Create `DeploymentStagePipeline`, `TestingStagePipeline`, `BuildStagePipeline` `@Component` beans implementing `StagePipeline`. Each encodes its ordering per design §D1/T1/B1.
+- **Files created:** 3 pipeline files
+- **Acceptance criteria:**
+  - `StagePipelineContractTest` (parameterized for all 3 impls) passes all 8 rows per design §M1.
+  - Each concrete pipeline has a focused unit test with its specific ordering assertions.
+- **Depends on:** BA-T01, BA-T03
+- **Blocks:** BA-T05
+
+#### BA-T05: Thread `StagePipeline` parameter through `ReleaseFlowProgressionService.progressAfterDecision`
+- **Phase:** B
+- **Design ref:** M4
+- **Architecture ref:** PL-4
+- **Effort:** M (medium)
+- **Description:** Add `StagePipeline stagePipeline` as a method parameter to `progressAfterDecision`. Rewrite the terminal-stage branch to call `stagePipeline.next(currentStage)` instead of `currentStage.next()`. Update the single existing caller (the v2 `DecisionController`) to pass `deploymentStagePipeline`. This commit is still on the old flat controller layout.
+- **Files modified:** `ReleaseFlowProgressionService.java`, old `DecisionController.java` (temporary — will move in Phase H)
+- **Acceptance criteria:**
+  - `ReleaseFlowProgressionServiceTest` parameterized over 3 pipelines; all existing assertions pass.
+  - New test: `progressAfterDecision` with `BuildStagePipeline` and `currentStage = "DEV"` results in `FlowStatus.Completed`.
+  - New test: `progressAfterDecision` with `BuildStagePipeline` and `currentStage = "SIT"` (wrong pipeline / wrong agent) also results in `FlowStatus.Completed` because `next("SIT")` returns empty — flow never auto-advances.
+- **Depends on:** BA-T04
+- **Blocks:** BA-T06
+
+#### BA-T06: `Request.stage` and `ReleaseFlow.currentStage` JPA attribute type change to `String`
+- **Phase:** B
+- **Design ref:** M5
+- **Architecture ref:** PL-3
+- **Effort:** L (large — biggest mechanical commit in the delivery)
+- **Description:** Change JPA attribute type from `Stage` enum to `String`. Remove `@Enumerated(EnumType.STRING)`. Update every repository method, service method, DTO call site, and test that previously passed `Stage`. The touched files span Platform Core domain, DTOs, repositories, tests.
+- **Files modified:** `ReleaseFlow.java`, `Request.java`, `ReleaseFlowService.java`, `ImportService.java`, `TaskService.java`, `ReleaseFlowAggregation.java`, `ReleaseFlowListItemDto.java`, `ReleaseFlowRepository.java`, `RequestRepository.java`, and ~15 test files
+- **Acceptance criteria:**
+  - `mvn test` green. All existing repository and service integration tests pass after mechanical `Stage.SIT` → `"SIT"` replacement.
+  - `grep` confirms no class outside `contracts/enums/Stage.java` references the `Stage` import. (Stage.java itself still exists at this step; deleted in BA-T07.)
+- **Depends on:** BA-T05
+- **Blocks:** BA-T07
+
+#### BA-T07: Delete `contracts/enums/Stage.java`
+- **Phase:** B
+- **Design ref:** M5 follow-up
+- **Architecture ref:** PL-3
+- **Effort:** S
+- **Description:** Delete the shared Stage enum. After BA-T06 no code should import it; this commit only removes the file.
+- **Files deleted:** `src/main/java/com/wwa/deploymentagent/contracts/enums/Stage.java`
+- **Acceptance criteria:**
+  - `mvn test` green.
+  - ArchUnit rule `platform_does_not_reference_stage_enums` activates and passes.
+- **Depends on:** BA-T06
+- **Blocks:** —
+
+---
+
+### Phase C — DTO and aggregation refactor
+
+#### BA-T08: Rewrite `ReleaseFlowListItemDto` to generic stage map
+- **Phase:** C
+- **Design ref:** M6
+- **Architecture ref:** PL-7
+- **Effort:** M
+- **Description:** Replace positional `sitStatus / uatStatus / prodStatus / sitPresent / uatPresent / prodPresent` fields with `Map<String, RequestStatus> stageStatuses` and `Set<String> stagesPresent`. Update both positional call sites (`ReleaseFlowListItemDto.from` factory and `ReleaseFlowService.buildStitchedSummary`). Update every test assertion that reads the old fields.
+- **Files modified:** `ReleaseFlowListItemDto.java`, `ReleaseFlowService.java` (stitched summary builder), `ReleaseFlowListItemDtoTest.java`, `ReleaseFlowServiceTest.java`, any other test asserting on the positional fields
+- **Acceptance criteria:**
+  - `ReleaseFlowListItemDtoTest` 5 new cases from design §M6 pass (DEV-only, SIT+UAT, PROD-only, empty, archived-filtered).
+  - Frontend snapshot tests for summary views break temporarily (will be fixed when the frontend factory lands in Phase G).
+- **Depends on:** BA-T07
+- **Blocks:** BA-T09, BA-T10
+
+#### BA-T09: Rewrite `ReleaseFlowAggregation` to iterate observed stages
+- **Phase:** C
+- **Design ref:** M7
+- **Architecture ref:** PL-3 consequence
+- **Effort:** S
+- **Description:** Replace `Stage.values()` iteration with iteration over the observed-stage set per design §M7.
+- **Files modified:** `ReleaseFlowAggregation.java`
+- **Acceptance criteria:**
+  - `ReleaseFlowAggregationTest` passes unchanged semantics (see design §M7 proof note).
+- **Depends on:** BA-T08
+- **Blocks:** —
+
+---
+
+### Phase D — Stitching relocation
+
+#### BA-T10: Move `ReleaseFlowFamilyKey` to `agents/deployment/domain/`
+- **Phase:** D
+- **Design ref:** D2
+- **Architecture ref:** PL-5
+- **Effort:** S
+- **Description:** Move the file; update package declaration; change visibility to package-private. Do not change the regex. The test file also moves.
+- **Files moved:** `ReleaseFlowFamilyKey.java`, `ReleaseFlowFamilyKeyTest.java`
+- **Acceptance criteria:**
+  - `mvn test` green.
+  - Test file passes in new location.
+- **Depends on:** BA-T02
+- **Blocks:** BA-T11
+
+#### BA-T11: Create `DeploymentStitchingService`
+- **Phase:** D
+- **Design ref:** D3, A1
+- **Architecture ref:** PL-5
+- **Effort:** L
+- **Description:** Create `agents/deployment/domain/DeploymentStitchingService.java`. Port `listStitchedSummaries` and `getStitchedDetail` method bodies from platform `ReleaseFlowService` into this new service. Adapt the bodies to use `String stage` and the new `stageStatuses` map from M6. The old `ReleaseFlowService` methods still exist at this step — they will be deleted in BA-T12.
+- **Files created:** `DeploymentStitchingService.java`, `DeploymentStitchingServiceTest.java`
+- **Acceptance criteria:**
+  - `DeploymentStitchingServiceTest` ports all v2 `ReleaseFlowServiceTest` stitched-summary and stitched-detail assertions and passes.
+  - `mvn test` green (because the old platform methods still exist).
+- **Depends on:** BA-T10, BA-T08
+- **Blocks:** BA-T12
+
+#### BA-T12: Delete stitching from `ReleaseFlowService`; add `listByAgent`
+- **Phase:** D
+- **Design ref:** M3
+- **Architecture ref:** PL-5
+- **Effort:** M
+- **Description:** Delete `listStitchedSummaries` and `getStitchedDetail` from platform `ReleaseFlowService`. Add new method `Page<ReleaseFlow> listByAgent(String agentId, ReleaseFlowFilter filter, Pageable pageable)`. Update all callers:
+  - Old `ReleaseFlowController` (Deployment Agent path) → call `DeploymentStitchingService` instead. Temporary state; the controller itself moves in Phase H.
+  - Old `TestingAgentReleaseFlowController` → call `releaseFlowService.listByAgent("testing-agent", ...)`. Temporary state.
+  - `ReleaseFlowFilter` value record is created.
+- **Files modified:** `ReleaseFlowService.java`, old `ReleaseFlowController.java`, old `TestingAgentReleaseFlowController.java`
+- **Files created:** `ReleaseFlowFilter.java`
+- **Acceptance criteria:**
+  - `mvn test` green.
+  - `ReleaseFlowServiceTest` has new tests for `listByAgent_scopesByAgentColumn`, `listByAgent_excludesNullAgent`, `listByAgent_filtersByStageString`.
+  - Old platform stitching method references no longer exist.
+- **Depends on:** BA-T11
+- **Blocks:** Phase H
+
+---
+
+### Phase E — Guard and Audit
+
+#### BA-T13: Create `platform/web/security/AgentBoundaryGuard.java`
+- **Phase:** E
+- **Design ref:** M2
+- **Architecture ref:** PL-9
+- **Effort:** M
+- **Description:** Create the guard component with three `@Transactional(readOnly = true)` assertion methods per design §M2. Unit tests per the 12-row matrix. No controllers call it yet in this commit; it is introduced to the codebase as a dormant component.
+- **Files created:** `AgentBoundaryGuard.java`, `AgentBoundaryGuardTest.java`
+- **Acceptance criteria:**
+  - 12 unit test cases from design §M2 all pass.
+  - `mvn test` green.
+- **Depends on:** BA-T02
+- **Blocks:** Phase H
+
+#### BA-T14: `AuditLoggerService` dynamic `agentName`
+- **Phase:** E
+- **Design ref:** M8
+- **Architecture ref:** PL-11
+- **Effort:** S
+- **Description:** Replace the hardcoded `"deployment-agent"` literal at `AuditLoggerService.java:61` with `scope.agent()`. Remove the v2 null fallback. Add an `IllegalStateException` guard for null scope agent. Update `AuditLoggerServiceTest` to include all four scenarios in design §M8 plus the null-scope guard assertion.
+- **Files modified:** `AuditLoggerService.java`, `AuditLoggerServiceTest.java`
+- **Acceptance criteria:**
+  - All 4 test rows from design §M8 pass.
+  - The null-scope case throws `IllegalStateException` with a clear message.
+  - `mvn test` green. **Note:** Existing audit tests that rely on the old hardcoded value will fail here if they assert `agentName = "deployment-agent"` unconditionally. Fix them in the same commit.
+- **Depends on:** —
+- **Blocks:** —
+
+---
+
+### Phase F — Platform capability route migration
+
+#### BA-T15: Move capability controllers to `/api/platform/*` + update `SecurityConfig` + update UAT runbook
+- **Phase:** F
+- **Design ref:** M9
+- **Architecture ref:** PL-2, §API Boundaries Cutover Strategy
+- **Effort:** M
+- **Description:** Move `AuthController`, `AuditLogController`, `ConfigurationController`, `AccessGrantController` to `platform/web/shared/` package and update their `@RequestMapping` prefixes to `/api/platform/*`. Extract the template download endpoint from the current `UploadController` into a new `TemplateDownloadController` under `platform/web/shared/`. Update `SecurityConfig.java:36` whitelist to `/api/platform/auth/login`. No route aliases — this is the hard cutover. Also update `docs/UAT_RUNBOOK.md` — it currently contains 6+ curl examples against `/api/deployment-agent/auth/*`, `/api/deployment-agent/audit-logs`, and `/api/deployment-agent/access-grants` that will silently break after the cutover.
+- **Files moved:** 4 controller files
+- **Files created:** `TemplateDownloadController.java`
+- **Files modified:** `SecurityConfig.java`; existing unit tests for the 5 capability controllers (update expected URL paths); `docs/UAT_RUNBOOK.md` (update all `/api/deployment-agent/auth/*`, `/api/deployment-agent/audit-logs`, and `/api/deployment-agent/access-grants` references to `/api/platform/*`)
+- **Acceptance criteria:**
+  - `PlatformRouteMigrationTest` (new integration test, design §M9 gate test) passes all 4 scenarios:
+    - Unauthenticated `POST /api/platform/auth/login` → 2xx
+    - Unauthenticated `POST /api/deployment-agent/auth/login` → 401 (old route removed)
+    - Cookie from platform login works on `/api/deployment-agent/*`
+    - Cookie from platform login works on `/api/build-agent/*` (when those routes land in Phase H)
+  - All existing capability controller tests updated to new paths and passing.
+  - `docs/UAT_RUNBOOK.md` grep for `/api/deployment-agent/(auth|audit-logs|config|access-grants|templates)` returns zero matches.
+- **Depends on:** —
+- **Blocks:** BA-T16
+
+#### BA-T16: Frontend platform API client and migrated capability modules
+- **Phase:** F
+- **Design ref:** M10
+- **Architecture ref:** PL-2
+- **Effort:** M
+- **Description:** Create `frontend/src/platform/api/platformClient.ts` (baseURL `/api/platform`, 401 interceptor). Move `auth.ts`, `audit.ts`, `config.ts`, `accessGrants.ts`, and create `templates.ts` — all bound to `platformClient`. Move platform stores (`user.ts`, `audit.ts`, `config.ts`, `accessGrants.ts`) to `frontend/src/platform/stores/`. Move platform shell views (`LoginView`, `WwaHomeView`, `WorkspaceLayout`, `AuditLogView`, `ConfigAdminView`, `AccessManagementView`, `TemplateManagementView`) to `frontend/src/platform/views/`. Update all imports throughout the frontend.
+- **Files created:** `platformClient.ts`, `templates.ts`
+- **Files moved:** 4 API modules, 4 stores, 7 views
+- **Files modified:** Every file that imported the moved modules
+- **Acceptance criteria:**
+  - `cd frontend && npm run build` passes.
+  - Manual smoke: local login via `/api/platform/auth/login` works and lands on the home page.
+  - `LoginView` posts to the new URL (verify by inspecting the compiled code or via browser DevTools).
+- **Depends on:** BA-T15
+- **Blocks:** Phase I
+
+---
+
+### Phase G — Frontend factory
+
+#### BA-T17: Create `createAgentWorkspace` factory and sub-factories
+- **Phase:** G
+- **Design ref:** M11, A4
+- **Architecture ref:** PL-8
+- **Effort:** L
+- **Description:** Create `frontend/src/platform/composables/createAgentWorkspace.ts` with the full public signature from design §M11. Create sub-factories `createReleaseFlowApi.ts`, `createReleaseFlowStore.ts`. The factory does not yet replace any existing agent's code; it is introduced as a new tool.
+- **Files created:** `createAgentWorkspace.ts`, `createReleaseFlowApi.ts`, `createReleaseFlowStore.ts`
+- **Acceptance criteria:**
+  - `createAgentWorkspace.test.ts` 7 cases from design §M11 all pass (baseURL binding, route generation, props for SummaryView, `?linked=` gating, distinct Pinia store IDs across two workspaces).
+  - `cd frontend && npm run build` green.
+- **Depends on:** BA-T16
+- **Blocks:** BA-T18, Phase I
+
+#### BA-T18: Create `AgentSummaryView` and `AgentDetailView` generic components
+- **Phase:** G
+- **Design ref:** M10, M11
+- **Architecture ref:** PL-8
+- **Effort:** M
+- **Description:** Create the two generic view components in `frontend/src/platform/components/`. They read from a store and a config object injected by `createAgentWorkspace`. `AgentSummaryView` reads `stageStatuses` from DTO per M6; `AgentDetailView` passes `?linked=` through to the API when `supportsStitching` is true.
+- **Files created:** `AgentSummaryView.vue`, `AgentDetailView.vue`, their `.test.ts` files
+- **Acceptance criteria:**
+  - Component tests pass.
+  - `cd frontend && npm run build` green.
+- **Depends on:** BA-T17
+- **Blocks:** Phase I
+
+---
+
+### Phase H — Agent Module migrations (backend)
+
+#### BA-T19: Migrate Deployment Agent controllers to `agents/deployment/web/`
+- **Phase:** H
+- **Design ref:** D4
+- **Architecture ref:** PL-2, PL-6, PL-9
+- **Effort:** L
+- **Description:** Create `DeploymentReleaseFlowController`, `DeploymentUploadController`, `DeploymentTaskController`, `DeploymentDecisionController` under `agents/deployment/web/`. Each controller:
+  - Forces `agent = "deployment-agent"` server-side.
+  - Invokes `AgentBoundaryGuard` on every ID-bearing endpoint.
+  - `DeploymentReleaseFlowController.list` scopes by `agent = "deployment-agent"` (PL-6 — removes the implicit global view).
+  - `DeploymentDecisionController` passes `DeploymentStagePipeline` into `progressAfterDecision`.
+  - Stitched linked detail is delegated to `DeploymentStitchingService`.
+  Delete the old `web/controller/ReleaseFlowController`, `UploadController`, `TaskController`, `DecisionController`.
+- **Files created:** 4 new controllers
+- **Files deleted:** 4 old controllers
+- **Files modified:** Controller integration tests rebind to new class names; add assertions for agent-scoped summary and guard-blocked cross-agent access.
+- **Acceptance criteria:**
+  - All existing Deployment Agent integration tests pass (after class-name rebinding).
+  - Updated Deployment Agent summary test asserts `agent IS NULL` rows are invisible.
+  - New test: cross-agent task probe with a Testing Agent task ID returns 404.
+  - `mvn test` green.
+- **Depends on:** BA-T12, BA-T13
+- **Blocks:** BA-T23
+
+#### BA-T20: Migrate Testing Agent controllers to `agents/testing/web/`
+- **Phase:** H
+- **Design ref:** T2
+- **Architecture ref:** PL-2, PL-9
+- **Effort:** M
+- **Description:** Create `TestingReleaseFlowController`, `TestingUploadController`, `TestingTaskController`, `TestingDecisionController` under `agents/testing/web/`. Each invokes `AgentBoundaryGuard` (closes v2 R-08). `TestingReleaseFlowController.list` calls `releaseFlowService.listByAgent("testing-agent", ...)`. `TestingDecisionController` passes `TestingStagePipeline`. Delete old `TestingAgent*Controller` files.
+- **Files created:** 4 new controllers
+- **Files deleted:** `TestingAgentReleaseFlowController.java`, `TestingAgentTaskController.java`, `TestingAgentUploadController.java`
+- **Acceptance criteria:**
+  - Testing Agent integration tests pass after class-name rebinding.
+  - New test: cross-agent task probe with a Deployment Agent task ID returns 404 (proof that v2 R-08 is closed).
+  - `mvn test` green.
+- **Depends on:** BA-T12, BA-T13
+- **Blocks:** BA-T24
+
+#### BA-T21: Create Build Agent controllers under `agents/build/web/`
+- **Phase:** H
+- **Design ref:** B2, B3, B4, B5
+- **Architecture ref:** PL-10, BA-1, BA-2, BA-3
+- **Effort:** L
+- **Description:** Create `BuildReleaseFlowController`, `BuildUploadController`, `BuildTaskController`, `BuildDecisionController` per design §B2–B5 code skeletons. Every ID-bearing endpoint calls `AgentBoundaryGuard` with `AgentId.BUILD_AGENT`. `BuildReleaseFlowController.getById` does not read `?linked=`. `BuildUploadController` forces `agent = "build-agent"` and `stage = "DEV"`. `BuildDecisionController` passes `BuildStagePipeline` into progression.
+- **Files created:** 4 controllers
+- **Acceptance criteria (integration tests, ~25 cases across 4 test files):**
+  - `BuildReleaseFlowControllerTest`: list scoped to build-agent (6 cases)
+  - `BuildUploadControllerTest`: upload forces agent + stage (5 cases)
+  - `BuildTaskControllerTest`: guard on every endpoint (10 cases)
+  - `BuildDecisionControllerTest`: guard + pipeline threading (4 cases)
+  - `mvn test` green.
+- **Depends on:** BA-T12, BA-T13, BA-T14
+- **Blocks:** BA-T22, BA-T25
+
+#### BA-T22: End-to-end Build Agent data isolation tests
+- **Phase:** H
+- **Design ref:** §9 (13 critical integration scenarios)
+- **Architecture ref:** PL-5, PL-6, PL-9
+- **Effort:** M
+- **Description:** Create `BuildDataIsolationTest` covering the 13 critical integration scenarios in design §9.
+- **Files created:** `BuildDataIsolationTest.java`
+- **Acceptance criteria:**
+  - All 13 scenarios pass.
+  - `mvn test` green.
+- **Depends on:** BA-T21
+- **Blocks:** Phase J
+
+---
+
+### Phase I — Frontend migration
+
+#### BA-T23: Create `frontend/src/agents/deployment/index.ts`; delete old flat Deployment Agent frontend files
+- **Phase:** I
+- **Design ref:** D5
+- **Architecture ref:** PL-8
+- **Effort:** M
+- **Description:** Create `frontend/src/agents/deployment/index.ts` calling `createAgentWorkspace({ key: 'deployment-agent', supportsStitching: true, stageFilter: 'dropdown', stages: ['SIT','UAT','PROD'] })`. Wire the returned routes into the platform router. Delete `frontend/src/api/client.ts`, `releaseFlows.ts`, `tasks.ts`, `upload.ts`; `frontend/src/stores/releaseFlow.ts`, `task.ts`; `frontend/src/views/ReleaseFlowSummaryView.vue`, `ReleaseFlowDetailView.vue`.
+- **Files created:** `index.ts`
+- **Files deleted:** 4 api files, 2 stores, 2 views
+- **Acceptance criteria:**
+  - `cd frontend && npm run build` green.
+  - Manual smoke: Deployment Agent summary loads, filters work, detail page works, stitched linked detail (via `?linked=`) still works.
+- **Depends on:** BA-T17, BA-T18, BA-T19
+- **Blocks:** BA-T25
+
+#### BA-T24: Create `frontend/src/agents/testing/index.ts`; delete old Testing Agent frontend files
+- **Phase:** I
+- **Design ref:** T3
+- **Architecture ref:** PL-8
+- **Effort:** M
+- **Description:** Create `frontend/src/agents/testing/index.ts`. Wire routes into the platform router. Delete `testingAgentClient.ts`, `testingAgentReleaseFlows.ts`, `testingAgentTasks.ts`, `testingAgentUpload.ts`, `testingAgentReleaseFlow.ts` (store), `TestingAgentSummaryView.vue`, `TestingAgentDetailView.vue`.
+- **Files created:** `index.ts`
+- **Files deleted:** 4 api files, 1 store, 2 views
+- **Acceptance criteria:**
+  - `cd frontend && npm run build` green.
+  - Manual smoke: Testing Agent summary loads, upload dialog shows UAT as disabled input.
+- **Depends on:** BA-T17, BA-T18, BA-T20
+- **Blocks:** BA-T25
+
+#### BA-T25: Create `frontend/src/agents/build/index.ts`; register Build Agent in `agentRegistry.ts` and router
+- **Phase:** I
+- **Design ref:** B6
+- **Architecture ref:** PL-8
+- **Effort:** S
+- **Description:** Create `frontend/src/agents/build/index.ts` (~20 lines). Add a Build Agent entry to `platform/config/agentRegistry.ts`. Extend `AgentCategory` type to include `'build'`. Wire the factory-returned routes into the platform router at `/wwa/build-agent` and `/wwa/build-agent/release-flows/:id`. Add `AgentId.BUILD_AGENT` to frontend constants file.
+- **Files created:** `index.ts`
+- **Files modified:** `agentRegistry.ts`, router config, `agentId.ts`
+- **Acceptance criteria:**
+  - `cd frontend && npm run build` green.
+  - Manual smoke: Build Agent card appears on home page; clicking it lands on `/wwa/build-agent`; upload dialog shows DEV as disabled input; summary shows the DEV column.
+- **Depends on:** BA-T17, BA-T18, BA-T21
+- **Blocks:** Phase J
+
+---
+
+### Phase J — Verification
+
+#### BA-T26: Full backend regression (`mvn test`) + ArchUnit fitness checks
+- **Phase:** J
+- **Design ref:** §7 (ArchUnit rules), §8.1 (backend test matrix)
+- **Architecture ref:** R-01 mitigation
+- **Effort:** S
+- **Description:** Run `mvn test` clean. Confirm all 6 ArchUnit rules in design §7 pass. Confirm all existing Deployment Agent and Testing Agent integration tests pass after Phase H migration.
+- **Acceptance criteria:**
+  - `mvn test` exits 0.
+  - ArchUnit report shows 0 violations.
+  - No flaky tests introduced.
+- **Depends on:** BA-T22, BA-T23, BA-T24, BA-T25
+- **Blocks:** BA-T27
+
+#### BA-T27: Frontend build + manual smoke of 13 critical scenarios
+- **Phase:** J
+- **Design ref:** §9
+- **Architecture ref:** R-09 mitigation
+- **Effort:** M
+- **Description:** Run `cd frontend && npm run build` clean. Manually execute the 13 critical integration scenarios from design §9 against a running local instance (`mvn spring-boot:run -Dspring-boot.run.profiles=local`). Record any UX regressions.
+- **Acceptance criteria:**
+  - Frontend build exits 0.
+  - All 13 manual scenarios pass.
+  - Session cookie preservation scenario (#11) verified end-to-end: login → access Deployment Agent → access Build Agent without re-login.
+- **Depends on:** BA-T26
+- **Blocks:** BA-T28
+
+#### BA-T28: Release notes + follow-up ticket creation
+- **Phase:** J
+- **Design ref:** —
+- **Architecture ref:** R-02, R-04, R-08, R-12
+- **Effort:** S
+- **Description:** Write release notes covering:
+  - Breaking platform route change (`/api/deployment-agent/*` capabilities → `/api/platform/*`) with the full route mapping.
+  - Legacy `agent IS NULL` data visibility removed until Global View ships (architecture R-04).
+  - `AuditLoggerService.agentName` forward-only fix for Testing Agent historical defect (architecture R-08).
+  - Per-agent Stage enum removal (no user-visible effect; documented for developers).
+  Create follow-up tickets for:
+  - Global View feature (architecture R-04)
+  - Template download file-name unification (architecture R-12)
+  - `createAgentWorkspace` factory enhancements if any were deferred during Phase I.
+- **Acceptance criteria:**
+  - Release notes PR created and approved.
+  - Follow-up tickets exist in the issue tracker.
+- **Depends on:** BA-T27
+- **Blocks:** —
+
+---
+
+## 5. Parallel Work Opportunities
+
+Tasks within a phase can sometimes run concurrently. The following groups are independent and can be worked by separate engineers / branches:
+
+- **Phase A:** BA-T01 and BA-T02 are fully independent.
+- **Phase B:** BA-T03 and BA-T01 are independent once the empty packages exist. BA-T04 depends on both.
+- **Phase E:** BA-T13 (guard) and BA-T14 (audit) are fully independent and can land in parallel.
+- **Phase F:** BA-T15 (backend) and BA-T16 (frontend) must be sequential because BA-T16 depends on the new routes existing.
+- **Phase G:** BA-T17 and BA-T18 are sequential (components depend on factory sub-types).
+- **Phase H:** BA-T19, BA-T20, BA-T21 are fully independent of each other once BA-T12 and BA-T13 have landed. Three engineers can migrate the three agents concurrently.
+- **Phase I:** BA-T23, BA-T24, BA-T25 are fully independent once Phase G + their matching Phase H task has landed. Again, three concurrent streams are possible.
+
+**Serialization-mandatory boundaries:**
+- Phase B must serialize end-to-end (each task depends on the previous).
+- Phase C must complete before Phase D (stitching) and Phase H (controllers).
+- Phase E must complete before Phase H (controllers invoke the guard).
+- Phase F must complete before Phase I (frontend needs `/api/platform/*` routes to exist).
+- Phase G must complete before Phase I (frontend factory must exist before agents use it).
+
+---
+
+## 6. Dependency Graph (Critical Path)
 
 ```
-BA-TASK-001 (Stage) ─> BA-TASK-003 (ListItemDto) ─> BA-TASK-007 (ReleaseFlow ctrl)
-BA-TASK-002 (FamilyKey)    ← parallel with 001, no hard dep
-BA-TASK-005 (Audit fix)    ← parallel with 001/002/004, no hard dep
-
-BA-TASK-004 (AgentId) ─┬─> BA-TASK-006 (Guard)
-                      ├─> BA-TASK-008 (Upload ctrl)
-                      ├─> BA-TASK-009 (Task ctrl)
-                      ├─> BA-TASK-010 (Decision ctrl)
-                      └─> BA-TASK-012 (Frontend API)
-
-BA-TASK-006 (Guard) ─> BA-TASK-007/009/010
-
-BA-TASK-007..010 ─> BA-TASK-011a (Controller unit tests) ─> BA-TASK-011b (Isolation + Progression) ─> BA-TASK-019 (mvn test)
-
-BA-TASK-012 (Frontend API) ─> BA-TASK-013 (Store) ─> BA-TASK-014/015 (Views) ─┬─> BA-TASK-017 (Routes) ─> BA-TASK-018 (Frontend build)
-                                                                              └─> BA-TASK-018a (Frontend component tests)
-
-BA-TASK-019 + BA-TASK-018 + BA-TASK-018a ─> BA-TASK-020 (E2E manual)
+BA-T01 ──┐
+         ├─► BA-T04 ─► BA-T05 ─► BA-T06 ─► BA-T07 ─► BA-T08 ─► BA-T09
+BA-T02 ──┤                                                      │
+BA-T03 ──┘                                                      ▼
+                                                      BA-T10 ─► BA-T11 ─► BA-T12 ┐
+                                                                                  │
+                                                      BA-T13 ───────────────────► ┤
+                                                      BA-T14 ───────────────────► ┤
+                                                                                  ▼
+                                                      BA-T15 ─► BA-T16            │
+                                                                  │                │
+                                                                  ▼                │
+                                                      BA-T17 ─► BA-T18             │
+                                                                  │                │
+                                                                  ▼                ▼
+                                                     ┌─ BA-T19 ─► BA-T23 ┐
+                                                     ├─ BA-T20 ─► BA-T24 ┼─► BA-T22 ─► BA-T26 ─► BA-T27 ─► BA-T28
+                                                     └─ BA-T21 ─► BA-T25 ┘
 ```
 
-### Prerequisite Clusters
+**Critical path (longest chain):** BA-T01 → BA-T04 → BA-T05 → BA-T06 → BA-T07 → BA-T08 → BA-T09 → BA-T12 → BA-T19 → BA-T23 → BA-T26 → BA-T27 → BA-T28
 
-| Cluster | Tasks | Description |
-|---|---|---|
-| **Shared contracts & audit** | 001, 002, 003, 004, 005 | Stage enum / FamilyKey / ListItemDto / AgentId / Audit fix |
-| **Agent boundary guard** | 006 | New security component + unit tests |
-| **Build Agent controllers** | 007, 008, 009, 010 | Four thin controllers |
-| **Backend tests** | 011a, 011b, 019 | Controller unit tests + cross-cutting integration + full regression |
-| **Frontend infrastructure** | 012, 013 | API modules + store |
-| **Build Agent views** | 014, 015 | Summary + detail |
-| **Routing** | 016, 017 | Registry + routes |
-| **Verification** | 018, 018a, 020 | Build gate + component tests + E2E |
-
-### Parallel Workstreams
-
-- BA-TASK-001, 002, 004, 005 have **no mutual hard dependencies** and can all proceed in parallel from day 1
-- BA-TASK-003 depends on 001 (needs `Stage.DEV` constant in `from()` factory)
-- BA-TASK-006 depends on 004 (uses `AgentId` constants in tests)
-- Frontend (012 → 013 → 014/015 → 018a) can run fully in parallel with backend controller work (007 through 011b)
-- Agent registry (016) is independent and can be done any time
-- BA-TASK-018a and BA-TASK-018 are independent of each other; 018a can run once views exist, 018 once routes are wired
+This path has 13 tasks and represents the minimum serial length of the delivery. Parallelism in Phases B/H/I does not shorten the critical path; it reduces wall-clock time for the team overall.
 
 ---
 
-## Task Summary
+## 7. Task Summary
 
-| Task | Description | Size | Priority | Owner |
+| Task | Phase | Effort | Depends on | Blocks |
 |---|---|---|---|---|
-| BA-TASK-001 | Extend `Stage` enum with `DEV` (explicit `next()` switch) | XS | Must | backend |
-| BA-TASK-002 | Conservative `ReleaseFlowFamilyKey` DEV recognition | S | Must | backend |
-| BA-TASK-003 | Append `devStatus`/`devPresent` to `ReleaseFlowListItemDto` | S | Must | backend |
-| BA-TASK-004 | Add `AgentId.BUILD_AGENT` constant (backend + frontend) | XS | Must | backend + frontend |
-| BA-TASK-005 | Fix `AuditLoggerService.agentName` hardcoding (shared) | XS | Must | backend |
-| BA-TASK-006 | `AgentBoundaryGuard` component + unit tests | S | Must | backend |
-| BA-TASK-007 | `BuildAgentReleaseFlowController` | S | Must | backend |
-| BA-TASK-008 | `BuildAgentUploadController` | S | Must | backend |
-| BA-TASK-009 | `BuildAgentTaskController` | M | Must | backend |
-| BA-TASK-010 | `BuildAgentDecisionController` | XS | Must | backend |
-| BA-TASK-011a | Build Agent controller unit integration tests (4 files) | M | Must | QA / backend |
-| BA-TASK-011b | Build Agent cross-cutting integration tests (isolation + progression) | M | Must | QA / backend |
-| BA-TASK-012 | Frontend API client + duplicated API modules | S | Must | frontend |
-| BA-TASK-013 | Duplicated Build Agent store | S | Must | frontend |
-| BA-TASK-014 | `BuildAgentSummaryView.vue` (duplicated, DEV-only) | M | Must | frontend |
-| BA-TASK-015 | `BuildAgentDetailView.vue` (duplicated, no linked) | L | Must | frontend |
-| BA-TASK-016 | Extend `AgentCategory` + register Build Agent | XS | Must | frontend |
-| BA-TASK-017 | Add Build Agent routes | XS | Must | frontend |
-| BA-TASK-018 | Frontend build + type check verification | XS | Must | QA |
-| BA-TASK-018a | Frontend component tests (summary / detail / DA+TA regression) | S | Must | frontend / QA |
-| BA-TASK-019 | Full `mvn test` regression (incl. enum-order surface) | S | Must | QA / backend |
-| BA-TASK-020 | End-to-end manual verification | M | Must | QA |
+| BA-T01 | A | S | — | BA-T04, BA-T05 |
+| BA-T02 | A | S | — | (all later) |
+| BA-T03 | B | S | BA-T02 | BA-T04 |
+| BA-T04 | B | S | BA-T01, BA-T03 | BA-T05 |
+| BA-T05 | B | M | BA-T04 | BA-T06 |
+| BA-T06 | B | L | BA-T05 | BA-T07 |
+| BA-T07 | B | S | BA-T06 | — |
+| BA-T08 | C | M | BA-T07 | BA-T09, BA-T10 |
+| BA-T09 | C | S | BA-T08 | — |
+| BA-T10 | D | S | BA-T02 | BA-T11 |
+| BA-T11 | D | L | BA-T10, BA-T08 | BA-T12 |
+| BA-T12 | D | M | BA-T11 | Phase H |
+| BA-T13 | E | M | BA-T02 | Phase H |
+| BA-T14 | E | S | — | — |
+| BA-T15 | F | M | — | BA-T16 |
+| BA-T16 | F | M | BA-T15 | Phase I |
+| BA-T17 | G | L | BA-T16 | BA-T18, Phase I |
+| BA-T18 | G | M | BA-T17 | Phase I |
+| BA-T19 | H | L | BA-T12, BA-T13 | BA-T23 |
+| BA-T20 | H | M | BA-T12, BA-T13 | BA-T24 |
+| BA-T21 | H | L | BA-T12, BA-T13, BA-T14 | BA-T22, BA-T25 |
+| BA-T22 | H | M | BA-T21 | Phase J |
+| BA-T23 | I | M | BA-T17, BA-T18, BA-T19 | BA-T25 (parallel-safe) |
+| BA-T24 | I | M | BA-T17, BA-T18, BA-T20 | (parallel-safe) |
+| BA-T25 | I | S | BA-T17, BA-T18, BA-T21 | Phase J |
+| BA-T26 | J | S | BA-T22, BA-T23, BA-T24, BA-T25 | BA-T27 |
+| BA-T27 | J | M | BA-T26 | BA-T28 |
+| BA-T28 | J | S | BA-T27 | — |
 
-**Total: 22 tasks** — 7 XS, 9 S, 5 M, 1 L
+**Effort legend:** S = < 0.5 day, M = 0.5–2 days, L = 2–5 days. Numbers are engineer-day estimates for a developer familiar with the codebase; multiply if onboarding a new contributor.
 
-- XS (7): 001, 004, 005, 010, 016, 017, 018
-- S (9): 002, 003, 006, 007, 008, 012, 013, 018a, 019
-- M (5): 009, 011a, 011b, 014, 020
-- L (1): 015
+**Rollup by phase:**
 
----
-
-## Risks / Blockers
-
-| Risk | Severity | Status / Mitigation |
-|---|---|---|
-| `Stage.next()` rewrite breaks tests assuming `{SIT, UAT, PROD}` | MEDIUM | Full `mvn test` gate after BA-TASK-001; grep confirmed no external `Stage.ordinal()` usage |
-| `ReleaseFlowFamilyKey` DEV extension accidentally strips legitimate `dev-*` project names | LOW | Conservative regex strategy per BA-TASK-002; explicit test case for `dev-tools` preservation |
-| `ReleaseFlowListItemDto` positional constructor miswired | LOW | Append-only; two call sites updated in lockstep; `ReleaseFlowListItemDtoTest` covers |
-| `AuditLoggerService` fix retroactively changes Testing Agent audit rows | MEDIUM (R-12) | Accepted as forward-only fix; documented in spec R-12; release notes |
-| Deployment Agent summary now visibly shows build-only rows with empty columns | LOW (R-13) | Accepted per AD-12; explicit E2E check in BA-TASK-020 step 7 |
-| Cross-agent stitching is not supported (R-14) | LOW (R-14) | Accepted as MVP scope; documented in spec; BA-TASK-011b data isolation test asserts separate rows |
-| Build Agent detail does not support `?linked=` (AD-10) | LOW (R-11) | Accepted; BA-TASK-015 removes `linkedFlowQuery`; BA-TASK-020 step 14 verifies silent ignore |
-| Testing Agent pre-existing cross-agent task mutation gap is NOT closed by Build Agent MVP | MEDIUM (R-08) | Accepted; tracked as follow-up FU-006 |
-| Family key `findByReleaseFlowIds` method must exist in `RequestRepository` | LOW | Verified: used by `ReleaseFlowService.findRequestsByReleaseFlowIds` |
-
----
-
-## Follow-Up Tasks (Separate PR)
-
-After Build Agent is working and verified, the following should be scheduled in separate PRs:
-
-| ID | Task | Description |
-|---|---|---|
-| FU-001 | Extract `AgentSummaryView.vue` | Shared component parameterized by `stageColumns: Stage[]`; Deployment/Testing/Build views become thin wrappers |
-| FU-002 | Extract `AgentDetailView.vue` | Shared component parameterized by stage tabs and linked-detail support flag |
-| FU-003 | Extract `agentApiFactory.ts` | Replace duplicated API modules with a factory taking an axios instance |
-| FU-004 | Extract `agentReleaseFlowFactory.ts` | Replace duplicated stores with a factory |
-| FU-005 | Refactor dialog components | Accept API functions via props instead of hardcoded imports (prerequisite for FU-001/002) |
-| FU-006 | Back-patch Testing Agent with `AgentBoundaryGuard` | Close R-08: apply the same guard to Testing Agent task mutation and flow detail endpoints |
-| FU-007 | Cross-agent family view (optional) | Refactor `listStitchedSummaries` so a single stitched row can span multiple agents; addresses R-14 |
-| FU-008 | Unify upload template download file names | Change Deployment / Testing / Build Agent Content-Disposition to a single neutral `request-template.xlsx`, per the CLAUDE.md rule; addresses R-15. User-visible change to Testing Agent download name |
+| Phase | Tasks | S | M | L |
+|---|---|---|---|---|
+| A | 2 | 2 | 0 | 0 |
+| B | 5 | 2 | 1 | 2 |
+| C | 2 | 1 | 1 | 0 |
+| D | 3 | 1 | 1 | 1 |
+| E | 2 | 1 | 1 | 0 |
+| F | 2 | 0 | 2 | 0 |
+| G | 2 | 0 | 1 | 1 |
+| H | 4 | 0 | 2 | 2 |
+| I | 3 | 1 | 2 | 0 |
+| J | 3 | 2 | 1 | 0 |
+| **Total** | **28** | **10** | **12** | **6** |
 
 ---
 
-## Open Questions
+## 8. Risks and Blockers (Execution-Level)
 
-1. Should BA-TASK-020 step 11 (verifying Testing Agent audit fix) be elevated to a formal regression test rather than manual verification?
-2. When should FU-006 (Testing Agent boundary back-patch) be scheduled? Recommendation: immediately after Build Agent merges, since the guard component already exists
-3. Should BA-TASK-015 reject `?linked=` with HTTP 400 instead of silently ignoring it? MVP chooses silent ignore; open for future tightening
+These are execution risks that show up while running the task list. Architecture-level risks (R-01 through R-12) live in `build-agent-architecture.md` §Open Architecture Risks and are not repeated here — this section only tracks mitigations that are actionable at task-execution time.
+
+| ID | Risk | Triggering phase | Mitigation (who does what) |
+|---|---|---|---|
+| X-01 | BA-T06 (JPA attribute String migration) breaks a test class we did not anticipate | Phase B | Land BA-T06 on a dedicated feature branch; run `mvn test` locally before pushing; if a test fails, fix it in the same commit — do not split |
+| X-02 | `DeploymentStitchingService` port loses a subtle edge case from the v2 `listStitchedSummaries` (e.g. attempt-view semantics) | Phase D (BA-T11) | Port the test file at the same time as the service; confirm the ported test file still passes before starting BA-T12 |
+| X-03 | BA-T15 platform route cutover takes effect before BA-T16 frontend migration ships, locking out local developers | Phase F | Land BA-T15 and BA-T16 in the same PR/commit pair; do not merge BA-T15 alone to main |
+| X-04 | `SecurityConfig.java:36` whitelist update is forgotten alongside BA-T15, making login unreachable in test environments | Phase F (BA-T15) | `PlatformRouteMigrationTest` scenario #1 (unauthenticated POST to `/api/platform/auth/login` → 2xx) is the gate; CI blocks the commit if it fails |
+| X-05 | Deployment Agent integration tests that assert "global view" behavior still exist after BA-T19 and fail | Phase H (BA-T19) | Grep the test suite for `agent IS NULL` or "all flows visible" assertions before starting BA-T19; fix or delete them in the same commit |
+| X-06 | `AgentBoundaryGuard` retroactively breaks Deployment Agent archived-flow visibility if `includeArchived=true` is not set | Phase H (BA-T19) | Design §M2 specifies `includeArchived=true` in the guard; verify the implementation matches; add a test for archived-flow access |
+| X-07 | Testing Agent has an active development branch touching `TestingAgent*Controller` that collides with BA-T20 | Phase H (BA-T20) | Coordinate merge order with `Testing-Agent/Develop-leo` (or whatever branch exists at merge time); rebase before BA-T20 lands |
+| X-08 | Frontend factory edge cases surface during Phase I Deployment Agent migration (BA-T23) that the factory does not support | Phase I (BA-T23) | Migrate Testing Agent (BA-T24) or Build Agent (BA-T25) first — simpler agents validate the factory; only then tackle Deployment Agent. Add missing factory config options as discovered, keeping BA-T17 on a branch until BA-T23 confirms coverage |
+| X-09 | Phase J manual smoke reveals a session-cookie failure across the route cutover | Phase J (BA-T27) | If reproduced, check `application.properties` for a stray `server.servlet.session.cookie.path` override and remove; re-test. If not reproduced, ship |
+
+---
+
+## 9. Follow-Up Tasks (Separate PRs)
+
+The following items are intentionally out of scope for this delivery and are tracked as separate PRs to keep the scope bounded.
+
+| ID | Title | Source | Blocks future work? |
+|---|---|---|---|
+| FU-01 | Platform-level Global View page (cross-agent flow listing) | Architecture R-04, PL-8 | Blocks visibility of legacy null-agent data |
+| FU-02 | Template download file-name unification (`request-template.xlsx` across all agents) | Spec §10.1 note, Architecture R-12 | No |
+| FU-03 | Controller-level `@Transactional` for `AgentBoundaryGuard` performance mitigation (if Phase J benchmarks reveal a problem) | Architecture R-11 mitigation path | No (contingent on measurement) |
+| FU-04 | Backfill migration for legacy `Request.agent IS NULL` rows | Architecture R-04 follow-up | No |
+| FU-05 | Agent Module Maven multi-module split (if ArchUnit boundary discipline proves insufficient) | Architecture PL-2 alternative | No |
+| FU-06 | `createAgentWorkspace` factory enhancements for agent-specific view overrides via slots, if a 4th agent surfaces requirements not expressible in config | PL-8 scaling | No |
+| FU-07 | Extract shared `Jenkins`/`Ansible` execution adapter enhancements to support Build Agent-specific build artifacts (when product requirements appear) | Out of scope this delivery | No |
+
+---
+
+## 10. Open Questions
+
+- **Q-01.** Phase H ordering: should BA-T19 (Deployment Agent migration) land before BA-T20 and BA-T21, or simultaneously? The critical path assumes they are independent; if the team prefers to land one agent at a time for confidence, BA-T20 and BA-T21 can wait until BA-T19's migration has been in main for a short soak period. **Default:** concurrent.
+- **Q-02.** BA-T28 release-notes audience: is this an internal engineering change-log or also a user-facing release note? The breaking route change (`/api/platform/*`) has no user-visible effect (login still works via the same URL from the user's perspective), but developers operating the system need to know. **Default:** internal engineering change-log only.
+- **Q-03.** Legacy `agent IS NULL` data visibility — do any production users currently rely on seeing those rows? If yes, the Global View follow-up (FU-01) becomes a hard dependency of this delivery's release. **Default:** no known dependency; ship.
+- **Q-04.** `AgentBoundaryGuard` performance benchmark (BA-T27 / architecture R-11) — is it a blocking gate or an informational measurement? **Default:** informational; ship if functional correctness is verified. Mitigation FU-03 is contingent on measured regression.
+
+Answers to these feed directly into the final merge strategy. In the absence of an answer, the "**Default**" is taken.

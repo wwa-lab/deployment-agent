@@ -1,12 +1,14 @@
 # Build Agent User Stories
 
+> **Status note (2026-04-11):** Acceptance criteria in this document were updated alongside the v3 architecture rewrite to remove v2-era implementation mechanism references (`Stage.DEV.next() == null`, `devStatus` / `devPresent` DTO fields, `ReleaseFlowFamilyKey` cross-agent stitching, Deployment Agent "global view", R-08 Testing Agent boundary gap). Product intent is unchanged; only the mechanism description and a few cross-agent visibility claims were corrected. See `build-agent-architecture.md` §Spec Delta for the authoritative delta. Original document first drafted before the Agent Module pattern existed; stories BA-1 through BA-6 and their source-story traceability are stable.
+
 ## Overview
 
 This document defines the MVP user stories for Build Agent under the WWA Agent Workspace Hub.
-Build Agent is the third agent workspace, mirroring the Testing Agent workflow but scoped to build activities. It reuses the same domain model (Release Flow, Request, Task), shared platform capabilities, and human-in-the-loop control pattern.
+Build Agent is the first Agent Module delivered under the v3 multi-agent pattern. It reuses the same release-flow domain shape (Release Flow, Request, Task) via Platform Core services, shared platform capabilities (auth, audit, configuration, access management, template download — all now at `/api/platform/*`), and the human-in-the-loop control pattern, while owning its own stage vocabulary (`BuildStage { DEV }`), its own `StagePipeline`, and its own controllers.
 
 The main MVP objective is:
-**Provide a dedicated build workspace with full data isolation from Deployment Agent and Testing Agent, while reusing all existing domain logic and shared capabilities.**
+**Provide a dedicated build workspace with full data isolation from Deployment Agent and Testing Agent, enforced by per-agent controllers plus a platform-level `AgentBoundaryGuard` on every ID-bearing endpoint.**
 
 ---
 
@@ -150,7 +152,7 @@ so that the created request is automatically tagged as a build-agent request and
 
 **Dependencies**
 
-- Backend `BuildAgentUploadController` that delegates to `ImportService` with `agent = "build-agent"` and forces stage to `DEV`.
+- Backend `BuildUploadController` (under `agents/build/web/`) that delegates to Platform Core `ImportService` with `agent = "build-agent"`, `stage = "DEV"`, and `BuildStagePipeline`, all forced server-side.
 - Frontend API client configured for `/api/build-agent`.
 - `UploadDialog` accepts `:allowed-stages` prop set to `['DEV']`.
 
@@ -180,23 +182,23 @@ so that build, testing, and deployment activities are clearly separated.
 
 2. Given the user is in the Deployment Agent workspace,
    When the Deployment Flow Summary loads,
-   Then Deployment Agent continues its existing "global view" behavior: all release flows are visible regardless of agent. Build-only flows appear as rows with empty `SIT` / `UAT` / `PROD` columns because Deployment Agent does not render the `devStatus` / `devPresent` fields.
+   Then Deployment Agent shows only release flows that contain at least one request with `agent = "deployment-agent"`. Build Agent flows are NOT visible in the Deployment Agent summary. (Deployment Agent is a peer agent in v3, not an implicit global view.)
 
 3. Given the user is in the Testing Agent workspace,
    When the Testing Flow Summary loads,
-   Then Testing Agent continues its existing behavior: only flows with at least one testing-agent request are shown. Build-only flows are NOT shown in Testing Agent.
+   Then Testing Agent shows only flows with at least one testing-agent request. Build-only flows are NOT shown in Testing Agent.
 
 4. Given two Build Agent uploads share the same DEV release identifier (e.g. both `DEV-1234`),
    When the user views the Build Agent summary,
-   Then the two persisted flows are stitched into a single summary row via `ReleaseFlowFamilyKey` within-agent grouping.
+   Then the second upload upserts into the existing Build Agent Release Flow row (matching existing `ImportService.findOrCreateReleaseFlowByIdentifier` behavior); only one row is visible in the summary.
 
 5. Given a Build Agent DEV-1234 flow exists and a Deployment Agent SIT-1234 flow exists for the same underlying release,
-   When the user views the Build Agent summary,
-   Then they appear as separate summary rows — the Build Agent summary does NOT cross-agent-stitch with Deployment Agent flows. If the user wants to see the full DEV→SIT→UAT→PROD family chain, they switch to Deployment Agent.
+   When the user views either agent's summary,
+   Then the two release flows appear only in their respective agent workspaces — Build Agent does not show the SIT row, and Deployment Agent does not show the DEV row. Cross-agent visibility of the full DEV → SIT → UAT → PROD family is out of scope for this delivery and is tracked as a platform-level Global View follow-up (architecture R-04).
 
 6. Given legacy data exists (requests without an `agent` value),
    When the Build Agent summary loads,
-   Then legacy data is NOT shown in Build Agent (legacy data remains visible only in Deployment Agent).
+   Then legacy data is NOT shown in Build Agent. Under v3 PL-6, legacy `agent IS NULL` rows are invisible from every agent workspace until the platform Global View ships. No backfill migration is part of this delivery.
 
 7. Given the user applies filters (Project, Release ID, Stage, Status),
    When the filter takes effect,
@@ -214,9 +216,9 @@ so that build, testing, and deployment activities are clearly separated.
 
 **Dependencies**
 
-- Backend `BuildAgentReleaseFlowController` with agent-scoped list endpoint.
-- `ReleaseFlowService` already supports agent filtering.
-- Frontend `useBuildAgentReleaseFlowStore` with separate state from the deployment and testing agent stores.
+- Backend `BuildReleaseFlowController` (under `agents/build/web/`) with agent-scoped list endpoint that calls Platform Core `ReleaseFlowService.listByAgent("build-agent", ...)`.
+- Platform `ReleaseFlowService.listByAgent(...)` method exists (delivered in Phase D of the Platform refactor).
+- Frontend Build Agent workspace (Axios client, Pinia store, summary/detail views) generated by `createAgentWorkspace(config)` in `frontend/src/agents/build/index.ts`; no hand-written per-agent store or client.
 
 **Out of Scope**
 
@@ -369,24 +371,24 @@ so that I can execute the full build workflow without switching to another agent
 
 **Notes / Assumptions**
 
-- The detail page structure, layout, and interaction patterns are identical to Testing Agent, except only the `DEV` stage tab is shown.
-- The only differences are the page title, API prefix, Pinia store instance, and the fact that only the `DEV` stage tab is shown.
-- Task-level permission checks (owner or DEVOPS_ADMIN) apply identically, AND an additional controller-layer guard enforces `request.agent == "build-agent"` on every task mutation.
-- Terminal-stage behavior for DEV is implemented by `Stage.DEV.next() == null`; the existing `ReleaseFlowProgressionService` already handles `next() == null` as "flow terminal" so no progression service changes are required.
+- The detail page structure, layout, and interaction patterns are driven by the generic `AgentDetailView` in Platform Core, configured via `createAgentWorkspace({ stages: ['DEV'], supportsStitching: false, ... })`. Build Agent does not author its own view components.
+- The only differences across agents are the config object passed into `createAgentWorkspace`: `key`, `name`, `apiBase`, `stages`, `supportsStitching`, `stageFilter`.
+- Task-level permission checks (owner or DEVOPS_ADMIN) apply identically, AND the platform-level `AgentBoundaryGuard` enforces `request.agent == "build-agent"` on every ID-bearing endpoint before delegating to Platform Core services.
+- Terminal-stage behavior for DEV is implemented by `BuildStagePipeline.next("DEV")` returning `Optional.empty()`. The shared `ReleaseFlowProgressionService.progressAfterDecision(...)` receives the pipeline as a method parameter and treats an empty `next(...)` as "flow terminal". This is the same code path that terminates Deployment Agent flows at PROD.
 
 **Dependencies**
 
-- Backend `BuildAgentTaskController` + `BuildAgentDecisionController` delegating to existing `TaskService`, `DecisionEngine`, `RecordResultService`, `AutoExecutionService`, `TaskExecutionHistoryService`.
-- Shared `AgentBoundaryGuard` helper that loads a task, resolves its parent request, and asserts `request.agent == expectedAgent` (throws to produce HTTP 404).
-- Frontend `BuildAgentDetailView` using `useBuildAgentReleaseFlowStore`.
-- `Stage` enum extension (`DEV` value + explicit `next()` switch).
+- Backend `BuildTaskController` + `BuildDecisionController` (under `agents/build/web/`) delegating to Platform Core `TaskService`, `DecisionEngine`, `RecordResultService`, `AutoExecutionService`, `TaskExecutionHistoryService`.
+- Platform `AgentBoundaryGuard` component, invoked by every Agent Module's controllers on ID-bearing endpoints.
+- Frontend Build Agent workspace created via `createAgentWorkspace({ key: 'build-agent', ... })` in `frontend/src/agents/build/index.ts`.
+- `agents/build/domain/BuildStage { DEV }` enum and `agents/build/domain/BuildStagePipeline` `@Component`.
 
 **Out of Scope**
 
 - Build-specific task types or execution adapters.
 - Build-specific result formats.
 - Multi-stage build pipelines within a single release flow.
-- Back-patching Testing Agent to enforce the same agent boundary (tracked as a separate follow-up risk R-08).
+- Platform-level Global View (cross-agent flow listing) — acknowledged as a needed capability but deferred to a follow-up delivery (architecture R-04).
 
 ---
 
