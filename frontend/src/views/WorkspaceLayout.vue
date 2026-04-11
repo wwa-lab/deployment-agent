@@ -11,6 +11,7 @@ const route = useRoute()
 const sidebarRef = ref<HTMLElement | null>(null)
 const sidebarScrollRef = ref<HTMLElement | null>(null)
 const wwaButtonRef = ref<HTMLElement | null>(null)
+const flyoutRef = ref<HTMLElement | null>(null)
 const flyoutTop = ref(0)
 const isWwaFlyoutOpen = ref(false)
 
@@ -59,6 +60,10 @@ function setWwaButtonRef(element: Element | null) {
   wwaButtonRef.value = element as HTMLElement | null
 }
 
+function setFlyoutRef(element: Element | null) {
+  flyoutRef.value = element as HTMLElement | null
+}
+
 function updateFlyoutPosition() {
   if (!sidebarRef.value || !wwaButtonRef.value) {
     return
@@ -66,7 +71,25 @@ function updateFlyoutPosition() {
 
   const sidebarRect = sidebarRef.value.getBoundingClientRect()
   const buttonRect = wwaButtonRef.value.getBoundingClientRect()
-  flyoutTop.value = buttonRect.top - sidebarRect.top + buttonRect.height / 2
+  const buttonCenter = buttonRect.top - sidebarRect.top + buttonRect.height / 2
+
+  if (!flyoutRef.value || window.innerWidth <= 1024) {
+    flyoutTop.value = buttonCenter
+    return
+  }
+
+  const flyoutHeight = flyoutRef.value.getBoundingClientRect().height
+  const viewportPadding = 12
+  const minTop = viewportPadding
+  const maxTop = Math.max(
+    minTop,
+    window.innerHeight - sidebarRect.top - flyoutHeight - viewportPadding,
+  )
+
+  flyoutTop.value = Math.min(
+    Math.max(buttonCenter - flyoutHeight / 2, minTop),
+    maxTop,
+  )
 }
 
 function handlePrimaryNav(item: PrimaryNavItem) {
@@ -119,6 +142,18 @@ watch(
     updateFlyoutPosition()
   },
 )
+
+watch(
+  () => isWwaFlyoutOpen.value,
+  async (isOpen) => {
+    if (!isOpen) {
+      return
+    }
+
+    await nextTick()
+    updateFlyoutPosition()
+  },
+)
 </script>
 
 <template>
@@ -164,6 +199,7 @@ watch(
 
       <div
         v-if="isWwaFlyoutOpen"
+        :ref="setFlyoutRef"
         class="secondary-flyout"
         :style="{ top: `${flyoutTop}px` }"
       >
@@ -425,8 +461,9 @@ watch(
   position: absolute;
   top: 0;
   left: calc(100% + 18px);
-  transform: translateY(-50%);
   min-width: 260px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   padding: 14px 12px;
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(37, 67, 128, 0.96) 0%, rgba(30, 53, 101, 0.96) 100%);

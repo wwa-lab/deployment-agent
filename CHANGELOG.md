@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed the WWA flyout workspace menu so it now clamps within the viewport and scrolls when necessary, keeping top entries like `Deployment Agent` and `WWA Home` reachable on shorter browser windows.
 - Completed the Build Agent frontend so the workspace now supports real DEV-stage upload, list/detail navigation, and task-level edit/run/result/activity/decision actions instead of the earlier read-only generic wrapper; also aligned WWA home copy and repo/UAT/build-agent docs with the current `/api/platform/*` route split, shared template download contract (`/api/platform/upload/template`, `request-template.xlsx`), and frontend agent constants.
 - Tightened the `.claude` implementation skills so `tasks-to-implementation` no longer silently chooses migration cutover strategy, treats new-project repos that call existing services as greenfield integrations instead of brownfield by default, scopes red-test baselines to relevant failures, clarifies when temporary infrastructure adapters are allowed, and `tasks-to-code` now clearly reserves itself for incremental brownfield work instead of overlapping with scaffolding or migration flows.
 - Fixed Testing Agent detail dialogs that were still falling back to Deployment Agent API modules under the hood: the rundown edit dialog and task activity dialog now accept injected agent-specific API functions, and the Testing Agent detail page wires them to the `/api/testing-agent/...` clients so those actions stay inside the correct workspace boundary.
