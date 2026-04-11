@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Tightened the `.claude` implementation skills so `tasks-to-implementation` no longer silently chooses migration cutover strategy, treats new-project repos that call existing services as greenfield integrations instead of brownfield by default, scopes red-test baselines to relevant failures, clarifies when temporary infrastructure adapters are allowed, and `tasks-to-code` now clearly reserves itself for incremental brownfield work instead of overlapping with scaffolding or migration flows.
 - Fixed Testing Agent detail dialogs that were still falling back to Deployment Agent API modules under the hood: the rundown edit dialog and task activity dialog now accept injected agent-specific API functions, and the Testing Agent detail page wires them to the `/api/testing-agent/...` clients so those actions stay inside the correct workspace boundary.
 - Fixed Testing Agent task input handling around Ansible submissions: partial task-input edits now preserve previously uploaded fields such as `parameters` and `system`, and the Ansible adapter now keeps structured `parameters` payloads as structured `extra_vars` instead of flattening everything through `toString()`.
 - Synced the task feedback behavior across shared workflow surfaces: the shared task edit/decision dialogs can now call the correct agent-specific APIs, Deployment Agent and Testing Agent detail pages now expose the same status-aware edit/decision options, and backend decision rules now allow `Skip` from `Awaiting_Review` with test coverage.
