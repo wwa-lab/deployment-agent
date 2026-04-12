@@ -5,6 +5,7 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.RecordResultRequestDto;
 import com.wwa.deploymentagent.contracts.dto.TaskDto;
 import com.wwa.deploymentagent.contracts.dto.TaskExecutionHistoryDto;
+import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.domain.execution.AutoExecutionService;
 import com.wwa.deploymentagent.domain.task.RecordResultService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
@@ -74,6 +75,35 @@ public class TestingTaskController {
         return ResponseEntity.ok(TaskDto.from(taskService.editInput(id, newInput, user)));
     }
 
+    @PutMapping("/{id}/execution-type")
+    public ResponseEntity<TaskDto> editExecutionType(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserContext user) {
+        String value = body != null ? body.get("executionType") : null;
+        if (value == null) {
+            throw new ValidationAppException("executionType is required");
+        }
+        ExecutionType newType;
+        try {
+            newType = ExecutionType.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new ValidationAppException("Invalid executionType: " + value + ". Must be MANUAL or AUTO");
+        }
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
+        return ResponseEntity.ok(TaskDto.from(taskService.editExecutionType(id, newType, user)));
+    }
+
+    @PutMapping("/{id}/names")
+    public ResponseEntity<TaskDto> editNames(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
+        return ResponseEntity.ok(TaskDto.from(
+                taskService.editNames(id, body.get("taskName"), body.get("taskGroupName"), user)));
+    }
+
     @GetMapping("/{id}/executions")
     public ResponseEntity<List<TaskExecutionHistoryDto>> getExecutions(@PathVariable String id) {
         boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
@@ -82,6 +112,31 @@ public class TestingTaskController {
                 .map(TaskExecutionHistoryDto::from)
                 .toList();
         return ResponseEntity.ok(dtos);
+    }
+
+    @PostMapping("/{id}/clone")
+    public ResponseEntity<TaskDto> cloneTask(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.TESTING_AGENT);
+        return ResponseEntity.ok(TaskDto.from(taskService.cloneTask(id, user)));
+    }
+
+    @PutMapping("/reorder")
+    public ResponseEntity<List<TaskDto>> reorderTasks(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserContext user) {
+        @SuppressWarnings("unchecked")
+        List<String> orderedIds = (List<String>) body.get("taskIds");
+        String requestId = (String) body.get("requestId");
+        if (orderedIds == null || requestId == null) {
+            throw new ValidationAppException("requestId and taskIds are required");
+        }
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.TESTING_AGENT);
+        return ResponseEntity.ok(
+                taskService.reorderTasks(requestId, orderedIds, user).stream()
+                        .map(TaskDto::from)
+                        .toList());
     }
 
     @PostMapping("/{id}/record-result")

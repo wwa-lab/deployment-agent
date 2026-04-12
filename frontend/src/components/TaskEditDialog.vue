@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import type { Task } from '../types'
+import type { Task, ExecutionType } from '../types'
 import AiSuggestionPanel from './AiSuggestionPanel.vue'
 import { AI_ASSIST_PREVIEW_ENABLED } from '../config/platformConfig'
 
 const props = withDefaults(defineProps<{
   task: Task
   editTaskFn: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  editNamesFn: (taskId: string, names: { taskName?: string; taskGroupName?: string }) => Promise<Task>
+  editExecutionTypeFn: (taskId: string, executionType: 'MANUAL' | 'AUTO') => Promise<Task>
   recordResultFn: (
     taskId: string,
     body: { resultSummary: Record<string, unknown>; resultLogs?: string }
@@ -24,20 +26,30 @@ const getInputParams = () => ({
 })
 
 const form = reactive({
+  taskName: props.task.taskName ?? '',
+  taskGroupName: props.task.taskGroupName ?? '',
   script: getInputParams().script,
   parameters: getInputParams().parameters,
   resultSummary: '',
   resultLogs: '',
+  executionType: props.task.executionType as ExecutionType,
 })
 
+let originalTaskName = props.task.taskName ?? ''
+let originalTaskGroupName = props.task.taskGroupName ?? ''
 let originalScript = getInputParams().script
 let originalParameters = getInputParams().parameters
 
 watch(() => props.task, (newTask) => {
+  form.taskName = newTask.taskName ?? ''
+  form.taskGroupName = newTask.taskGroupName ?? ''
   form.script = newTask.inputParameters?.script ?? ''
   form.parameters = newTask.inputParameters?.parameters ?? ''
   form.resultSummary = ''
   form.resultLogs = ''
+  form.executionType = newTask.executionType
+  originalTaskName = newTask.taskName ?? ''
+  originalTaskGroupName = newTask.taskGroupName ?? ''
   originalScript = newTask.inputParameters?.script ?? ''
   originalParameters = newTask.inputParameters?.parameters ?? ''
 }, { immediate: false })
@@ -46,10 +58,24 @@ const saving = ref(false)
 const error = ref('')
 const fieldErrors = reactive<{ script?: string; parameters?: string; resultSummary?: string }>({})
 
+const canChangeExecutionType = computed(
+  () =>
+    props.mode === 'edit' &&
+    (props.task.taskStatus === 'Pending' || props.task.taskStatus === 'Ready_For_Execution'),
+)
+
+const hasExecutionTypeChange = computed(
+  () => form.executionType !== props.task.executionType,
+)
+
 const canSubmitManualResult = computed(
   () =>
     props.task.executionType === 'MANUAL' &&
     (props.task.taskStatus === 'Ready_For_Execution' || props.task.taskStatus === 'Executing'),
+)
+
+const hasNameChanges = computed(
+  () => form.taskName !== originalTaskName || form.taskGroupName !== originalTaskGroupName,
 )
 
 const hasInputChanges = computed(
@@ -87,7 +113,7 @@ const submitLabel = computed(() =>
   saving.value
     ? 'Saving...'
     : isStartingManualExecution.value
-      ? 'Run'
+      ? 'Start Manual Execution'
     : requiresResultForRunningManualTask.value
       ? 'Submit Result'
     : isSubmittingResult.value
@@ -95,9 +121,15 @@ const submitLabel = computed(() =>
       : 'Save',
 )
 
-const dialogTitle = computed(() =>
-  props.mode === 'run' ? `Run Task — ${props.task.taskName}` : `Edit Task — ${props.task.taskName}`,
-)
+const dialogTitle = computed(() => {
+  if (props.mode === 'run' && props.task.executionType === 'MANUAL' && props.task.taskStatus === 'Ready_For_Execution') {
+    return `Start Manual Task — ${props.task.taskName}`
+  }
+  if (props.mode === 'run' && props.task.executionType === 'MANUAL' && props.task.taskStatus === 'Executing') {
+    return `Record Result — ${props.task.taskName}`
+  }
+  return props.mode === 'run' ? `Run Task — ${props.task.taskName}` : `Edit Task — ${props.task.taskName}`
+})
 
 const manualResultHelp = computed(() =>
   props.mode === 'run' && props.task.executionType === 'MANUAL' && props.task.taskStatus === 'Executing'
@@ -126,7 +158,7 @@ async function submit() {
     return
   }
 
-  if (!hasInputChanges.value && !isSubmittingResult.value && !isStartingManualExecution.value) {
+  if (!hasNameChanges.value && !hasInputChanges.value && !hasExecutionTypeChange.value && !isSubmittingResult.value && !isStartingManualExecution.value) {
     error.value = 'No changes to save.'
     return
   }
@@ -134,6 +166,17 @@ async function submit() {
   saving.value = true
   error.value = ''
   try {
+    if (hasNameChanges.value) {
+      const names: { taskName?: string; taskGroupName?: string } = {}
+      if (form.taskName !== originalTaskName) names.taskName = form.taskName.trim()
+      if (form.taskGroupName !== originalTaskGroupName) names.taskGroupName = form.taskGroupName.trim()
+      await props.editNamesFn(props.task.id, names)
+    }
+
+    if (hasExecutionTypeChange.value) {
+      await props.editExecutionTypeFn(props.task.id, form.executionType)
+    }
+
     if (hasInputChanges.value) {
       await props.editTaskFn(props.task.id, {
         script: form.script,
@@ -171,6 +214,61 @@ async function submit() {
 
       <div class="modal-body">
         <div v-if="error" class="alert alert-error">{{ error }}</div>
+
+        <div v-if="isStartingManualExecution" class="manual-steps-hint">
+          <div class="manual-steps-title">Manual task workflow</div>
+          <ol class="manual-steps-list">
+            <li><strong>Start</strong> — click the button below to mark this task as in-progress</li>
+            <li><strong>Execute</strong> — perform the manual step outside this system</li>
+            <li><strong>Record Result</strong> — come back and click "Record Result" to submit the outcome</li>
+            <li><strong>Review</strong> — a reviewer will approve or reject the result</li>
+          </ol>
+        </div>
+
+        <div v-if="canChangeExecutionType" class="form-group">
+          <label class="form-label">Step Name</label>
+          <input
+            v-model="form.taskName"
+            class="form-control"
+            placeholder="Step name..."
+          />
+        </div>
+
+        <div v-if="canChangeExecutionType" class="form-group">
+          <label class="form-label">Task Name</label>
+          <input
+            v-model="form.taskGroupName"
+            class="form-control"
+            placeholder="Task group name..."
+          />
+        </div>
+
+        <div v-if="canChangeExecutionType" class="form-group">
+          <label class="form-label">Execution Type</label>
+          <div class="execution-type-toggle">
+            <button
+              type="button"
+              class="toggle-btn"
+              :class="{ active: form.executionType === 'AUTO' }"
+              @click="form.executionType = 'AUTO'"
+            >
+              AUTO
+            </button>
+            <button
+              type="button"
+              class="toggle-btn"
+              :class="{ active: form.executionType === 'MANUAL' }"
+              @click="form.executionType = 'MANUAL'"
+            >
+              MANUAL
+            </button>
+          </div>
+          <p class="execution-type-hint">
+            {{ form.executionType === 'AUTO'
+              ? 'Submitted to Jenkins/Ansible for automated execution.'
+              : 'Performed manually outside the system; you record the result afterwards.' }}
+          </p>
+        </div>
 
         <AiSuggestionPanel
           v-if="AI_ASSIST_PREVIEW_ENABLED"
@@ -256,6 +354,73 @@ async function submit() {
   font-size: 12px;
   color: #dc2626;
   margin-top: 2px;
+}
+
+.execution-type-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.toggle-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggle-btn:not(:last-child) {
+  border-right: 1px solid #d1d5db;
+}
+
+.toggle-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.toggle-btn:hover:not(.active) {
+  background: #f3f4f6;
+}
+
+.execution-type-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.manual-steps-hint {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+}
+
+.manual-steps-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 6px;
+}
+
+.manual-steps-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #78350f;
+  line-height: 1.7;
+}
+
+.manual-steps-list strong {
+  color: #92400e;
 }
 
 .manual-result-panel {

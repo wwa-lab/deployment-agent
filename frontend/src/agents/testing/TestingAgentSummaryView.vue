@@ -16,7 +16,7 @@ const copy: ReleaseFlowSummaryCopy = {
   introTitleId: 'wwa-testing-intro-title',
   introHeading: 'iSeries A/B testing with human control',
   introBody:
-    'WWA currently supports a Testing Agent workspace. Testing Agent is the A/B testing workspace for iSeries programs, enabling controlled rundowns by program level with human-in-the-loop sign-off at every step.',
+    'Run controlled A/B testing rundowns for iSeries programs with human-in-the-loop sign-off at every step.',
   loadingLabel: 'Loading workflows...',
   emptyHeading: 'No workflows found.',
   emptyHint: 'Upload a workflow file to get started.',

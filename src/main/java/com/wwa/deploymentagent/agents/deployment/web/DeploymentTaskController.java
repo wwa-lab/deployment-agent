@@ -5,6 +5,7 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.RecordResultRequestDto;
 import com.wwa.deploymentagent.contracts.dto.TaskDto;
 import com.wwa.deploymentagent.contracts.dto.TaskExecutionHistoryDto;
+import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.domain.execution.AutoExecutionService;
 import com.wwa.deploymentagent.domain.task.RecordResultService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
@@ -25,8 +26,10 @@ import java.util.Map;
  * <pre>
  *   GET  /api/deployment-agent/tasks?requestId=X   – list tasks for a request
  *   GET  /api/deployment-agent/tasks/:id            – single task detail
- *   PUT  /api/deployment-agent/tasks/:id/input      – edit task input (owner or DEVOPS_ADMIN)
- *   GET  /api/deployment-agent/tasks/:id/executions – execution history
+ *   PUT  /api/deployment-agent/tasks/:id/input          – edit task input (owner or DEVOPS_ADMIN)
+ *   PUT  /api/deployment-agent/tasks/:id/execution-type – change MANUAL↔AUTO (owner or DEVOPS_ADMIN)
+ *   PUT  /api/deployment-agent/tasks/:id/names          – edit task/step name (owner or DEVOPS_ADMIN)
+ *   GET  /api/deployment-agent/tasks/:id/executions     – execution history
  *   POST /api/deployment-agent/tasks/:id/record-result – MANUAL task result record
  *   POST /api/deployment-agent/tasks/:id/start-manual  – MANUAL task start
  *   POST /api/deployment-agent/tasks/:id/submit-auto   – AUTO task submission
@@ -74,6 +77,35 @@ public class DeploymentTaskController {
         return ResponseEntity.ok(TaskDto.from(taskService.editInput(id, newInput, user)));
     }
 
+    @PutMapping("/{id}/execution-type")
+    public ResponseEntity<TaskDto> editExecutionType(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserContext user) {
+        String value = body != null ? body.get("executionType") : null;
+        if (value == null) {
+            throw new ValidationAppException("executionType is required");
+        }
+        ExecutionType newType;
+        try {
+            newType = ExecutionType.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new ValidationAppException("Invalid executionType: " + value + ". Must be MANUAL or AUTO");
+        }
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
+        return ResponseEntity.ok(TaskDto.from(taskService.editExecutionType(id, newType, user)));
+    }
+
+    @PutMapping("/{id}/names")
+    public ResponseEntity<TaskDto> editNames(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
+        return ResponseEntity.ok(TaskDto.from(
+                taskService.editNames(id, body.get("taskName"), body.get("taskGroupName"), user)));
+    }
+
     @GetMapping("/{id}/executions")
     public ResponseEntity<List<TaskExecutionHistoryDto>> getExecutions(@PathVariable String id) {
         boundaryGuard.assertTaskBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
@@ -82,6 +114,31 @@ public class DeploymentTaskController {
                 .map(TaskExecutionHistoryDto::from)
                 .toList();
         return ResponseEntity.ok(dtos);
+    }
+
+    @PostMapping("/{id}/clone")
+    public ResponseEntity<TaskDto> cloneTask(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
+        return ResponseEntity.ok(TaskDto.from(taskService.cloneTask(id, user)));
+    }
+
+    @PutMapping("/reorder")
+    public ResponseEntity<List<TaskDto>> reorderTasks(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserContext user) {
+        @SuppressWarnings("unchecked")
+        List<String> orderedIds = (List<String>) body.get("taskIds");
+        String requestId = (String) body.get("requestId");
+        if (orderedIds == null || requestId == null) {
+            throw new ValidationAppException("requestId and taskIds are required");
+        }
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.DEPLOYMENT_AGENT);
+        return ResponseEntity.ok(
+                taskService.reorderTasks(requestId, orderedIds, user).stream()
+                        .map(TaskDto::from)
+                        .toList());
     }
 
     @PostMapping("/{id}/record-result")

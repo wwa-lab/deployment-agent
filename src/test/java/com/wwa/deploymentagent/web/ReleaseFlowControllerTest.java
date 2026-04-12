@@ -461,7 +461,7 @@ class ReleaseFlowControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Release identifier must match xxx-sit-01 / xxx-uat-01 / xxx-prod-01."));
+                .andExpect(jsonPath("$.message").value("Release identifier must match xxx-dev-01 / xxx-sit-01 / xxx-uat-01 / xxx-prod-01."));
     }
 
     @Test

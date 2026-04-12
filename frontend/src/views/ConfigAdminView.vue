@@ -562,9 +562,7 @@ function displayValue(value?: string) {
     </div>
 
     <div v-if="!canEdit" class="helper-banner helper-banner-muted">
-      You are in read-only mode. All signed-in users can review shared configuration, and only
-      <strong>DEVOPS_ADMIN</strong> can edit it. For local testing, use <strong>emp-003</strong>
-      if you want to verify editing behavior.
+      Read-only mode. Only <strong>DEVOPS_ADMIN</strong> can edit configuration.
     </div>
 
     <div class="mode-tabs">
@@ -596,11 +594,9 @@ function displayValue(value?: string) {
 
     <div v-if="activeView === 'component'" class="component-workspace">
         <div class="helper-banner">
-          This view manages scoped integration components directly. Runtime resolution now prefers
-          the most specific matching row in this order: <strong>Agent Override</strong>,
-          <strong>SNOW Group Default</strong>, <strong>Application Default</strong>, then
-          <strong>Platform Default</strong>. Use <strong>Configuration</strong> when you need
-          key-level edits against one scoped row.
+          Resolution priority: <strong>Agent Override</strong> → <strong>SNOW Group Default</strong>
+          → <strong>Application Default</strong> → <strong>Platform Default</strong>.
+          Use the <strong>Configuration</strong> tab for key-level edits.
         </div>
 
         <div v-if="store.error" class="alert alert-error">
@@ -800,8 +796,7 @@ function displayValue(value?: string) {
             <div>
               <h2 class="section-title">Scope Directory ({{ filteredScopeEntries.length }})</h2>
               <p class="section-subtitle">
-                Maintain reusable scope values for uploads and other workflow surfaces that need
-                controlled Application and SNOW Group choices.
+                Curated Application + SNOW Group choices for upload dialogs.
               </p>
             </div>
             <button
@@ -880,9 +875,7 @@ function displayValue(value?: string) {
 
     <div v-else class="raw-workspace">
         <div class="helper-banner helper-banner-muted">
-          Configuration lists the derived key rows behind each scoped component instance. When a
-          task runs, the backend resolves the most specific matching row for each tool based on its
-          Application, SNOW Group, and Agent context.
+          Key-level configuration rows. Runtime resolves the most specific match by Application, SNOW Group, and Agent.
         </div>
 
         <div class="toolbar-card">

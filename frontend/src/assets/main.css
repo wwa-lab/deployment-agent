@@ -121,6 +121,13 @@ input, select, textarea {
 }
 .btn-secondary:hover:not(:disabled) { background: rgba(239, 245, 255, 0.98); }
 
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+  border-color: #d97706;
+}
+.btn-warning:hover:not(:disabled) { background: #d97706; }
+
 .btn-danger {
   background: #ef4444;
   color: white;

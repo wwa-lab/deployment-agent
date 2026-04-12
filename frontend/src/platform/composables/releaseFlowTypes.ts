@@ -32,6 +32,8 @@ export interface ReleaseFlowDetailApi {
     },
   ) => Promise<Request>
   editTask: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  editNames: (taskId: string, names: { taskName?: string; taskGroupName?: string }) => Promise<Task>
+  editExecutionType: (taskId: string, executionType: 'MANUAL' | 'AUTO') => Promise<Task>
   recordResult: (
     taskId: string,
     body: { resultSummary: Record<string, unknown>; resultLogs?: string },
@@ -39,6 +41,8 @@ export interface ReleaseFlowDetailApi {
   submitDecision: (taskId: string, decision: string) => Promise<Task>
   submitAutoExecution: (taskId: string) => Promise<Task>
   startManualExecution: (taskId: string) => Promise<Task>
+  cloneTask: (taskId: string) => Promise<Task>
+  reorderTasks: (requestId: string, taskIds: string[]) => Promise<Task[]>
   listTaskExecutions: (taskId: string) => Promise<TaskExecutionHistory[]>
   getTaskResult: (taskId: string, executionId?: string) => Promise<TaskResult>
 }

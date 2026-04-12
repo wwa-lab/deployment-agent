@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class TemplateRundownCreationService {
     private static final Pattern RELEASE_IDENTIFIER_PATTERN = Pattern.compile(
-            "^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>sit|uat|prod)-(?<sequence>0[1-9]|[1-9][0-9])$",
+            "^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>dev|sit|uat|prod)-(?<sequence>0[1-9]|[1-9][0-9])$",
             Pattern.CASE_INSENSITIVE);
 
     private final ReleaseFlowRepository releaseFlowRepository;
@@ -308,7 +308,7 @@ public class TemplateRundownCreationService {
         var matcher = RELEASE_IDENTIFIER_PATTERN.matcher(normalized);
         if (!matcher.matches()) {
             throw new ValidationAppException(
-                    "Release identifier must match xxx-sit-01 / xxx-uat-01 / xxx-prod-01.");
+                    "Release identifier must match xxx-dev-01 / xxx-sit-01 / xxx-uat-01 / xxx-prod-01.");
         }
 
         String releaseStage = matcher.group("stage");

@@ -4,10 +4,12 @@ import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.*;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
+import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowFilter;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.releaseflow.TemplateRundownCreationService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import com.wwa.deploymentagent.platform.web.security.AgentBoundaryGuard;
@@ -26,8 +28,9 @@ import java.util.Map;
  * Build Agent release flow controller (BA-T21).
  *
  * <pre>
- *   GET /api/build-agent/release-flows           – DEV-stage list scoped to build-agent
- *   GET /api/build-agent/release-flows/:id       – single flow detail (no stitching)
+ *   GET  /api/build-agent/release-flows           – DEV-stage list scoped to build-agent
+ *   GET  /api/build-agent/release-flows/:id      – single flow detail (no stitching)
+ *   POST /api/build-agent/release-flows/from-template – create from template (forces DEV + build-agent)
  * </pre>
  *
  * <p>PL-6 boundary: every endpoint forces {@code agent = "build-agent"} server-side.
@@ -38,7 +41,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BuildReleaseFlowController {
 
+    private static final String FORCED_STAGE = "DEV";
+
     private final ReleaseFlowService releaseFlowService;
+    private final TemplateRundownCreationService templateRundownCreationService;
     private final AgentBoundaryGuard boundaryGuard;
 
     @GetMapping
@@ -76,6 +82,108 @@ public class BuildReleaseFlowController {
 
         return ResponseEntity.ok(new PaginatedResponseDto<>(
                 dtos, result.getTotalElements(), result.getNumber(), result.getSize()));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/start")
+    public ResponseEntity<RequestDto> startRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId);
+        validateRequestScope(user, requestForValidation, "start_rundown");
+        validateRundownOperator(user, requestForValidation, "start_rundown");
+
+        Request request = releaseFlowService.startRequestDeployment(flowId, requestId, user);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/fail")
+    public ResponseEntity<RequestDto> markRequestFailed(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId);
+        validateRequestScope(user, requestForValidation, "mark_request_failed");
+        validateRundownOperator(user, requestForValidation, "mark_request_failed");
+
+        Request request = releaseFlowService.markRequestFailed(flowId, requestId, user);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PatchMapping("/{flowId}/requests/{requestId}/rundown")
+    public ResponseEntity<RequestDto> updateRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @RequestBody RequestRundownUpdateDto body,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId), "update_rundown");
+        validateOwnerEdit(user, body);
+
+        Request request = releaseFlowService.updateRequestRundown(flowId, requestId, body);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/archive")
+    public ResponseEntity<RequestArchiveResultDto> archiveRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId), "archive_rundown");
+        return ResponseEntity.ok(releaseFlowService.archiveRequestRundown(flowId, requestId, user));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/restore")
+    public ResponseEntity<RequestArchiveResultDto> restoreRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateAdmin(user, "restore_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId, true), "restore_rundown");
+        return ResponseEntity.ok(releaseFlowService.restoreRequestRundown(flowId, requestId, user));
+    }
+
+    @DeleteMapping("/{flowId}/requests/{requestId}/purge")
+    public ResponseEntity<RequestPurgeResultDto> purgeArchivedRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateAdmin(user, "purge_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId, true), "purge_rundown");
+        return ResponseEntity.ok(releaseFlowService.purgeArchivedRequestRundown(flowId, requestId, user));
+    }
+
+    @PostMapping("/from-template")
+    public ResponseEntity<UploadResponseDto> createFromTemplate(
+            @RequestBody CreateRundownFromTemplateDto body,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        CreateRundownFromTemplateDto forced = new CreateRundownFromTemplateDto(
+                body.templateId(), body.templateName(),
+                body.projectId(), body.projectName(),
+                FORCED_STAGE, body.releaseId(),
+                body.snowGroup(), body.application(),
+                AgentId.BUILD_AGENT, body.site(),
+                body.owner(), body.estimatedRemainingMinutes(),
+                body.tasks());
+        ImportResult result = templateRundownCreationService.createRundown(forced, user);
+        return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 
     @GetMapping("/{id}")
@@ -131,5 +239,87 @@ public class BuildReleaseFlowController {
         return requests.stream()
                 .filter(req -> user.hasScopedAccess(req.getApplication(), req.getSnowGroup()))
                 .toList();
+    }
+
+    private Request findRequestForScopeValidation(String flowId, String requestId) {
+        return findRequestForScopeValidation(flowId, requestId, false);
+    }
+
+    private Request findRequestForScopeValidation(String flowId, String requestId, boolean includeArchived) {
+        return releaseFlowService.findRequestsForFlow(flowId, includeArchived).stream()
+                .filter(request -> request.getId().equals(requestId))
+                .findFirst()
+                .orElseThrow(() -> new ForbiddenAppException("request_scope_lookup"));
+    }
+
+    private void validateRundownEditor(UserContext user) {
+        if (user == null) {
+            throw new ForbiddenAppException("update_rundown");
+        }
+        if (!user.hasRole("DEVELOPER") && !user.hasRole("TL") && !user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException("update_rundown");
+        }
+    }
+
+    private void validateAdmin(UserContext user, String action) {
+        if (user == null || !user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private void validateOwnerEdit(UserContext user, RequestRundownUpdateDto body) {
+        if (body == null) {
+            return;
+        }
+        if (body.owner() != null && (user == null || !user.hasRole("DEVOPS_ADMIN"))) {
+            throw new ForbiddenAppException("update_rundown_owner");
+        }
+    }
+
+    private void validateRequestScope(UserContext user, Request request, String action) {
+        if (user == null) {
+            throw new ForbiddenAppException(action);
+        }
+        if (user.isGlobalDevOpsAdmin()) {
+            return;
+        }
+        if (!user.hasScopedAccess(request.getApplication(), request.getSnowGroup())) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private void validateRundownOperator(UserContext user, Request request, String action) {
+        if (user == null) {
+            throw new ForbiddenAppException(action);
+        }
+        if (user.hasRole("DEVOPS_ADMIN")) {
+            return;
+        }
+        if ((!user.hasRole("DEVELOPER") && !user.hasRole("TL")) || !isRundownOwner(user, request)) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private boolean isRundownOwner(UserContext user, Request request) {
+        String owner = normalizeIdentity(request.getOwner());
+        if (owner == null) {
+            return false;
+        }
+
+        String displayName = user.displayName() == null ? null : user.displayName().replaceAll("\\s*\\(.*\\)$", "").trim();
+        String firstName = displayName == null || displayName.isBlank() ? null : displayName.split("\\s+")[0];
+
+        return List.of(user.userId(), displayName, firstName)
+                .stream()
+                .map(this::normalizeIdentity)
+                .filter(value -> value != null)
+                .anyMatch(owner::equals);
+    }
+
+    private String normalizeIdentity(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 }

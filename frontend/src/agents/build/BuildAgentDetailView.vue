@@ -2,18 +2,29 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  archiveRequestRundown as archiveRequestRundownApi,
+  cloneTask as cloneTaskApi,
+  editExecutionType as editExecutionTypeApi,
+  editNames as editNamesApi,
   editTask as editTaskApi,
   getTaskResult,
   listTaskExecutions as listBuildTaskExecutions,
+  markRequestFailed as markRequestFailedApi,
+  purgeRequestRundown as purgeRequestRundownApi,
+  reorderTasks as reorderTasksApi,
   recordResult as recordResultApi,
+  restoreRequestRundown as restoreRequestRundownApi,
   startManualExecution as startManualExecutionApi,
+  startRequestDeployment as startRequestDeploymentApi,
   submitAutoExecution,
   submitDecision as submitDecisionApi,
+  updateRequestRundown as updateRequestRundownApi,
 } from './api'
 import { useBuildAgentStore } from './index'
 import { useUserStore } from '../../stores/user'
 import TaskEditDialog from '../../components/TaskEditDialog.vue'
 import DecisionDialog from '../../components/DecisionDialog.vue'
+import RundownEditDialog from '../../components/RundownEditDialog.vue'
 import TaskActivityDialog from '../../components/TaskActivityDialog.vue'
 import type { Request, Task, TaskResult } from '../../types'
 
@@ -34,8 +45,10 @@ const decidingTask = ref<Task | null>(null)
 const viewingActivityTask = ref<Task | null>(null)
 const initialDecision = ref<DecisionOption | null>(null)
 const allowedDecisionOptions = ref<DecisionOption[]>(['Approve', 'Reject', 'Skip'])
+const editingRundown = ref<Request | null>(null)
 const refreshingDetail = ref(false)
 const submittingAuto = ref<string | null>(null)
+const requestActionLoadingId = ref<string | null>(null)
 const activeTab = ref(0)
 
 const viewingResult = ref<{ task: Task; result: TaskResult | null; loading: boolean } | null>(null)
@@ -231,6 +244,175 @@ function archivedRequestReason(request: Request): string | null {
   return 'Archived build rundowns are read-only.'
 }
 
+function isRundownOperator(request: Request): boolean {
+  if (userStore.isDevOpsAdmin) return true
+  if (!userStore.isDeveloper && !userStore.isTL) return false
+  return matchesCurrentUserIdentity(request.owner)
+}
+
+function hasPendingTasks(request: Request): boolean {
+  return request.tasks.some((task) => task.taskStatus === 'Pending')
+}
+
+function hasFailEligibleTasks(request: Request): boolean {
+  return request.tasks.some(
+    (task) => !['Approved', 'Skipped', 'Rejected', 'Failed'].includes(task.taskStatus),
+  )
+}
+
+function canStartRundown(request: Request): boolean {
+  return (
+    isRundownOperator(request) &&
+    !isArchivedRequest(request) &&
+    request.requestStatus === 'Pending' &&
+    hasPendingTasks(request)
+  )
+}
+
+function startRundownDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (request.requestStatus !== 'Pending') return 'Available only when rundown status is Pending'
+  if (!hasPendingTasks(request)) return 'No pending tasks remain to start'
+  return null
+}
+
+function canMarkRequestFailed(request: Request): boolean {
+  return (
+    isRundownOperator(request) &&
+    !isArchivedRequest(request) &&
+    !['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus) &&
+    hasFailEligibleTasks(request)
+  )
+}
+
+function markRequestFailedDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus)) {
+    return 'Available only while the rundown is still active'
+  }
+  if (!hasFailEligibleTasks(request)) return 'No active tasks remain to fail'
+  return null
+}
+
+async function handleStartRundown(request: Request) {
+  if (!canStartRundown(request)) return
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:start`
+  try {
+    await startRequestDeploymentApi(detail.id, request.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handleMarkRequestFailed(request: Request) {
+  if (!canMarkRequestFailed(request)) return
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:fail`
+  try {
+    await markRequestFailedApi(detail.id, request.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+function canEditRundown(): boolean {
+  return userStore.isDeveloper || userStore.isTL || userStore.isDevOpsAdmin
+}
+
+function canEditRundownFields(request: Request): boolean {
+  return canEditRundown() && !isArchivedRequest(request)
+}
+
+function canRestoreRundown(): boolean {
+  return userStore.isDevOpsAdmin
+}
+
+function canPurgeRundown(request: Request): boolean {
+  return userStore.isDevOpsAdmin && isArchivedRequest(request)
+}
+
+async function handleArchiveRundown(request: Request) {
+  if (!canEditRundown()) return
+  if (!window.confirm(
+    'Archive this DEV build rundown? The rundown will be marked as archived and become read-only.',
+  )) return
+
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:archive`
+  try {
+    const result = await archiveRequestRundownApi(detail.id, request.id)
+    if (result.releaseFlowArchived && !includeArchivedView.value) {
+      await store.fetchList()
+      await router.push('/wwa/build-agent')
+      return
+    }
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handleRestoreRundown(request: Request) {
+  if (!canRestoreRundown()) return
+  if (!window.confirm('Restore this DEV build rundown back into the active workflow?')) return
+
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:restore`
+  try {
+    await restoreRequestRundownApi(detail.id, request.id)
+    await store.fetchList()
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handlePurgeRundown(request: Request) {
+  if (!canPurgeRundown(request)) return
+  if (!window.confirm(
+    'Permanently delete this archived build rundown? This action cannot be undone.',
+  )) return
+
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:purge`
+  try {
+    const result = await purgeRequestRundownApi(detail.id, request.id)
+    await store.fetchList()
+    if (result.releaseFlowDeleted) {
+      await router.push('/wwa/build-agent')
+      return
+    }
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function onRundownSaved() {
+  editingRundown.value = null
+  await store.refreshDetail()
+}
+
 function taskActionReason(request: Request, reason: string | null): string | null {
   return archivedRequestReason(request) ?? reason
 }
@@ -281,6 +463,65 @@ async function openViewResult(task: Task) {
     viewingResult.value = { task, result, loading: false }
   } catch {
     viewingResult.value = { task, result: null, loading: false }
+  }
+}
+
+async function handleCloneTask(task: Task) {
+  if (!canModifyTask(task)) return
+  cloningTaskId.value = task.id
+  try {
+    await cloneTaskApi(task.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    cloningTaskId.value = null
+  }
+}
+
+const cloningTaskId = ref<string | null>(null)
+
+const dragTaskId = ref<string | null>(null)
+const dragOverTaskId = ref<string | null>(null)
+
+function onDragStart(task: Task, event: DragEvent) {
+  dragTaskId.value = task.id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', task.id)
+  }
+}
+
+function onDragOver(task: Task, event: DragEvent) {
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  dragOverTaskId.value = task.id
+}
+
+function onDragLeave() { dragOverTaskId.value = null }
+function onDragEnd() { dragTaskId.value = null; dragOverTaskId.value = null }
+
+async function onDrop(request: Request, targetTask: Task, event: DragEvent) {
+  event.preventDefault()
+  dragOverTaskId.value = null
+  const sourceId = dragTaskId.value
+  dragTaskId.value = null
+  if (!sourceId || sourceId === targetTask.id) return
+  if (isArchivedRequest(request)) return
+
+  const tasks = [...request.tasks]
+  const sourceIdx = tasks.findIndex(t => t.id === sourceId)
+  const targetIdx = tasks.findIndex(t => t.id === targetTask.id)
+  if (sourceIdx === -1 || targetIdx === -1) return
+
+  const [moved] = tasks.splice(sourceIdx, 1)
+  tasks.splice(targetIdx, 0, moved)
+
+  try {
+    await reorderTasksApi(request.id, tasks.map(t => t.id))
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
   }
 }
 
@@ -578,6 +819,41 @@ const activeRequestSummary = computed(() => {
                 >
                   {{ refreshingDetail ? 'Refreshing...' : 'Refresh' }}
                 </button>
+                <button
+                  v-if="canEditRundownFields(req)"
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  @click="editingRundown = req"
+                >
+                  Edit Rundown
+                </button>
+                <button
+                  v-if="canEditRundownFields(req)"
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:archive`"
+                  @click="handleArchiveRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:archive` ? 'Archiving...' : 'Archive Rundown' }}
+                </button>
+                <button
+                  v-if="req.archivedAt && canRestoreRundown()"
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:restore`"
+                  @click="handleRestoreRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:restore` ? 'Restoring...' : 'Restore Rundown' }}
+                </button>
+                <button
+                  v-if="canPurgeRundown(req)"
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:purge`"
+                  @click="handlePurgeRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:purge` ? 'Deleting...' : 'Delete Permanently' }}
+                </button>
               </div>
             </div>
 
@@ -688,6 +964,29 @@ const activeRequestSummary = computed(() => {
                 </div>
               </div>
             </div>
+
+            <div class="rundown-section">
+              <div class="rundown-request-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-start"
+                  :disabled="!!startRundownDisabledReason(req) || requestActionLoadingId === `${req.id}:start`"
+                  :title="startRundownDisabledReason(req) ?? undefined"
+                  @click="handleStartRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:start` ? 'Starting...' : 'Start Rundown' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  :disabled="!!markRequestFailedDisabledReason(req) || requestActionLoadingId === `${req.id}:fail`"
+                  :title="markRequestFailedDisabledReason(req) ?? undefined"
+                  @click="handleMarkRequestFailed(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:fail` ? 'Marking...' : 'Mark as Failed' }}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div v-if="req.tasks.length === 0" class="empty-state">No tasks in this request.</div>
@@ -746,7 +1045,20 @@ const activeRequestSummary = computed(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="task in req.tasks" :key="task.id">
+                <tr
+                  v-for="task in req.tasks"
+                  :key="task.id"
+                  :draggable="!isArchivedRequest(req) && userStore.isDevOpsAdmin"
+                  :class="{
+                    'drag-source': dragTaskId === task.id,
+                    'drag-over': dragOverTaskId === task.id && dragTaskId !== task.id,
+                  }"
+                  @dragstart="onDragStart(task, $event)"
+                  @dragover="onDragOver(task, $event)"
+                  @dragleave="onDragLeave"
+                  @dragend="onDragEnd"
+                  @drop="onDrop(req, task, $event)"
+                >
                   <td>{{ task.category ?? '—' }}</td>
                   <td>{{ task.taskGroupName }}</td>
                   <td>{{ task.stepSeq }}</td>
@@ -817,6 +1129,15 @@ const activeRequestSummary = computed(() => {
                         >
                           Activity
                         </button>
+                        <span class="action-tooltip" title="Create a copy of this task">
+                          <button
+                            class="btn btn-secondary btn-sm"
+                            :disabled="isArchivedRequest(req) || !canModifyTask(task) || cloningTaskId === task.id"
+                            @click.stop="handleCloneTask(task)"
+                          >
+                            {{ cloningTaskId === task.id ? 'Cloning...' : 'Clone' }}
+                          </button>
+                        </span>
                         <span class="action-tooltip" :title="viewResultDisabledReason(task) ?? ''">
                           <button
                             class="btn btn-secondary btn-sm"
@@ -930,6 +1251,8 @@ const activeRequestSummary = computed(() => {
       :task="editingTask"
       :mode="taskDialogMode"
       :edit-task-fn="editTaskApi"
+      :edit-names-fn="editNamesApi"
+      :edit-execution-type-fn="editExecutionTypeApi"
       :record-result-fn="recordResultApi"
       :start-manual-execution-fn="startManualExecutionApi"
       @saved="onTaskSaved"
@@ -944,6 +1267,14 @@ const activeRequestSummary = computed(() => {
       :submit-decision-fn="submitDecisionApi"
       @decided="onDecisionMade"
       @close="closeDecisionDialog"
+    />
+
+    <RundownEditDialog
+      v-if="editingRundown"
+      :request="editingRundown"
+      :update-request-rundown-fn="updateRequestRundownApi"
+      @saved="onRundownSaved"
+      @close="editingRundown = null"
     />
 
     <TaskActivityDialog
@@ -1411,5 +1742,23 @@ const activeRequestSummary = computed(() => {
   .result-grid {
     grid-template-columns: 1fr;
   }
+}
+
+tr[draggable="true"] { cursor: grab; }
+tr[draggable="true"]:active { cursor: grabbing; }
+.drag-source { opacity: 0.4; }
+.drag-over { border-top: 2px solid #3b82f6 !important; }
+
+.rundown-request-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-start {
+  min-width: 140px;
+}
+.btn-start:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 </style>

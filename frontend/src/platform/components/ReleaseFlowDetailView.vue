@@ -189,7 +189,20 @@ function runButtonLabel(task: Task): string {
   if (task.executionType === 'AUTO' && task.taskStatus === 'Executing') {
     return 'Running...'
   }
+  if (task.executionType === 'MANUAL') {
+    return 'Start Manual'
+  }
   return 'Run'
+}
+
+function runButtonTooltip(task: Task): string | null {
+  if (task.executionType === 'MANUAL' && task.taskStatus === 'Ready_For_Execution') {
+    return 'Mark this task as started, then perform the manual step and come back to record the result'
+  }
+  if (task.executionType === 'MANUAL' && task.taskStatus === 'Executing') {
+    return 'Record the outcome of this manual step to move it to review'
+  }
+  return null
 }
 
 function canRerun(task: Task): boolean {
@@ -280,14 +293,34 @@ function markRequestFailedDisabledReason(request: Request): string | null {
 }
 
 const submittingAuto = ref<string | null>(null)
+const actionError = ref<string | null>(null)
+let actionErrorTimer: number | null = null
+
+function showActionError(message: string) {
+  actionError.value = message
+  if (actionErrorTimer !== null) clearTimeout(actionErrorTimer)
+  actionErrorTimer = window.setTimeout(() => {
+    actionError.value = null
+    actionErrorTimer = null
+  }, 10000)
+}
+
+function dismissActionError() {
+  actionError.value = null
+  if (actionErrorTimer !== null) {
+    clearTimeout(actionErrorTimer)
+    actionErrorTimer = null
+  }
+}
 
 async function handleSubmitAuto(task: Task) {
   submittingAuto.value = task.id
+  actionError.value = null
   try {
     await props.api.submitAutoExecution(task.id)
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (err) {
+    showActionError(err instanceof Error ? err.message : String(err))
   } finally {
     submittingAuto.value = null
   }
@@ -327,6 +360,80 @@ async function openViewResult(task: Task) {
     viewingResult.value = { task, result, loading: false }
   } catch {
     viewingResult.value = { task, result: null, loading: false }
+  }
+}
+
+async function handleCloneTask(task: Task) {
+  if (!canModifyTask(task)) return
+  cloningTaskId.value = task.id
+  try {
+    await props.api.cloneTask(task.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    cloningTaskId.value = null
+  }
+}
+
+const cloningTaskId = ref<string | null>(null)
+
+// ─── Drag-and-drop reorder ──────────────────────────────────────────────────
+const dragTaskId = ref<string | null>(null)
+const dragOverTaskId = ref<string | null>(null)
+const reordering = ref(false)
+
+function onDragStart(task: Task, event: DragEvent) {
+  dragTaskId.value = task.id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', task.id)
+  }
+}
+
+function onDragOver(task: Task, event: DragEvent) {
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  dragOverTaskId.value = task.id
+}
+
+function onDragLeave() {
+  dragOverTaskId.value = null
+}
+
+function onDragEnd() {
+  dragTaskId.value = null
+  dragOverTaskId.value = null
+}
+
+async function onDrop(request: Request, targetTask: Task, event: DragEvent) {
+  event.preventDefault()
+  dragOverTaskId.value = null
+
+  const sourceId = dragTaskId.value
+  dragTaskId.value = null
+  if (!sourceId || sourceId === targetTask.id) return
+  if (isArchivedRequest(request)) return
+
+  const tasks = [...request.tasks]
+  const sourceIdx = tasks.findIndex(t => t.id === sourceId)
+  const targetIdx = tasks.findIndex(t => t.id === targetTask.id)
+  if (sourceIdx === -1 || targetIdx === -1) return
+
+  const [moved] = tasks.splice(sourceIdx, 1)
+  tasks.splice(targetIdx, 0, moved)
+
+  const orderedIds = tasks.map(t => t.id)
+  reordering.value = true
+  try {
+    await props.api.reorderTasks(request.id, orderedIds)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    reordering.value = false
   }
 }
 
@@ -1000,6 +1107,12 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <!-- Action error banner -->
+            <div v-if="actionError" class="action-error-banner">
+              <span class="action-error-message">{{ actionError }}</span>
+              <button class="action-error-dismiss" @click="dismissActionError">&times;</button>
+            </div>
+
             <table class="data-table">
             <thead>
               <tr>
@@ -1017,7 +1130,20 @@ onUnmounted(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="task in req.tasks" :key="task.id">
+              <tr
+                v-for="task in req.tasks"
+                :key="task.id"
+                :draggable="!isArchivedRequest(req) && canEditRundown()"
+                :class="{
+                  'drag-source': dragTaskId === task.id,
+                  'drag-over': dragOverTaskId === task.id && dragTaskId !== task.id,
+                }"
+                @dragstart="onDragStart(task, $event)"
+                @dragover="onDragOver(task, $event)"
+                @dragleave="onDragLeave"
+                @dragend="onDragEnd"
+                @drop="onDrop(req, task, $event)"
+              >
                 <td>{{ task.category ?? '—' }}</td>
                 <td>{{ task.taskGroupName }}</td>
                 <td>{{ task.stepSeq }}</td>
@@ -1088,6 +1214,15 @@ onUnmounted(() => {
                       >
                         Activity
                       </button>
+                      <span class="action-tooltip" title="Create a copy of this task">
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          :disabled="isArchivedRequest(req) || !canModifyTask(task) || cloningTaskId === task.id"
+                          @click.stop="handleCloneTask(task)"
+                        >
+                          {{ cloningTaskId === task.id ? 'Cloning...' : 'Clone' }}
+                        </button>
+                      </span>
                       <span class="action-tooltip" :title="viewResultDisabledReason(task) ?? ''">
                         <button
                           class="btn btn-secondary btn-sm"
@@ -1097,9 +1232,10 @@ onUnmounted(() => {
                           View Result
                         </button>
                       </span>
-                      <span class="action-tooltip" :title="taskActionReason(req, runDisabledReason(task)) ?? ''">
+                      <span class="action-tooltip" :title="taskActionReason(req, runDisabledReason(task)) ?? runButtonTooltip(task) ?? ''">
                         <button
-                          class="btn btn-primary btn-sm"
+                          class="btn btn-sm"
+                          :class="task.executionType === 'MANUAL' && task.taskStatus === 'Executing' ? 'btn-warning' : 'btn-primary'"
                           :disabled="isArchivedRequest(req) || !canRun(task) || submittingAuto === task.id"
                           @click.stop="handleRun(task)"
                         >
@@ -1196,6 +1332,8 @@ onUnmounted(() => {
       :task="editingTask"
       :mode="taskDialogMode"
       :edit-task-fn="api.editTask"
+      :edit-names-fn="api.editNames"
+      :edit-execution-type-fn="api.editExecutionType"
       :record-result-fn="api.recordResult"
       :start-manual-execution-fn="api.startManualExecution"
       @saved="onTaskSaved"
@@ -1232,6 +1370,35 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.action-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #991b1b;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.action-error-message {
+  flex: 1;
+}
+
+.action-error-dismiss {
+  background: none;
+  border: none;
+  color: #991b1b;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .detail-view {
   display: flex;
   flex-direction: column;
@@ -1738,5 +1905,22 @@ onUnmounted(() => {
   margin-top: 8px;
   font-size: 12px;
   color: #dc2626;
+}
+
+/* Drag-and-drop reorder */
+tr[draggable="true"] {
+  cursor: grab;
+}
+
+tr[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.drag-source {
+  opacity: 0.4;
+}
+
+.drag-over {
+  border-top: 2px solid #3b82f6 !important;
 }
 </style>

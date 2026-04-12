@@ -8,12 +8,15 @@ import type {
   UploadResponse,
 } from '../types'
 
-const RELEASE_IDENTIFIER_PATTERN = /^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>sit|uat|prod)-(?<sequence>0[1-9]|[1-9][0-9])$/i
+const RELEASE_IDENTIFIER_PATTERN = /^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>dev|sit|uat|prod)-(?<sequence>0[1-9]|[1-9][0-9])$/i
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   template: TemplateRecord
   createRundownFromTemplateFn: (input: CreateRundownFromTemplateInput) => Promise<UploadResponse>
-}>()
+  allowedStages?: string[]
+}>(), {
+  allowedStages: () => ['SIT', 'UAT', 'PROD'],
+})
 
 const emit = defineEmits<{
   close: []
@@ -32,7 +35,7 @@ const fieldErrors = reactive<{
 
 const form = reactive({
   projectName: props.template.application || props.template.name,
-  stage: defaultStageForCategory(props.template.category) as Stage,
+  stage: (props.allowedStages.length === 1 ? props.allowedStages[0] : defaultStageForCategory(props.template.category)) as Stage,
   releaseId: '',
   application: props.template.application,
   snowGroup: props.template.snowGroup,
@@ -97,7 +100,7 @@ function validateForm(): boolean {
   } else {
     const match = releaseId.match(RELEASE_IDENTIFIER_PATTERN)
     if (!match) {
-      fieldErrors.releaseId = 'Use format xxx-sit-01 / xxx-uat-01 / xxx-prod-01.'
+      fieldErrors.releaseId = `Use format xxx-${form.stage.toLowerCase()}-01.`
     } else if ((match.groups?.stage ?? '').toUpperCase() !== form.stage) {
       fieldErrors.releaseId = `Workflow Identifier must match the selected stage ${form.stage}.`
     }
@@ -193,10 +196,12 @@ async function submit() {
         <div class="create-grid">
           <div class="form-group">
             <label class="form-label">Stage</label>
-            <select v-model="form.stage" class="form-control">
-              <option value="SIT">SIT</option>
-              <option value="UAT">UAT</option>
-              <option value="PROD">PROD</option>
+            <select
+              v-model="form.stage"
+              class="form-control"
+              :disabled="allowedStages.length === 1"
+            >
+              <option v-for="s in allowedStages" :key="s" :value="s">{{ s }}</option>
             </select>
           </div>
 
@@ -209,7 +214,7 @@ async function submit() {
               :class="{ 'input-error': attemptedSubmit && !!fieldErrors.releaseId }"
               :placeholder="releaseIdentifierPlaceholder"
             />
-            <div class="field-hint">Format: `xxx-sit-01` / `xxx-uat-01` / `xxx-prod-01`</div>
+            <div class="field-hint">Format: `xxx-{{ allowedStages[0]?.toLowerCase() ?? 'sit' }}-01`</div>
             <div v-if="attemptedSubmit && fieldErrors.releaseId" class="field-error">
               {{ fieldErrors.releaseId }}
             </div>

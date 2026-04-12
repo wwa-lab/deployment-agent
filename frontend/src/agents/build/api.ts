@@ -1,8 +1,12 @@
 import { buildClient } from './index'
 import type {
+  CreateRundownFromTemplateInput,
   PaginatedResponse,
   ReleaseFlowDetail,
   ReleaseFlowListItem,
+  Request,
+  RequestArchiveResult,
+  RequestPurgeResult,
   Stage,
   Task,
   TaskExecutionHistory,
@@ -37,6 +41,78 @@ export async function getReleaseFlow(
   return response.data
 }
 
+export async function createRundownFromTemplate(
+  input: CreateRundownFromTemplateInput,
+): Promise<UploadResponse> {
+  const response = await buildClient.post('/release-flows/from-template', input)
+  return response.data
+}
+
+export async function startRequestDeployment(flowId: string, requestId: string): Promise<Request> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/start`,
+  )
+  return response.data
+}
+
+export async function markRequestFailed(flowId: string, requestId: string): Promise<Request> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/fail`,
+  )
+  return response.data
+}
+
+export interface UpdateRequestRundownInput {
+  snowGroup?: string
+  application?: string
+  agent?: string
+  owner?: string
+  site?: string
+  estimatedRemainingMinutes?: number
+}
+
+export async function updateRequestRundown(
+  flowId: string,
+  requestId: string,
+  input: UpdateRequestRundownInput,
+): Promise<Request> {
+  const response = await buildClient.patch(
+    `/release-flows/${flowId}/requests/${requestId}/rundown`,
+    input,
+  )
+  return response.data
+}
+
+export async function archiveRequestRundown(
+  flowId: string,
+  requestId: string,
+): Promise<RequestArchiveResult> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/archive`,
+  )
+  return response.data
+}
+
+export async function restoreRequestRundown(
+  flowId: string,
+  requestId: string,
+): Promise<RequestArchiveResult> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/restore`,
+  )
+  return response.data
+}
+
+export async function purgeRequestRundown(
+  flowId: string,
+  requestId: string,
+): Promise<RequestPurgeResult> {
+  const response = await buildClient.delete(
+    `/release-flows/${flowId}/requests/${requestId}/purge`,
+  )
+  return response.data
+}
+
 export async function listTaskExecutions(taskId: string): Promise<TaskExecutionHistory[]> {
   const response = await buildClient.get(`/tasks/${taskId}/executions`)
   return response.data as TaskExecutionHistory[]
@@ -62,6 +138,32 @@ export async function editTask(
   inputParameters: Record<string, unknown>,
 ): Promise<Task> {
   const response = await buildClient.put(`/tasks/${taskId}/input`, inputParameters)
+  return response.data
+}
+
+export async function editNames(
+  taskId: string,
+  names: { taskName?: string; taskGroupName?: string },
+): Promise<Task> {
+  const response = await buildClient.put(`/tasks/${taskId}/names`, names)
+  return response.data
+}
+
+export async function editExecutionType(
+  taskId: string,
+  executionType: 'MANUAL' | 'AUTO',
+): Promise<Task> {
+  const response = await buildClient.put(`/tasks/${taskId}/execution-type`, { executionType })
+  return response.data
+}
+
+export async function cloneTask(taskId: string): Promise<Task> {
+  const response = await buildClient.post(`/tasks/${taskId}/clone`)
+  return response.data
+}
+
+export async function reorderTasks(requestId: string, taskIds: string[]): Promise<Task[]> {
+  const response = await buildClient.put('/tasks/reorder', { requestId, taskIds })
   return response.data
 }
 

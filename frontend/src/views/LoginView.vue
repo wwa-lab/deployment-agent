@@ -63,13 +63,12 @@ async function handleLogin() {
         <div class="login-story-grid">
           <div class="login-story-copy-block">
             <div class="login-story-kicker">WWA Platform</div>
-            <h1 id="login-story-title" class="login-story-title">Workflow automation first, AI next</h1>
+            <h1 id="login-story-title" class="login-story-title">Unified workflow automation</h1>
             <p class="login-story-copy">
-              WWA currently focuses on controlled workflow automation, bringing testing, deployment,
-              platform controls, and audit visibility into one shared workspace. AI-assisted
-              workflows will be layered in gradually in future phases.
+              Build, testing, deployment, and platform controls in one shared workspace.
             </p>
             <div class="login-story-pills">
+              <span class="login-story-pill">Build Workflow</span>
               <span class="login-story-pill">Testing Workflow</span>
               <span class="login-story-pill">Deployment Workflow</span>
               <span class="login-story-pill">Platform Controls</span>
@@ -97,14 +96,16 @@ async function handleLogin() {
                 <strong class="metric-value">Human-in-the-Loop</strong>
               </article>
               <article class="login-console-metric">
-                <span class="metric-label">Next Phase</span>
-                <strong class="metric-value">AI Assist</strong>
+                <span class="metric-label">Execution</span>
+                <strong class="metric-value">Jenkins + Ansible</strong>
               </article>
             </div>
 
             <div class="login-console-flow">
               <div class="console-block-label">Active Workspaces</div>
               <div class="login-flow-track">
+                <span class="login-flow-node is-active">Build</span>
+                <span class="login-flow-line"></span>
                 <span class="login-flow-node is-active">Testing</span>
                 <span class="login-flow-line"></span>
                 <span class="login-flow-node is-active">Deploy</span>
@@ -116,15 +117,15 @@ async function handleLogin() {
             <div class="login-console-stream">
               <div class="login-console-stream-row">
                 <span class="stream-dot"></span>
-                <span>Testing and deployment status stay visible from one workspace hub.</span>
+                <span>Upload, track, and execute rundowns across stages.</span>
               </div>
               <div class="login-console-stream-row">
                 <span class="stream-dot"></span>
-                <span>Config, audit, and access controls stay available as shared services.</span>
+                <span>Human-in-the-loop approval at every checkpoint.</span>
               </div>
               <div class="login-console-stream-row">
                 <span class="stream-dot"></span>
-                <span>AI copilots join only after the automation control plane is solid.</span>
+                <span>Config, audit, and access controls as shared services.</span>
               </div>
             </div>
           </div>
@@ -182,13 +183,12 @@ async function handleLogin() {
             {{ guestLoading ? 'Entering...' : 'Continue as Guest (read-only)' }}
           </button>
           <p class="login-guest-hint">
-            No account needed. Browse every page read-only — uploads, executions, and edits are disabled.
+            No account needed. Browse read-only — write actions are disabled.
           </p>
         </div>
 
         <div class="login-hint">
           <p>Dev accounts: emp-001 (Developer), emp-002 (TL), emp-003 (DevOps Admin), emp-004 (Audit), emp-005 (Management)</p>
-          <p>Any password works in dev mode</p>
         </div>
       </div>
     </div>

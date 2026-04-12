@@ -4,11 +4,14 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import CreateRundownDialog from '../components/CreateRundownDialog.vue'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
+import { createRundownFromTemplate as createBuildRundownFromTemplate } from '../agents/build/api'
 import { createRundownFromTemplate as createDeploymentRundownFromTemplate } from '../agents/deployment/api'
+import { createRundownFromTemplate as createTestingRundownFromTemplate } from '../agents/testing/api'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
 import TemplateTaskDialog from '../components/TemplateTaskDialog.vue'
 import { agentRegistry } from '../config/agentRegistry'
 import type {
+  CreateRundownFromTemplateInput,
   CreateTemplateDraft,
   TemplateRecord,
   TemplateTask,
@@ -740,6 +743,22 @@ function workspaceRouteForAgent(agentName?: string): string | null {
   return matchedAgent?.route ?? null
 }
 
+function createRundownFnForAgent(
+  agentName?: string,
+): (input: CreateRundownFromTemplateInput) => Promise<UploadResponse> {
+  const normalized = agentName?.trim().toLowerCase()
+  if (normalized === 'build agent') return createBuildRundownFromTemplate
+  if (normalized === 'testing agent') return createTestingRundownFromTemplate
+  return createDeploymentRundownFromTemplate
+}
+
+function allowedStagesForAgent(agentName?: string): string[] {
+  const normalized = agentName?.trim().toLowerCase()
+  if (normalized === 'build agent') return ['DEV']
+  if (normalized === 'testing agent') return ['UAT']
+  return ['SIT', 'UAT', 'PROD']
+}
+
 function handleRundownCreated(result: UploadResponse) {
   const templateName = creatingRundownTemplate.value?.name ?? 'template'
   const targetWorkspaceRoute = workspaceRouteForAgent(creatingRundownTemplate.value?.agent)
@@ -952,7 +971,7 @@ onBeforeUnmount(() => {
         <p class="view-eyebrow">WWA Shared Capability</p>
         <h1 class="view-title">Template Management</h1>
         <p class="view-subtitle">
-          Pick a reusable template, narrow by ownership context, and start from a known workflow baseline.
+          Browse and manage reusable workflow templates.
         </p>
       </div>
     </div>
@@ -962,7 +981,7 @@ onBeforeUnmount(() => {
         <div>
           <h2 class="panel-title">Current Scope</h2>
           <p class="scope-summary-copy">
-            Narrow templates by Application, SNOW Group, Agent, and Site before choosing the right rollout blueprint.
+            Filter templates by scope. Filters also set defaults for new templates.
           </p>
         </div>
         <div class="scope-template-count">
@@ -1425,7 +1444,8 @@ onBeforeUnmount(() => {
     <CreateRundownDialog
       v-if="creatingRundownTemplate"
       :template="creatingRundownTemplate"
-      :create-rundown-from-template-fn="createDeploymentRundownFromTemplate"
+      :create-rundown-from-template-fn="createRundownFnForAgent(creatingRundownTemplate.agent)"
+      :allowed-stages="allowedStagesForAgent(creatingRundownTemplate.agent)"
       @close="closeCreateRundownDialog"
       @created="handleRundownCreated"
     />

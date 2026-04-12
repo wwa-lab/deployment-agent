@@ -207,7 +207,7 @@ function toggleArchivedVisibility() {
     </div>
 
     <section class="wwa-intro-card" :aria-labelledby="copy.introTitleId">
-      <div class="wwa-intro-kicker">WWA Today</div>
+      <div class="wwa-intro-kicker">Overview</div>
       <h2 :id="copy.introTitleId" class="wwa-intro-title">{{ copy.introHeading }}</h2>
       <p class="wwa-intro-text">{{ copy.introBody }}</p>
     </section>

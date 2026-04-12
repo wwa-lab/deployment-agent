@@ -7,11 +7,13 @@ import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.ExternalStatus;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.configuration.ConfigurationComponentService;
 import com.wwa.deploymentagent.domain.configuration.ConfigurationScope;
 import com.wwa.deploymentagent.domain.decision.ReleaseFlowProgressionService;
 import com.wwa.deploymentagent.domain.task.*;
 import com.wwa.deploymentagent.errors.ConflictAppException;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
+import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,7 @@ public class AutoExecutionService {
     private final TaskPermissionService taskPermissionService;
     private final List<AutoExecutionAdapter> adapters;
     private final ExecutionTargetResolver targetResolver;
+    private final ConfigurationComponentService configurationComponentService;
     private final AuditLoggerService auditLogger;
     private final ReleaseFlowProgressionService progressionService;
     private final TaskService taskService;
@@ -78,6 +81,16 @@ public class AutoExecutionService {
         ExecutionTarget target = targetResolver.resolve(inputParams);
         AutoExecutionAdapter adapter = findAdapter(target.systemType());
         ConfigurationScope scope = ConfigurationScope.from(task.getRequest());
+
+        // Pre-flight: verify external system configuration is available
+        try {
+            configurationComponentService.resolveForSystem(target.systemType(), scope);
+        } catch (Exception e) {
+            throw new ValidationAppException(
+                    target.systemType() + " configuration is not ready. "
+                    + "Please configure the endpoint URL and credentials in Configuration Management "
+                    + "before running AUTO tasks. (" + e.getMessage() + ")");
+        }
 
         // Create execution history record
         int maxAttempt = executionHistoryRepository.findMaxAttemptNumberByTaskId(taskId);
