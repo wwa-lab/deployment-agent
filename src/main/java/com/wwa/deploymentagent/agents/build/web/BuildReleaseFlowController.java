@@ -78,6 +78,40 @@ public class BuildReleaseFlowController {
                 dtos, result.getTotalElements(), result.getNumber(), result.getSize()));
     }
 
+    @PostMapping("/{flowId}/requests/{requestId}/start")
+    public ResponseEntity<RequestDto> startRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId);
+        validateRequestScope(user, requestForValidation, "start_rundown");
+        validateRundownOperator(user, requestForValidation, "start_rundown");
+
+        Request request = releaseFlowService.startRequestDeployment(flowId, requestId, user);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/fail")
+    public ResponseEntity<RequestDto> markRequestFailed(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId);
+        validateRequestScope(user, requestForValidation, "mark_request_failed");
+        validateRundownOperator(user, requestForValidation, "mark_request_failed");
+
+        Request request = releaseFlowService.markRequestFailed(flowId, requestId, user);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ReleaseFlowDetailDto> getById(
             @PathVariable String id,
@@ -131,5 +165,59 @@ public class BuildReleaseFlowController {
         return requests.stream()
                 .filter(req -> user.hasScopedAccess(req.getApplication(), req.getSnowGroup()))
                 .toList();
+    }
+
+    private Request findRequestForScopeValidation(String flowId, String requestId) {
+        return releaseFlowService.findRequestsForFlow(flowId, false).stream()
+                .filter(request -> request.getId().equals(requestId))
+                .findFirst()
+                .orElseThrow(() -> new ForbiddenAppException("request_scope_lookup"));
+    }
+
+    private void validateRequestScope(UserContext user, Request request, String action) {
+        if (user == null) {
+            throw new ForbiddenAppException(action);
+        }
+        if (user.isGlobalDevOpsAdmin()) {
+            return;
+        }
+        if (!user.hasScopedAccess(request.getApplication(), request.getSnowGroup())) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private void validateRundownOperator(UserContext user, Request request, String action) {
+        if (user == null) {
+            throw new ForbiddenAppException(action);
+        }
+        if (user.hasRole("DEVOPS_ADMIN")) {
+            return;
+        }
+        if ((!user.hasRole("DEVELOPER") && !user.hasRole("TL")) || !isRundownOwner(user, request)) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private boolean isRundownOwner(UserContext user, Request request) {
+        String owner = normalizeIdentity(request.getOwner());
+        if (owner == null) {
+            return false;
+        }
+
+        String displayName = user.displayName() == null ? null : user.displayName().replaceAll("\\s*\\(.*\\)$", "").trim();
+        String firstName = displayName == null || displayName.isBlank() ? null : displayName.split("\\s+")[0];
+
+        return List.of(user.userId(), displayName, firstName)
+                .stream()
+                .map(this::normalizeIdentity)
+                .filter(value -> value != null)
+                .anyMatch(owner::equals);
+    }
+
+    private String normalizeIdentity(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 }

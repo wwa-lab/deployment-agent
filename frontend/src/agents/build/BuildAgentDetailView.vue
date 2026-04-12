@@ -8,9 +8,11 @@ import {
   editTask as editTaskApi,
   getTaskResult,
   listTaskExecutions as listBuildTaskExecutions,
+  markRequestFailed as markRequestFailedApi,
   reorderTasks as reorderTasksApi,
   recordResult as recordResultApi,
   startManualExecution as startManualExecutionApi,
+  startRequestDeployment as startRequestDeploymentApi,
   submitAutoExecution,
   submitDecision as submitDecisionApi,
 } from './api'
@@ -40,6 +42,7 @@ const initialDecision = ref<DecisionOption | null>(null)
 const allowedDecisionOptions = ref<DecisionOption[]>(['Approve', 'Reject', 'Skip'])
 const refreshingDetail = ref(false)
 const submittingAuto = ref<string | null>(null)
+const requestActionLoadingId = ref<string | null>(null)
 const activeTab = ref(0)
 
 const viewingResult = ref<{ task: Task; result: TaskResult | null; loading: boolean } | null>(null)
@@ -233,6 +236,88 @@ function isArchivedRequest(request: Request): boolean {
 function archivedRequestReason(request: Request): string | null {
   if (!isArchivedRequest(request)) return null
   return 'Archived build rundowns are read-only.'
+}
+
+function isRundownOperator(request: Request): boolean {
+  if (userStore.isDevOpsAdmin) return true
+  if (!userStore.isDeveloper && !userStore.isTL) return false
+  return matchesCurrentUserIdentity(request.owner)
+}
+
+function hasPendingTasks(request: Request): boolean {
+  return request.tasks.some((task) => task.taskStatus === 'Pending')
+}
+
+function hasFailEligibleTasks(request: Request): boolean {
+  return request.tasks.some(
+    (task) => !['Approved', 'Skipped', 'Rejected', 'Failed'].includes(task.taskStatus),
+  )
+}
+
+function canStartRundown(request: Request): boolean {
+  return (
+    isRundownOperator(request) &&
+    !isArchivedRequest(request) &&
+    request.requestStatus === 'Pending' &&
+    hasPendingTasks(request)
+  )
+}
+
+function startRundownDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (request.requestStatus !== 'Pending') return 'Available only when rundown status is Pending'
+  if (!hasPendingTasks(request)) return 'No pending tasks remain to start'
+  return null
+}
+
+function canMarkRequestFailed(request: Request): boolean {
+  return (
+    isRundownOperator(request) &&
+    !isArchivedRequest(request) &&
+    !['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus) &&
+    hasFailEligibleTasks(request)
+  )
+}
+
+function markRequestFailedDisabledReason(request: Request): string | null {
+  if (isArchivedRequest(request)) return archivedRequestReason(request)
+  if (!isRundownOperator(request)) return 'Rundown owner or admin only'
+  if (['Completed', 'Failed', 'Rejected', 'Skipped'].includes(request.requestStatus)) {
+    return 'Available only while the rundown is still active'
+  }
+  if (!hasFailEligibleTasks(request)) return 'No active tasks remain to fail'
+  return null
+}
+
+async function handleStartRundown(request: Request) {
+  if (!canStartRundown(request)) return
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:start`
+  try {
+    await startRequestDeploymentApi(detail.id, request.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handleMarkRequestFailed(request: Request) {
+  if (!canMarkRequestFailed(request)) return
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:fail`
+  try {
+    await markRequestFailedApi(detail.id, request.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
 }
 
 function taskActionReason(request: Request, reason: string | null): string | null {
@@ -749,6 +834,29 @@ const activeRequestSummary = computed(() => {
                   <div class="rundown-progress-label">Last Updated</div>
                   <div class="rundown-progress-value">{{ formatDateTime(activeRequestSummary.lastUpdated) }}</div>
                 </div>
+              </div>
+            </div>
+
+            <div class="rundown-section">
+              <div class="rundown-request-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-start"
+                  :disabled="!!startRundownDisabledReason(req) || requestActionLoadingId === `${req.id}:start`"
+                  :title="startRundownDisabledReason(req) ?? undefined"
+                  @click="handleStartRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:start` ? 'Starting...' : 'Start Rundown' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  :disabled="!!markRequestFailedDisabledReason(req) || requestActionLoadingId === `${req.id}:fail`"
+                  :title="markRequestFailedDisabledReason(req) ?? undefined"
+                  @click="handleMarkRequestFailed(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:fail` ? 'Marking...' : 'Mark as Failed' }}
+                </button>
               </div>
             </div>
           </div>
@@ -1504,4 +1612,17 @@ tr[draggable="true"] { cursor: grab; }
 tr[draggable="true"]:active { cursor: grabbing; }
 .drag-source { opacity: 0.4; }
 .drag-over { border-top: 2px solid #3b82f6 !important; }
+
+.rundown-request-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-start {
+  min-width: 140px;
+}
+.btn-start:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
 </style>

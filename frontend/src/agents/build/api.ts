@@ -3,6 +3,7 @@ import type {
   PaginatedResponse,
   ReleaseFlowDetail,
   ReleaseFlowListItem,
+  Request,
   Stage,
   Task,
   TaskExecutionHistory,
@@ -34,6 +35,20 @@ export async function getReleaseFlow(
   params?: { includeArchived?: boolean },
 ): Promise<ReleaseFlowDetail> {
   const response = await buildClient.get(`/release-flows/${id}`, { params })
+  return response.data
+}
+
+export async function startRequestDeployment(flowId: string, requestId: string): Promise<Request> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/start`,
+  )
+  return response.data
+}
+
+export async function markRequestFailed(flowId: string, requestId: string): Promise<Request> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/fail`,
+  )
   return response.data
 }
 
