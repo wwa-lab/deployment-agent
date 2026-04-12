@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { agentRegistry } from '../config/agentRegistry'
 import { useScopeDirectoryStore } from '../stores/scopeDirectory'
 import { useUserStore } from '../stores/user'
@@ -41,6 +41,9 @@ const availableAgents = computed(() => agentRegistry.filter((agent) => agent.ena
 const workspaceAgent = computed(() => props.workspaceAgent)
 const stage = ref<Stage | ''>(availableStages.value.length === 1 ? availableStages.value[0] : '')
 const file = ref<File | null>(null)
+const modalBodyRef = ref<HTMLElement | null>(null)
+const stageSelectRef = ref<HTMLSelectElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const releaseIdentifier = ref('')
 const uploading = ref(false)
 const downloadingTemplate = ref(false)
@@ -51,9 +54,16 @@ const scopeForm = reactive({
   snowGroup: props.initialScope?.snowGroup ?? '',
   agent: props.workspaceAgent?.key ?? props.initialScope?.agent ?? '',
 })
+const activeDirectoryAgent = computed(() => props.workspaceAgent?.key ?? (scopeForm.agent.trim() || undefined))
+function matchesScopeDirectoryAgent(entryAgent?: string) {
+  const normalizedEntryAgent = entryAgent?.trim()
+  const normalizedActiveAgent = activeDirectoryAgent.value?.trim()
+  return !normalizedEntryAgent || !normalizedActiveAgent || normalizedEntryAgent === normalizedActiveAgent
+}
 const applicationOptions = computed(() => {
   const values = new Set(
     scopeDirectoryStore.entries
+      .filter((entry) => matchesScopeDirectoryAgent(entry.agent))
       .map((entry) => entry.application)
       .concat(scopeForm.application ? [scopeForm.application] : []),
   )
@@ -67,6 +77,7 @@ const snowGroupOptions = computed(() => {
 
   const values = new Set(
     scopeDirectoryStore.entries
+      .filter((entry) => matchesScopeDirectoryAgent(entry.agent))
       .filter((entry) => entry.application === scopeForm.application)
       .map((entry) => entry.snowGroup)
       .filter((value): value is string => Boolean(value))
@@ -77,9 +88,7 @@ const snowGroupOptions = computed(() => {
 })
 
 const canUseUpload = computed(() => userStore.canUploadRelease)
-const canSubmit = computed(() =>
-  canUseUpload.value && stage.value !== '' && file.value !== null && !uploading.value,
-)
+const canSubmit = computed(() => canUseUpload.value && !uploading.value)
 
 onMounted(() => {
   void scopeDirectoryStore.fetchEntries().catch(() => undefined)
@@ -105,12 +114,61 @@ watch(
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
-  file.value = input.files?.[0] ?? null
+  const selectedFile = input.files?.[0] ?? null
+  if (selectedFile && !selectedFile.name.toLowerCase().endsWith('.xlsx')) {
+    file.value = null
+    input.value = ''
+    error.value = 'Choose a valid .xlsx workflow file before uploading.'
+    fileInputRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    fileInputRef.value?.focus()
+    return
+  }
+
+  file.value = selectedFile
   error.value = ''
 }
 
+watch(stage, (nextStage) => {
+  if (nextStage) {
+    error.value = ''
+  }
+})
+
+function focusRequiredField(target: HTMLSelectElement | HTMLInputElement | null) {
+  target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  target?.focus()
+}
+
+function showError(message: string) {
+  error.value = message
+  void nextTick(() => {
+    modalBodyRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  })
+}
+
+function validateBeforeSubmit() {
+  if (!canUseUpload.value) {
+    showError('Upload is available to DEVELOPER, TL, and DEVOPS_ADMIN users.')
+    return false
+  }
+
+  if (!stage.value) {
+    showError('Select a stage before uploading.')
+    focusRequiredField(stageSelectRef.value)
+    return false
+  }
+
+  if (!file.value) {
+    showError('Choose a valid .xlsx workflow file before uploading.')
+    focusRequiredField(fileInputRef.value)
+    return false
+  }
+
+  return true
+}
+
 async function submit() {
-  if (!canSubmit.value || !file.value || !stage.value) return
+  if (!validateBeforeSubmit() || !file.value || !stage.value) return
   uploading.value = true
   error.value = ''
   try {
@@ -123,7 +181,7 @@ async function submit() {
     })
     await props.onUploadSuccess()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'Upload failed'
+    showError(e instanceof Error ? e.message : 'Upload failed')
   } finally {
     uploading.value = false
   }
@@ -162,7 +220,7 @@ function close() {
         <button class="modal-close" @click="close">✕</button>
       </div>
 
-      <div class="modal-body">
+      <div ref="modalBodyRef" class="modal-body">
         <!-- Success state -->
         <div v-if="successResult" class="alert alert-success">
           <strong>Upload successful!</strong><br />
@@ -188,7 +246,12 @@ function close() {
 
           <div class="form-group">
             <label class="form-label">Stage <span class="required">*</span></label>
-            <select v-model="stage" class="form-control" :disabled="!canUseUpload || availableStages.length === 1">
+            <select
+              ref="stageSelectRef"
+              v-model="stage"
+              class="form-control"
+              :disabled="!canUseUpload || availableStages.length === 1"
+            >
               <option v-if="availableStages.length > 1" value="">Select stage...</option>
               <option v-for="s in availableStages" :key="s" :value="s">{{ s }}</option>
             </select>
@@ -205,9 +268,9 @@ function close() {
             />
             <div class="field-hint">
               Recommended for repeated uploads. Reuse the same identifier when later uploads should
-              stay grouped under one workflow summary. Re-uploading the same stage under the same
-              identifier creates a new attempt. If left blank, WWA falls back to project + stage
-              matching.
+              stay grouped under one workflow summary across SIT, UAT, and PROD. Re-uploading the
+              same stage under the same identifier creates a new attempt. If left blank, WWA creates
+              a new rollout instead of implicitly merging stages.
             </div>
           </div>
 
@@ -301,8 +364,9 @@ function close() {
           <div class="form-group">
             <label class="form-label">Workflow File (XLSX) <span class="required">*</span></label>
             <input
+              ref="fileInputRef"
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx"
               class="form-control"
               :disabled="!canUseUpload"
               @change="onFileChange"
@@ -324,6 +388,7 @@ function close() {
       </div>
 
       <div class="modal-footer">
+        <div v-if="error && !successResult" class="footer-error">{{ error }}</div>
         <button class="btn btn-secondary" @click="close">
           {{ successResult ? 'Close' : 'Cancel' }}
         </button>
@@ -359,6 +424,14 @@ function close() {
 
 .template-link {
   margin-top: 4px;
+}
+
+.footer-error {
+  margin-right: auto;
+  max-width: min(60%, 420px);
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .field-hint {

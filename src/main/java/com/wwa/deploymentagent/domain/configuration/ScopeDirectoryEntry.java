@@ -19,6 +19,7 @@ import java.util.UUID;
         indexes = {
                 @Index(name = "IDX_DSD_APPLICATION", columnList = "application"),
                 @Index(name = "IDX_DSD_APP_SNOW", columnList = "application, snow_group"),
+                @Index(name = "IDX_DSD_APP_SNOW_AGENT", columnList = "application, snow_group, agent"),
                 @Index(name = "UK_DSD_SCOPE_KEY", columnList = "scope_key", unique = true)
         }
 )
@@ -38,6 +39,9 @@ public class ScopeDirectoryEntry {
 
     @Column(name = "snow_group", length = 255)
     private String snowGroup;
+
+    @Column(name = "agent", length = 255)
+    private String agent;
 
     @Column(name = "updated_by", length = 255, nullable = false)
     private String updatedBy;

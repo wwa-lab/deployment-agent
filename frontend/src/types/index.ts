@@ -234,7 +234,8 @@ export interface ScopeDirectoryEntry {
   id: string
   application: string
   snowGroup?: string
-  scopeSource: 'Application Default' | 'SNOW Group Default'
+  agent?: string
+  scopeSource: 'Application Default' | 'SNOW Group Default' | 'Agent Override'
   updatedBy?: string
   updatedAt?: string
 }

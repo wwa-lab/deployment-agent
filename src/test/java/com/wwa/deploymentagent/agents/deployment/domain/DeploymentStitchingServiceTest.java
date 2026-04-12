@@ -61,6 +61,33 @@ class DeploymentStitchingServiceTest {
     }
 
     @Test
+    @DisplayName("listStitchedSummaries keeps generated blank-identifier uploads as separate rows")
+    void listStitchedSummaries_doesNotStitchGeneratedSequenceIds() {
+        ReleaseFlow sitFlow = releaseFlowService.create(
+                "PROJ-SEPARATE", "Separate Project", "sit-separateproject-0001", "sit-separateproject-0001", "SIT");
+        Request sitRequest = helper.seedRequest(sitFlow, "SIT", RequestStatus.Completed);
+        sitRequest.setApplication("AMH HCC");
+        requestRepository.save(sitRequest);
+
+        ReleaseFlow uatFlow = releaseFlowService.create(
+                "PROJ-SEPARATE", "Separate Project", "uat-separateproject-0002", "uat-separateproject-0002", "UAT");
+        Request uatRequest = helper.seedRequest(uatFlow, "UAT", RequestStatus.Pending);
+        uatRequest.setApplication("AMH HCC");
+        requestRepository.save(uatRequest);
+
+        Page<ReleaseFlowListItemDto> page = stitchingService.listStitchedSummaries(
+                "PROJ-SEPARATE", null, null, null, null, null, null, "latest",
+                PageRequest.of(0, 20), false);
+
+        assertThat(page.getContent()).hasSize(2);
+        assertThat(page.getContent())
+                .allSatisfy(row -> {
+                    assertThat(row.stitched()).isFalse();
+                    assertThat(row.linkedReleaseCount()).isEqualTo(1);
+                });
+    }
+
+    @Test
     @DisplayName("getStitchedDetail returns a stitched detail for explicit linked flow ids")
     void getStitchedDetail_returnsStitchedDetail() {
         ReleaseFlow sitFlow = releaseFlowService.create(

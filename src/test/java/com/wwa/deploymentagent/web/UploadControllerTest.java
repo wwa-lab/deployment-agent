@@ -78,4 +78,24 @@ class UploadControllerTest {
                 // server-side (PL-6), overriding any client-supplied value.
                 .andExpect(jsonPath("$.agent").value("deployment-agent"));
     }
+
+    @Test
+    @DisplayName("POST /upload returns a friendly message for invalid Excel format")
+    void upload_invalidExcelFormatReturnsFriendlyMessage() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "broken.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "not-a-real-xlsx".getBytes());
+
+        mockMvc.perform(multipart("/api/deployment-agent/upload")
+                        .file(file)
+                        .param("stage", "SIT")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value(
+                        "Invalid Excel file format. Please upload a valid .xlsx file, preferably using the downloaded template."));
+    }
 }

@@ -141,13 +141,6 @@ public class ImportService {
             return findOrCreateReleaseFlowByIdentifier(projectId, projectName, stage, explicitReleaseId);
         }
 
-        Optional<ReleaseFlow> existing = releaseFlowRepository
-                .findActiveByProjectIdWithoutStageOrderByCreatedAtDesc(projectId, stage)
-                .stream()
-                .findFirst();
-        if (existing.isPresent()) {
-            return existing.get();
-        }
         return createReleaseFlow(projectId, projectName, stage);
     }
 

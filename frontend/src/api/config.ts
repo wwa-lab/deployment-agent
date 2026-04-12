@@ -43,6 +43,7 @@ interface ScopeDirectoryApiEntry {
   id: string
   application: string
   snowGroup?: string
+  agent?: string
   scopeSource: ScopeDirectoryEntry['scopeSource']
   updatedBy?: string
   updatedAt?: string
@@ -95,6 +96,7 @@ function mapScopeDirectoryEntry(entry: ScopeDirectoryApiEntry): ScopeDirectoryEn
     id: entry.id,
     application: entry.application,
     snowGroup: entry.snowGroup,
+    agent: entry.agent,
     scopeSource: entry.scopeSource,
     updatedBy: entry.updatedBy,
     updatedAt: entry.updatedAt,
@@ -158,6 +160,7 @@ export async function saveScopeDirectoryEntry(entry: {
   id?: string
   application: string
   snowGroup?: string
+  agent?: string
 }): Promise<ScopeDirectoryEntry> {
   const response = await platformClient.post('/config/scopes', entry)
   return mapScopeDirectoryEntry(response.data as ScopeDirectoryApiEntry)

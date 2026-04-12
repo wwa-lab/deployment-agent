@@ -1,6 +1,8 @@
 package com.wwa.deploymentagent.domain.fileimport;
 
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
+import com.wwa.deploymentagent.errors.ValidationAppException;
+import org.apache.poi.ooxml.POIXMLException;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
@@ -33,7 +35,7 @@ public class ExcelParserService {
         List<ParsedTaskRow> rows = new ArrayList<>();
         List<ImportError> errors = new ArrayList<>();
 
-        try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(fileBytes))) {
+        try (Workbook workbook = openWorkbook(fileBytes)) {
             Sheet sheet = workbook.getSheet(SHEET_NAME);
             if (sheet == null) {
                 errors.add(new ImportError(0, "Sheet", "Sheet '" + SHEET_NAME + "' not found"));
@@ -62,6 +64,15 @@ public class ExcelParserService {
         }
 
         return new ParseResult(rows, errors);
+    }
+
+    private Workbook openWorkbook(byte[] fileBytes) throws IOException {
+        try {
+            return new XSSFWorkbook(new ByteArrayInputStream(fileBytes));
+        } catch (POIXMLException | IllegalArgumentException ex) {
+            throw new ValidationAppException(
+                    "Invalid Excel file format. Please upload a valid .xlsx file, preferably using the downloaded template.");
+        }
     }
 
     // ─── Row parsing ──────────────────────────────────────────────────────────

@@ -95,20 +95,20 @@ class ExcelImportWorkflowTest {
     }
 
     @Test
-    @DisplayName("importing same project as a different stage adds a new Request to the same Release Flow")
-    void importFile_secondStage_addsNewRequest() throws IOException {
+    @DisplayName("importing same project as a different stage without an explicit identifier creates a new Release Flow")
+    void importFile_secondStage_withoutIdentifierCreatesNewReleaseFlow() throws IOException {
         byte[] sitXlsx = buildValidXlsx("WF-PROJ-300", "Workflow Project 300", 2);
         ImportResult sitResult = importService.importFile(sitXlsx, "SIT", developer);
 
         byte[] uatXlsx = buildValidXlsx("WF-PROJ-300", "Workflow Project 300", 2);
         ImportResult uatResult = importService.importFile(uatXlsx, "UAT", developer);
 
-        // Both imports belong to the same Release Flow
-        assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
+        assertThat(uatResult.releaseFlowId()).isNotEqualTo(sitResult.releaseFlowId());
 
-        // The Release Flow should now have two Requests (SIT + UAT)
-        List<?> requests = requestRepository.findByReleaseFlowId(sitResult.releaseFlowId());
-        assertThat(requests).hasSize(2);
+        List<?> sitRequests = requestRepository.findByReleaseFlowId(sitResult.releaseFlowId());
+        List<?> uatRequests = requestRepository.findByReleaseFlowId(uatResult.releaseFlowId());
+        assertThat(sitRequests).hasSize(1);
+        assertThat(uatRequests).hasSize(1);
     }
 
     // ─── XLSX builder helper ──────────────────────────────────────────────────

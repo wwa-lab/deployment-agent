@@ -103,6 +103,21 @@ function statusBadgeClass(status: string) {
   return map[status] ?? 'badge-pending'
 }
 
+function stageToneClass(stage?: string) {
+  switch (stage?.toUpperCase()) {
+    case 'SIT':
+      return 'stage-tone-sit'
+    case 'UAT':
+      return 'stage-tone-uat'
+    case 'PROD':
+      return 'stage-tone-prod'
+    case 'DEV':
+      return 'stage-tone-dev'
+    default:
+      return 'stage-tone-default'
+  }
+}
+
 function archiveBadgeClass(archivedAt?: string) {
   return archivedAt ? 'badge-rejected' : 'badge-pending'
 }
@@ -299,7 +314,14 @@ function toggleArchivedVisibility() {
             <th>Scope</th>
             <th>Rundown Owner</th>
             <th>Current Stage</th>
-            <th v-for="stage in stages" :key="stage" class="stage-column">{{ stage }}</th>
+            <th
+              v-for="stage in stages"
+              :key="stage"
+              class="stage-column stage-header"
+              :class="stageToneClass(stage)"
+            >
+              {{ stage }}
+            </th>
             <th>Overall Status</th>
           </tr>
         </thead>
@@ -326,16 +348,22 @@ function toggleArchivedVisibility() {
             </td>
             <td class="owner-cell">{{ rundownOwnerLabel(flow.owner) }}</td>
             <td class="stage-column">
-              <span class="badge badge-running">{{ flow.currentStage }}</span>
+              <span class="badge current-stage-badge" :class="stageToneClass(flow.currentStage)">
+                {{ flow.currentStage }}
+              </span>
             </td>
             <td v-for="stage in stages" :key="`${flow.id}-${stage}`" class="stage-column">
-              <span v-if="stagePresent(flow, stage)" class="badge" :class="statusBadgeClass(stageStatus(flow, stage))">
+              <span
+                v-if="stagePresent(flow, stage)"
+                class="badge stage-status-badge"
+                :class="[statusBadgeClass(stageStatus(flow, stage)), stageToneClass(stage)]"
+              >
                 {{ statusLabel(stageStatus(flow, stage)) }}
               </span>
               <span v-else class="stage-empty">—</span>
             </td>
             <td>
-              <span class="badge" :class="statusBadgeClass(flow.flowStatus)">
+              <span class="badge overall-status-badge" :class="statusBadgeClass(flow.flowStatus)">
                 {{ statusLabel(flow.flowStatus) }}
               </span>
               <span
@@ -491,6 +519,156 @@ function toggleArchivedVisibility() {
 .archive-chip,
 .archive-status-chip {
   margin-top: 6px;
+}
+
+.stage-header {
+  letter-spacing: 0.04em;
+}
+
+.stage-tone-sit {
+  --stage-accent: #38bdf8;
+  --stage-accent-soft: #f0f9ff;
+  --stage-accent-border: #bae6fd;
+  --stage-accent-text: #0369a1;
+  --stage-chip-bg: #e0f2fe;
+  --stage-chip-border: #7dd3fc;
+  --stage-chip-text: #0369a1;
+}
+
+.stage-tone-uat {
+  --stage-accent: #3b82f6;
+  --stage-accent-soft: #eff6ff;
+  --stage-accent-border: #bfdbfe;
+  --stage-accent-text: #1d4ed8;
+  --stage-chip-bg: #dbeafe;
+  --stage-chip-border: #93c5fd;
+  --stage-chip-text: #1d4ed8;
+}
+
+.stage-tone-prod {
+  --stage-accent: #4f46e5;
+  --stage-accent-soft: #eef2ff;
+  --stage-accent-border: #c7d2fe;
+  --stage-accent-text: #4338ca;
+  --stage-chip-bg: #1d4ed8;
+  --stage-chip-border: #1e40af;
+  --stage-chip-text: #eff6ff;
+}
+
+.stage-tone-dev,
+.stage-tone-default {
+  --stage-accent: #64748b;
+  --stage-accent-soft: #f8fafc;
+  --stage-accent-border: #cbd5e1;
+  --stage-accent-text: #475569;
+  --stage-chip-bg: #e2e8f0;
+  --stage-chip-border: #cbd5e1;
+  --stage-chip-text: #475569;
+}
+
+.stage-header.stage-tone-sit {
+  color: #0284c7;
+}
+
+.stage-header.stage-tone-uat {
+  color: #2563eb;
+}
+
+.stage-header.stage-tone-prod {
+  color: #4338ca;
+}
+
+.current-stage-badge,
+.stage-status-badge,
+.overall-status-badge {
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.current-stage-badge {
+  background: var(--stage-chip-bg);
+  color: var(--stage-chip-text);
+  border-color: var(--stage-chip-border);
+}
+
+.stage-status-badge {
+  position: relative;
+  padding-left: 16px;
+  border-color: var(--stage-accent-border);
+}
+
+.stage-status-badge::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 999px;
+  background: var(--stage-accent);
+}
+
+.stage-status-badge.stage-tone-sit.badge-pending {
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.stage-status-badge.stage-tone-uat.badge-pending {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.stage-status-badge.stage-tone-prod.badge-pending {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.stage-status-badge.badge-running,
+.stage-status-badge.badge-completed,
+.stage-status-badge.badge-failed,
+.stage-status-badge.badge-rejected,
+.stage-status-badge.badge-pending-review,
+.stage-status-badge.badge-approved,
+.stage-status-badge.badge-skipped {
+  border-color: var(--stage-accent-border);
+}
+
+.overall-status-badge.badge-pending {
+  background: #e2e8f0;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.overall-status-badge.badge-running {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
+.overall-status-badge.badge-completed,
+.overall-status-badge.badge-approved {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.overall-status-badge.badge-failed,
+.overall-status-badge.badge-rejected {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.overall-status-badge.badge-pending-review {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.overall-status-badge.badge-skipped {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #cbd5e1;
 }
 
 .row-archived {

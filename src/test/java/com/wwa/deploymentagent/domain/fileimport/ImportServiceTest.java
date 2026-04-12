@@ -65,20 +65,23 @@ class ImportServiceTest {
     }
 
     @Test
-    @DisplayName("existing project: new stage attaches Request to same Release Flow")
-    void importFile_existingProject_attachesNewRequest() throws IOException {
+    @DisplayName("existing project without explicit release identifier: new stage creates a new release flow")
+    void importFile_existingProjectWithoutIdentifier_createsNewReleaseFlow() throws IOException {
         // First upload for SIT
         byte[] sitXlsx = buildXlsx("PROJ-A", "Project A", "TG-01", "Task", 1, "step-1", "MANUAL");
         ImportResult sitResult = importService.importFile(sitXlsx, "SIT", developer);
 
-        // Second upload for UAT – same project
+        // Second upload for UAT – same project, but no explicit workflow identifier
         byte[] uatXlsx = buildXlsx("PROJ-A", "Project A", "TG-01", "Task", 1, "uat-step", "MANUAL");
         ImportResult uatResult = importService.importFile(uatXlsx, "UAT", developer);
 
-        assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
+        assertThat(uatResult.releaseFlowId()).isNotEqualTo(sitResult.releaseFlowId());
+        assertThat(uatResult.releaseId()).isNotEqualTo(sitResult.releaseId());
 
         long requestCount = requestRepository.findByReleaseFlowId(sitResult.releaseFlowId()).size();
-        assertThat(requestCount).isEqualTo(2); // SIT + UAT
+        long secondRequestCount = requestRepository.findByReleaseFlowId(uatResult.releaseFlowId()).size();
+        assertThat(requestCount).isEqualTo(1);
+        assertThat(secondRequestCount).isEqualTo(1);
     }
 
     @Test
@@ -138,8 +141,8 @@ class ImportServiceTest {
     }
 
     @Test
-    @DisplayName("later-stage upload attaches to the newest release flow that does not already have that stage")
-    void importFile_laterStageUpload_usesNewestEligibleReleaseFlow() throws IOException {
+    @DisplayName("later-stage upload without explicit release identifier creates a new release flow")
+    void importFile_laterStageUploadWithoutIdentifier_createsNewReleaseFlow() throws IOException {
         ImportResult firstSit = importService.importFile(
                 buildXlsx("PROJ-D", "Project D", "TG-01", "Task D", 1, "sit-step-1", "MANUAL"),
                 "SIT",
@@ -154,15 +157,18 @@ class ImportServiceTest {
                 "UAT",
                 developer);
 
-        assertThat(uatResult.releaseFlowId()).isEqualTo(secondSit.releaseFlowId());
+        assertThat(uatResult.releaseFlowId()).isNotEqualTo(secondSit.releaseFlowId());
         assertThat(uatResult.releaseFlowId()).isNotEqualTo(firstSit.releaseFlowId());
 
         assertThat(requestRepository.findByReleaseFlowId(secondSit.releaseFlowId()))
                 .extracting(request -> request.getStage())
-                .containsExactlyInAnyOrder("SIT", "UAT");
+                .containsExactly("SIT");
         assertThat(requestRepository.findByReleaseFlowId(firstSit.releaseFlowId()))
                 .extracting(request -> request.getStage())
                 .containsExactly("SIT");
+        assertThat(requestRepository.findByReleaseFlowId(uatResult.releaseFlowId()))
+                .extracting(request -> request.getStage())
+                .containsExactly("UAT");
     }
 
     @Test

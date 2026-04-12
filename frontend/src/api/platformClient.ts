@@ -27,11 +27,16 @@ platformClient.interceptors.response.use(
         router.push('/login')
       }
     }
-    const message =
+    const summary =
       error.response?.data?.message ||
       error.response?.data?.error ||
       error.message ||
       'An unexpected error occurred'
+    const details =
+      typeof error.response?.data?.details === 'string' && error.response.data.details.trim()
+        ? error.response.data.details.trim()
+        : ''
+    const message = details && details !== summary ? `${summary} ${details}` : summary
     return Promise.reject(new Error(message))
   },
 )

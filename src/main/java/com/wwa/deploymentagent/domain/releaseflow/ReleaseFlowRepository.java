@@ -42,21 +42,6 @@ public interface ReleaseFlowRepository extends JpaRepository<ReleaseFlow, String
 
     List<ReleaseFlow> findByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(String projectId);
 
-    @Query("""
-            SELECT rf FROM ReleaseFlow rf
-            WHERE rf.projectId = :projectId
-              AND rf.archivedAt IS NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM Request r
-                  WHERE r.releaseFlow = rf
-                    AND r.stage = :stage
-                    AND r.archivedAt IS NULL
-              )
-            ORDER BY rf.createdAt DESC
-            """)
-    List<ReleaseFlow> findActiveByProjectIdWithoutStageOrderByCreatedAtDesc(@Param("projectId") String projectId,
-                                                                             @Param("stage") String stage);
-
     default Optional<ReleaseFlow> findFirstByProjectId(String projectId) {
         return findFirstByProjectIdAndArchivedAtIsNullOrderByCreatedAtDesc(projectId);
     }

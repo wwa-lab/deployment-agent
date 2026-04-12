@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { agentRegistry } from '../config/agentRegistry'
 import type { ScopeDirectoryEntry } from '../types'
 
 const props = defineProps<{
@@ -11,13 +12,25 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  save: [draft: { application: string; snowGroup?: string }]
+  save: [draft: { application: string; snowGroup?: string; agent?: string }]
 }>()
 
 const isCreate = computed(() => props.mode === 'create')
+const agentOptions = computed(() => {
+  const baseOptions = agentRegistry
+    .filter((agent) => agent.enabled)
+    .map((agent) => ({ value: agent.key, label: agent.name }))
+
+  if (props.entry?.agent && !baseOptions.some((option) => option.value === props.entry?.agent)) {
+    return [...baseOptions, { value: props.entry.agent, label: props.entry.agent }]
+  }
+
+  return baseOptions
+})
 const form = reactive({
   application: props.entry?.application ?? '',
   snowGroup: props.entry?.snowGroup ?? '',
+  agent: props.entry?.agent ?? '',
 })
 const localError = ref('')
 
@@ -29,9 +42,15 @@ function submit() {
     return
   }
 
+  if (form.agent.trim() && !form.snowGroup.trim()) {
+    localError.value = 'Agent scope requires both Application and SNOW Group.'
+    return
+  }
+
   emit('save', {
     application: form.application.trim(),
     snowGroup: form.snowGroup.trim() || undefined,
+    agent: form.agent.trim() || undefined,
   })
 }
 </script>
@@ -74,9 +93,22 @@ function submit() {
           </p>
         </div>
 
+        <div class="form-group">
+          <label class="form-label">Agent <span class="optional">(Optional)</span></label>
+          <select v-model="form.agent" class="form-control">
+            <option value="">All Agents</option>
+            <option v-for="option in agentOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+          <p class="field-hint">
+            Optional agent-specific override. Agent scope requires both Application and SNOW Group.
+          </p>
+        </div>
+
         <p class="field-hint">
-          Upload dialogs use this directory to offer curated Application and SNOW Group choices
-          instead of manual typing.
+          Upload dialogs use this directory to offer curated Application, SNOW Group, and Agent
+          choices instead of manual typing.
         </p>
       </div>
 

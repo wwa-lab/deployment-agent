@@ -26,6 +26,9 @@ public class ScopeDirectoryService {
                         .comparing(ScopeDirectoryEntry::getApplication, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(
                                 ScopeDirectoryEntry::getSnowGroup,
+                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(
+                                ScopeDirectoryEntry::getAgent,
                                 Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }
@@ -36,7 +39,7 @@ public class ScopeDirectoryService {
             throw new ValidationAppException("Authenticated user is required.");
         }
 
-        ConfigurationScope scope = normalizeScope(request.application(), request.snowGroup());
+        ConfigurationScope scope = normalizeScope(request.application(), request.snowGroup(), request.agent());
 
         ScopeDirectoryEntry entry = request.id() == null || request.id().isBlank()
                 ? new ScopeDirectoryEntry()
@@ -51,12 +54,14 @@ public class ScopeDirectoryService {
                             "Scope directory entry already exists for '"
                                     + scope.application()
                                     + "'"
-                                    + (scope.snowGroup() != null ? " / '" + scope.snowGroup() + "'" : ""));
+                                    + (scope.snowGroup() != null ? " / '" + scope.snowGroup() + "'" : "")
+                                    + (scope.agent() != null ? " / '" + scope.agent() + "'" : ""));
                 });
 
         entry.setScopeKey(scope.scopeKey());
         entry.setApplication(scope.application());
         entry.setSnowGroup(scope.snowGroup());
+        entry.setAgent(scope.agent());
         entry.setUpdatedBy(user.userId());
         ScopeDirectoryEntry saved = scopeDirectoryRepository.save(entry);
 
@@ -72,9 +77,9 @@ public class ScopeDirectoryService {
         auditLogger.log(user, AuditActionType.config_delete, auditContext(entry, "scope_directory"));
     }
 
-    private static ConfigurationScope normalizeScope(String application, String snowGroup) {
+    private static ConfigurationScope normalizeScope(String application, String snowGroup, String agent) {
         try {
-            ConfigurationScope scope = new ConfigurationScope(application, snowGroup, null);
+            ConfigurationScope scope = new ConfigurationScope(application, snowGroup, agent);
             scope.validateHierarchy();
             if (scope.application() == null) {
                 throw new ValidationAppException("Application is required.");
@@ -89,9 +94,12 @@ public class ScopeDirectoryService {
         java.util.Map<String, Object> context = new java.util.LinkedHashMap<>();
         context.put("application", entry.getApplication());
         context.put("snowGroup", entry.getSnowGroup() != null ? entry.getSnowGroup() : "");
-        context.put("agent", "platform");
+        context.put("agent", entry.getAgent() != null ? entry.getAgent() : "platform");
         context.put("scopeDirectoryEntryId", entry.getId());
-        context.put("scopeSource", new ConfigurationScope(entry.getApplication(), entry.getSnowGroup(), null).scopeSource());
+        context.put("scopeSource", new ConfigurationScope(
+                entry.getApplication(),
+                entry.getSnowGroup(),
+                entry.getAgent()).scopeSource());
         context.put("changedFields", java.util.List.of(changedField));
         return context;
     }

@@ -10,6 +10,7 @@ public record ScopeDirectoryEntryDto(
         String id,
         String application,
         String snowGroup,
+        String agent,
         String scopeSource,
         String updatedBy,
         Instant updatedAt
@@ -19,7 +20,8 @@ public record ScopeDirectoryEntryDto(
                 entry.getId(),
                 entry.getApplication(),
                 entry.getSnowGroup(),
-                new ConfigurationScope(entry.getApplication(), entry.getSnowGroup(), null).scopeSource(),
+                entry.getAgent(),
+                new ConfigurationScope(entry.getApplication(), entry.getSnowGroup(), entry.getAgent()).scopeSource(),
                 entry.getUpdatedBy(),
                 entry.getUpdatedAt());
     }
@@ -27,6 +29,7 @@ public record ScopeDirectoryEntryDto(
     public record UpsertRequest(
             String id,
             @NotBlank String application,
-            String snowGroup
+            String snowGroup,
+            String agent
     ) {}
 }

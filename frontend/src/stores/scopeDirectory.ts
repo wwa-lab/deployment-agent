@@ -35,6 +35,7 @@ export const useScopeDirectoryStore = defineStore('scope-directory', () => {
     id?: string
     application: string
     snowGroup?: string
+    agent?: string
   }) {
     error.value = ''
     try {

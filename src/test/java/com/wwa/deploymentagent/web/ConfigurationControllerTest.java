@@ -182,6 +182,58 @@ class ConfigurationControllerTest {
     }
 
     @Test
+    @DisplayName("scope directory supports agent-specific overrides")
+    void scopeDirectory_agentOverrideCrudFlow() throws Exception {
+        String createResponse = mockMvc.perform(post(BASE + "/scopes")
+                        .header("X-User-Id", "admin-user")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "application": "AMH HCC",
+                                  "snowGroup": "HTSA-CSI-HCC-AMH-PRJ",
+                                  "agent": "deployment-agent"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.application").value("AMH HCC"))
+                .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
+                .andExpect(jsonPath("$.agent").value("deployment-agent"))
+                .andExpect(jsonPath("$.scopeSource").value("Agent Override"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String scopeId = objectMapper.readTree(createResponse).path("id").asText();
+
+        mockMvc.perform(get(BASE + "/scopes")
+                        .header("X-User-Id", "user1")
+                        .header("X-User-Role", "DEVELOPER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(scopeId))
+                .andExpect(jsonPath("$[0].agent").value("deployment-agent"))
+                .andExpect(jsonPath("$[0].scopeSource").value("Agent Override"));
+    }
+
+    @Test
+    @DisplayName("scope directory rejects agent overrides without snow group")
+    void scopeDirectory_agentOverrideRequiresSnowGroup() throws Exception {
+        mockMvc.perform(post(BASE + "/scopes")
+                        .header("X-User-Id", "admin-user")
+                        .header("X-User-Role", "DEVOPS_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "application": "AMH HCC",
+                                  "agent": "deployment-agent"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Agent scope requires both Application and SNOW Group to be set"));
+    }
+
+    @Test
     @DisplayName("scope directory rejects non-admin writes")
     void scopeDirectory_nonAdminReturnsForbidden() throws Exception {
         mockMvc.perform(post(BASE + "/scopes")
