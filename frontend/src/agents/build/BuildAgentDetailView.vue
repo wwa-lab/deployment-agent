@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  archiveRequestRundown as archiveRequestRundownApi,
   cloneTask as cloneTaskApi,
   editExecutionType as editExecutionTypeApi,
   editNames as editNamesApi,
@@ -9,17 +10,21 @@ import {
   getTaskResult,
   listTaskExecutions as listBuildTaskExecutions,
   markRequestFailed as markRequestFailedApi,
+  purgeRequestRundown as purgeRequestRundownApi,
   reorderTasks as reorderTasksApi,
   recordResult as recordResultApi,
+  restoreRequestRundown as restoreRequestRundownApi,
   startManualExecution as startManualExecutionApi,
   startRequestDeployment as startRequestDeploymentApi,
   submitAutoExecution,
   submitDecision as submitDecisionApi,
+  updateRequestRundown as updateRequestRundownApi,
 } from './api'
 import { useBuildAgentStore } from './index'
 import { useUserStore } from '../../stores/user'
 import TaskEditDialog from '../../components/TaskEditDialog.vue'
 import DecisionDialog from '../../components/DecisionDialog.vue'
+import RundownEditDialog from '../../components/RundownEditDialog.vue'
 import TaskActivityDialog from '../../components/TaskActivityDialog.vue'
 import type { Request, Task, TaskResult } from '../../types'
 
@@ -40,6 +45,7 @@ const decidingTask = ref<Task | null>(null)
 const viewingActivityTask = ref<Task | null>(null)
 const initialDecision = ref<DecisionOption | null>(null)
 const allowedDecisionOptions = ref<DecisionOption[]>(['Approve', 'Reject', 'Skip'])
+const editingRundown = ref<Request | null>(null)
 const refreshingDetail = ref(false)
 const submittingAuto = ref<string | null>(null)
 const requestActionLoadingId = ref<string | null>(null)
@@ -318,6 +324,93 @@ async function handleMarkRequestFailed(request: Request) {
   } finally {
     requestActionLoadingId.value = null
   }
+}
+
+function canEditRundown(): boolean {
+  return userStore.isDeveloper || userStore.isTL || userStore.isDevOpsAdmin
+}
+
+function canEditRundownFields(request: Request): boolean {
+  return canEditRundown() && !isArchivedRequest(request)
+}
+
+function canRestoreRundown(): boolean {
+  return userStore.isDevOpsAdmin
+}
+
+function canPurgeRundown(request: Request): boolean {
+  return userStore.isDevOpsAdmin && isArchivedRequest(request)
+}
+
+async function handleArchiveRundown(request: Request) {
+  if (!canEditRundown()) return
+  if (!window.confirm(
+    'Archive this DEV build rundown? The rundown will be marked as archived and become read-only.',
+  )) return
+
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:archive`
+  try {
+    const result = await archiveRequestRundownApi(detail.id, request.id)
+    if (result.releaseFlowArchived && !includeArchivedView.value) {
+      await store.fetchList()
+      await router.push('/wwa/build-agent')
+      return
+    }
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handleRestoreRundown(request: Request) {
+  if (!canRestoreRundown()) return
+  if (!window.confirm('Restore this DEV build rundown back into the active workflow?')) return
+
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:restore`
+  try {
+    await restoreRequestRundownApi(detail.id, request.id)
+    await store.fetchList()
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function handlePurgeRundown(request: Request) {
+  if (!canPurgeRundown(request)) return
+  if (!window.confirm(
+    'Permanently delete this archived build rundown? This action cannot be undone.',
+  )) return
+
+  const detail = store.detail
+  if (!detail) return
+  requestActionLoadingId.value = `${request.id}:purge`
+  try {
+    const result = await purgeRequestRundownApi(detail.id, request.id)
+    await store.fetchList()
+    if (result.releaseFlowDeleted) {
+      await router.push('/wwa/build-agent')
+      return
+    }
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    requestActionLoadingId.value = null
+  }
+}
+
+async function onRundownSaved() {
+  editingRundown.value = null
+  await store.refreshDetail()
 }
 
 function taskActionReason(request: Request, reason: string | null): string | null {
@@ -725,6 +818,41 @@ const activeRequestSummary = computed(() => {
                   @click="handleRefreshDetail"
                 >
                   {{ refreshingDetail ? 'Refreshing...' : 'Refresh' }}
+                </button>
+                <button
+                  v-if="canEditRundownFields(req)"
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  @click="editingRundown = req"
+                >
+                  Edit Rundown
+                </button>
+                <button
+                  v-if="canEditRundownFields(req)"
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:archive`"
+                  @click="handleArchiveRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:archive` ? 'Archiving...' : 'Archive Rundown' }}
+                </button>
+                <button
+                  v-if="req.archivedAt && canRestoreRundown()"
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:restore`"
+                  @click="handleRestoreRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:restore` ? 'Restoring...' : 'Restore Rundown' }}
+                </button>
+                <button
+                  v-if="canPurgeRundown(req)"
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  :disabled="requestActionLoadingId === `${req.id}:purge`"
+                  @click="handlePurgeRundown(req)"
+                >
+                  {{ requestActionLoadingId === `${req.id}:purge` ? 'Deleting...' : 'Delete Permanently' }}
                 </button>
               </div>
             </div>
@@ -1139,6 +1267,14 @@ const activeRequestSummary = computed(() => {
       :submit-decision-fn="submitDecisionApi"
       @decided="onDecisionMade"
       @close="closeDecisionDialog"
+    />
+
+    <RundownEditDialog
+      v-if="editingRundown"
+      :request="editingRundown"
+      :update-request-rundown-fn="updateRequestRundownApi"
+      @saved="onRundownSaved"
+      @close="editingRundown = null"
     />
 
     <TaskActivityDialog

@@ -4,6 +4,8 @@ import type {
   ReleaseFlowDetail,
   ReleaseFlowListItem,
   Request,
+  RequestArchiveResult,
+  RequestPurgeResult,
   Stage,
   Task,
   TaskExecutionHistory,
@@ -48,6 +50,57 @@ export async function startRequestDeployment(flowId: string, requestId: string):
 export async function markRequestFailed(flowId: string, requestId: string): Promise<Request> {
   const response = await buildClient.post(
     `/release-flows/${flowId}/requests/${requestId}/fail`,
+  )
+  return response.data
+}
+
+export interface UpdateRequestRundownInput {
+  snowGroup?: string
+  application?: string
+  agent?: string
+  owner?: string
+  site?: string
+  estimatedRemainingMinutes?: number
+}
+
+export async function updateRequestRundown(
+  flowId: string,
+  requestId: string,
+  input: UpdateRequestRundownInput,
+): Promise<Request> {
+  const response = await buildClient.patch(
+    `/release-flows/${flowId}/requests/${requestId}/rundown`,
+    input,
+  )
+  return response.data
+}
+
+export async function archiveRequestRundown(
+  flowId: string,
+  requestId: string,
+): Promise<RequestArchiveResult> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/archive`,
+  )
+  return response.data
+}
+
+export async function restoreRequestRundown(
+  flowId: string,
+  requestId: string,
+): Promise<RequestArchiveResult> {
+  const response = await buildClient.post(
+    `/release-flows/${flowId}/requests/${requestId}/restore`,
+  )
+  return response.data
+}
+
+export async function purgeRequestRundown(
+  flowId: string,
+  requestId: string,
+): Promise<RequestPurgeResult> {
+  const response = await buildClient.delete(
+    `/release-flows/${flowId}/requests/${requestId}/purge`,
   )
   return response.data
 }

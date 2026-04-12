@@ -112,6 +112,57 @@ public class BuildReleaseFlowController {
         return ResponseEntity.ok(RequestDto.from(request, taskDtos));
     }
 
+    @PatchMapping("/{flowId}/requests/{requestId}/rundown")
+    public ResponseEntity<RequestDto> updateRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @RequestBody RequestRundownUpdateDto body,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId), "update_rundown");
+        validateOwnerEdit(user, body);
+
+        Request request = releaseFlowService.updateRequestRundown(flowId, requestId, body);
+        List<TaskDto> taskDtos = request.getTasks().stream()
+                .map(TaskDto::from)
+                .toList();
+        return ResponseEntity.ok(RequestDto.from(request, taskDtos));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/archive")
+    public ResponseEntity<RequestArchiveResultDto> archiveRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId), "archive_rundown");
+        return ResponseEntity.ok(releaseFlowService.archiveRequestRundown(flowId, requestId, user));
+    }
+
+    @PostMapping("/{flowId}/requests/{requestId}/restore")
+    public ResponseEntity<RequestArchiveResultDto> restoreRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateAdmin(user, "restore_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId, true), "restore_rundown");
+        return ResponseEntity.ok(releaseFlowService.restoreRequestRundown(flowId, requestId, user));
+    }
+
+    @DeleteMapping("/{flowId}/requests/{requestId}/purge")
+    public ResponseEntity<RequestPurgeResultDto> purgeArchivedRequestRundown(
+            @PathVariable String flowId,
+            @PathVariable String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        validateAdmin(user, "purge_rundown");
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId, true), "purge_rundown");
+        return ResponseEntity.ok(releaseFlowService.purgeArchivedRequestRundown(flowId, requestId, user));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ReleaseFlowDetailDto> getById(
             @PathVariable String id,
@@ -168,10 +219,38 @@ public class BuildReleaseFlowController {
     }
 
     private Request findRequestForScopeValidation(String flowId, String requestId) {
-        return releaseFlowService.findRequestsForFlow(flowId, false).stream()
+        return findRequestForScopeValidation(flowId, requestId, false);
+    }
+
+    private Request findRequestForScopeValidation(String flowId, String requestId, boolean includeArchived) {
+        return releaseFlowService.findRequestsForFlow(flowId, includeArchived).stream()
                 .filter(request -> request.getId().equals(requestId))
                 .findFirst()
                 .orElseThrow(() -> new ForbiddenAppException("request_scope_lookup"));
+    }
+
+    private void validateRundownEditor(UserContext user) {
+        if (user == null) {
+            throw new ForbiddenAppException("update_rundown");
+        }
+        if (!user.hasRole("DEVELOPER") && !user.hasRole("TL") && !user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException("update_rundown");
+        }
+    }
+
+    private void validateAdmin(UserContext user, String action) {
+        if (user == null || !user.hasRole("DEVOPS_ADMIN")) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    private void validateOwnerEdit(UserContext user, RequestRundownUpdateDto body) {
+        if (body == null) {
+            return;
+        }
+        if (body.owner() != null && (user == null || !user.hasRole("DEVOPS_ADMIN"))) {
+            throw new ForbiddenAppException("update_rundown_owner");
+        }
     }
 
     private void validateRequestScope(UserContext user, Request request, String action) {
