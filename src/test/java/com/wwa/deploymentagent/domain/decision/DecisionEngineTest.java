@@ -191,4 +191,46 @@ class DecisionEngineTest {
                 decisionEngine.applyDecision(task.getId(), DecisionType.skip, ownerUser, null))
                 .isInstanceOf(InvalidStateTransitionException.class);
     }
+
+    // ─── idempotency (P1-1) ─────────────────────────────────────────────────
+    //
+    // When a decision would move the task to a state it is already in, the
+    // decision is a successful no-op: the status does not change, no state
+    // transition exception is thrown, and no duplicate audit entry is
+    // written. This prevents double-click / retry scenarios from producing
+    // confusing 422 responses. Rerun is intentionally excluded because it
+    // must always create a new execution history attempt.
+
+    @Test
+    @DisplayName("approve: already Approved is an idempotent no-op")
+    void approve_alreadyApproved_isNoOp() {
+        Task task = helper.seedTask(request, TaskStatus.Approved);
+
+        decisionEngine.applyDecision(task.getId(), DecisionType.approve, ownerUser, "retry");
+
+        Task updated = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Approved);
+    }
+
+    @Test
+    @DisplayName("reject: already Rejected is an idempotent no-op")
+    void reject_alreadyRejected_isNoOp() {
+        Task task = helper.seedTask(request, TaskStatus.Rejected);
+
+        decisionEngine.applyDecision(task.getId(), DecisionType.reject, ownerUser, "retry");
+
+        Task updated = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Rejected);
+    }
+
+    @Test
+    @DisplayName("skip: already Skipped is an idempotent no-op")
+    void skip_alreadySkipped_isNoOp() {
+        Task task = helper.seedTask(request, TaskStatus.Skipped);
+
+        decisionEngine.applyDecision(task.getId(), DecisionType.skip, ownerUser, "retry");
+
+        Task updated = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Skipped);
+    }
 }

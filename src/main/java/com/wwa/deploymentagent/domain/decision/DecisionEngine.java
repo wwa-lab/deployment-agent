@@ -4,11 +4,14 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
+import com.wwa.deploymentagent.domain.eventing.DomainEvent;
+import com.wwa.deploymentagent.domain.eventing.DomainEventPublisher;
 import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.domain.task.TaskPermissionService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
 import com.wwa.deploymentagent.domain.task.TaskService;
 import com.wwa.deploymentagent.errors.InvalidStateTransitionException;
+import com.wwa.deploymentagent.platform.web.common.CorrelationIdFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +41,7 @@ public class DecisionEngine {
     private final AuditLoggerService auditLogger;
     private final TaskPermissionService taskPermissionService;
     private final DecisionGate decisionGate;
+    private final DomainEventPublisher domainEventPublisher;
 
     /**
      * Apply a decision to a task.
@@ -58,6 +62,19 @@ public class DecisionEngine {
         Task task = taskService.getById(taskId);
         taskPermissionService.assertOwnerOrAdmin(task, user, "decision:" + decision.name());
 
+        // Idempotency (P1-1): if the task is already in the terminal state that this
+        // decision would produce, treat the call as a successful no-op. This prevents
+        // double-click/retry scenarios from producing confusing 422 responses. The
+        // permission check still runs first so that an unauthorized caller cannot
+        // probe the current task state by calling the decision endpoint.
+        //
+        // Rerun is intentionally excluded from this rule: it is a "try again" action
+        // that must create a fresh execution history row every time it is invoked,
+        // even when the task is already in Ready_For_Execution.
+        if (isAlreadyInTargetState(task.getTaskStatus(), decision)) {
+            return;
+        }
+
         GateOutcome gateOutcome = decisionGate.evaluate(task, decision, user);
         if (!gateOutcome.allowed()) {
             throw new InvalidStateTransitionException(
@@ -68,6 +85,7 @@ public class DecisionEngine {
 
         String releaseFlowId = task.getRequest().getReleaseFlow().getId();
         String requestId = task.getRequest().getId();
+        TaskStatus previousStatus = task.getTaskStatus();
 
         switch (decision) {
             case approve -> {
@@ -121,5 +139,59 @@ public class DecisionEngine {
             auditContext.put("actorRef", gateOutcome.actorRef());
         }
         auditLogger.log(user, auditAction, releaseFlowId, requestId, taskId, auditContext);
+
+        // Publish a domain event onto the transactional outbox (P2-2 seam).
+        // MVP: no consumer reads this; rows accumulate in PENDING state. The
+        // future email notification dispatcher will consume task.* events.
+        // Event publication is inside the same @Transactional boundary so the
+        // event is durable iff the business state change is durable.
+        Map<String, Object> eventPayload = new LinkedHashMap<>();
+        eventPayload.put("previousStatus", previousStatus.name());
+        eventPayload.put("newStatus", targetStatusFor(decision).name());
+        eventPayload.put("actorKind", gateOutcome.actorKind().name());
+        if (gateOutcome.actorRef() != null) {
+            eventPayload.put("actorRef", gateOutcome.actorRef());
+        }
+        eventPayload.put("releaseFlowId", releaseFlowId);
+        eventPayload.put("requestId", requestId);
+        eventPayload.put("comment", comment != null ? comment : "");
+        domainEventPublisher.publish(new DomainEvent(
+                "task." + decision.name(),
+                "Task",
+                taskId,
+                null,
+                CorrelationIdFilter.current(),
+                eventPayload));
+    }
+
+    /**
+     * Nominal target status for a non-idempotent decision application.
+     * Used for domain event payloads so consumers can read the intended
+     * target without replicating the state machine rules. Rerun ends in
+     * {@code Ready_For_Execution} even though it also creates a new
+     * execution history row.
+     */
+    private static TaskStatus targetStatusFor(DecisionType decision) {
+        return switch (decision) {
+            case approve -> TaskStatus.Approved;
+            case reject -> TaskStatus.Rejected;
+            case rerun -> TaskStatus.Ready_For_Execution;
+            case skip -> TaskStatus.Skipped;
+        };
+    }
+
+    /**
+     * Returns true when the requested decision would transition the task to a
+     * state the task is already in — used by the idempotency rule in
+     * {@link #applyDecision}.
+     */
+    private static boolean isAlreadyInTargetState(TaskStatus current, DecisionType decision) {
+        return switch (decision) {
+            case approve -> current == TaskStatus.Approved;
+            case reject -> current == TaskStatus.Rejected;
+            case skip -> current == TaskStatus.Skipped;
+            // Rerun always creates a new attempt — never idempotent.
+            case rerun -> false;
+        };
     }
 }

@@ -237,8 +237,33 @@ The seams exist because the product has a hard constraint of **"7×24 platform a
 | 4 | `expected_sla_minutes` nullable column on `DA_TASK` | `domain/task/Task.java` | Always null, no runtime reads | Scheduled timeout sweeper that escalates overdue decisions |
 | 5 | `DecisionGate` interface + `ManualDecisionGate` implementation | `domain/decision/DecisionGate.java`, `domain/decision/ManualDecisionGate.java`, `domain/decision/GateOutcome.java` | `DecisionEngine.applyDecision` consults the gate; the only implementation always returns `proceedAsHuman(user)` | Policy and AI-assisted gates composed in front of the manual gate without touching call sites |
 | 6 | `AutoExecutionAdapter.supportsCancel()` + `cancel(TaskExecutionHistory)` default methods | `domain/execution/AutoExecutionAdapter.java` | `supportsCancel()` returns `false`; `cancel(...)` throws `UnsupportedOperationException`; no runtime code calls either | Human-on-the-loop cancel button and SLA-driven cancellation, per-adapter opt-in |
+| 7 | Transactional outbox: `DomainEvent` + `DomainEventPublisher` interface + `OutboxDomainEventPublisher` + `DA_OUTBOX_EVENT` table | `domain/eventing/*`, `V17__add_outbox_event_table.sql` | `DecisionEngine` publishes a `task.<decision>` event to `DA_OUTBOX_EVENT` inside each decision transaction. No consumer reads these rows in MVP — they accumulate in `PENDING` status. | Email notification dispatcher (confirmed product roadmap); future webhook / BI / Slack integrations |
 
-The canonical Oracle DDL for seams 1–4 is in `src/main/resources/db/migration/V15__add_mvp_foundation_seams.sql`. Tests and the `local` Spring profile use Hibernate auto-DDL, so the seams are created from the JPA entities automatically in H2; the migration script is the authoritative reference for production Oracle rollouts.
+The canonical Oracle DDL for seams 1–4 is in `src/main/resources/db/migration/V15__add_mvp_foundation_seams.sql`. Seam 7 (the outbox table) has its own migration `V17__add_outbox_event_table.sql`. Tests and the `local` Spring profile use Hibernate auto-DDL, so the seams are created from the JPA entities automatically in H2; the migration scripts are the authoritative reference for production Oracle rollouts.
+
+#### Seam 7 details — why the outbox is a seam and not a feature
+
+The outbox table (`DA_OUTBOX_EVENT`) and the `DomainEventPublisher` interface are scaffolding for a feature that **does not exist yet**: the product roadmap will add email notifications for task state transitions, and the same mechanism will later serve any other downstream integration (Slack, webhooks, BI export). Building the scaffolding now is cheap; adding it later would require retrofitting event emission into every state-transition call site and then dealing with the history of events that were never captured.
+
+The seam is designed to the transactional outbox pattern:
+
+- **Atomicity with the business transaction.** `OutboxDomainEventPublisher.publish()` writes an `OutboxEvent` row inside the caller's `@Transactional` method. Because the insert is part of the same transaction as the state change that caused the event, the event is guaranteed to be durable if and only if the state change is durable. There is no "we sent the email but then the rollback undid the decision" race.
+- **Correlation-aware.** Every outbox row captures the originating HTTP request's correlation ID (pulled from `CorrelationIdFilter` via SLF4J MDC), so the future dispatcher can correlate delivered notifications back to the log lines and audit entries that triggered them.
+- **No consumer in MVP.** Rows accumulate in `PENDING` state and nothing reads them. This is intentional — the seam is not a half-built feature. Adding the dispatcher later is pure additive code.
+- **One integration point today; more tomorrow.** MVP only publishes from `DecisionEngine` (task approval / rejection / rerun / skip events). When the email notification feature lands, the consumer will subscribe to `task.*` events first, and we will extend the set of publishing call sites (`RecordResultService`, `AutoExecutionService`, `ReleaseFlowService`, the external execution monitor) as the consumer requires them. Each additional publisher is a small, scoped edit rather than a cross-cutting refactor.
+
+What the outbox seam explicitly does **not** include:
+
+- A dispatcher, retry loop, poison-queue handling, or delivery metrics
+- An event schema registry or versioning contract
+- A consumer of any kind (email, webhook, Slack, BI)
+- A replay mechanism for events that were published before a consumer existed — once a dispatcher is added, it will only deliver rows that arrive after its start time, unless a back-fill run is explicitly requested by an operator
+
+A separate, smaller infrastructure debt item — `DecisionEngine` idempotency — was closed in the same delivery as seam 7, but it is not itself a seam. See the "Active Behavior" note below.
+
+#### Active Behavior: Decision endpoint idempotency (not a seam)
+
+Independently of seam 7, `DecisionEngine.applyDecision` now treats calls that would transition a task to a state it is already in as successful no-ops. Double-clicking Approve on an already-Approved task (or Reject on an already-Rejected task, or Skip on an already-Skipped task) returns 200 without writing a duplicate audit entry or publishing a duplicate domain event. Rerun is **intentionally excluded** from this rule because it must always create a new execution history attempt. The permission check still runs first so unauthorized callers cannot probe task state through idempotent calls. This change is active from day one — it is not a reservation — and it exists because the previous behavior produced confusing 422 responses for ordinary retry / double-click scenarios.
 
 ### What the Seams Do Not Provide
 
