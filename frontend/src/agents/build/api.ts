@@ -1,4 +1,3 @@
-import platformClient from '../../api/platformClient'
 import { buildClient } from './index'
 import type {
   PaginatedResponse,
@@ -131,7 +130,7 @@ export async function uploadFile(
 }
 
 export async function downloadTemplate(): Promise<Blob> {
-  const response = await platformClient.get('/upload/template', {
+  const response = await buildClient.get('/upload/template', {
     responseType: 'blob',
   })
   return response.data

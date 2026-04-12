@@ -162,6 +162,23 @@ public class Task {
     @Column(name = "import_metadata", columnDefinition = "CLOB")
     private Map<String, Object> importMetadata;
 
+    /**
+     * Per-agent custom fields populated by the import pipeline when a template
+     * schema registered in {@code TemplateSchemaRegistry} declares extra
+     * columns beyond the shared default schema. MVP seam: the default schema
+     * declares no custom columns, so this stays NULL for every task. No
+     * runtime code reads this field yet — it exists so that a future agent can
+     * add template columns without a schema migration and without polluting
+     * the shared Task attributes other agents rely on.
+     *
+     * <p>Pair with: {@code TemplateSchemaRegistry} + per-agent upload template
+     * download route. See docs/04-architecture/architecture.md §MVP Foundation
+     * Seams.
+     */
+    @Convert(converter = JsonAttributeConverter.class)
+    @Column(name = "custom_fields", columnDefinition = "CLOB")
+    private Map<String, Object> customFields;
+
     // ─── Execution tracking ──────────────────────────────────────────────────
 
     /** Summary of the latest execution result – JSON map (null until first execution). */

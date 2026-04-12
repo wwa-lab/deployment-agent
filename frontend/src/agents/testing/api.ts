@@ -1,4 +1,3 @@
-import platformClient from '../../api/platformClient'
 import { testingClient } from './index'
 import type {
   CreateRundownFromTemplateInput,
@@ -211,7 +210,7 @@ export async function uploadFile(
 }
 
 export async function downloadTemplate(): Promise<Blob> {
-  const response = await platformClient.get('/upload/template', {
+  const response = await testingClient.get('/upload/template', {
     responseType: 'blob',
   })
   return response.data

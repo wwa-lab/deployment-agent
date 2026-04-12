@@ -238,8 +238,9 @@ The seams exist because the product has a hard constraint of **"7×24 platform a
 | 5 | `DecisionGate` interface + `ManualDecisionGate` implementation | `domain/decision/DecisionGate.java`, `domain/decision/ManualDecisionGate.java`, `domain/decision/GateOutcome.java` | `DecisionEngine.applyDecision` consults the gate; the only implementation always returns `proceedAsHuman(user)` | Policy and AI-assisted gates composed in front of the manual gate without touching call sites |
 | 6 | `AutoExecutionAdapter.supportsCancel()` + `cancel(TaskExecutionHistory)` default methods | `domain/execution/AutoExecutionAdapter.java` | `supportsCancel()` returns `false`; `cancel(...)` throws `UnsupportedOperationException`; no runtime code calls either | Human-on-the-loop cancel button and SLA-driven cancellation, per-adapter opt-in |
 | 7 | Transactional outbox: `DomainEvent` + `DomainEventPublisher` interface + `OutboxDomainEventPublisher` + `DA_OUTBOX_EVENT` table | `domain/eventing/*`, `V17__add_outbox_event_table.sql` | `DecisionEngine` publishes a `task.<decision>` event to `DA_OUTBOX_EVENT` inside each decision transaction. No consumer reads these rows in MVP — they accumulate in `PENDING` status. | Email notification dispatcher (confirmed product roadmap); future webhook / BI / Slack integrations |
+| 8 | `TemplateSchema` + `TemplateSchemaRegistry` + `custom_fields` CLOB on `DA_TASK` + per-agent template download routes | `domain/fileimport/TemplateSchema.java`, `domain/fileimport/TemplateSchemaRegistry.java`, `domain/task/Task.java`, `V18__add_task_custom_fields.sql`, `/api/<agent-key>/upload/template` in each agent's upload controller | Every agent resolves to the same `DEFAULT_SCHEMA`, so all three per-agent template endpoints return byte-identical files and no task ever writes `custom_fields`. | Per-agent template customization (customer-specific columns on one agent without touching shared schema or other agents' templates) |
 
-The canonical Oracle DDL for seams 1–4 is in `src/main/resources/db/migration/V15__add_mvp_foundation_seams.sql`. Seam 7 (the outbox table) has its own migration `V17__add_outbox_event_table.sql`. Tests and the `local` Spring profile use Hibernate auto-DDL, so the seams are created from the JPA entities automatically in H2; the migration scripts are the authoritative reference for production Oracle rollouts.
+The canonical Oracle DDL for seams 1–4 is in `src/main/resources/db/migration/V15__add_mvp_foundation_seams.sql`. Seam 7 (the outbox table) has its own migration `V17__add_outbox_event_table.sql`. Seam 8 (the task custom-fields column) is added in `V18__add_task_custom_fields.sql`. Tests and the `local` Spring profile use Hibernate auto-DDL, so the seams are created from the JPA entities automatically in H2; the migration scripts are the authoritative reference for production Oracle rollouts.
 
 #### Seam 7 details — why the outbox is a seam and not a feature
 
@@ -260,6 +261,32 @@ What the outbox seam explicitly does **not** include:
 - A replay mechanism for events that were published before a consumer existed — once a dispatcher is added, it will only deliver rows that arrive after its start time, unless a back-fill run is explicitly requested by an operator
 
 A separate, smaller infrastructure debt item — `DecisionEngine` idempotency — was closed in the same delivery as seam 7, but it is not itself a seam. See the "Active Behavior" note below.
+
+#### Seam 8 details — per-agent template customization
+
+The product ships today with a single shared XLSX upload template: every agent — Deployment, Testing, Build — downloads the same sheet with the same columns, and `ExcelParserService` parses it against a single hardcoded field mapping. Internal feedback already anticipates that a future customer will demand an extra column on one agent's template (for example a "test scenario id" on Testing Agent or a "build artifact hash" on Build Agent). Adding that field later as a physical column on `DA_TASK` would force every agent to carry it; adding it to the generator without adding it to the parser would break round-trip upload; and routing it through the legacy `/api/platform/upload/template` endpoint would make the template shared by contract even though it is no longer shared in practice.
+
+Seam 8 reserves the shape that makes that future change cheap:
+
+- **`TemplateSchema` value object** (`domain/fileimport/TemplateSchema.java`) — immutable record describing `sheetName`, downloadable `fileName`, ordered `headers`, `sampleRow`, and `customFieldColumns`. This is a descriptor, not a full parsing DSL — the parser still applies hardcoded field-level validation for the shared default schema.
+- **`TemplateSchemaRegistry`** (`domain/fileimport/TemplateSchemaRegistry.java`) — a Spring-managed registry keyed by `AgentId`. Day-1 every agent resolves to `DEFAULT_SCHEMA`, so `UploadTemplateService.generateTemplate(agentId)` returns byte-identical output for all three agents. Intentionally has no inheritance or overlay semantics: per-agent schemas, when they diverge, are registered as full replacements.
+- **`UploadTemplateService.generateTemplate(String agentId)`** — agent-aware overload that reads the registered schema from the registry. The no-arg overload is preserved for existing callers (tests, legacy `/api/platform/upload/template`) and returns the default schema bytes.
+- **Per-agent template download routes** — `GET /api/deployment-agent/upload/template`, `GET /api/testing-agent/upload/template`, and `GET /api/build-agent/upload/template`, added inside each agent's existing upload controller. Each forces its own `AgentId` server-side when calling the service (same server-side agent boundary as `POST /upload`). The legacy `/api/platform/upload/template` route is kept as the default-schema fallback for backwards compatibility and is used by the shared Template Management page.
+- **`Task.custom_fields` CLOB** (`V18__add_task_custom_fields.sql`) — JSON column on `DA_TASK` using `JsonAttributeConverter`, destined to receive values parsed from any columns listed in `TemplateSchema.customFieldColumns`. Day-1 no schema declares any such columns, so the field stays `NULL` for every row.
+
+The seam is correct if and only if the following properties hold. Every follow-up change that touches templates should re-check them:
+
+1. **Generator and parser share one source of truth.** `UploadTemplateService` reads headers, sheet name, and sample row from `TemplateSchemaRegistry`, and `ExcelParserService.SHEET_NAME` is derived from `TemplateSchemaRegistry.DEFAULT_SCHEMA.sheetName()` so that the parser cannot silently drift from the generator for the shared schema. A future agent-specific parser will need to accept an `agentId` and resolve its sheet name from the registry the same way.
+2. **Per-agent HTTP boundary matches per-agent schema resolution.** Each per-agent template route forces its own `AgentId` server-side before calling `generateTemplate(agentId)`. Client-supplied agent parameters are ignored, matching the rules already documented under "Multi-Agent Rules" in `CLAUDE.md`.
+3. **Custom fields are additive.** A future customization that introduces a `custom_fields` column must not remove, rename, or reinterpret any column already in `DEFAULT_SCHEMA`. Divergence is allowed in one direction only: extra columns beyond the shared core.
+4. **No agent-specific column becomes a physical column.** The entire point of `custom_fields` is to absorb per-agent template columns without touching `DA_TASK`'s schema. If a future column turns out to be needed by every agent, it should be promoted into `DEFAULT_SCHEMA` and onto `DA_TASK` as a physical column through the normal migration path — not left in `custom_fields` indefinitely.
+
+What Seam 8 explicitly does **not** include:
+
+- A per-agent parser. `ExcelParserService` still validates the default schema only; a customer-specific column that needs validation beyond "present as a string" will require a parser change scoped to that agent.
+- Per-agent DTOs. The current `TaskDto` returns the shared field set only; exposing `custom_fields` over the API is deferred until a concrete customization actually needs it.
+- Per-agent frontend column rendering. The shared `ReleaseFlowDetailView` does not display `custom_fields` yet; that is left for the future customization to add under its own agent's view.
+- A policy for what happens when a schema drops a column that has historical rows populated for it. Because day-1 no agent has ever diverged, the rule is "the first divergence owns the problem."
 
 #### Active Behavior: Decision endpoint idempotency (not a seam)
 

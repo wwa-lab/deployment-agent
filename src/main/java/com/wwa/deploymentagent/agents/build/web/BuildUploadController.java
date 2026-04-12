@@ -5,9 +5,13 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.UploadResponseDto;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.fileimport.ImportService;
+import com.wwa.deploymentagent.domain.fileimport.TemplateSchema;
+import com.wwa.deploymentagent.domain.fileimport.UploadTemplateService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +37,7 @@ public class BuildUploadController {
     private static final String FORCED_STAGE = "DEV";
 
     private final ImportService importService;
+    private final UploadTemplateService uploadTemplateService;
 
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<UploadResponseDto> upload(
@@ -58,6 +63,21 @@ public class BuildUploadController {
                 application,
                 AgentId.BUILD_AGENT);
         return ResponseEntity.ok(UploadResponseDto.from(result));
+    }
+
+    @GetMapping("/template")
+    public ResponseEntity<byte[]> downloadTemplate(
+            @AuthenticationPrincipal UserContext user) throws IOException {
+        validateUploadRole(user);
+
+        TemplateSchema schema = uploadTemplateService.resolveSchema(AgentId.BUILD_AGENT);
+        byte[] bytes = uploadTemplateService.generateTemplate(AgentId.BUILD_AGENT);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + schema.fileName() + "\"")
+                .body(bytes);
     }
 
     private void validateUploadRole(UserContext user) {

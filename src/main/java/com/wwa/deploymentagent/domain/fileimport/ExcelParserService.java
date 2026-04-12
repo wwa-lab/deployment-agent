@@ -20,7 +20,14 @@ import java.util.*;
 @Service
 public class ExcelParserService {
 
-    static final String SHEET_NAME = "AMH_HCC_task";
+    /**
+     * MVP sheet name. Derived from the default template schema so that the
+     * generator and parser cannot drift. When a future agent registers its
+     * own schema with a different sheet name in {@link TemplateSchemaRegistry},
+     * the parser will need to accept an {@code agentId} parameter and resolve
+     * its sheet name from the registry as well — left for that change.
+     */
+    static final String SHEET_NAME = TemplateSchemaRegistry.DEFAULT_SCHEMA.sheetName();
 
     public ParseResult parse(byte[] fileBytes) throws IOException {
         List<ParsedTaskRow> rows = new ArrayList<>();

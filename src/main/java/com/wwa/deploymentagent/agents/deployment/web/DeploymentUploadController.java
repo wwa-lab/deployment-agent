@@ -5,9 +5,13 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.UploadResponseDto;
 import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.fileimport.ImportService;
+import com.wwa.deploymentagent.domain.fileimport.TemplateSchema;
+import com.wwa.deploymentagent.domain.fileimport.UploadTemplateService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +28,10 @@ import java.io.IOException;
  *
  * <p>Authorization: DEVELOPER, TL, or DEVOPS_ADMIN role.
  * <p>Agent is always forced to {@link AgentId#DEPLOYMENT_AGENT} regardless of client param.
- * <p>Template download moved to {@code GET /api/platform/upload/template} in BA-T15.
+ * <p>Template download: {@code GET /api/deployment-agent/upload/template} resolves
+ * this agent's template schema from the registry. The legacy platform-level
+ * route {@code GET /api/platform/upload/template} is kept as the default-schema
+ * fallback for backwards compatibility.
  */
 @RestController
 @RequestMapping("/api/deployment-agent/upload")
@@ -32,6 +39,7 @@ import java.io.IOException;
 public class DeploymentUploadController {
 
     private final ImportService importService;
+    private final UploadTemplateService uploadTemplateService;
 
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<UploadResponseDto> upload(
@@ -63,6 +71,21 @@ public class DeploymentUploadController {
                 application,
                 AgentId.DEPLOYMENT_AGENT);
         return ResponseEntity.ok(UploadResponseDto.from(result));
+    }
+
+    @GetMapping("/template")
+    public ResponseEntity<byte[]> downloadTemplate(
+            @AuthenticationPrincipal UserContext user) throws IOException {
+        validateUploadRole(user);
+
+        TemplateSchema schema = uploadTemplateService.resolveSchema(AgentId.DEPLOYMENT_AGENT);
+        byte[] bytes = uploadTemplateService.generateTemplate(AgentId.DEPLOYMENT_AGENT);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + schema.fileName() + "\"")
+                .body(bytes);
     }
 
     private void validateUploadRole(UserContext user) {
