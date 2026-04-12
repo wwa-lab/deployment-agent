@@ -128,13 +128,13 @@ function submit() {
 }
 
 .optional {
-  color: #64748b;
+  color: var(--color-text-muted);
   font-weight: 400;
 }
 
 .field-hint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.5;
 }
 </style>

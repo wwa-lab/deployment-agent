@@ -1280,17 +1280,17 @@ onUnmounted(() => {
 .field-value {
   font-size: 14px;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .field-note {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   max-width: 320px;
   line-height: 1.4;
 }
 
-.mono { font-family: monospace; }
+.mono { font-family: var(--font-mono); }
 
 .tabs {
   display: flex;
@@ -1307,7 +1307,7 @@ onUnmounted(() => {
   border-bottom: 2px solid transparent;
   font-size: 14px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--color-text-muted);
   cursor: pointer;
   margin-bottom: -1px;
   display: flex;
@@ -1315,7 +1315,7 @@ onUnmounted(() => {
   gap: 4px;
 }
 
-.tab-btn:hover { color: #1e293b; }
+.tab-btn:hover { color: var(--color-text-primary); }
 .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
 
 .requests-section {
@@ -1339,14 +1339,14 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 18px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   border-bottom: 1px solid #e2e8f0;
 }
 
 .rundown-title {
   font-size: 15px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .rundown-head-actions {
@@ -1375,7 +1375,7 @@ onUnmounted(() => {
   margin-bottom: 14px;
   font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .rundown-info-grid {
@@ -1392,13 +1392,13 @@ onUnmounted(() => {
   margin-right: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .rundown-field-value {
   font-size: 14px;
   font-weight: 500;
-  color: #334155;
+  color: var(--color-text-secondary);
   word-break: break-word;
 }
 
@@ -1441,7 +1441,7 @@ onUnmounted(() => {
   gap: 6px;
   font-size: 12px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .mix-dot {
@@ -1481,13 +1481,13 @@ onUnmounted(() => {
 .rundown-progress-label {
   font-size: 13px;
   font-weight: 600;
-  color: #334155;
+  color: var(--color-text-secondary);
   margin-bottom: 6px;
 }
 
 .rundown-progress-value {
   font-size: 14px;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .rundown-request-actions {
@@ -1501,7 +1501,7 @@ onUnmounted(() => {
   margin-bottom: 14px;
   padding: 16px 18px;
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   border: 1px solid #e2e8f0;
 }
 
@@ -1516,13 +1516,13 @@ onUnmounted(() => {
 .task-dependency-title {
   font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .task-dependency-copy {
   margin-top: 4px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.5;
 }
 
@@ -1541,14 +1541,14 @@ onUnmounted(() => {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
 }
 
 .task-dependency-value {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .task-dependency-warning {
@@ -1655,12 +1655,12 @@ onUnmounted(() => {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: white;
-  color: #334155;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
 .decision-select:disabled {
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   color: #94a3b8;
   cursor: not-allowed;
 }
@@ -1678,19 +1678,19 @@ onUnmounted(() => {
 .result-panel-title {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 6px;
 }
 
 .result-pre {
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   padding: 10px;
   font-size: 12px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 200px;
@@ -1706,13 +1706,13 @@ onUnmounted(() => {
   gap: 20px;
   margin-top: 12px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .external-link-section {
   margin-top: 16px;
   padding: 12px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   border: 1px solid #e2e8f0;
   border-radius: 6px;
 }

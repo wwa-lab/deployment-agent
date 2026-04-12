@@ -1090,14 +1090,14 @@ function displayValue(value?: string) {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .view-title {
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .view-subtitle {
@@ -1105,7 +1105,7 @@ function displayValue(value?: string) {
   max-width: 720px;
   font-size: 14px;
   line-height: 1.6;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .mode-tabs {
@@ -1119,7 +1119,7 @@ function displayValue(value?: string) {
   border: none;
   border-radius: 12px 12px 0 0;
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1149,8 +1149,8 @@ function displayValue(value?: string) {
 }
 
 .helper-banner-muted {
-  color: #475569;
-  background: #f8fafc;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-secondary);
   border-color: #e2e8f0;
 }
 
@@ -1186,7 +1186,7 @@ function displayValue(value?: string) {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .toolbar-actions {
@@ -1211,13 +1211,13 @@ function displayValue(value?: string) {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .section-subtitle {
   margin: 6px 0 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .table-container {
@@ -1227,7 +1227,7 @@ function displayValue(value?: string) {
 .component-name {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .component-description {
@@ -1235,7 +1235,7 @@ function displayValue(value?: string) {
   max-width: 320px;
   font-size: 12px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .endpoint-cell {
@@ -1245,7 +1245,7 @@ function displayValue(value?: string) {
 
 .config-item-name {
   font-size: 13px;
-  color: #0f172a;
+  color: var(--color-text-primary);
   white-space: nowrap;
 }
 
@@ -1253,7 +1253,7 @@ function displayValue(value?: string) {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .config-value-cell {
@@ -1263,7 +1263,7 @@ function displayValue(value?: string) {
 .config-value-text {
   max-width: 420px;
   word-break: break-word;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .status-badge,
@@ -1321,12 +1321,12 @@ function displayValue(value?: string) {
 }
 
 .mono {
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .timestamp {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 

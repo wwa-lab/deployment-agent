@@ -1483,21 +1483,21 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .view-title {
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .view-subtitle {
   margin: 8px 0 0;
   max-width: 760px;
   font-size: 14px;
-  color: #475569;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
@@ -1516,7 +1516,7 @@ onBeforeUnmount(() => {
   margin: 8px 0 0;
   font-size: 14px;
   line-height: 1.6;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .scope-template-count {
@@ -1540,7 +1540,7 @@ onBeforeUnmount(() => {
   padding: 14px 16px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
 }
 
 .scope-summary-label {
@@ -1548,14 +1548,14 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .scope-summary-value {
   margin-top: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .template-layout {
@@ -1573,7 +1573,7 @@ onBeforeUnmount(() => {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .filter-stack {
@@ -1636,24 +1636,24 @@ onBeforeUnmount(() => {
 .table-feedback {
   margin: 10px 0 0;
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .panel-title {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .template-name-cell {
   min-width: 220px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .mono-cell {
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .category-pill,
@@ -1688,15 +1688,15 @@ onBeforeUnmount(() => {
 
 .description-cell {
   min-width: 260px;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .empty-task-state {
   padding: 16px;
   border: 1px dashed #cbd5e1;
   border-radius: 10px;
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
   font-size: 14px;
   line-height: 1.6;
   display: flex;
@@ -1744,14 +1744,14 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #334155;
+  color: var(--color-text-secondary);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
 
 .more-menu-item:hover {
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
 }
 
 .more-menu-item-danger {
@@ -1796,7 +1796,7 @@ onBeforeUnmount(() => {
 .detail-section-title {
   font-size: 16px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .details-grid {
@@ -1819,12 +1819,12 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .detail-value {
   font-size: 14px;
-  color: #334155;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
@@ -1847,14 +1847,14 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .dependency-summary-value {
   margin-top: 8px;
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .dependency-map {
@@ -1893,7 +1893,7 @@ onBeforeUnmount(() => {
 .dependency-map-title {
   font-size: 15px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .dependency-map-row,
@@ -1913,7 +1913,7 @@ onBeforeUnmount(() => {
   padding-top: 2px;
   font-size: 12px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--color-text-muted);
   text-transform: uppercase;
 }
 

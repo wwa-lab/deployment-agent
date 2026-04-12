@@ -319,7 +319,7 @@ function submit() {
 .summary-item {
   padding: 12px 14px;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   border: 1px solid #e2e8f0;
 }
 
@@ -329,20 +329,20 @@ function submit() {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
 }
 
 .summary-value {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .field-hint {
   margin: 6px 0 0;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .form-row {

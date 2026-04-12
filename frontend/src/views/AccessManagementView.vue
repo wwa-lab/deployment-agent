@@ -382,14 +382,14 @@ function statusClass(status: AccessGrantStatus) {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .view-title {
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .view-subtitle {
@@ -397,7 +397,7 @@ function statusClass(status: AccessGrantStatus) {
   max-width: 760px;
   font-size: 14px;
   line-height: 1.6;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .helper-banner {
@@ -409,8 +409,8 @@ function statusClass(status: AccessGrantStatus) {
 }
 
 .helper-banner-muted {
-  color: #475569;
-  background: #f8fafc;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-secondary);
 }
 
 .helper-banner-warn {
@@ -450,7 +450,7 @@ function statusClass(status: AccessGrantStatus) {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .toolbar-actions {
@@ -464,7 +464,7 @@ function statusClass(status: AccessGrantStatus) {
   border-radius: 16px;
   background: white;
   border: 1px dashed #cbd5e1;
-  color: #64748b;
+  color: var(--color-text-muted);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -482,13 +482,13 @@ function statusClass(status: AccessGrantStatus) {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .section-subtitle {
   margin: 6px 0 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .table-scroll {
@@ -514,22 +514,22 @@ function statusClass(status: AccessGrantStatus) {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .primary-cell {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .cell-meta {
   margin-top: 4px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 .status-badge,
@@ -591,7 +591,7 @@ function statusClass(status: AccessGrantStatus) {
 
 .pagination-info {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .pagination-controls {

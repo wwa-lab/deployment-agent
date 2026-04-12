@@ -568,13 +568,13 @@ async function handleLogin() {
 .login-title {
   font-size: 24px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin: 10px 0 6px;
 }
 
 .login-subtitle {
   font-size: 14px;
-  color: #5f6f8c;
+  color: var(--color-text-secondary);
 }
 
 .login-form {
@@ -594,7 +594,7 @@ async function handleLogin() {
 .form-label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .form-input {
@@ -602,7 +602,7 @@ async function handleLogin() {
   border: 1px solid #d8e3f3;
   border-radius: 10px;
   font-size: 14px;
-  color: #1e293b;
+  color: var(--color-text-primary);
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
@@ -618,7 +618,7 @@ async function handleLogin() {
 .field-hint {
   margin: 0;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .btn-full {
@@ -665,7 +665,7 @@ async function handleLogin() {
 .login-guest-hint {
   margin: 0;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   text-align: center;
   line-height: 1.5;
 }

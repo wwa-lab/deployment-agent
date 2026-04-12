@@ -437,8 +437,8 @@ function submit() {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
 }
@@ -446,7 +446,7 @@ function submit() {
 .field-hint {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .directory-feedback {
@@ -455,7 +455,7 @@ function submit() {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .directory-feedback-error {
@@ -501,12 +501,12 @@ function submit() {
 .directory-option-name {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .directory-option-id {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .directory-chip {
@@ -544,8 +544,8 @@ function submit() {
   margin-top: 10px;
   padding: 12px;
   border-radius: 10px;
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 

@@ -348,7 +348,7 @@ const workspaceAgent = buildAgentDescriptor
 .view-title {
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
@@ -358,13 +358,13 @@ const workspaceAgent = buildAgentDescriptor
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .view-subtitle {
   margin: 8px 0 0;
   font-size: 14px;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .filter-bar {
@@ -390,7 +390,7 @@ const workspaceAgent = buildAgentDescriptor
 }
 
 .release-id {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   color: #2563eb;
 }
@@ -403,19 +403,19 @@ const workspaceAgent = buildAgentDescriptor
   min-width: 140px;
   white-space: nowrap;
   font-weight: 600;
-  color: #334155;
+  color: var(--color-text-secondary);
 }
 
 .scope-primary {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .scope-meta {
   margin-top: 4px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .archive-chip,
@@ -447,7 +447,7 @@ const workspaceAgent = buildAgentDescriptor
 
 .pagination-info {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .pagination-controls {

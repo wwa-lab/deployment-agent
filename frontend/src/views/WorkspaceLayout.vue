@@ -655,12 +655,12 @@ watch(
 .topbar-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .breadcrumb-workspace {
   font-weight: 400;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .breadcrumb-sep {
@@ -705,7 +705,7 @@ watch(
 
 .finblock-topbar-link {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   text-decoration: none;
   border: 1px solid #e2e8f0;
   padding: 4px 10px;
@@ -720,7 +720,7 @@ watch(
 
 .user-name {
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 

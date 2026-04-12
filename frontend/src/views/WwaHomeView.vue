@@ -242,21 +242,21 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   font-family: var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
 }
 
 .home-title {
   font-size: 30px;
   font-weight: 700;
-  color: #17294a;
+  color: var(--color-text-primary);
   margin: 0 0 8px;
   letter-spacing: -0.02em;
 }
 
 .home-subtitle {
   font-size: 15px;
-  color: #566989;
+  color: var(--color-text-secondary);
   margin: 0;
   max-width: 60ch;
 }
@@ -276,7 +276,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 .home-user-name {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .home-user-role {
@@ -492,7 +492,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   font-family: var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin: 0 0 16px;
 }
 
@@ -560,13 +560,13 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 .agent-card-name {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .agent-card-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .agent-card-arrow {
@@ -590,7 +590,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(247, 250, 255, 0.78) 100%);
   border: 1px solid rgba(221, 231, 247, 0.94);
   border-radius: 14px;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;

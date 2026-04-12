@@ -161,7 +161,7 @@ function statusBadgeClass(status: string): string {
 <style scoped>
 .task-info {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 16px;
   display: flex;
   align-items: center;
@@ -171,7 +171,7 @@ function statusBadgeClass(status: string): string {
 
 .info-label {
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .decision-list {
@@ -193,7 +193,7 @@ function statusBadgeClass(status: string): string {
 
 .decision-option:hover {
   border-color: #94a3b8;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
 }
 
 .decision-option.selected.decision-approve {
@@ -213,7 +213,7 @@ function statusBadgeClass(status: string): string {
 
 .decision-option.selected.decision-skip {
   border-color: #94a3b8;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
 }
 
 .radio-input {
@@ -230,11 +230,11 @@ function statusBadgeClass(status: string): string {
 .decision-label {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .decision-desc {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 </style>

@@ -315,7 +315,7 @@ async function submit() {
 
 .field-hint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 
@@ -328,7 +328,7 @@ async function submit() {
 
 .scope-preview-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .scope-preview-value {

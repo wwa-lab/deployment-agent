@@ -299,15 +299,15 @@ async function submit() {
   height: 36px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   font-size: 20px;
   line-height: 1;
 }
 
 .field-hint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .dependency-option-grid {
@@ -323,8 +323,8 @@ async function submit() {
   padding: 10px 12px;
   border: 1px solid #dbe2ea;
   border-radius: 10px;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .dependency-option.selected {
@@ -341,9 +341,9 @@ async function submit() {
   padding: 12px;
   border: 1px dashed #cbd5e1;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 760px) {

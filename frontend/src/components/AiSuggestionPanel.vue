@@ -112,20 +112,20 @@ const mockLine = computed(() =>
 
 .ai-body {
   font-size: 12.5px;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .ai-headline {
   font-size: 13px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .ai-mock {
   margin: 0 0 8px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 

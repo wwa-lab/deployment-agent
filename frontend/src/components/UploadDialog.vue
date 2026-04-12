@@ -412,13 +412,13 @@ function close() {
 }
 
 .optional {
-  color: #64748b;
+  color: var(--color-text-muted);
   font-weight: 400;
 }
 
 .file-name {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-top: 4px;
 }
 
@@ -436,7 +436,7 @@ function close() {
 
 .field-hint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 
@@ -449,8 +449,8 @@ function close() {
   padding: 8px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
   display: flex;
   align-items: center;
 }

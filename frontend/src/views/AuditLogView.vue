@@ -406,7 +406,7 @@ function scopeValue(value?: string): string {
   padding: 8px 18px;
   font-size: 13px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--color-text-muted);
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -416,7 +416,7 @@ function scopeValue(value?: string): string {
 }
 
 .scope-tab:hover {
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .scope-tab.active {
@@ -436,13 +436,13 @@ function scopeValue(value?: string): string {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .view-title {
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
@@ -451,7 +451,7 @@ function scopeValue(value?: string): string {
   max-width: 760px;
   font-size: 14px;
   line-height: 1.6;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .helper-banner {
@@ -465,8 +465,8 @@ function scopeValue(value?: string): string {
 }
 
 .helper-banner-muted {
-  color: #475569;
-  background: #f8fafc;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-secondary);
   border-color: #e2e8f0;
 }
 
@@ -497,7 +497,7 @@ function scopeValue(value?: string): string {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .toolbar-actions {
@@ -518,13 +518,13 @@ function scopeValue(value?: string): string {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .section-subtitle {
   margin: 6px 0 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .table-scroll {
@@ -533,12 +533,12 @@ function scopeValue(value?: string): string {
 
 .user-name {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .timestamp {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
@@ -551,7 +551,7 @@ function scopeValue(value?: string): string {
 
 .type-label {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .result-badge {
@@ -593,7 +593,7 @@ function scopeValue(value?: string): string {
   gap: 8px;
   align-items: baseline;
   line-height: 1.5;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .scope-line + .scope-line {
@@ -605,11 +605,11 @@ function scopeValue(value?: string): string {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .detail-text {
-  color: #0f172a;
+  color: var(--color-text-primary);
   line-height: 1.6;
 }
 
@@ -617,11 +617,11 @@ function scopeValue(value?: string): string {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .mono {
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .pagination {
@@ -634,7 +634,7 @@ function scopeValue(value?: string): string {
 
 .pagination-info {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .pagination-controls {
