@@ -6,6 +6,11 @@ export async function login(employeeId: string, password: string): Promise<AuthR
   return response.data
 }
 
+export async function loginAsGuest(): Promise<AuthResponse> {
+  const response = await platformClient.post('/auth/guest')
+  return response.data
+}
+
 export async function logout(): Promise<void> {
   await platformClient.post('/auth/logout')
 }

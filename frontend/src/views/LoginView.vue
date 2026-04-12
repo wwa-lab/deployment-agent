@@ -10,6 +10,20 @@ const employeeId = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const guestLoading = ref(false)
+
+async function handleGuestLogin() {
+  error.value = ''
+  guestLoading.value = true
+  try {
+    await userStore.loginAsGuest()
+    router.push('/wwa/home')
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Unable to start guest session'
+  } finally {
+    guestLoading.value = false
+  }
+}
 
 async function handleLogin() {
   error.value = ''
@@ -152,10 +166,25 @@ async function handleLogin() {
             <p class="field-hint">For local testing, any non-empty password works.</p>
           </div>
 
-          <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
+          <button type="submit" class="btn btn-primary btn-full" :disabled="loading || guestLoading">
             {{ loading ? 'Signing in...' : 'Sign In' }}
           </button>
         </form>
+
+        <div class="login-guest">
+          <span class="login-guest-divider">or</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-full login-guest-btn"
+            :disabled="loading || guestLoading"
+            @click="handleGuestLogin"
+          >
+            {{ guestLoading ? 'Entering...' : 'Continue as Guest (read-only)' }}
+          </button>
+          <p class="login-guest-hint">
+            No account needed. Browse every page read-only — uploads, executions, and edits are disabled.
+          </p>
+        </div>
 
         <div class="login-hint">
           <p>Dev accounts: emp-001 (Developer), emp-002 (TL), emp-003 (DevOps Admin), emp-004 (Audit), emp-005 (Management)</p>
@@ -606,6 +635,39 @@ async function handleLogin() {
   border-radius: 10px;
   font-size: 13px;
   border: 1px solid #fecaca;
+}
+
+.login-guest {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.login-guest-divider {
+  align-self: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.login-guest-btn {
+  padding: 10px;
+  justify-content: center;
+}
+
+.login-guest-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .login-hint {

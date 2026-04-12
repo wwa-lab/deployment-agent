@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.config;
 
+import com.wwa.deploymentagent.web.security.GuestReadOnlyFilter;
 import com.wwa.deploymentagent.web.security.HeaderAuthFilter;
 import com.wwa.deploymentagent.web.security.SessionAuthFilter;
 import org.springframework.context.annotation.Bean;
@@ -27,19 +28,22 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                     SessionAuthFilter sessionAuthFilter,
-                                                    HeaderAuthFilter headerAuthFilter) throws Exception {
+                                                    HeaderAuthFilter headerAuthFilter,
+                                                    GuestReadOnlyFilter guestReadOnlyFilter) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/platform/auth/login").permitAll()
+                    .requestMatchers("/api/platform/auth/guest").permitAll()
                     .anyRequest().authenticated())
             .exceptionHandling(ex -> ex
                     .authenticationEntryPoint((request, response, authException) ->
                             response.sendError(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED)))
             .addFilterBefore(sessionAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(headerAuthFilter, SessionAuthFilter.class);
+            .addFilterAfter(headerAuthFilter, SessionAuthFilter.class)
+            .addFilterAfter(guestReadOnlyFilter, HeaderAuthFilter.class);
 
         return http.build();
     }

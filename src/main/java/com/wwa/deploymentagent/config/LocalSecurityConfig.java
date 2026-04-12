@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.config;
 
+import com.wwa.deploymentagent.web.security.GuestReadOnlyFilter;
 import com.wwa.deploymentagent.web.security.HeaderAuthFilter;
 import com.wwa.deploymentagent.web.security.SessionAuthFilter;
 import org.springframework.context.annotation.Bean;
@@ -17,14 +18,16 @@ public class LocalSecurityConfig {
     @Bean
     public SecurityFilterChain localSecurityFilterChain(HttpSecurity http,
                                                         SessionAuthFilter sessionAuthFilter,
-                                                        HeaderAuthFilter headerAuthFilter) throws Exception {
+                                                        HeaderAuthFilter headerAuthFilter,
+                                                        GuestReadOnlyFilter guestReadOnlyFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 .addFilterBefore(sessionAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(headerAuthFilter, SessionAuthFilter.class);
+                .addFilterAfter(headerAuthFilter, SessionAuthFilter.class)
+                .addFilterAfter(guestReadOnlyFilter, HeaderAuthFilter.class);
 
         return http.build();
     }

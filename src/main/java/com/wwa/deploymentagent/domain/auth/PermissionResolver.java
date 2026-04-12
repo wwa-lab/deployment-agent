@@ -81,6 +81,15 @@ public class PermissionResolver {
                 PermissionKey.AUDIT_VIEW,
                 PermissionKey.PLATFORM_AUDIT_VIEW
         ));
+        // Guest is a global anonymous viewer. Grant enough permissions for
+        // nav/page rendering only; all write endpoints are blocked upstream
+        // by GuestReadOnlyFilter regardless of permissions.
+        permissions.put(Role.GUEST, Set.of(
+                PermissionKey.PLATFORM_ENTER,
+                PermissionKey.RELEASE_VIEW,
+                PermissionKey.AUDIT_VIEW,
+                PermissionKey.PLATFORM_AUDIT_VIEW
+        ));
 
         return Map.copyOf(permissions);
     }

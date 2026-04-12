@@ -275,9 +275,18 @@ watch(
             ← WWA Home
           </router-link>
           <a :href="FINBLOCK_URL" class="finblock-topbar-link" title="Return to FinBlock">← FinBlock</a>
+          <span
+            v-if="userStore.isGuest"
+            class="guest-readonly-badge"
+            title="Guest mode is read-only. Sign in to perform actions."
+          >
+            👁 Read-only preview
+          </span>
           <span class="user-name">{{ userStore.displayName || userStore.userId }}</span>
           <span class="badge badge-role">{{ userStore.role }}</span>
-          <button class="btn btn-secondary btn-sm" @click="handleLogout">Logout</button>
+          <button class="btn btn-secondary btn-sm" @click="handleLogout">
+            {{ userStore.isGuest ? 'Exit' : 'Logout' }}
+          </button>
         </div>
       </header>
       <main class="main-content">
@@ -713,6 +722,22 @@ watch(
   font-size: 13px;
   color: #374151;
   font-weight: 500;
+}
+
+.guest-readonly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid #fcd34d;
 }
 
 .main-content {
