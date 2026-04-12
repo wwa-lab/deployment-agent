@@ -4,10 +4,12 @@ import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.*;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
+import com.wwa.deploymentagent.domain.fileimport.ImportResult;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowFilter;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
+import com.wwa.deploymentagent.domain.releaseflow.TemplateRundownCreationService;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
 import com.wwa.deploymentagent.errors.ValidationAppException;
 import com.wwa.deploymentagent.platform.web.security.AgentBoundaryGuard;
@@ -26,8 +28,9 @@ import java.util.Map;
  * Build Agent release flow controller (BA-T21).
  *
  * <pre>
- *   GET /api/build-agent/release-flows           – DEV-stage list scoped to build-agent
- *   GET /api/build-agent/release-flows/:id       – single flow detail (no stitching)
+ *   GET  /api/build-agent/release-flows           – DEV-stage list scoped to build-agent
+ *   GET  /api/build-agent/release-flows/:id      – single flow detail (no stitching)
+ *   POST /api/build-agent/release-flows/from-template – create from template (forces DEV + build-agent)
  * </pre>
  *
  * <p>PL-6 boundary: every endpoint forces {@code agent = "build-agent"} server-side.
@@ -38,7 +41,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BuildReleaseFlowController {
 
+    private static final String FORCED_STAGE = "DEV";
+
     private final ReleaseFlowService releaseFlowService;
+    private final TemplateRundownCreationService templateRundownCreationService;
     private final AgentBoundaryGuard boundaryGuard;
 
     @GetMapping
@@ -161,6 +167,23 @@ public class BuildReleaseFlowController {
         boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
         validateRequestScope(user, findRequestForScopeValidation(flowId, requestId, true), "purge_rundown");
         return ResponseEntity.ok(releaseFlowService.purgeArchivedRequestRundown(flowId, requestId, user));
+    }
+
+    @PostMapping("/from-template")
+    public ResponseEntity<UploadResponseDto> createFromTemplate(
+            @RequestBody CreateRundownFromTemplateDto body,
+            @AuthenticationPrincipal UserContext user) {
+        validateRundownEditor(user);
+        CreateRundownFromTemplateDto forced = new CreateRundownFromTemplateDto(
+                body.templateId(), body.templateName(),
+                body.projectId(), body.projectName(),
+                FORCED_STAGE, body.releaseId(),
+                body.snowGroup(), body.application(),
+                AgentId.BUILD_AGENT, body.site(),
+                body.owner(), body.estimatedRemainingMinutes(),
+                body.tasks());
+        ImportResult result = templateRundownCreationService.createRundown(forced, user);
+        return ResponseEntity.ok(UploadResponseDto.from(result));
     }
 
     @GetMapping("/{id}")

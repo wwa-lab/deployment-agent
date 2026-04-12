@@ -1,5 +1,6 @@
 import { buildClient } from './index'
 import type {
+  CreateRundownFromTemplateInput,
   PaginatedResponse,
   ReleaseFlowDetail,
   ReleaseFlowListItem,
@@ -37,6 +38,13 @@ export async function getReleaseFlow(
   params?: { includeArchived?: boolean },
 ): Promise<ReleaseFlowDetail> {
   const response = await buildClient.get(`/release-flows/${id}`, { params })
+  return response.data
+}
+
+export async function createRundownFromTemplate(
+  input: CreateRundownFromTemplateInput,
+): Promise<UploadResponse> {
+  const response = await buildClient.post('/release-flows/from-template', input)
   return response.data
 }
 
