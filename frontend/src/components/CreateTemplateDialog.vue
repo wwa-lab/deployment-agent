@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useUserStore } from '../stores/user'
-import { downloadTemplate } from '../api/upload'
+import { downloadTemplate } from '../api/template'
 import type { CreateTemplateDraft } from '../types'
 
 const props = defineProps<{
@@ -444,7 +444,7 @@ async function createUploadTemplate() {
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -484,7 +484,7 @@ async function createUploadTemplate() {
 .section-title {
   font-size: 15px;
   font-weight: 700;
-  color: #334155;
+  color: var(--color-text-secondary);
 }
 
 .duration-input {
@@ -503,15 +503,15 @@ async function createUploadTemplate() {
   height: 36px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   font-size: 20px;
   line-height: 1;
 }
 
 .field-hint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .textarea-control {
@@ -530,7 +530,7 @@ async function createUploadTemplate() {
   border: 1px solid #dbeafe;
   border-radius: 10px;
   background: #f8fbff;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -539,7 +539,7 @@ async function createUploadTemplate() {
   margin-bottom: 4px;
   font-size: 14px;
   font-weight: 700;
-  color: #334155;
+  color: var(--color-text-secondary);
 }
 
 .upload-tab {
@@ -576,12 +576,12 @@ async function createUploadTemplate() {
   padding: 40px 20px;
   border: 1px dashed #cbd5e1;
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
 }
 
 .upload-file-name {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .sr-only {

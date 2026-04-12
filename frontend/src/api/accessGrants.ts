@@ -1,4 +1,4 @@
-import apiClient from './client'
+import platformClient from './platformClient'
 import type {
   AccessGrant,
   AccessGrantDirectoryCandidate,
@@ -16,12 +16,12 @@ type ListParams = {
 }
 
 export async function listAccessGrants(params: ListParams): Promise<PaginatedResponse<AccessGrant>> {
-  const response = await apiClient.get('/access-grants', { params })
+  const response = await platformClient.get('/access-grants', { params })
   return response.data
 }
 
 export async function searchAccessGrantDirectory(query: string, limit = 8): Promise<AccessGrantDirectoryCandidate[]> {
-  const response = await apiClient.get('/access-grants/directory', {
+  const response = await platformClient.get('/access-grants/directory', {
     params: { query, limit },
   })
   return response.data
@@ -35,7 +35,7 @@ export async function createAccessGrant(input: {
   scopeGrants: AccessScope[]
   note?: string
 }): Promise<AccessGrant> {
-  const response = await apiClient.post('/access-grants', input)
+  const response = await platformClient.post('/access-grants', input)
   return response.data
 }
 
@@ -45,7 +45,7 @@ export async function updateAccessGrant(input: {
   scopeGrants: AccessScope[]
   note?: string
 }): Promise<AccessGrant> {
-  const response = await apiClient.patch(`/access-grants/${input.employeeId}`, {
+  const response = await platformClient.patch(`/access-grants/${input.employeeId}`, {
     assignedRoles: input.assignedRoles,
     scopeGrants: input.scopeGrants,
     note: input.note,
@@ -57,7 +57,7 @@ export async function suspendAccessGrant(input: {
   employeeId: string
   note?: string
 }): Promise<AccessGrant> {
-  const response = await apiClient.post(`/access-grants/${input.employeeId}/suspend`, {
+  const response = await platformClient.post(`/access-grants/${input.employeeId}/suspend`, {
     note: input.note,
   })
   return response.data
@@ -69,7 +69,7 @@ export async function reactivateAccessGrant(input: {
   scopeGrants: AccessScope[]
   note?: string
 }): Promise<AccessGrant> {
-  const response = await apiClient.post(`/access-grants/${input.employeeId}/reactivate`, {
+  const response = await platformClient.post(`/access-grants/${input.employeeId}/reactivate`, {
     assignedRoles: input.assignedRoles,
     scopeGrants: input.scopeGrants,
     note: input.note,

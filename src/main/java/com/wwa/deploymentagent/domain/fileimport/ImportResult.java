@@ -1,11 +1,9 @@
 package com.wwa.deploymentagent.domain.fileimport;
 
-import com.wwa.deploymentagent.contracts.enums.Stage;
-
 public record ImportResult(
         String releaseFlowId,
         String releaseId,
-        Stage stage,
+        String stage,
         int taskCount,
         String snowGroup,
         String application,

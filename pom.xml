@@ -54,6 +54,18 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Flyway – schema migration authority for Oracle (dev profile).
+             Intentionally NOT used by local/test profiles, which keep
+             Hibernate DDL auto for fast iteration. See application.properties. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-oracle</artifactId>
+        </dependency>
+
         <!-- Apache POI – Excel parsing -->
         <dependency>
             <groupId>org.apache.poi</groupId>
@@ -83,6 +95,12 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.3.0</version>
             <scope>test</scope>
         </dependency>
 <!--        <dependency>-->

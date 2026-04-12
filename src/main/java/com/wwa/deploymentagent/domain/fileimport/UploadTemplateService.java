@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.fileimport;
 
+import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -8,54 +9,75 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Generates a valid starter workbook that callers can download and fill in.
+ *
+ * <p>The concrete schema (sheet name, column headers, sample row, downloadable
+ * file name) is resolved from {@link TemplateSchemaRegistry} so that the
+ * template for a given agent is defined in exactly one place and stays in
+ * sync with any future per-agent customization.
+ *
+ * <p>MVP Foundation Seam — the no-arg {@link #generateTemplate()} overload is
+ * preserved for existing callers (including test fixtures) and returns the
+ * default schema bytes.
  */
 @Service
+@RequiredArgsConstructor
 public class UploadTemplateService {
 
-    private static final String[] HEADERS = {
-            "Project ID", "Project Name", "Task ID", "Task Name",
-            "Step seq#", "Step", "Execution Type",
-            "Script to be executed", "Parameter (input)",
-            "Parameter (Expected Output)", "Owner",
-            "Planned Start date/time", "Planned End date/time",
-            "Activity category", "Common", "Dependencies", "Validation", "Critical",
-            "Status", "Start date/time", "End date/time"
-    };
+    private final TemplateSchemaRegistry schemaRegistry;
 
+    /**
+     * Generates the default (shared) template. Kept for backwards compatibility
+     * with existing tests and the legacy {@code /api/platform/upload/template}
+     * route; per-agent callers should prefer {@link #generateTemplate(String)}.
+     */
     public byte[] generateTemplate() throws IOException {
+        return generateFromSchema(TemplateSchemaRegistry.DEFAULT_SCHEMA);
+    }
+
+    /**
+     * Generates the template bytes for a specific agent. Day-1 this returns
+     * the same bytes as {@link #generateTemplate()} for every agent because
+     * all agents share the default schema, but callers should route through
+     * this overload so future per-agent divergence is picked up automatically.
+     */
+    public byte[] generateTemplate(String agentId) throws IOException {
+        return generateFromSchema(schemaRegistry.resolve(agentId));
+    }
+
+    /**
+     * Exposes the resolved schema for callers that need both the bytes and
+     * metadata such as the downloadable file name (used by the HTTP layer to
+     * populate the {@code Content-Disposition} header).
+     */
+    public TemplateSchema resolveSchema(String agentId) {
+        return schemaRegistry.resolve(agentId);
+    }
+
+    private byte[] generateFromSchema(TemplateSchema schema) throws IOException {
+        List<String> headers = schema.headers();
+        List<String> sampleRow = schema.sampleRow();
+
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet(ExcelParserService.SHEET_NAME);
+            Sheet sheet = workbook.createSheet(schema.sheetName());
 
             Row header = sheet.createRow(0);
-            for (int i = 0; i < HEADERS.length; i++) {
-                header.createCell(i).setCellValue(HEADERS[i]);
+            for (int i = 0; i < headers.size(); i++) {
+                header.createCell(i).setCellValue(headers.get(i));
             }
 
-            Row sample = sheet.createRow(1);
-            sample.createCell(0).setCellValue("WF-PROJ-001");
-            sample.createCell(1).setCellValue("Workflow Project");
-            sample.createCell(2).setCellValue("TG-001");
-            sample.createCell(3).setCellValue("Deploy Application");
-            sample.createCell(4).setCellValue("1");
-            sample.createCell(5).setCellValue("deploy-step-1");
-            sample.createCell(6).setCellValue("MANUAL");
-            sample.createCell(7).setCellValue("deploy.sh");
-            sample.createCell(8).setCellValue("--env uat");
-            sample.createCell(9).setCellValue("Deployment succeeds");
-            sample.createCell(10).setCellValue("alice");
-            sample.createCell(11).setCellValue("2026-03-22T09:00:00Z");
-            sample.createCell(12).setCellValue("2026-03-22T09:30:00Z");
-            sample.createCell(13).setCellValue("Application");
-            sample.createCell(14).setCellValue("N");
-            sample.createCell(15).setCellValue("DB ready");
-            sample.createCell(16).setCellValue("Smoke test passes");
-            sample.createCell(17).setCellValue("Y");
+            if (!sampleRow.isEmpty()) {
+                Row sample = sheet.createRow(1);
+                for (int i = 0; i < sampleRow.size(); i++) {
+                    sample.createCell(i).setCellValue(sampleRow.get(i));
+                }
+            }
 
-            for (int i = 0; i < HEADERS.length; i++) {
+            for (int i = 0; i < headers.size(); i++) {
                 sheet.autoSizeColumn(i);
             }
 

@@ -1,7 +1,7 @@
-# Deployment Agent UAT Runbook
+# WWA UAT Runbook
 
 > **Audience:** Delivery lead, DevOps engineer, backend engineer, frontend engineer, UAT coordinator  
-> **Purpose:** Bring Deployment Agent into an internal/UAT environment in a controlled way and verify the product in the order `Database -> Backend -> Frontend -> Integrated UAT`
+> **Purpose:** Bring the WWA workspace into an internal/UAT environment in a controlled way and verify the product in the order `Database -> Backend -> Frontend -> Integrated UAT`
 
 > **Naming note:** the workspace display name is now `Deployment Agent`, but the current implementation still uses technical identifiers such as `/api/deployment-agent` and `/wwa/deployment-agent`.
 
@@ -34,7 +34,7 @@ For the current codebase, the most practical internal UAT setup is:
    - The repo now includes a full current-state Oracle schema script for greenfield UAT setup at [ORACLE_CURRENT_SCHEMA.sql](/Users/leo/wwa-lab/deployment-agent/docs/sql/ORACLE_CURRENT_SCHEMA.sql).
 
 2. **A UAT static hosting / reverse proxy plan must exist for the frontend.**
-   - The SPA uses relative API calls via [`frontend/src/api/client.ts`](/Users/leo/wwa-lab/deployment-agent/frontend/src/api/client.ts) with `baseURL: '/api/deployment-agent'`.
+   - The SPA uses relative API calls via [`platformClient.ts`](/Users/leo/wwa-lab/deployment-agent/frontend/src/api/platformClient.ts) and the agent-specific modules under [`frontend/src/agents/`](/Users/leo/wwa-lab/deployment-agent/frontend/src/agents).
    - The simplest UAT deployment is same-origin hosting with `/api` proxied to the backend.
 
 3. **Stub login must be accepted for this UAT cycle, or a real Team Book provider must be built first.**
@@ -81,7 +81,7 @@ Reference: [README.md](/Users/leo/wwa-lab/deployment-agent/README.md), [StubTeam
 
 ### 4.1 Create Oracle schema/user
 
-Create the Oracle schema/user that will own Deployment Agent tables.
+Create the Oracle schema/user that will own the WWA tables.
 
 Minimum expectation:
 
@@ -174,7 +174,7 @@ After startup:
 3. Call:
 
 ```bash
-curl -i http://<uat-backend-host>:8080/api/deployment-agent/auth/me
+curl -i http://<uat-backend-host>:8080/api/platform/auth/me
 ```
 
 Expected result before login:
@@ -188,7 +188,7 @@ Use stub credentials:
 ```bash
 curl -i -c cookies.txt -H 'Content-Type: application/json' \
   -d '{"employeeId":"emp-003","password":"anything"}' \
-  http://<uat-backend-host>:8080/api/deployment-agent/auth/login
+  http://<uat-backend-host>:8080/api/platform/auth/login
 ```
 
 Expected result:
@@ -201,16 +201,17 @@ Expected result:
   - `permissions`
   - `scopes`
 
-Reference: [AuthController.java](/Users/leo/wwa-lab/deployment-agent/src/main/java/com/wwa/deploymentagent/web/controller/AuthController.java), [AuthResponseDto.java](/Users/leo/wwa-lab/deployment-agent/src/main/java/com/wwa/deploymentagent/contracts/dto/AuthResponseDto.java)
+Reference: [AuthController.java](/Users/leo/wwa-lab/deployment-agent/src/main/java/com/wwa/deploymentagent/platform/web/shared/AuthController.java), [AuthResponseDto.java](/Users/leo/wwa-lab/deployment-agent/src/main/java/com/wwa/deploymentagent/contracts/dto/AuthResponseDto.java)
 
 ### 5.6 Backend functional smoke
 
 With the session cookie, validate at least:
 
-- `GET /api/deployment-agent/auth/me`
+- `GET /api/platform/auth/me`
 - `GET /api/deployment-agent/release-flows`
-- `GET /api/deployment-agent/audit-logs`
-- `GET /api/deployment-agent/access-grants` as `emp-003`
+- `GET /api/build-agent/release-flows`
+- `GET /api/platform/audit-logs`
+- `GET /api/platform/access-grants` as `emp-003`
 - `POST /api/deployment-agent/release-flows/from-template` — confirm `403` without a valid role, `400` on a malformed release identifier
 
 ---
@@ -236,16 +237,14 @@ Build output:
 
 ### 6.3 Deploy the SPA
 
-The frontend should be hosted so that browser requests to:
+The frontend should be hosted so that browser requests to `/api/...` are proxied to the backend.
 
-- `/api/deployment-agent/...`
+This is important because the shared platform client at [`platformClient.ts`](/Users/leo/wwa-lab/deployment-agent/frontend/src/api/platformClient.ts) uses:
 
-are proxied to the backend.
-
-This is important because [`frontend/src/api/client.ts`](/Users/leo/wwa-lab/deployment-agent/frontend/src/api/client.ts) uses:
-
-- `baseURL: '/api/deployment-agent'`
+- `baseURL: '/api/platform'`
 - `withCredentials: true`
+
+and each agent workspace uses its own agent-prefixed client (`/api/build-agent`, `/api/testing-agent`, `/api/deployment-agent`).
 
 Recommended UAT setup:
 
@@ -367,7 +366,7 @@ UAT should not be marked ready unless all of the following are true:
 - backend starts cleanly against Oracle without schema validation failure
 - frontend is deployed and can call backend via `/api/deployment-agent`
 - login/session works through the chosen UAT auth mode
-- upload, summary, detail, task flow, audit, and access management all work
+- upload, summary, detail, task flow, audit, and access management all work across Build, Deployment, and Testing workspaces
 - template-based rundown creation is validated (Scenario B2)
 - owner/admin restriction on rundown controls is validated
 - at least one archive/restore path is verified
@@ -422,5 +421,5 @@ npm run build
 ```bash
 curl -i -c cookies.txt -H 'Content-Type: application/json' \
   -d '{"employeeId":"emp-003","password":"anything"}' \
-  http://<uat-backend-host>:8080/api/deployment-agent/auth/login
+  http://<uat-backend-host>:8080/api/platform/auth/login
 ```

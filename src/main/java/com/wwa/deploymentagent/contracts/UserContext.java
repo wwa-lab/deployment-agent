@@ -65,8 +65,21 @@ public record UserContext(
         return hasRole("DEVOPS_ADMIN") && scopes.isEmpty();
     }
 
+    /**
+     * True when the user was created through the anonymous guest login
+     * endpoint. Guest viewers bypass scope filtering for read operations
+     * so they can browse every page, but write operations are blocked
+     * earlier by GuestReadOnlyFilter.
+     */
+    public boolean isGuestViewer() {
+        return hasRole("GUEST");
+    }
+
     public boolean hasScopedAccess(String application, String snowGroup) {
         if (isGlobalDevOpsAdmin()) {
+            return true;
+        }
+        if (isGuestViewer()) {
             return true;
         }
         if (scopes.isEmpty()) {

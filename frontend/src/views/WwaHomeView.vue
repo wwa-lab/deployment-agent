@@ -32,13 +32,14 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 
           <section class="wwa-intro-card home-intro-card" aria-labelledby="wwa-home-intro-title">
             <div class="wwa-intro-kicker">WWA Today</div>
-            <h2 id="wwa-home-intro-title" class="wwa-intro-title">A shared workflow automation workspace</h2>
-            <p class="wwa-intro-text">
-              WWA currently serves controlled workflow operations, including Testing Agent,
-              Deployment Agent, and shared platform capabilities. Use this hub to enter the active
-              workspaces today, while AI-assisted capabilities are introduced in later phases.
-            </p>
-          </section>
+              <h2 id="wwa-home-intro-title" class="wwa-intro-title">A shared workflow automation workspace</h2>
+              <p class="wwa-intro-text">
+              WWA currently serves controlled workflow operations, including Build Agent,
+              Testing Agent, Deployment Agent, and shared platform capabilities. Use this hub to
+              enter the active workspaces today, while AI-assisted capabilities are introduced in
+              later phases.
+              </p>
+            </section>
         </div>
 
         <aside class="home-console" aria-label="WWA control summary">
@@ -51,7 +52,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
             <article class="home-console-panel">
               <span class="home-console-panel-label">Current Focus</span>
               <strong class="home-console-panel-value">Agent Workflows</strong>
-              <p class="home-console-panel-copy">Testing and deployment workspaces with human checkpoints.</p>
+              <p class="home-console-panel-copy">Build, testing, and deployment workspaces with human checkpoints.</p>
             </article>
             <article class="home-console-panel">
               <span class="home-console-panel-label">Shared Controls</span>
@@ -68,6 +69,8 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           <div class="home-console-track">
             <div class="home-console-track-label">Active Workspaces</div>
             <div class="home-console-track-row">
+              <span class="home-console-node is-active">Build</span>
+              <span class="home-console-line"></span>
               <span class="home-console-node is-active">Testing</span>
               <span class="home-console-line"></span>
               <span class="home-console-node is-active">Deploy</span>
@@ -79,7 +82,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           <div class="home-console-stream">
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
-              <span>Testing and deployment workspaces stay available from one shared hub.</span>
+              <span>Build, testing, and deployment workspaces stay available from one shared hub.</span>
             </div>
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
@@ -239,21 +242,21 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   font-family: var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
 }
 
 .home-title {
   font-size: 30px;
   font-weight: 700;
-  color: #17294a;
+  color: var(--color-text-primary);
   margin: 0 0 8px;
   letter-spacing: -0.02em;
 }
 
 .home-subtitle {
   font-size: 15px;
-  color: #566989;
+  color: var(--color-text-secondary);
   margin: 0;
   max-width: 60ch;
 }
@@ -273,7 +276,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 .home-user-name {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .home-user-role {
@@ -489,7 +492,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   font-family: var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin: 0 0 16px;
 }
 
@@ -557,13 +560,13 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 .agent-card-name {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .agent-card-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .agent-card-arrow {
@@ -587,7 +590,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(247, 250, 255, 0.78) 100%);
   border: 1px solid rgba(221, 231, 247, 0.94);
   border-radius: 14px;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;

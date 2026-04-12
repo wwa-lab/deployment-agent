@@ -1,7 +1,6 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.task.Task;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -41,9 +40,8 @@ public class Request {
     @JoinColumn(name = "release_flow_id", nullable = false)
     private ReleaseFlow releaseFlow;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "stage", length = 10, nullable = false)
-    private Stage stage;
+    private String stage;
 
     @Column(name = "attempt_number", nullable = false)
     private Integer attemptNumber = 1;

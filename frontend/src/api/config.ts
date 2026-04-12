@@ -1,5 +1,5 @@
-import apiClient from './client'
-import type { ConfigComponent, ConfigItem } from '../types'
+import platformClient from './platformClient'
+import type { ConfigComponent, ConfigItem, ScopeDirectoryEntry } from '../types'
 
 interface ConfigApiItem {
   componentInstanceId?: string
@@ -35,6 +35,16 @@ interface ConfigApiComponent {
   serviceUser?: string
   credentialConfigured: boolean
   description?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+interface ScopeDirectoryApiEntry {
+  id: string
+  application: string
+  snowGroup?: string
+  agent?: string
+  scopeSource: ScopeDirectoryEntry['scopeSource']
   updatedBy?: string
   updatedAt?: string
 }
@@ -81,15 +91,27 @@ function mapConfigComponent(component: ConfigApiComponent): ConfigComponent {
   }
 }
 
+function mapScopeDirectoryEntry(entry: ScopeDirectoryApiEntry): ScopeDirectoryEntry {
+  return {
+    id: entry.id,
+    application: entry.application,
+    snowGroup: entry.snowGroup,
+    agent: entry.agent,
+    scopeSource: entry.scopeSource,
+    updatedBy: entry.updatedBy,
+    updatedAt: entry.updatedAt,
+  }
+}
+
 export async function listConfig(): Promise<{ data: ConfigItem[] }> {
-  const response = await apiClient.get('/config')
+  const response = await platformClient.get('/config')
   return {
     data: (response.data as ConfigApiItem[]).map(mapConfigItem),
   }
 }
 
 export async function listConfigComponents(): Promise<{ data: ConfigComponent[] }> {
-  const response = await apiClient.get('/config/components')
+  const response = await platformClient.get('/config/components')
   return {
     data: (response.data as ConfigApiComponent[]).map(mapConfigComponent),
   }
@@ -102,7 +124,7 @@ export async function updateConfig(item: {
   value: string
   description?: string
 }): Promise<ConfigItem> {
-  const response = await apiClient.post('/config', item)
+  const response = await platformClient.post('/config', item)
   return mapConfigItem(response.data as ConfigApiItem)
 }
 
@@ -119,10 +141,31 @@ export async function updateConfigComponent(component: {
   credentialValue?: string
   description?: string
 }): Promise<ConfigComponent> {
-  const response = await apiClient.post('/config/components', component)
+  const response = await platformClient.post('/config/components', component)
   return mapConfigComponent(response.data as ConfigApiComponent)
 }
 
 export async function deleteConfigComponent(componentInstanceId: string): Promise<void> {
-  await apiClient.delete(`/config/components/${componentInstanceId}`)
+  await platformClient.delete(`/config/components/${componentInstanceId}`)
+}
+
+export async function listScopeDirectoryEntries(): Promise<{ data: ScopeDirectoryEntry[] }> {
+  const response = await platformClient.get('/config/scopes')
+  return {
+    data: (response.data as ScopeDirectoryApiEntry[]).map(mapScopeDirectoryEntry),
+  }
+}
+
+export async function saveScopeDirectoryEntry(entry: {
+  id?: string
+  application: string
+  snowGroup?: string
+  agent?: string
+}): Promise<ScopeDirectoryEntry> {
+  const response = await platformClient.post('/config/scopes', entry)
+  return mapScopeDirectoryEntry(response.data as ScopeDirectoryApiEntry)
+}
+
+export async function deleteScopeDirectoryEntry(id: string): Promise<void> {
+  await platformClient.delete(`/config/scopes/${id}`)
 }

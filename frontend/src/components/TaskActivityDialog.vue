@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { listAuditLogs } from '../api/audit'
-import { listTaskExecutions } from '../api/tasks'
 import type { AuditLogEntry, Task, TaskExecutionHistory } from '../types'
 
 type ActivityTone = 'success' | 'fail' | 'neutral'
@@ -22,12 +21,10 @@ type ActivityRow = {
   rawType: string
 }
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   task: Task
-  listTaskExecutionsFn?: (taskId: string) => Promise<TaskExecutionHistory[]>
-}>(), {
-  listTaskExecutionsFn: listTaskExecutions,
-})
+  listTaskExecutionsFn: (taskId: string) => Promise<TaskExecutionHistory[]>
+}>()
 const emit = defineEmits<{ close: [] }>()
 
 const loading = ref(false)
@@ -433,7 +430,7 @@ const definitionOutput = computed(() => {
 .definition-panel {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   padding: 14px;
 }
 
@@ -443,23 +440,23 @@ const definitionOutput = computed(() => {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .definition-pre {
   margin: 0;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .summary-item {
   padding: 12px 14px;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
   border: 1px solid #e2e8f0;
 }
 
@@ -470,13 +467,13 @@ const definitionOutput = computed(() => {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .summary-value {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .action-row {
@@ -488,7 +485,7 @@ const definitionOutput = computed(() => {
 
 .action-label {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .result-badge {
@@ -520,15 +517,15 @@ const definitionOutput = computed(() => {
 .timestamp {
   white-space: nowrap;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .message-cell {
   max-width: 260px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
-  color: #334155;
+  color: var(--color-text-secondary);
   word-break: break-word;
 }
 
@@ -536,7 +533,7 @@ const definitionOutput = computed(() => {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 900px) {

@@ -30,14 +30,14 @@ class TestingAgentUploadControllerTest {
     @Autowired private RequestRepository requestRepository;
 
     @Test
-    @DisplayName("GET /template returns xlsx with testing agent filename")
+    @DisplayName("GET /api/platform/upload/template returns neutral xlsx filename")
     void downloadTemplate_returnsWorkbook() throws Exception {
-        mockMvc.perform(get("/api/testing-agent/upload/template")
+        mockMvc.perform(get("/api/platform/upload/template")
                         .header("X-User-Id", "emp-001")
                         .header("X-User-Role", "DEVELOPER"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
-                        "attachment; filename=\"testing-request-template.xlsx\""))
+                        "attachment; filename=\"request-template.xlsx\""))
                 .andExpect(header().string("Content-Type",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     }

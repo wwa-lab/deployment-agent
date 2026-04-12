@@ -30,7 +30,7 @@ class UploadControllerTest {
     @Test
     @DisplayName("GET /upload/template with developer auth returns downloadable xlsx")
     void downloadTemplate_returnsWorkbook() throws Exception {
-        mockMvc.perform(get("/api/deployment-agent/upload/template")
+        mockMvc.perform(get("/api/platform/upload/template")
                         .header("X-User-Id", "emp-001")
                         .header("X-User-Role", "DEVELOPER"))
                 .andExpect(status().isOk())
@@ -43,7 +43,7 @@ class UploadControllerTest {
     @Test
     @DisplayName("GET /upload/template with DevOps Admin auth returns downloadable xlsx")
     void downloadTemplate_devOpsAdminCanDownloadTemplate() throws Exception {
-        mockMvc.perform(get("/api/deployment-agent/upload/template")
+        mockMvc.perform(get("/api/platform/upload/template")
                         .header("X-User-Id", "emp-003")
                         .header("X-User-Role", "DEVOPS_ADMIN"))
                 .andExpect(status().isOk())
@@ -54,7 +54,7 @@ class UploadControllerTest {
     }
 
     @Test
-    @DisplayName("POST /upload persists and returns uploaded scope context plus explicit release identifier")
+    @DisplayName("POST /upload persists and returns uploaded scope context plus explicit release identifier without requiring a client agent param")
     void upload_returnsScopeContext() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -68,13 +68,34 @@ class UploadControllerTest {
                         .param("releaseId", "WFPROJ-20260327-01")
                         .param("application", "AMH HCC")
                         .param("snowGroup", "HTSA-CSI-HCC-AMH-PRJ")
-                        .param("agent", "Deployment Agent")
                         .header("X-User-Id", "emp-003")
                         .header("X-User-Role", "DEVOPS_ADMIN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.releaseId").value("WFPROJ-20260327-01"))
                 .andExpect(jsonPath("$.application").value("AMH HCC"))
                 .andExpect(jsonPath("$.snowGroup").value("HTSA-CSI-HCC-AMH-PRJ"))
-                .andExpect(jsonPath("$.agent").value("Deployment Agent"));
+                // Post-BA-T19 Deployment Upload forces agent = "deployment-agent"
+                // server-side (PL-6), overriding any client-supplied value.
+                .andExpect(jsonPath("$.agent").value("deployment-agent"));
+    }
+
+    @Test
+    @DisplayName("POST /upload returns a friendly message for invalid Excel format")
+    void upload_invalidExcelFormatReturnsFriendlyMessage() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "broken.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "not-a-real-xlsx".getBytes());
+
+        mockMvc.perform(multipart("/api/deployment-agent/upload")
+                        .file(file)
+                        .param("stage", "SIT")
+                        .header("X-User-Id", "emp-003")
+                        .header("X-User-Role", "DEVOPS_ADMIN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value(
+                        "Invalid Excel file format. Please upload a valid .xlsx file, preferably using the downloaded template."));
     }
 }

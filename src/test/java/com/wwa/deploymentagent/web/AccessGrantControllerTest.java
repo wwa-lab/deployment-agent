@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("AccessGrantController")
 class AccessGrantControllerTest {
 
-    private static final String BASE = "/api/deployment-agent/access-grants";
+    private static final String BASE = "/api/platform/access-grants";
 
     @Autowired
     private MockMvc mockMvc;

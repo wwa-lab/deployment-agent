@@ -11,6 +11,25 @@ Converts a structured engineering specification (`spec.md` or equivalent) into a
 
 ## Workflow
 
+### Step 0 — Codebase Grounding Pass (MANDATORY)
+
+Before writing the architecture document, scan the source spec for every non-trivial claim about existing code and verify each one against the real codebase. This is the single highest-leverage step — the Build Agent architecture v1 collected 2 Critical findings and 1 Major finding because this step was skipped.
+
+What to grep / Read:
+- Every method name, class name, file path, or line reference in the spec
+- Every claim like "the existing X already supports Y"
+- Every `@Annotation` or configuration reference
+- Every column, enum value, or table mentioned
+
+For each claim:
+1. Match → OK
+2. Wrong → correct in the generated architecture AND flag to user at the top of your response
+3. Unverifiable → tag downstream as `[UNVERIFIED]`, do not assert as fact
+
+**Kill Phantom Inheritance:** Do not carry forward a claim from the spec just because it's written confidently. The spec may itself be wrong — re-verify.
+
+See `../_shared/grounding-rules.md` (Rules 1, 2, 6) for the full protocol.
+
 ### Step 1 — Locate and ingest the specification
 
 Check for the specification in this order:
@@ -38,7 +57,15 @@ Read the entire spec carefully. Extract and mentally model:
 Transform the spec analysis into a coherent architecture. Follow these principles:
 
 - **Derive, don't invent.** Only include architectural elements supported by the spec. If you infer something, label it as an assumption.
-- **Stay high-level.** Produce component-level, not class-level design. No code, no database schemas, no API request/response bodies.
+- **Stay high-level — FORBIDDEN LIST FOR ARCHITECTURE DOCS:** the following belong in `design.md` or `tasks.md`, NOT in architecture. Omit them entirely:
+  - Specific file paths (`src/main/java/.../FooController.java`)
+  - Class signatures, method signatures, or class skeletons
+  - Code blocks that contain implementation (Java / TypeScript / SQL bodies)
+  - LOC estimates (`~60 lines`)
+  - Test file names or test class names (`FooControllerTest`, `StageTest`)
+  - Task IDs, PR decomposition, phase gates, owner assignments
+  - Concrete repository method names or parameter lists
+  The correct architecture abstraction level is "Component X is responsible for Y and interacts with Z via protocol P" — not "class Foo implements method bar(String x)".
 - **Group by capability domain.** Where the system has multiple functional areas, organize components around those domains.
 - **Be explicit about layers.** Clearly separate frontend, backend, orchestration/execution, configuration, persistence, monitoring/audit, and integration adapters.
 - **Model state where it matters.** For workflow or DevOps platforms, lifecycle state, execution state, task state, and audit history are architecturally significant — call them out.
@@ -318,16 +345,26 @@ The system is organized into four primary layers:
 
 ## Quality Checklist
 
-Before finalizing the output, verify:
+Before finalizing the output, verify the architecture-specific items:
 
 - [ ] All major sections are present (or explicitly omitted with a reason)
 - [ ] Every inferred element is labeled `[ASSUMPTION]`
-- [ ] No low-level implementation detail (no code, no schemas, no API response shapes)
+- [ ] No low-level implementation detail (no code, no schemas, no API response shapes, no file paths, no LOC estimates, no test file names)
 - [ ] State model is explicit for any stateful workflow or execution entity
 - [ ] External integrations each have a described interaction pattern
 - [ ] Gaps in the spec are surfaced in Risks or Open Questions, not silently resolved
 - [ ] Language is concise, professional, and engineering-appropriate
 - [ ] **High-Level Architecture Diagram** (plain-text ASCII block diagram in fenced code block) is present and complete
+
+Then run the **shared Pre-Ship Checklist** from `../_shared/grounding-rules.md`:
+
+- [ ] F1 — Every method/class/file/annotation reference is grep-verified or tagged `[UNVERIFIED]`
+- [ ] F2 — Every "the existing X already supports Y" claim is verified against real code
+- [ ] F3 — No architecture-forbidden content (file paths, class signatures, code, LOC, test names, task IDs)
+- [ ] F4 — Scope / Assumptions / Risks / Open Questions do not contradict each other; component responsibilities match the stated state model
+- [ ] F5 — Every new rule (interaction pattern, ordering, algorithm) traced against 3 edge cases
+- [ ] F6 — No "implementation will decide" deferrals; architectural decisions are committed
+- [ ] F7 — Inherited claims from the spec were re-verified against the codebase, not carried forward blindly
 
 ---
 

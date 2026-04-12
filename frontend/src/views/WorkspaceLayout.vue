@@ -11,6 +11,7 @@ const route = useRoute()
 const sidebarRef = ref<HTMLElement | null>(null)
 const sidebarScrollRef = ref<HTMLElement | null>(null)
 const wwaButtonRef = ref<HTMLElement | null>(null)
+const flyoutRef = ref<HTMLElement | null>(null)
 const flyoutTop = ref(0)
 const isWwaFlyoutOpen = ref(false)
 
@@ -59,6 +60,10 @@ function setWwaButtonRef(element: Element | null) {
   wwaButtonRef.value = element as HTMLElement | null
 }
 
+function setFlyoutRef(element: Element | null) {
+  flyoutRef.value = element as HTMLElement | null
+}
+
 function updateFlyoutPosition() {
   if (!sidebarRef.value || !wwaButtonRef.value) {
     return
@@ -66,7 +71,25 @@ function updateFlyoutPosition() {
 
   const sidebarRect = sidebarRef.value.getBoundingClientRect()
   const buttonRect = wwaButtonRef.value.getBoundingClientRect()
-  flyoutTop.value = buttonRect.top - sidebarRect.top + buttonRect.height / 2
+  const buttonCenter = buttonRect.top - sidebarRect.top + buttonRect.height / 2
+
+  if (!flyoutRef.value || window.innerWidth <= 1024) {
+    flyoutTop.value = buttonCenter
+    return
+  }
+
+  const flyoutHeight = flyoutRef.value.getBoundingClientRect().height
+  const viewportPadding = 12
+  const minTop = viewportPadding
+  const maxTop = Math.max(
+    minTop,
+    window.innerHeight - sidebarRect.top - flyoutHeight - viewportPadding,
+  )
+
+  flyoutTop.value = Math.min(
+    Math.max(buttonCenter - flyoutHeight / 2, minTop),
+    maxTop,
+  )
 }
 
 function handlePrimaryNav(item: PrimaryNavItem) {
@@ -119,6 +142,18 @@ watch(
     updateFlyoutPosition()
   },
 )
+
+watch(
+  () => isWwaFlyoutOpen.value,
+  async (isOpen) => {
+    if (!isOpen) {
+      return
+    }
+
+    await nextTick()
+    updateFlyoutPosition()
+  },
+)
 </script>
 
 <template>
@@ -164,6 +199,7 @@ watch(
 
       <div
         v-if="isWwaFlyoutOpen"
+        :ref="setFlyoutRef"
         class="secondary-flyout"
         :style="{ top: `${flyoutTop}px` }"
       >
@@ -239,9 +275,18 @@ watch(
             ← WWA Home
           </router-link>
           <a :href="FINBLOCK_URL" class="finblock-topbar-link" title="Return to FinBlock">← FinBlock</a>
+          <span
+            v-if="userStore.isGuest"
+            class="guest-readonly-badge"
+            title="Guest mode is read-only. Sign in to perform actions."
+          >
+            👁 Read-only preview
+          </span>
           <span class="user-name">{{ userStore.displayName || userStore.userId }}</span>
           <span class="badge badge-role">{{ userStore.role }}</span>
-          <button class="btn btn-secondary btn-sm" @click="handleLogout">Logout</button>
+          <button class="btn btn-secondary btn-sm" @click="handleLogout">
+            {{ userStore.isGuest ? 'Exit' : 'Logout' }}
+          </button>
         </div>
       </header>
       <main class="main-content">
@@ -425,8 +470,9 @@ watch(
   position: absolute;
   top: 0;
   left: calc(100% + 18px);
-  transform: translateY(-50%);
   min-width: 260px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   padding: 14px 12px;
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(37, 67, 128, 0.96) 0%, rgba(30, 53, 101, 0.96) 100%);
@@ -609,12 +655,12 @@ watch(
 .topbar-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .breadcrumb-workspace {
   font-weight: 400;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .breadcrumb-sep {
@@ -659,7 +705,7 @@ watch(
 
 .finblock-topbar-link {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   text-decoration: none;
   border: 1px solid #e2e8f0;
   padding: 4px 10px;
@@ -674,8 +720,24 @@ watch(
 
 .user-name {
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-weight: 500;
+}
+
+.guest-readonly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid #fcd34d;
 }
 
 .main-content {

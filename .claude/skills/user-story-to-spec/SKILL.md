@@ -34,6 +34,19 @@ Trigger on any of these signals:
 
 ## Core Process
 
+### Step 0 — Codebase Grounding Pass (MANDATORY)
+
+Before writing a single line of the spec, scan the user stories for any claim that references existing code, existing system behavior, existing endpoints, existing columns, existing services, or existing constants. For every such claim:
+
+1. Grep or Read the referenced file / method / class / column
+2. If the claim matches reality, proceed
+3. If the claim is wrong, correct it in the generated spec AND flag the correction at the top of your response
+4. If you cannot verify, tag the downstream claim `[UNVERIFIED]`
+
+Also note: **user stories often contain implicit assumptions about existing behavior** ("the existing login flow", "as we already do for X agent"). Those implicit assumptions must also be grounded, not inherited blindly.
+
+See `../_shared/grounding-rules.md` (Rule 1) for the full protocol and examples.
+
 ### Step 1 — Ingest and Parse All Stories
 
 Read every story provided. For each one, identify:
@@ -68,9 +81,9 @@ Separate every requirement into:
 Produce the spec using the output format below. Every section must be present. If a section has no
 content, write `None identified` — never omit sections.
 
-### Step 5 — Quality Check
+### Step 5 — Quality Check + Pre-Ship Consistency Sweep
 
-Before outputting, verify:
+Before outputting, verify the spec-specific quality items:
 - [ ] Every source story is referenced at least once in the spec
 - [ ] All acceptance criteria from the source stories are captured (possibly consolidated)
 - [ ] Functional and non-functional requirements are clearly separated
@@ -78,6 +91,17 @@ Before outputting, verify:
 - [ ] Conflicts and ambiguities are called out, not silently resolved
 - [ ] The spec is implementation-friendly but does not specify low-level solution design
 - [ ] Language is concise, professional, and engineering-appropriate
+
+Then run the **shared Pre-Ship Checklist** from `../_shared/grounding-rules.md`:
+- [ ] F1 — Every method/class/file/annotation reference is grep-verified or tagged `[UNVERIFIED]`
+- [ ] F2 — Every "the existing X already does Y" claim is verified or tagged
+- [ ] F3 — No design/tasks-level content (no file paths, no class signatures, no code)
+- [ ] F4 — Scope / assumptions / requirements / tests / success criteria do not contradict
+- [ ] F5 — Every new rule traced against 3 edge cases
+- [ ] F6 — No "implementation will decide" language
+- [ ] F7 — No blindly inherited claims from user stories; all re-verified
+
+**Specific contradiction hotspots for specs:** Scope vs. Out of Scope · Functional Requirements vs. Testing Considerations · "already supported" assumptions vs. the items you're adding to the feature.
 
 ---
 

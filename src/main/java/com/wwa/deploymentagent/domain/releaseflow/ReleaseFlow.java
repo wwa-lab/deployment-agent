@@ -2,7 +2,6 @@ package com.wwa.deploymentagent.domain.releaseflow;
 
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -61,9 +60,8 @@ public class ReleaseFlow {
     @Column(name = "normalized_release_id", length = 255, nullable = false)
     private String normalizedReleaseId;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "current_stage", length = 10, nullable = false)
-    private Stage currentStage;
+    private String currentStage;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "flow_status", length = 30, nullable = false)

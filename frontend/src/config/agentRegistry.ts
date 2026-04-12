@@ -9,7 +9,7 @@
  * docs/00-context/multi-agent-integration-standard.md section 8.
  */
 
-export type AgentCategory = 'deployment' | 'testing' | 'platform' | 'other'
+export type AgentCategory = 'deployment' | 'testing' | 'build' | 'platform' | 'other'
 
 export type AgentDescriptor = {
   /** Unique stable key. Used as route segment and CSS key. */
@@ -47,7 +47,20 @@ export const agentRegistry: AgentDescriptor[] = [
     enabled: true,
     category: 'testing',
   },
+  {
+    key: 'build-agent',
+    name: 'Build Agent',
+    description: 'DEV-stage build and packaging workspace for pre-deployment automation.',
+    route: '/wwa/build-agent',
+    icon: '🛠️',
+    enabled: true,
+    category: 'build',
+  },
 ]
+
+export function getAgentDescriptor(key: string): AgentDescriptor | undefined {
+  return agentRegistry.find((agent) => agent.key === key)
+}
 
 /** Platform-owned shared capability nav items. Not agent workspaces. */
 export type PlatformCapabilityDescriptor = {

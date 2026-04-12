@@ -42,7 +42,7 @@ class TestingAgentReleaseFlowControllerTest {
     @DisplayName("list returns only testing-agent flows")
     void list_returnsOnlyTestingAgentFlows() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
         mockMvc.perform(get(BASE)
                         .header("X-User-Id", "user1")
@@ -56,7 +56,7 @@ class TestingAgentReleaseFlowControllerTest {
     @DisplayName("list does not return deployment-agent flows")
     void list_excludesDeploymentAgentFlows() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.DEPLOYMENT_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.DEPLOYMENT_AGENT);
 
         mockMvc.perform(get(BASE)
                         .header("X-User-Id", "user1")
@@ -69,7 +69,7 @@ class TestingAgentReleaseFlowControllerTest {
     @DisplayName("list overrides client-supplied agent param to testing-agent")
     void list_overridesAgentParam() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
         mockMvc.perform(get(BASE)
                         .param("agent", AgentId.DEPLOYMENT_AGENT)
@@ -96,7 +96,7 @@ class TestingAgentReleaseFlowControllerTest {
     @DisplayName("getById returns 200 for existing flow")
     void getById_returns200_forExistingFlow() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
         mockMvc.perform(get(BASE + "/" + rf.getId())
                         .header("X-User-Id", "user1")

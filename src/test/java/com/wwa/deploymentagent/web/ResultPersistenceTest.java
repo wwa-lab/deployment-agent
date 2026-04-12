@@ -4,7 +4,7 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.ExecutionStatus;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
+
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
@@ -183,7 +183,7 @@ class ResultPersistenceTest {
         rf.setProjectName("Project " + projectId);
         rf.setReleaseId(normalizedReleaseId);
         rf.setNormalizedReleaseId(normalizedReleaseId);
-        rf.setCurrentStage(Stage.SIT);
+        rf.setCurrentStage("SIT");
         rf.setFlowStatus(FlowStatus.Pending);
         rf.setReviewStatus(ReviewStatus.Pending_Review);
         return releaseFlowRepository.save(rf);

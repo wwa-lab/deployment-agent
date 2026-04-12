@@ -29,7 +29,7 @@ class SecurityTest {
 
     private static final String RELEASE_FLOWS = "/api/deployment-agent/release-flows";
     private static final String TASKS         = "/api/deployment-agent/tasks";
-    private static final String CONFIG        = "/api/deployment-agent/config";
+    private static final String CONFIG        = "/api/platform/config";
     private static final String UPLOAD        = "/api/deployment-agent/upload";
 
     @Autowired

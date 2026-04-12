@@ -1,7 +1,6 @@
 package com.wwa.deploymentagent.domain.fileimport;
 
 import com.wwa.deploymentagent.contracts.UserContext;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
 import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowService;
@@ -55,41 +54,44 @@ class ImportServiceTest {
     void importFile_newProject_createsReleaseFlow() throws IOException {
         byte[] xlsx = buildXlsx("PAYMENT-HUB", "Payment Hub", "TG-01", "Deploy", 1, "step-1", "MANUAL");
 
-        ImportResult result = importService.importFile(xlsx, Stage.SIT, developer);
+        ImportResult result = importService.importFile(xlsx, "SIT", developer);
 
         assertThat(result.releaseFlowId()).isNotNull();
         assertThat(result.releaseId()).startsWith("sit-");
         assertThat(result.releaseId()).contains("paymenthub");
         assertThat(result.releaseId()).matches("sit-paymenthub-\\d{4}");
-        assertThat(result.stage()).isEqualTo(Stage.SIT);
+        assertThat(result.stage()).isEqualTo("SIT");
         assertThat(result.taskCount()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("existing project: new stage attaches Request to same Release Flow")
-    void importFile_existingProject_attachesNewRequest() throws IOException {
+    @DisplayName("existing project without explicit release identifier: new stage creates a new release flow")
+    void importFile_existingProjectWithoutIdentifier_createsNewReleaseFlow() throws IOException {
         // First upload for SIT
         byte[] sitXlsx = buildXlsx("PROJ-A", "Project A", "TG-01", "Task", 1, "step-1", "MANUAL");
-        ImportResult sitResult = importService.importFile(sitXlsx, Stage.SIT, developer);
+        ImportResult sitResult = importService.importFile(sitXlsx, "SIT", developer);
 
-        // Second upload for UAT – same project
+        // Second upload for UAT – same project, but no explicit workflow identifier
         byte[] uatXlsx = buildXlsx("PROJ-A", "Project A", "TG-01", "Task", 1, "uat-step", "MANUAL");
-        ImportResult uatResult = importService.importFile(uatXlsx, Stage.UAT, developer);
+        ImportResult uatResult = importService.importFile(uatXlsx, "UAT", developer);
 
-        assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
+        assertThat(uatResult.releaseFlowId()).isNotEqualTo(sitResult.releaseFlowId());
+        assertThat(uatResult.releaseId()).isNotEqualTo(sitResult.releaseId());
 
         long requestCount = requestRepository.findByReleaseFlowId(sitResult.releaseFlowId()).size();
-        assertThat(requestCount).isEqualTo(2); // SIT + UAT
+        long secondRequestCount = requestRepository.findByReleaseFlowId(uatResult.releaseFlowId()).size();
+        assertThat(requestCount).isEqualTo(1);
+        assertThat(secondRequestCount).isEqualTo(1);
     }
 
     @Test
     @DisplayName("same project + same stage upload creates a new release flow instead of overwriting the existing rundown")
     void importFile_sameStageUpload_createsNewReleaseFlow() throws IOException {
         byte[] first = buildXlsx("PROJ-B", "Project B", "TG-01", "Task B", 1, "original-step", "MANUAL");
-        ImportResult firstResult = importService.importFile(first, Stage.SIT, developer);
+        ImportResult firstResult = importService.importFile(first, "SIT", developer);
 
         byte[] second = buildXlsx("PROJ-B", "Project B", "TG-01", "Task B", 1, "updated-step", "MANUAL");
-        ImportResult secondResult = importService.importFile(second, Stage.SIT, developer);
+        ImportResult secondResult = importService.importFile(second, "SIT", developer);
 
         assertThat(secondResult.releaseFlowId()).isNotEqualTo(firstResult.releaseFlowId());
         assertThat(secondResult.releaseId()).isNotEqualTo(firstResult.releaseId());
@@ -123,7 +125,7 @@ class ImportServiceTest {
                         "", "", "", "", "", "", "", "")
         ));
 
-        ImportResult result = importService.importFile(xlsx, Stage.SIT, developer);
+        ImportResult result = importService.importFile(xlsx, "SIT", developer);
 
         var requests = requestRepository.findByReleaseFlowId(result.releaseFlowId());
         assertThat(requests).hasSize(1);
@@ -139,31 +141,34 @@ class ImportServiceTest {
     }
 
     @Test
-    @DisplayName("later-stage upload attaches to the newest release flow that does not already have that stage")
-    void importFile_laterStageUpload_usesNewestEligibleReleaseFlow() throws IOException {
+    @DisplayName("later-stage upload without explicit release identifier creates a new release flow")
+    void importFile_laterStageUploadWithoutIdentifier_createsNewReleaseFlow() throws IOException {
         ImportResult firstSit = importService.importFile(
                 buildXlsx("PROJ-D", "Project D", "TG-01", "Task D", 1, "sit-step-1", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer);
         ImportResult secondSit = importService.importFile(
                 buildXlsx("PROJ-D", "Project D", "TG-01", "Task D", 1, "sit-step-2", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer);
 
         ImportResult uatResult = importService.importFile(
                 buildXlsx("PROJ-D", "Project D", "TG-01", "Task D", 1, "uat-step", "MANUAL"),
-                Stage.UAT,
+                "UAT",
                 developer);
 
-        assertThat(uatResult.releaseFlowId()).isEqualTo(secondSit.releaseFlowId());
+        assertThat(uatResult.releaseFlowId()).isNotEqualTo(secondSit.releaseFlowId());
         assertThat(uatResult.releaseFlowId()).isNotEqualTo(firstSit.releaseFlowId());
 
         assertThat(requestRepository.findByReleaseFlowId(secondSit.releaseFlowId()))
-                .extracting(request -> request.getStage().name())
-                .containsExactlyInAnyOrder("SIT", "UAT");
-        assertThat(requestRepository.findByReleaseFlowId(firstSit.releaseFlowId()))
-                .extracting(request -> request.getStage().name())
+                .extracting(request -> request.getStage())
                 .containsExactly("SIT");
+        assertThat(requestRepository.findByReleaseFlowId(firstSit.releaseFlowId()))
+                .extracting(request -> request.getStage())
+                .containsExactly("SIT");
+        assertThat(requestRepository.findByReleaseFlowId(uatResult.releaseFlowId()))
+                .extracting(request -> request.getStage())
+                .containsExactly("UAT");
     }
 
     @Test
@@ -173,7 +178,7 @@ class ImportServiceTest {
 
         ImportResult sitResult = importService.importFile(
                 buildXlsx("PROJ-E", "Project E", "TG-01", "Task E", 1, "sit-step", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer,
                 releaseIdentifier,
                 null,
@@ -181,7 +186,7 @@ class ImportServiceTest {
                 null);
         ImportResult uatResult = importService.importFile(
                 buildXlsx("PROJ-E", "Project E", "TG-01", "Task E", 1, "uat-step", "MANUAL"),
-                Stage.UAT,
+                "UAT",
                 developer,
                 releaseIdentifier,
                 null,
@@ -192,7 +197,7 @@ class ImportServiceTest {
         assertThat(uatResult.releaseId()).isEqualTo(releaseIdentifier);
         assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
         assertThat(requestRepository.findByReleaseFlowId(sitResult.releaseFlowId()))
-                .extracting(request -> request.getStage().name())
+                .extracting(request -> request.getStage())
                 .containsExactlyInAnyOrder("SIT", "UAT");
     }
 
@@ -201,7 +206,7 @@ class ImportServiceTest {
     void importFile_stagePrefixedExplicitIdentifiers_shareReleaseFamily() throws IOException {
         ImportResult sitResult = importService.importFile(
                 buildXlsx("PROJ-E1", "Project E1", "TG-01", "Task E1", 1, "sit-step", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer,
                 "sit-01",
                 null,
@@ -209,7 +214,7 @@ class ImportServiceTest {
                 null);
         ImportResult uatResult = importService.importFile(
                 buildXlsx("PROJ-E1", "Project E1", "TG-01", "Task E1", 1, "uat-step", "MANUAL"),
-                Stage.UAT,
+                "UAT",
                 developer,
                 "uat-01",
                 null,
@@ -218,7 +223,7 @@ class ImportServiceTest {
 
         assertThat(uatResult.releaseFlowId()).isEqualTo(sitResult.releaseFlowId());
         assertThat(requestRepository.findByReleaseFlowId(sitResult.releaseFlowId()))
-                .extracting(request -> request.getStage().name())
+                .extracting(request -> request.getStage())
                 .containsExactlyInAnyOrder("SIT", "UAT");
     }
 
@@ -229,7 +234,7 @@ class ImportServiceTest {
 
         importService.importFile(
                 buildXlsx("PROJ-F", "Project F", "TG-01", "Task F", 1, "sit-step", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer,
                 releaseIdentifier,
                 null,
@@ -238,7 +243,7 @@ class ImportServiceTest {
 
         ImportResult retryResult = importService.importFile(
                 buildXlsx("PROJ-F", "Project F", "TG-01", "Task F", 1, "sit-step-2", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer,
                 releaseIdentifier,
                 null,
@@ -246,7 +251,7 @@ class ImportServiceTest {
                 null);
 
         var requests = requestRepository.findByReleaseFlowId(retryResult.releaseFlowId()).stream()
-                .filter(request -> request.getStage() == Stage.SIT)
+                .filter(request -> "SIT".equals(request.getStage()))
                 .sorted(java.util.Comparator.comparing(request -> request.getAttemptNumber()))
                 .toList();
 
@@ -260,7 +265,7 @@ class ImportServiceTest {
     void importFile_infixStageIdentifiers_stitchRetriesAndProgression() throws IOException {
         ImportResult sitFirst = importService.importFile(
                 buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "sit-step-1", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer,
                 "leo-sit-01",
                 null,
@@ -268,7 +273,7 @@ class ImportServiceTest {
                 null);
         ImportResult sitSecond = importService.importFile(
                 buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "sit-step-2", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer,
                 "leo-sit-02",
                 null,
@@ -276,7 +281,7 @@ class ImportServiceTest {
                 null);
         ImportResult uatResult = importService.importFile(
                 buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "uat-step", "MANUAL"),
-                Stage.UAT,
+                "UAT",
                 developer,
                 "leo-uat-01",
                 null,
@@ -284,7 +289,7 @@ class ImportServiceTest {
                 null);
         ImportResult prodResult = importService.importFile(
                 buildXlsx("PROJ-I", "Project I", "TG-01", "Task I", 1, "prod-step", "MANUAL"),
-                Stage.PROD,
+                "PROD",
                 developer,
                 "leo-prod-01",
                 null,
@@ -296,9 +301,9 @@ class ImportServiceTest {
         assertThat(prodResult.releaseFlowId()).isEqualTo(sitFirst.releaseFlowId());
 
         var requests = requestRepository.findByReleaseFlowId(sitFirst.releaseFlowId());
-        assertThat(requests.stream().filter(request -> request.getStage() == Stage.SIT)).hasSize(2);
-        assertThat(requests.stream().filter(request -> request.getStage() == Stage.UAT)).hasSize(1);
-        assertThat(requests.stream().filter(request -> request.getStage() == Stage.PROD)).hasSize(1);
+        assertThat(requests.stream().filter(request -> "SIT".equals(request.getStage()))).hasSize(2);
+        assertThat(requests.stream().filter(request -> "UAT".equals(request.getStage()))).hasSize(1);
+        assertThat(requests.stream().filter(request -> "PROD".equals(request.getStage()))).hasSize(1);
     }
 
     @Test
@@ -306,12 +311,12 @@ class ImportServiceTest {
     void importFile_generatedReleaseId_canBeReusedExplicitly() throws IOException {
         ImportResult sitResult = importService.importFile(
                 buildXlsx("PROJ-G", "Project G", "TG-01", "Task G", 1, "sit-step", "MANUAL"),
-                Stage.SIT,
+                "SIT",
                 developer);
 
         ImportResult uatResult = importService.importFile(
                 buildXlsx("PROJ-G", "Project G", "TG-01", "Task G", 1, "uat-step", "MANUAL"),
-                Stage.UAT,
+                "UAT",
                 developer,
                 sitResult.releaseId(),
                 null,
@@ -331,11 +336,11 @@ class ImportServiceTest {
                 "Project H",
                 legacyReleaseId,
                 legacyReleaseId.toLowerCase(),
-                Stage.SIT);
+                "SIT");
 
         ImportResult uatResult = importService.importFile(
                 buildXlsx("PROJ-H", "Project H", "TG-01", "Task H", 1, "uat-step", "MANUAL"),
-                Stage.UAT,
+                "UAT",
                 developer,
                 legacyReleaseId,
                 null,
@@ -352,7 +357,7 @@ class ImportServiceTest {
         // Missing required Project ID
         byte[] badXlsx = buildXlsxWithMissingProjectId();
 
-        assertThatThrownBy(() -> importService.importFile(badXlsx, Stage.SIT, developer))
+        assertThatThrownBy(() -> importService.importFile(badXlsx, "SIT", developer))
                 .isInstanceOf(ImportValidationException.class)
                 .satisfies(ex -> {
                     ImportValidationException ive = (ImportValidationException) ex;
@@ -365,7 +370,7 @@ class ImportServiceTest {
     void importFile_singleTaskOwner_setsRequestOwner() throws IOException {
         byte[] xlsx = buildXlsx("PROJ-C", "Project C", "TG-01", "Task C", 1, "step-1", "MANUAL", "alice");
 
-        ImportResult result = importService.importFile(xlsx, Stage.SIT, developer);
+        ImportResult result = importService.importFile(xlsx, "SIT", developer);
 
         var requests = requestRepository.findByReleaseFlowId(result.releaseFlowId());
         assertThat(requests).hasSize(1);

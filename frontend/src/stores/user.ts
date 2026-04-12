@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AccessScope, UserPermission, UserRole } from '../types'
-import { login as apiLogin, logout as apiLogout, checkSession } from '../api/auth'
+import {
+  login as apiLogin,
+  loginAsGuest as apiLoginAsGuest,
+  logout as apiLogout,
+  checkSession,
+} from '../api/auth'
 
 export const useUserStore = defineStore('user', () => {
   const userId = ref<string>('')
@@ -20,6 +25,7 @@ export const useUserStore = defineStore('user', () => {
   const isDevOpsAdmin = computed(() => hasRole('DEVOPS_ADMIN'))
   const isAudit = computed(() => hasRole('AUDIT'))
   const isManagement = computed(() => hasRole('MANAGEMENT'))
+  const isGuest = computed(() => hasRole('GUEST'))
   const canViewAudit = computed(() => hasPermission('audit.view'))
   const canUploadRelease = computed(() => hasPermission('release.upload'))
   const canManageAccess = computed(() => hasPermission('access.manage'))
@@ -46,6 +52,11 @@ export const useUserStore = defineStore('user', () => {
 
   async function login(employeeId: string, password: string) {
     const response = await apiLogin(employeeId, password)
+    applyAuthResponse(response)
+  }
+
+  async function loginAsGuest() {
+    const response = await apiLoginAsGuest()
     applyAuthResponse(response)
   }
 
@@ -86,12 +97,14 @@ export const useUserStore = defineStore('user', () => {
     isDevOpsAdmin,
     isAudit,
     isManagement,
+    isGuest,
     canViewAudit,
     canUploadRelease,
     canManageAccess,
     hasRole,
     hasPermission,
     login,
+    loginAsGuest,
     logout,
     initSession,
   }

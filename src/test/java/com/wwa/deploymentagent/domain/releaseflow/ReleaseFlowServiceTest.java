@@ -1,13 +1,13 @@
 package com.wwa.deploymentagent.domain.releaseflow;
 
 import com.wwa.deploymentagent.contracts.AccessScope;
+import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.RequestArchiveResultDto;
 import com.wwa.deploymentagent.contracts.dto.RequestPurgeResultDto;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
 import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
@@ -45,14 +45,14 @@ class ReleaseFlowServiceTest {
     @DisplayName("create sets all fields and defaults to Pending/Pending_Review")
     void create_setsAllFields() {
         ReleaseFlow rf = releaseFlowService.create(
-                "PROJ-X", "Project X", "sit-projectx-0001", "sit-projectx-0001", Stage.SIT);
+                "PROJ-X", "Project X", "sit-projectx-0001", "sit-projectx-0001", "SIT");
 
         assertThat(rf.getId()).isNotNull();
         assertThat(rf.getProjectId()).isEqualTo("PROJ-X");
         assertThat(rf.getProjectName()).isEqualTo("Project X");
         assertThat(rf.getReleaseId()).isEqualTo("sit-projectx-0001");
         assertThat(rf.getNormalizedReleaseId()).isEqualTo("sit-projectx-0001");
-        assertThat(rf.getCurrentStage()).isEqualTo(Stage.SIT);
+        assertThat(rf.getCurrentStage()).isEqualTo("SIT");
         assertThat(rf.getFlowStatus()).isEqualTo(FlowStatus.Pending);
         assertThat(rf.getReviewStatus())
                 .isEqualTo(com.wwa.deploymentagent.contracts.enums.ReviewStatus.Pending_Review);
@@ -108,7 +108,7 @@ class ReleaseFlowServiceTest {
     @DisplayName("list with no filters returns all flows")
     void list_noFilters_returnsAll() {
         helper.seedReleaseFlow(); // PROJ-001
-        releaseFlowService.create("PROJ-002", "Other Project", "sit-proj002-0001", "sit-proj002-0001", Stage.SIT);
+        releaseFlowService.create("PROJ-002", "Other Project", "sit-proj002-0001", "sit-proj002-0001", "SIT");
 
         Page<ReleaseFlow> result = releaseFlowService.list(null, null, null, PageRequest.of(0, 10));
 
@@ -119,7 +119,7 @@ class ReleaseFlowServiceTest {
     @DisplayName("list filtered by projectId returns matching flows only")
     void list_filteredByProjectId() {
         helper.seedReleaseFlow(); // projectId = "PROJ-001"
-        releaseFlowService.create("OTHER-PROJ", "Other", "sit-other-0001", "sit-other-0001", Stage.SIT);
+        releaseFlowService.create("OTHER-PROJ", "Other", "sit-other-0001", "sit-other-0001", "SIT");
 
         Page<ReleaseFlow> result = releaseFlowService.list("PROJ-001", null, null, PageRequest.of(0, 10));
 
@@ -130,7 +130,7 @@ class ReleaseFlowServiceTest {
     @DisplayName("list filtered by flowStatus returns matching flows only")
     void list_filteredByFlowStatus() {
         helper.seedReleaseFlow(); // status = Pending
-        releaseFlowService.create("PROJ-R", "Running", "sit-running-0001", "sit-running-0001", Stage.SIT);
+        releaseFlowService.create("PROJ-R", "Running", "sit-running-0001", "sit-running-0001", "SIT");
         // Mark second flow as Running
         releaseFlowRepository.findFirstByProjectId("PROJ-R").ifPresent(rf -> {
             rf.setFlowStatus(FlowStatus.Running);
@@ -145,10 +145,10 @@ class ReleaseFlowServiceTest {
     @DisplayName("list filtered by stage returns matching flows only")
     void list_filteredByStage() {
         helper.seedReleaseFlow(); // stage = SIT
-        releaseFlowService.create("UAT-PROJ", "UAT Project", "uat-uatproj-0001", "uat-uatproj-0001", Stage.UAT);
+        releaseFlowService.create("UAT-PROJ", "UAT Project", "uat-uatproj-0001", "uat-uatproj-0001", "UAT");
 
-        Page<ReleaseFlow> sitFlows = releaseFlowService.list(null, null, Stage.SIT, PageRequest.of(0, 10));
-        assertThat(sitFlows.getContent()).allMatch(rf -> rf.getCurrentStage() == Stage.SIT);
+        Page<ReleaseFlow> sitFlows = releaseFlowService.list(null, null, "SIT", PageRequest.of(0, 10));
+        assertThat(sitFlows.getContent()).allMatch(rf -> "SIT".equals(rf.getCurrentStage()));
     }
 
     @Test
@@ -162,7 +162,7 @@ class ReleaseFlowServiceTest {
         requestRepository.save(matchingRequest);
 
         ReleaseFlow otherFlow = releaseFlowService.create(
-                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", Stage.SIT);
+                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", "SIT");
         Request otherRequest = helper.seedRequest(otherFlow);
         otherRequest.setApplication("PowerCARD");
         otherRequest.setSnowGroup("HTSA-CSI-CARD-PRD");
@@ -194,7 +194,7 @@ class ReleaseFlowServiceTest {
         requestRepository.save(matchingRequest);
 
         ReleaseFlow hiddenFlow = releaseFlowService.create(
-                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", Stage.SIT);
+                "PROJ-002", "PowerCARD", "sit-powercard-0001", "sit-powercard-0001", "SIT");
         Request hiddenRequest = helper.seedRequest(hiddenFlow);
         hiddenRequest.setApplication("PowerCARD");
         hiddenRequest.setSnowGroup("HTSA-CSI-CARD-PRD");
@@ -232,12 +232,13 @@ class ReleaseFlowServiceTest {
     @DisplayName("advanceStage moves SIT → UAT and sets status to Running")
     void advanceStage_sitToUat() {
         ReleaseFlow rf = helper.seedReleaseFlow(); // SIT
-        assertThat(rf.getCurrentStage()).isEqualTo(Stage.SIT);
+        helper.seedRequest(rf, "SIT", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
+        assertThat(rf.getCurrentStage()).isEqualTo("SIT");
 
         releaseFlowService.advanceStage(rf.getId());
 
         ReleaseFlow updated = releaseFlowRepository.findById(rf.getId()).orElseThrow();
-        assertThat(updated.getCurrentStage()).isEqualTo(Stage.UAT);
+        assertThat(updated.getCurrentStage()).isEqualTo("UAT");
         assertThat(updated.getFlowStatus()).isEqualTo(FlowStatus.Running);
     }
 
@@ -245,27 +246,29 @@ class ReleaseFlowServiceTest {
     @DisplayName("advanceStage moves UAT → PROD")
     void advanceStage_uatToProd() {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        rf.setCurrentStage(Stage.UAT);
+        rf.setCurrentStage("UAT");
         releaseFlowRepository.save(rf);
+        helper.seedRequest(rf, "UAT", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
 
         releaseFlowService.advanceStage(rf.getId());
 
         ReleaseFlow updated = releaseFlowRepository.findById(rf.getId()).orElseThrow();
-        assertThat(updated.getCurrentStage()).isEqualTo(Stage.PROD);
+        assertThat(updated.getCurrentStage()).isEqualTo("PROD");
     }
 
     @Test
     @DisplayName("advanceStage on PROD does nothing (already at final stage)")
     void advanceStage_prod_noOp() {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        rf.setCurrentStage(Stage.PROD);
+        rf.setCurrentStage("PROD");
         rf.setFlowStatus(FlowStatus.Running);
         releaseFlowRepository.save(rf);
+        helper.seedRequest(rf, "PROD", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
 
         releaseFlowService.advanceStage(rf.getId());
 
         ReleaseFlow updated = releaseFlowRepository.findById(rf.getId()).orElseThrow();
-        assertThat(updated.getCurrentStage()).isEqualTo(Stage.PROD);
+        assertThat(updated.getCurrentStage()).isEqualTo("PROD");
         assertThat(updated.getFlowStatus()).isEqualTo(FlowStatus.Running); // unchanged
     }
 
@@ -318,10 +321,10 @@ class ReleaseFlowServiceTest {
     @DisplayName("recompute uses latest attempt per stage for flow status when stage has retries")
     void recomputeStatus_sameStageRetries_usesLatestAttempt() {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request firstAttempt = helper.seedRequest(rf, Stage.SIT, RequestStatus.Failed);
+        Request firstAttempt = helper.seedRequest(rf, "SIT", RequestStatus.Failed);
         helper.seedTask(firstAttempt, TaskStatus.Failed);
 
-        Request latestAttempt = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
+        Request latestAttempt = helper.seedRequest(rf, "SIT", RequestStatus.Pending);
         helper.seedTask(latestAttempt, TaskStatus.Pending);
 
         releaseFlowService.recomputeAndPersistStatus(rf.getId());
@@ -366,8 +369,8 @@ class ReleaseFlowServiceTest {
     @DisplayName("archiveRequestRundown realigns the remaining flow state when other active requests still exist")
     void archiveRequestRundown_updatesCurrentStageAndStatuses() {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request sit = helper.seedRequest(rf, Stage.SIT, RequestStatus.Pending);
-        Request uat = helper.seedRequest(rf, Stage.UAT, RequestStatus.Pending);
+        Request sit = helper.seedRequest(rf, "SIT", RequestStatus.Pending);
+        Request uat = helper.seedRequest(rf, "UAT", RequestStatus.Pending);
 
         RequestArchiveResultDto result = releaseFlowService.archiveRequestRundown(
                 rf.getId(), sit.getId(), new UserContext("admin-001", "DEVOPS_ADMIN"));
@@ -376,7 +379,7 @@ class ReleaseFlowServiceTest {
         assertThat(result.requestArchived()).isTrue();
         assertThat(result.releaseFlowArchived()).isFalse();
         assertThat(result.activeRequestCount()).isEqualTo(1);
-        assertThat(updated.getCurrentStage()).isEqualTo(Stage.UAT);
+        assertThat(updated.getCurrentStage()).isEqualTo("UAT");
         assertThat(updated.getFlowStatus()).isEqualTo(FlowStatus.Pending);
         assertThat(updated.getReviewStatus()).isEqualTo(ReviewStatus.Pending_Review);
         assertThat(requestRepository.findById(sit.getId())).get().extracting(Request::getArchivedAt).isNotNull();
@@ -412,5 +415,69 @@ class ReleaseFlowServiceTest {
                 rf.getId(), req.getId(), new UserContext("admin-001", "DEVOPS_ADMIN")))
                 .isInstanceOf(ValidationAppException.class)
                 .hasMessageContaining("Only archived rundowns can be permanently deleted.");
+    }
+
+    // ─── listByAgent (BA-T12) ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("listByAgent scopes results to matching agent column")
+    void listByAgent_scopesByAgentColumn() {
+        ReleaseFlow depFlow = releaseFlowService.create(
+                "PROJ-AGENT-DEP", "Dep Project", "sit-agent-dep-001", "sit-agent-dep-001", "SIT");
+        helper.seedRequest(depFlow, "SIT", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
+
+        ReleaseFlow testFlow = releaseFlowService.create(
+                "PROJ-AGENT-TEST", "Test Project", "uat-agent-test-001", "uat-agent-test-001", "UAT");
+        helper.seedRequest(testFlow, "UAT", RequestStatus.Pending, AgentId.TESTING_AGENT);
+
+        Page<ReleaseFlow> deploymentOnly = releaseFlowService.listByAgent(
+                AgentId.DEPLOYMENT_AGENT, ReleaseFlowFilter.empty(), PageRequest.of(0, 20));
+
+        assertThat(deploymentOnly.getContent())
+                .extracting(ReleaseFlow::getId)
+                .contains(depFlow.getId())
+                .doesNotContain(testFlow.getId());
+    }
+
+    @Test
+    @DisplayName("listByAgent excludes release flows whose requests have a null agent column")
+    void listByAgent_excludesNullAgent() {
+        ReleaseFlow flowWithAgent = releaseFlowService.create(
+                "PROJ-HAS-AGENT", "Has Agent Project", "sit-has-0001", "sit-has-0001", "SIT");
+        helper.seedRequest(flowWithAgent, "SIT", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
+
+        ReleaseFlow flowWithoutAgent = releaseFlowService.create(
+                "PROJ-NULL-AGENT", "Null Agent Project", "sit-null-0001", "sit-null-0001", "SIT");
+        helper.seedRequest(flowWithoutAgent, "SIT", RequestStatus.Pending, null);
+
+        Page<ReleaseFlow> page = releaseFlowService.listByAgent(
+                AgentId.DEPLOYMENT_AGENT, ReleaseFlowFilter.empty(), PageRequest.of(0, 20));
+
+        assertThat(page.getContent())
+                .extracting(ReleaseFlow::getId)
+                .contains(flowWithAgent.getId())
+                .doesNotContain(flowWithoutAgent.getId());
+    }
+
+    @Test
+    @DisplayName("listByAgent honors stage string filter on filter record")
+    void listByAgent_filtersByStageString() {
+        ReleaseFlow sitFlow = releaseFlowService.create(
+                "PROJ-STAGE", "Stage Project", "sit-stage-0001", "sit-stage-0001", "SIT");
+        helper.seedRequest(sitFlow, "SIT", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
+
+        ReleaseFlow uatFlow = releaseFlowService.create(
+                "PROJ-STAGE", "Stage Project", "uat-stage-0001", "uat-stage-0001", "UAT");
+        helper.seedRequest(uatFlow, "UAT", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
+
+        ReleaseFlowFilter sitOnly = new ReleaseFlowFilter(
+                null, null, "SIT", null, null, null, false);
+        Page<ReleaseFlow> page = releaseFlowService.listByAgent(
+                AgentId.DEPLOYMENT_AGENT, sitOnly, PageRequest.of(0, 20));
+
+        assertThat(page.getContent())
+                .extracting(ReleaseFlow::getId)
+                .contains(sitFlow.getId())
+                .doesNotContain(uatFlow.getId());
     }
 }

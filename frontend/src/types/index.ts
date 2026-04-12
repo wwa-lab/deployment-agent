@@ -1,7 +1,7 @@
 // Enums
 export type FlowStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Rejected'
 export type ReviewStatus = 'Pending_Review' | 'Approved' | 'Rejected'
-export type Stage = 'SIT' | 'UAT' | 'PROD'
+export type Stage = 'DEV' | 'SIT' | 'UAT' | 'PROD'
 export type TaskStatus =
   | 'Pending'
   | 'Ready_For_Execution'
@@ -13,7 +13,7 @@ export type TaskStatus =
   | 'Failed'
 export type ExecutionType = 'MANUAL' | 'AUTO'
 export type RequestStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Rejected'
-export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT' | 'MANAGEMENT'
+export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT' | 'MANAGEMENT' | 'GUEST'
 export type AccessGrantStatus = 'ACTIVE' | 'SUSPENDED'
 export type UserPermission =
   | 'release.view'
@@ -117,7 +117,7 @@ export interface ReleaseFlowListItem {
   projectName: string
   releaseId: string
   normalizedReleaseId?: string
-  currentStage: Stage
+  currentStage: string
   flowStatus: FlowStatus
   reviewStatus: ReviewStatus
   archivedAt?: string
@@ -126,12 +126,10 @@ export interface ReleaseFlowListItem {
   application?: string
   agent?: string
   owner?: string
-  sitStatus: RequestStatus
-  uatStatus: RequestStatus
-  prodStatus: RequestStatus
-  sitPresent: boolean
-  uatPresent: boolean
-  prodPresent: boolean
+  /** Per-stage aggregated status keyed by stage string (BA-T08). */
+  stageStatuses: Record<string, RequestStatus>
+  /** Set of stage strings with at least one request (BA-T08). */
+  stagesPresent: string[]
   stitched: boolean
   linkedReleaseCount: number
   linkedReleaseIds: string[]
@@ -230,6 +228,16 @@ export interface ConfigComponentDraft {
   serviceUser?: string
   credentialValue?: string
   description?: string
+}
+
+export interface ScopeDirectoryEntry {
+  id: string
+  application: string
+  snowGroup?: string
+  agent?: string
+  scopeSource: 'Application Default' | 'SNOW Group Default' | 'Agent Override'
+  updatedBy?: string
+  updatedAt?: string
 }
 
 // AuditLogEntry

@@ -17,7 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +55,7 @@ public class AutoExecutionService {
     private final AuditLoggerService auditLogger;
     private final ReleaseFlowProgressionService progressionService;
     private final TaskService taskService;
+    private final Clock clock;
 
     @Transactional
     public Task submitAutoExecution(String taskId, UserContext user) {
@@ -87,9 +88,9 @@ public class AutoExecutionService {
         history.setAttemptNumber(nextAttempt);
         history.setExecutionStatus(ExecutionStatus.Running);
         history.setInputSnapshot(task.getInputParameters());
-        history.setStartTime(Instant.now());
+        history.setStartTime(clock.instant());
         history.setExternalSystemType(target.systemType());
-        history.setSubmittedAt(Instant.now());
+        history.setSubmittedAt(clock.instant());
         history.setExternalStatus(ExternalStatus.QUEUED);
         history.setExternalStatusMessage("Submitting to " + target.systemType());
         history.setConfigApplication(scope.application());
@@ -100,7 +101,7 @@ public class AutoExecutionService {
         // Transition task to Executing
         task.setTaskStatus(TaskStatus.Executing);
         task.setLatestExecutionId(savedHistory.getId());
-        task.setStartTime(Instant.now());
+        task.setStartTime(clock.instant());
 
         // Call external system
         AutoSubmissionResult result = adapter.submit(target, inputParams, scope);
@@ -120,9 +121,9 @@ public class AutoExecutionService {
             savedHistory.setExecutionStatus(ExecutionStatus.Failed);
             savedHistory.setExternalStatus(ExternalStatus.FAILED);
             savedHistory.setExternalStatusMessage(result.message());
-            savedHistory.setEndTime(Instant.now());
+            savedHistory.setEndTime(clock.instant());
             task.setTaskStatus(TaskStatus.Failed);
-            task.setEndTime(Instant.now());
+            task.setEndTime(clock.instant());
         }
 
         executionHistoryRepository.save(savedHistory);

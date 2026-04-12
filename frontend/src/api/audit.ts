@@ -1,4 +1,4 @@
-import apiClient from './client'
+import platformClient from './platformClient'
 import type { AuditLogEntry, PaginatedResponse } from '../types'
 
 export async function listAuditLogs(params: {
@@ -10,6 +10,6 @@ export async function listAuditLogs(params: {
   snowGroup?: string
   agent?: string
 } = {}): Promise<PaginatedResponse<AuditLogEntry>> {
-  const response = await apiClient.get('/audit-logs', { params })
+  const response = await platformClient.get('/audit-logs', { params })
   return response.data
 }

@@ -32,7 +32,7 @@ class TestingAgentDataIsolationTest {
     @DisplayName("testing-agent list does not show deployment-agent flows")
     void testingAgent_doesNotSeeDeploymentAgentFlows() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.DEPLOYMENT_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.DEPLOYMENT_AGENT);
 
         mockMvc.perform(get(TA_BASE)
                         .header("X-User-Id", "user1")
@@ -42,24 +42,27 @@ class TestingAgentDataIsolationTest {
     }
 
     @Test
-    @DisplayName("deployment-agent list shows all flows regardless of agent")
-    void deploymentAgent_showsAllFlows() throws Exception {
+    @DisplayName("deployment-agent list is scoped to agent=deployment-agent (PL-6)")
+    void deploymentAgent_scopedToDeploymentAgent() throws Exception {
+        // Post-BA-T19 the Deployment Agent list excludes flows owned solely by other
+        // agents. A flow whose only request is tagged testing-agent must NOT appear in
+        // the deployment-agent list.
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
         mockMvc.perform(get(DA_BASE)
                         .header("X-User-Id", "user1")
                         .header("X-User-Role", "TL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total").value(1));
+                .andExpect(jsonPath("$.total").value(0));
     }
 
     @Test
     @DisplayName("each agent sees only its own flows when same project uploaded via both")
     void sameProject_eachAgentSeesOwnFlows() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        helper.seedRequest(rf, AgentId.DEPLOYMENT_AGENT);
-        helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.DEPLOYMENT_AGENT);
+        helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
 
         // Testing agent sees only 1 flow (with testing-agent request)
         mockMvc.perform(get(TA_BASE)

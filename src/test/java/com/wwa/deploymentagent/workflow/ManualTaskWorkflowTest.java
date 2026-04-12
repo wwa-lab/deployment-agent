@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.workflow;
 
+import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
@@ -53,7 +54,7 @@ class ManualTaskWorkflowTest {
     @BeforeEach
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
-        request = helper.seedRequest(releaseFlow);
+        request = helper.seedRequestWithAgent(releaseFlow, AgentId.DEPLOYMENT_AGENT);
         ownerUser = new UserContext("emp-001", "DEVELOPER");
     }
 

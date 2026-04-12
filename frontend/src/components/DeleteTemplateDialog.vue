@@ -63,18 +63,18 @@ async function confirmDelete() {
   flex-direction: column;
   gap: 8px;
   font-size: 14px;
-  color: #334155;
+  color: var(--color-text-secondary);
 }
 
 .impact-label {
   font-weight: 700;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .impact-note {
   margin: 16px 0 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.6;
 }
 

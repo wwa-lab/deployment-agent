@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { updateRequestRundown } from '../api/releaseFlows'
 import { useUserStore } from '../stores/user'
 import type { Request } from '../types'
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   request: Request
-  updateRequestRundownFn?: (
+  updateRequestRundownFn: (
     flowId: string,
     requestId: string,
     input: {
@@ -18,9 +17,7 @@ const props = withDefaults(defineProps<{
       estimatedRemainingMinutes?: number
     }
   ) => Promise<Request>
-}>(), {
-  updateRequestRundownFn: updateRequestRundown,
-})
+}>()
 const emit = defineEmits<{ saved: []; close: [] }>()
 const userStore = useUserStore()
 

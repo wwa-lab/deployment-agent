@@ -3,15 +3,18 @@ package com.wwa.deploymentagent.contracts.dto;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowAggregation;
 import com.wwa.deploymentagent.domain.releaseflow.Request;
 
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public record ReleaseFlowListItemDto(
@@ -20,7 +23,7 @@ public record ReleaseFlowListItemDto(
         String projectName,
         String releaseId,
         String normalizedReleaseId,
-        Stage currentStage,
+        String currentStage,
         FlowStatus flowStatus,
         ReviewStatus reviewStatus,
         java.time.Instant archivedAt,
@@ -29,12 +32,8 @@ public record ReleaseFlowListItemDto(
         String snowGroup,
         String agent,
         String owner,
-        RequestStatus sitStatus,
-        RequestStatus uatStatus,
-        RequestStatus prodStatus,
-        boolean sitPresent,
-        boolean uatPresent,
-        boolean prodPresent,
+        Map<String, RequestStatus> stageStatuses,
+        Set<String> stagesPresent,
         boolean stitched,
         int linkedReleaseCount,
         List<String> linkedReleaseIds,
@@ -43,12 +42,24 @@ public record ReleaseFlowListItemDto(
     public static final String ATTEMPT_VIEW_LATEST = "latest";
     public static final String ATTEMPT_VIEW_HISTORY = "history";
 
+    public ReleaseFlowListItemDto {
+        stageStatuses = stageStatuses == null
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(stageStatuses));
+        stagesPresent = stagesPresent == null
+                ? Collections.emptySet()
+                : Collections.unmodifiableSet(new LinkedHashSet<>(stagesPresent));
+    }
+
     public static ReleaseFlowListItemDto from(ReleaseFlow rf, List<Request> requests) {
         return from(rf, requests, ATTEMPT_VIEW_LATEST);
     }
 
     public static ReleaseFlowListItemDto from(ReleaseFlow rf, List<Request> requests, String attemptView) {
         Request scopeRequest = scopeRequestFor(rf, requests);
+        Set<String> observedStages = observedStages(requests);
+        Map<String, RequestStatus> statuses = buildStageStatuses(observedStages, requests, attemptView);
+
         return new ReleaseFlowListItemDto(
                 rf.getId(),
                 rf.getProjectId(),
@@ -66,12 +77,8 @@ public record ReleaseFlowListItemDto(
                 scopeRequest != null ? scopeRequest.getSnowGroup() : null,
                 scopeRequest != null ? scopeRequest.getAgent() : null,
                 scopeRequest != null ? scopeRequest.getOwner() : null,
-                requestStatusFor(requests, Stage.SIT, attemptView),
-                requestStatusFor(requests, Stage.UAT, attemptView),
-                requestStatusFor(requests, Stage.PROD, attemptView),
-                hasStage(requests, Stage.SIT),
-                hasStage(requests, Stage.UAT),
-                hasStage(requests, Stage.PROD),
+                statuses,
+                observedStages,
                 false,
                 1,
                 List.of(rf.getReleaseId()),
@@ -86,7 +93,7 @@ public record ReleaseFlowListItemDto(
 
         return requests.stream()
                 .filter(request -> request.getArchivedAt() == null)
-                .filter(request -> request.getStage() == rf.getCurrentStage())
+                .filter(request -> rf.getCurrentStage().equals(request.getStage()))
                 .max(requestAttemptComparator())
                 .or(() -> requests.stream()
                         .filter(request -> request.getArchivedAt() == null)
@@ -94,7 +101,30 @@ public record ReleaseFlowListItemDto(
                 .orElse(requests.get(0));
     }
 
-    private static RequestStatus requestStatusFor(List<Request> requests, Stage stage, String attemptView) {
+    private static Set<String> observedStages(List<Request> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return requests.stream()
+                .map(Request::getStage)
+                .filter(stage -> stage != null && !stage.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static Map<String, RequestStatus> buildStageStatuses(Set<String> observedStages,
+                                                                 List<Request> requests,
+                                                                 String attemptView) {
+        if (observedStages.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, RequestStatus> statuses = new LinkedHashMap<>();
+        for (String stage : observedStages) {
+            statuses.put(stage, requestStatusFor(requests, stage, attemptView));
+        }
+        return statuses;
+    }
+
+    private static RequestStatus requestStatusFor(List<Request> requests, String stage, String attemptView) {
         if (requests == null || requests.isEmpty()) {
             return RequestStatus.Pending;
         }
@@ -108,17 +138,9 @@ public record ReleaseFlowListItemDto(
                 stageRequests.stream().map(Request::getRequestStatus).toList());
     }
 
-    private static boolean hasStage(List<Request> requests, Stage stage) {
-        if (requests == null || requests.isEmpty()) {
-            return false;
-        }
-
-        return requests.stream().anyMatch(request -> request.getStage() == stage);
-    }
-
-    private static List<Request> stageRequestsByAttemptView(List<Request> requests, Stage stage, String attemptView) {
+    private static List<Request> stageRequestsByAttemptView(List<Request> requests, String stage, String attemptView) {
         List<Request> stageRequests = requests.stream()
-                .filter(request -> request.getStage() == stage)
+                .filter(request -> stage.equals(request.getStage()))
                 .toList();
         if (stageRequests.isEmpty()) {
             return List.of();
@@ -130,7 +152,7 @@ public record ReleaseFlowListItemDto(
     }
 
     private static List<Request> latestRequestsPerStage(List<Request> requests) {
-        Map<Stage, Request> latestByStage = requests.stream()
+        Map<String, Request> latestByStage = requests.stream()
                 .collect(Collectors.toMap(
                         Request::getStage,
                         request -> request,

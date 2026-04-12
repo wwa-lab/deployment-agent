@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import ConfigComponentDialog from '../components/ConfigComponentDialog.vue'
+import ScopeDirectoryDialog from '../components/ScopeDirectoryDialog.vue'
 import { useConfigStore } from '../stores/config'
+import { useScopeDirectoryStore } from '../stores/scopeDirectory'
 import { useUserStore } from '../stores/user'
-import type { ConfigComponentDraft, ConfigComponentRow, ConfigIntegrationId, ConfigKey } from '../types'
+import type {
+  ConfigComponentDraft,
+  ConfigComponentRow,
+  ConfigIntegrationId,
+  ConfigKey,
+  ScopeDirectoryEntry,
+} from '../types'
 
 type ScopeSource = 'Platform Default' | 'Application Default' | 'SNOW Group Default' | 'Agent Override'
 
@@ -66,14 +74,16 @@ const COMPONENT_DEFINITIONS: Array<{
 const SECRET_KEYS: ConfigKey[] = ['jenkins_api_token', 'ansible_api_token']
 
 const store = useConfigStore()
+const scopeDirectoryStore = useScopeDirectoryStore()
 const userStore = useUserStore()
 
 const canEdit = computed(() => userStore.isDevOpsAdmin)
+const refreshing = computed(() => store.loading || scopeDirectoryStore.loading)
 const componentDefinitionById = computed(
   () => new Map(COMPONENT_DEFINITIONS.map((definition) => [definition.id, definition])),
 )
 
-const activeView = ref<'component' | 'raw'>('component')
+const activeView = ref<'component' | 'scope' | 'raw'>('component')
 const searchTerm = ref('')
 const statusFilter = ref<'All' | ConfigComponentRow['status']>('All')
 const componentScopeFilters = reactive({
@@ -81,6 +91,8 @@ const componentScopeFilters = reactive({
   owningGroup: 'All',
   agent: 'All',
 })
+const scopeSearch = ref('')
+const scopeApplicationFilter = ref('All')
 const filterForm = reactive({
   owningGroup: 'All',
   application: 'All',
@@ -99,6 +111,11 @@ const creatingComponent = ref(false)
 const componentSaving = ref(false)
 const deletingComponentId = ref<string | null>(null)
 const componentError = ref('')
+const editingScopeEntry = ref<ScopeDirectoryEntry | null>(null)
+const creatingScopeEntry = ref(false)
+const scopeSaving = ref(false)
+const deletingScopeEntryId = ref<string | null>(null)
+const scopeError = ref('')
 
 const editingRowId = ref<string | null>(null)
 const editForm = reactive<{ value: string; description: string }>({ value: '', description: '' })
@@ -107,7 +124,7 @@ const rowError = ref<Record<string, string>>({})
 const rowSuccess = ref<Record<string, boolean>>({})
 
 onMounted(() => {
-  void store.fetchConfig()
+  void Promise.all([store.fetchConfig(), scopeDirectoryStore.fetchEntries()]).catch(() => undefined)
 })
 
 const componentRows = computed<ConfigComponentRow[]>(() => {
@@ -168,6 +185,26 @@ const componentAgentOptions = computed(() => [
   'All',
   ...new Set(componentRows.value.map((row) => row.agent).filter(Boolean)),
 ])
+
+const scopeApplicationOptions = computed(() => [
+  'All',
+  ...new Set(scopeDirectoryStore.entries.map((entry) => entry.application).filter(Boolean)),
+])
+
+const filteredScopeEntries = computed(() => {
+  const query = scopeSearch.value.trim().toLowerCase()
+
+  return scopeDirectoryStore.entries.filter((entry) => {
+    const matchesApplication =
+      scopeApplicationFilter.value === 'All' || entry.application === scopeApplicationFilter.value
+    const matchesSearch =
+      query.length === 0 ||
+      entry.application.toLowerCase().includes(query) ||
+      (entry.snowGroup ?? '').toLowerCase().includes(query)
+
+    return matchesApplication && matchesSearch
+  })
+})
 
 const filteredComponentRows = computed(() => {
   const query = searchTerm.value.trim().toLowerCase()
@@ -248,7 +285,7 @@ const componentDialogOptions = computed(() =>
 )
 
 async function refreshConfig() {
-  await store.fetchConfig()
+  await Promise.all([store.fetchConfig(), scopeDirectoryStore.fetchEntries(true)])
 }
 
 function applyRawFilters() {
@@ -266,7 +303,7 @@ function resetRawFilters() {
   applyRawFilters()
 }
 
-function selectView(view: 'component' | 'raw') {
+function selectView(view: 'component' | 'scope' | 'raw') {
   activeView.value = view
 }
 
@@ -289,6 +326,72 @@ function closeComponentEditor() {
   creatingComponent.value = false
   componentSaving.value = false
   componentError.value = ''
+}
+
+function openCreateScopeEntry() {
+  if (!canEdit.value) return
+  creatingScopeEntry.value = true
+  editingScopeEntry.value = null
+  scopeError.value = ''
+}
+
+function openScopeEditor(entry: ScopeDirectoryEntry) {
+  if (!canEdit.value) return
+  creatingScopeEntry.value = false
+  editingScopeEntry.value = entry
+  scopeError.value = ''
+}
+
+function closeScopeEditor() {
+  creatingScopeEntry.value = false
+  editingScopeEntry.value = null
+  scopeSaving.value = false
+  scopeError.value = ''
+}
+
+async function saveScopeEntry(draft: { application: string; snowGroup?: string }) {
+  if (!canEdit.value) return
+
+  scopeSaving.value = true
+  scopeError.value = ''
+
+  try {
+    await scopeDirectoryStore.saveEntry({
+      id: creatingScopeEntry.value ? undefined : editingScopeEntry.value?.id,
+      application: draft.application,
+      snowGroup: draft.snowGroup,
+    })
+    closeScopeEditor()
+  } catch (error: unknown) {
+    scopeError.value =
+      error instanceof Error ? error.message : 'Failed to save scope directory entry'
+  } finally {
+    scopeSaving.value = false
+  }
+}
+
+async function deleteScopeEntry(entry: ScopeDirectoryEntry) {
+  if (!canEdit.value) return
+
+  const confirmed = window.confirm(
+    `Delete scope entry "${entry.application}${entry.snowGroup ? ` / ${entry.snowGroup}` : ''}"?`,
+  )
+  if (!confirmed) return
+
+  deletingScopeEntryId.value = entry.id
+  scopeError.value = ''
+
+  try {
+    await scopeDirectoryStore.removeEntry(entry.id)
+    if (editingScopeEntry.value?.id === entry.id) {
+      closeScopeEditor()
+    }
+  } catch (error: unknown) {
+    scopeError.value =
+      error instanceof Error ? error.message : 'Failed to delete scope directory entry'
+  } finally {
+    deletingScopeEntryId.value = null
+  }
 }
 
 async function saveComponent(draft: ConfigComponentDraft) {
@@ -453,8 +556,8 @@ function displayValue(value?: string) {
         </p>
       </div>
 
-      <button class="btn btn-secondary" type="button" :disabled="store.loading" @click="refreshConfig">
-        {{ store.loading ? 'Refreshing...' : 'Refresh' }}
+      <button class="btn btn-secondary" type="button" :disabled="refreshing" @click="refreshConfig">
+        {{ refreshing ? 'Refreshing...' : 'Refresh' }}
       </button>
     </div>
 
@@ -472,6 +575,14 @@ function displayValue(value?: string) {
           @click="selectView('component')"
         >
           Component
+        </button>
+        <button
+          class="mode-tab"
+          :class="{ active: activeView === 'scope' }"
+          type="button"
+          @click="selectView('scope')"
+        >
+          Scope Directory
         </button>
         <button
           class="mode-tab"
@@ -637,6 +748,126 @@ function displayValue(value?: string) {
                         @click="deleteComponent(component)"
                       >
                         {{ deletingComponentId === component.id ? 'Deleting...' : 'Delete' }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+    </div>
+
+    <div v-else-if="activeView === 'scope'" class="scope-workspace">
+        <div class="helper-banner">
+          Maintain the curated <strong>Application + SNOW Group</strong> directory used by upload
+          dialogs. Uploaders choose from this list instead of typing free-form values each time.
+        </div>
+
+        <div v-if="scopeDirectoryStore.error || scopeError" class="alert alert-error">
+          {{ scopeError || scopeDirectoryStore.error }}
+        </div>
+
+        <div class="toolbar-card">
+          <div class="toolbar-grid">
+            <div class="toolbar-field toolbar-field-wide">
+              <label class="toolbar-label">Search</label>
+              <input
+                v-model="scopeSearch"
+                class="form-control"
+                type="text"
+                placeholder="Search application or SNOW Group"
+              />
+            </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Application</label>
+              <select v-model="scopeApplicationFilter" class="form-control">
+                <option
+                  v-for="application in scopeApplicationOptions"
+                  :key="application"
+                  :value="application"
+                >
+                  {{ application === 'All' ? 'All Applications' : application }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-header">
+            <div>
+              <h2 class="section-title">Scope Directory ({{ filteredScopeEntries.length }})</h2>
+              <p class="section-subtitle">
+                Maintain reusable scope values for uploads and other workflow surfaces that need
+                controlled Application and SNOW Group choices.
+              </p>
+            </div>
+            <button
+              v-if="canEdit"
+              class="btn btn-primary"
+              type="button"
+              @click="openCreateScopeEntry"
+            >
+              Add Scope Entry
+            </button>
+          </div>
+
+          <div
+            v-if="scopeDirectoryStore.loading && !scopeDirectoryStore.loaded"
+            class="loading-state"
+          >
+            <span class="spinner"></span>
+            <span>Loading scope directory...</span>
+          </div>
+
+          <div
+            v-else-if="!scopeDirectoryStore.loading && filteredScopeEntries.length === 0"
+            class="empty-state"
+          >
+            No scope directory entries matched the current filters.
+          </div>
+
+          <div v-else class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Application</th>
+                  <th>SNOW Group</th>
+                  <th>Scope Source</th>
+                  <th>Updated By</th>
+                  <th>Updated On</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in filteredScopeEntries" :key="entry.id">
+                  <td>{{ entry.application }}</td>
+                  <td>{{ entry.snowGroup ?? '—' }}</td>
+                  <td>
+                    <span class="scope-source-badge">{{ entry.scopeSource }}</span>
+                  </td>
+                  <td>{{ entry.updatedBy ?? '—' }}</td>
+                  <td class="timestamp">{{ formatDate(entry.updatedAt) }}</td>
+                  <td>
+                    <div class="action-btns">
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        type="button"
+                        :disabled="!canEdit"
+                        :title="canEdit ? '' : 'DEVOPS_ADMIN can edit scope directory entries.'"
+                        @click="openScopeEditor(entry)"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        class="btn btn-danger btn-sm"
+                        type="button"
+                        :disabled="!canEdit || deletingScopeEntryId === entry.id"
+                        @click="deleteScopeEntry(entry)"
+                      >
+                        {{ deletingScopeEntryId === entry.id ? 'Deleting...' : 'Delete' }}
                       </button>
                     </div>
                   </td>
@@ -826,6 +1057,16 @@ function displayValue(value?: string) {
       @close="closeComponentEditor"
       @save="saveComponent"
     />
+    <ScopeDirectoryDialog
+      v-if="editingScopeEntry || creatingScopeEntry"
+      :key="editingScopeEntry?.id ?? 'new-scope-entry'"
+      :entry="editingScopeEntry"
+      :mode="creatingScopeEntry ? 'create' : 'edit'"
+      :saving="scopeSaving"
+      :error="scopeError"
+      @close="closeScopeEditor"
+      @save="saveScopeEntry"
+    />
   </div>
 </template>
 
@@ -849,14 +1090,14 @@ function displayValue(value?: string) {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .view-title {
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .view-subtitle {
@@ -864,7 +1105,7 @@ function displayValue(value?: string) {
   max-width: 720px;
   font-size: 14px;
   line-height: 1.6;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .mode-tabs {
@@ -878,7 +1119,7 @@ function displayValue(value?: string) {
   border: none;
   border-radius: 12px 12px 0 0;
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -890,6 +1131,7 @@ function displayValue(value?: string) {
 }
 
 .component-workspace,
+.scope-workspace,
 .raw-workspace {
   display: flex;
   flex-direction: column;
@@ -907,8 +1149,8 @@ function displayValue(value?: string) {
 }
 
 .helper-banner-muted {
-  color: #475569;
-  background: #f8fafc;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-secondary);
   border-color: #e2e8f0;
 }
 
@@ -944,7 +1186,7 @@ function displayValue(value?: string) {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .toolbar-actions {
@@ -969,13 +1211,13 @@ function displayValue(value?: string) {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .section-subtitle {
   margin: 6px 0 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .table-container {
@@ -985,7 +1227,7 @@ function displayValue(value?: string) {
 .component-name {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .component-description {
@@ -993,7 +1235,7 @@ function displayValue(value?: string) {
   max-width: 320px;
   font-size: 12px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .endpoint-cell {
@@ -1003,7 +1245,7 @@ function displayValue(value?: string) {
 
 .config-item-name {
   font-size: 13px;
-  color: #0f172a;
+  color: var(--color-text-primary);
   white-space: nowrap;
 }
 
@@ -1011,7 +1253,7 @@ function displayValue(value?: string) {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .config-value-cell {
@@ -1021,7 +1263,7 @@ function displayValue(value?: string) {
 .config-value-text {
   max-width: 420px;
   word-break: break-word;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .status-badge,
@@ -1079,12 +1321,12 @@ function displayValue(value?: string) {
 }
 
 .mono {
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .timestamp {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 

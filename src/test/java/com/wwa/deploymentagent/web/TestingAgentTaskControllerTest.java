@@ -36,7 +36,7 @@ class TestingAgentTaskControllerTest {
     @DisplayName("GET /tasks?requestId=X returns tasks for request")
     void listByRequest_returnsTasks() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request req = helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        Request req = helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
         helper.seedTask(req);
 
         mockMvc.perform(get(BASE)
@@ -51,7 +51,7 @@ class TestingAgentTaskControllerTest {
     @DisplayName("GET /tasks/:id returns task")
     void getById_returnsTask() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request req = helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        Request req = helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
         Task task = helper.seedTask(req);
 
         mockMvc.perform(get(BASE + "/" + task.getId())
@@ -65,7 +65,7 @@ class TestingAgentTaskControllerTest {
     @DisplayName("GET /tasks/:id/executions returns empty list when no executions")
     void getExecutions_returnsEmptyList() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request req = helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        Request req = helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
         Task task = helper.seedTask(req);
 
         mockMvc.perform(get(BASE + "/" + task.getId() + "/executions")
@@ -79,7 +79,7 @@ class TestingAgentTaskControllerTest {
     @DisplayName("PUT /tasks/:id/input updates task input")
     void editInput_updatesTask() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request req = helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        Request req = helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
         Task task = helper.seedTask(req);
 
         mockMvc.perform(put(BASE + "/" + task.getId() + "/input")
@@ -95,7 +95,7 @@ class TestingAgentTaskControllerTest {
     @DisplayName("PUT /tasks/:id/input preserves unspecified input fields for Testing Agent tasks")
     void editInput_partialUpdate_preservesExistingFields() throws Exception {
         ReleaseFlow rf = helper.seedReleaseFlow();
-        Request req = helper.seedRequest(rf, AgentId.TESTING_AGENT);
+        Request req = helper.seedRequestWithAgent(rf, AgentId.TESTING_AGENT);
         Task task = helper.seedTask(req);
 
         mockMvc.perform(put(BASE + "/" + task.getId() + "/input")

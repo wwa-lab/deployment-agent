@@ -10,6 +10,8 @@ import com.wwa.deploymentagent.domain.releaseflow.RequestRepository;
 import com.wwa.deploymentagent.domain.task.Task;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.NotFoundAppException;
+import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import com.wwa.deploymentagent.platform.domain.StagePipelineRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class ReleaseFlowProgressionService {
     private final RequestRepository requestRepository;
     private final ReleaseFlowService releaseFlowService;
     private final ReleaseFlowRepository releaseFlowRepository;
+    private final StagePipelineRegistry stagePipelineRegistry;
 
     /**
      * Progress a release flow after a task decision.
@@ -69,8 +72,9 @@ public class ReleaseFlowProgressionService {
             request.setRequestStatus(RequestStatus.Completed);
             requestRepository.save(request);
 
-            if (releaseFlow.getCurrentStage().next() == null) {
-                // PROD completed – mark flow as Completed
+            StagePipeline pipeline = stagePipelineRegistry.forAgent(request.getAgent());
+            if (pipeline.isTerminal(releaseFlow.getCurrentStage())) {
+                // Terminal stage completed – mark flow as Completed
                 releaseFlowService.recomputeAndPersistStatus(releaseFlow.getId());
             } else {
                 // Advance to next stage

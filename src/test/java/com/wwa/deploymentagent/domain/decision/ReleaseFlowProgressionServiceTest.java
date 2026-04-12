@@ -1,5 +1,6 @@
 package com.wwa.deploymentagent.domain.decision;
 
+import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.enums.*;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlow;
 import com.wwa.deploymentagent.domain.releaseflow.ReleaseFlowRepository;
@@ -36,7 +37,7 @@ class ReleaseFlowProgressionServiceTest {
     @BeforeEach
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
-        request = helper.seedRequest(releaseFlow, Stage.SIT);
+        request = helper.seedRequest(releaseFlow, "SIT", RequestStatus.Pending, AgentId.DEPLOYMENT_AGENT);
     }
 
     @Test
@@ -84,7 +85,7 @@ class ReleaseFlowProgressionServiceTest {
 
         ReleaseFlow refreshed = releaseFlowRepository.findById(releaseFlow.getId()).orElseThrow();
         // With one task approved, SIT completes → flow should advance to UAT or Completed
-        assertThat(refreshed.getCurrentStage()).isIn(Stage.UAT, Stage.SIT);
+        assertThat(refreshed.getCurrentStage()).isIn("UAT", "SIT");
         // Stage advances only if it was the sole task; confirm request is Completed
         Request refreshedReq = requestRepository.findById(request.getId()).orElseThrow();
         assertThat(refreshedReq.getRequestStatus()).isEqualTo(RequestStatus.Completed);

@@ -1,26 +1,20 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import {
-  editTask as editTaskApi,
-  recordResult as recordResultApi,
-  startManualExecution as startManualExecutionApi,
-} from '../api/tasks'
 import type { Task } from '../types'
+import AiSuggestionPanel from './AiSuggestionPanel.vue'
+import { AI_ASSIST_PREVIEW_ENABLED } from '../config/platformConfig'
 
 const props = withDefaults(defineProps<{
   task: Task
-  mode?: 'edit' | 'run'
-  editTaskFn?: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
-  recordResultFn?: (
+  editTaskFn: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  recordResultFn: (
     taskId: string,
     body: { resultSummary: Record<string, unknown>; resultLogs?: string }
   ) => Promise<Task>
-  startManualExecutionFn?: (taskId: string) => Promise<Task>
+  startManualExecutionFn: (taskId: string) => Promise<Task>
+  mode?: 'edit' | 'run'
 }>(), {
   mode: 'edit',
-  editTaskFn: editTaskApi,
-  recordResultFn: recordResultApi,
-  startManualExecutionFn: startManualExecutionApi,
 })
 const emit = defineEmits<{ saved: []; close: [] }>()
 
@@ -177,6 +171,12 @@ async function submit() {
 
       <div class="modal-body">
         <div v-if="error" class="alert alert-error">{{ error }}</div>
+
+        <AiSuggestionPanel
+          v-if="AI_ASSIST_PREVIEW_ENABLED"
+          context="task-edit"
+          :task-name="task.taskName"
+        />
 
         <div class="form-group">
           <label class="form-label">Script</label>

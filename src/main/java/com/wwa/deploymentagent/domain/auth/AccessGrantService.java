@@ -18,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Collection;
@@ -37,15 +38,18 @@ public class AccessGrantService {
     private final PermissionResolver permissionResolver;
     private final TeamBookAuthenticationProvider authProvider;
     private final AuditLoggerService auditLogger;
+    private final Clock clock;
 
     public AccessGrantService(AccessGrantRepository accessGrantRepository,
                               PermissionResolver permissionResolver,
                               TeamBookAuthenticationProvider authProvider,
-                              AuditLoggerService auditLogger) {
+                              AuditLoggerService auditLogger,
+                              Clock clock) {
         this.accessGrantRepository = accessGrantRepository;
         this.permissionResolver = permissionResolver;
         this.authProvider = authProvider;
         this.auditLogger = auditLogger;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -123,7 +127,7 @@ public class AccessGrantService {
         }
 
         grant.setDisplayNameSnapshot(employee.displayName());
-        grant.setLastLoginAt(Instant.now());
+        grant.setLastLoginAt(clock.instant());
         accessGrantRepository.save(grant);
 
         Set<String> permissions = permissionResolver.resolvePermissions(roles);

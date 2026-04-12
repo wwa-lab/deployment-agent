@@ -50,6 +50,21 @@ If spec.md and implemented code disagree, note the discrepancy in the design as 
 
 ## Workflow
 
+### Step 0: Codebase Grounding Pass (MANDATORY)
+
+Before writing any design artifact, scan the source spec/architecture for every claim about existing code and verify each against the real repository. This single step prevents the vast majority of review findings.
+
+Required verifications:
+1. Every method name referenced in spec/architecture — grep it. Use `file.java:line` anchors in the generated design, not just method names
+2. Every claim like "the existing X already supports Y" — verify or tag `[UNVERIFIED]`
+3. Every annotation (`@PreAuthorize`, `@Transactional`, etc.) — confirm the real codebase uses the same style, or use the actual pattern (e.g., imperative validation helpers)
+4. Every upstream assumption — the spec may be wrong. Re-verify; do not inherit blindly (Rule 6 in grounding-rules)
+5. Every signature you plan to cite — confirm parameter names, parameter counts, return types
+
+**Design-specific requirement:** Because the design document carries implementation-facing detail (file paths, class names, method signatures), every reference to an existing file MUST include a real line anchor like `ReleaseFlowService.java:172`. If you cannot produce a line anchor, tag the reference `[UNVERIFIED]`.
+
+See `../_shared/grounding-rules.md` (Rules 1, 2, 6) for the full protocol.
+
 ### Step 1: Locate and Ingest Sources
 
 Check for source documents in this order:
@@ -226,6 +241,20 @@ Date / Version / Base Path / Backend stack / Auth model
 - No meta commentary
 
 **Skip this artifact** if the design has no API surface (e.g., a pure library or batch system).
+
+### Step 7.5: Pre-Ship Self-Review (MANDATORY)
+
+Before delivering any artifact, run the **shared Pre-Ship Checklist** from `../_shared/grounding-rules.md` across every generated file:
+
+- [ ] F1 — Every method/class/file/annotation reference is grep-verified and anchored with `file.ext:line`, or tagged `[UNVERIFIED]`
+- [ ] F2 — Every "the existing X already supports Y" claim is verified against real code
+- [ ] F3 — The architecture doc contains no design/task-level content (no code bodies, no precise method signatures, no LOC estimates, no test file names). The design doc contains no task-level content (no task IDs, no PR decomposition, no phase gates, no owner assignments)
+- [ ] F4 — Scope / Assumptions / Design Boundaries / Testing Considerations do not contradict each other. In particular: test expectations must match the rules they are testing, and Module descriptions must match the `[Out of Scope]` list
+- [ ] F5 — Every new rule (regex, ordering, sorting, algorithm, enum, routing) has been traced against at least 3 edge cases, including one case where the rule is intentionally NOT supposed to fire
+- [ ] F6 — No "implementation will decide" / "grep and choose later" language. Every implementation-impacting decision (DTO field order, method parameter shape, fallback behavior, boundary response codes) is committed
+- [ ] F7 — Every claim inherited from the architecture or spec has been re-verified, not carried forward blindly. Known phantom-inheritance hot spots: claims about existing service method names, repository method names, authorization style (`@PreAuthorize` vs imperative), load patterns (`findByIdWithFullHierarchy` vs `getById + findRequestsForFlow`)
+
+If any box is unchecked, fix the gap before delivering.
 
 ### Step 8: Deliver All Artifacts
 

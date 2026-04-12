@@ -1,9 +1,10 @@
 # WWA Agent Workspace Hub
 
-This repository hosts the **WWA Agent Workspace Hub** — a multi-agent platform for controlled, human-in-the-loop operational workflows. It currently contains two active agent workspaces:
+This repository hosts the **WWA Agent Workspace Hub** — a multi-agent platform for controlled, human-in-the-loop operational workflows. It currently contains three active agent workspaces:
 
 | Agent | Purpose | Stages |
 |-------|---------|--------|
+| **Build Agent** | DEV-stage build and packaging workflow with task-level execution and review controls | DEV |
 | **Deployment Agent** | Release orchestration — creating, running, reviewing, and auditing deployment rundowns | SIT, UAT, PROD |
 | **Testing Agent** | iSeries A/B testing — tracking and progressing test rundowns by program level | UAT |
 
@@ -12,12 +13,14 @@ This README reflects the current repository code and the current design baseline
 ## Current Baseline
 
 - Platform shell name: **WWA Agent Workspace Hub** (`WWA`)
-- Active agent workspaces: **Deployment Agent**, **Testing Agent**
+- Active agent workspaces: **Build Agent**, **Deployment Agent**, **Testing Agent**
 - Current technical identifiers:
   - repository / artifact: `deployment-agent`
   - Java package: `com.wwa.deploymentagent`
   - Deployment Agent: route `/wwa/deployment-agent`, API `/api/deployment-agent`
   - Testing Agent: route `/wwa/testing-agent`, API `/api/testing-agent`
+  - Build Agent: route `/wwa/build-agent`, API `/api/build-agent`
+  - Shared platform capabilities: API `/api/platform`
 - Current implementation status: MVP release orchestration, iSeries A/B testing workspace, scoped access-governance foundations, template-based rundown creation, rundown archive lifecycle, scoped configuration management, and WWA shell integration
 
 ## What Is Implemented Today
@@ -44,6 +47,14 @@ This README reflects the current repository code and the current design baseline
 - Task lifecycle actions for edit input, start MANUAL execution, submit AUTO execution, record results, and apply review decisions
 - Execution history per task attempt, including reruns and external job links
 - Rundown-level controls for editing scope metadata, starting deployment, marking failed, archiving, restoring, and purging
+
+### Build Agent
+
+- DEV-only build workspace with upload, summary, and detail pages inside the WWA shell
+- Upload flow reusing the shared Excel template while forcing `agent = "build-agent"` and `stage = "DEV"` server-side
+- Task lifecycle actions for edit input, start MANUAL execution, submit AUTO execution, record results, view activity, and apply review decisions
+- Attempt-aware detail view that keeps repeated DEV uploads grouped under the same workflow summary while exposing request attempts in the detail page
+- Shared audit/access/config/session platform services under `/api/platform/*`
 
 ### Testing Agent
 
@@ -82,9 +93,13 @@ The current implementation is split between a Spring Boot backend and a Vue fron
 
 ```text
 src/main/java/com/wwa/deploymentagent/
+  agents/           Agent-specific controllers and domain helpers
+    build/
+    deployment/
+    testing/
   config/           Spring configuration
   contracts/        DTOs, enums, request/response contracts, user context
-  domain/           Business logic and persistence-facing services
+  domain/           Shared business logic and persistence-facing services
     audit/
     auth/
     configuration/
@@ -94,11 +109,10 @@ src/main/java/com/wwa/deploymentagent/
     releaseflow/
     task/
   errors/           Shared application exceptions
+  platform/
+    web/shared/     Platform capability controllers (`/api/platform/*`)
+    web/security/   Session/header auth filters and Spring Security glue
   util/             Shared converters and helpers
-  web/
-    controller/     HTTP entry points (deployment-agent + testing-agent controllers)
-    exception/      Global exception handling
-    security/       Session/header auth filters and Spring Security glue
 
 src/main/resources/
   application.properties
@@ -108,6 +122,7 @@ src/main/resources/
 frontend/
   src/
     api/            Axios clients and endpoint wrappers
+    agents/         Agent-specific entrypoints, API wrappers, and views
     components/     Dialogs and reusable UI pieces
     config/         WWA shell and agent registry config
     router/         Vue Router setup
@@ -209,6 +224,7 @@ npm run build
 WWA shell pages currently exposed by the frontend:
 
 - `/wwa/home` — agent workspace selector
+- `/wwa/build-agent` — Build Agent summary and detail
 - `/wwa/deployment-agent` — Deployment Agent summary and detail
 - `/wwa/testing-agent` — Testing Agent summary and detail
 - `/wwa/template-management` — template authoring (platform)
@@ -218,19 +234,27 @@ WWA shell pages currently exposed by the frontend:
 
 Main backend API groups:
 
+Platform:
+- `/api/platform/auth`
+- `/api/platform/access-grants`
+- `/api/platform/config`
+- `/api/platform/audit-logs`
+- `/api/platform/upload/template`
+
 Deployment Agent:
-- `/api/deployment-agent/auth`
-- `/api/deployment-agent/access-grants`
 - `/api/deployment-agent/upload`
 - `/api/deployment-agent/release-flows`
 - `/api/deployment-agent/tasks`
-- `/api/deployment-agent/config`
-- `/api/deployment-agent/audit-logs`
 
 Testing Agent:
 - `/api/testing-agent/upload`
 - `/api/testing-agent/release-flows`
 - `/api/testing-agent/tasks`
+
+Build Agent:
+- `/api/build-agent/upload`
+- `/api/build-agent/release-flows`
+- `/api/build-agent/tasks`
 
 ## Source Documents
 

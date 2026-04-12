@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { submitDecision as submitDecisionApi } from '../api/tasks'
 import type { Task } from '../types'
+import AiSuggestionPanel from './AiSuggestionPanel.vue'
+import { AI_ASSIST_PREVIEW_ENABLED } from '../config/platformConfig'
 
 const props = withDefaults(defineProps<{
   task: Task
+  submitDecisionFn: (taskId: string, decision: string) => Promise<Task>
   initialDecision?: Decision | null
   allowedDecisions?: Decision[]
-  submitDecisionFn?: (taskId: string, decision: string) => Promise<Task>
 }>(), {
   initialDecision: null,
   allowedDecisions: () => ['Approve', 'Reject', 'Rerun', 'Skip'],
-  submitDecisionFn: submitDecisionApi,
 })
 const emit = defineEmits<{ decided: []; close: [] }>()
 
@@ -116,6 +116,12 @@ function statusBadgeClass(status: string): string {
           <span class="badge" :class="statusBadgeClass(task.taskStatus)">{{ task.taskStatus }}</span>
         </div>
 
+        <AiSuggestionPanel
+          v-if="AI_ASSIST_PREVIEW_ENABLED"
+          context="decision"
+          :task-name="task.taskName"
+        />
+
         <div class="decision-list">
           <label
             v-for="d in decisions"
@@ -155,7 +161,7 @@ function statusBadgeClass(status: string): string {
 <style scoped>
 .task-info {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 16px;
   display: flex;
   align-items: center;
@@ -165,7 +171,7 @@ function statusBadgeClass(status: string): string {
 
 .info-label {
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .decision-list {
@@ -187,7 +193,7 @@ function statusBadgeClass(status: string): string {
 
 .decision-option:hover {
   border-color: #94a3b8;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
 }
 
 .decision-option.selected.decision-approve {
@@ -207,7 +213,7 @@ function statusBadgeClass(status: string): string {
 
 .decision-option.selected.decision-skip {
   border-color: #94a3b8;
-  background: #f8fafc;
+  background: var(--color-surface-secondary);
 }
 
 .radio-input {
@@ -224,11 +230,11 @@ function statusBadgeClass(status: string): string {
 .decision-label {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .decision-desc {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 </style>

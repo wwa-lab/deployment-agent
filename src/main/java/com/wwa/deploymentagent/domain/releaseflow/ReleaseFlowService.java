@@ -12,8 +12,10 @@ import com.wwa.deploymentagent.contracts.enums.AuditActionType;
 import com.wwa.deploymentagent.contracts.enums.FlowStatus;
 import com.wwa.deploymentagent.contracts.enums.RequestStatus;
 import com.wwa.deploymentagent.contracts.enums.ReviewStatus;
-import com.wwa.deploymentagent.contracts.enums.Stage;
 import com.wwa.deploymentagent.contracts.enums.TaskStatus;
+import com.wwa.deploymentagent.agents.deployment.domain.ReleaseFlowFamilyKey;
+import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import com.wwa.deploymentagent.platform.domain.StagePipelineRegistry;
 import com.wwa.deploymentagent.domain.audit.AuditLoggerService;
 import com.wwa.deploymentagent.domain.task.TaskRepository;
 import com.wwa.deploymentagent.errors.ForbiddenAppException;
@@ -29,7 +31,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.time.Clock;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,6 +60,8 @@ public class ReleaseFlowService {
     private final RequestRepository requestRepository;
     private final TaskRepository taskRepository;
     private final AuditLoggerService auditLogger;
+    private final StagePipelineRegistry stagePipelineRegistry;
+    private final Clock clock;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -98,7 +104,7 @@ public class ReleaseFlowService {
     public Page<ReleaseFlow> list(
             String projectId,
             FlowStatus flowStatus,
-            Stage stage,
+            String stage,
             String application,
             String snowGroup,
             String agent,
@@ -152,14 +158,14 @@ public class ReleaseFlowService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ReleaseFlow> list(String projectId, FlowStatus flowStatus, Stage stage, Pageable pageable) {
+    public Page<ReleaseFlow> list(String projectId, FlowStatus flowStatus, String stage, Pageable pageable) {
         return list(projectId, flowStatus, stage, null, null, null, null, pageable, false);
     }
 
     @Transactional(readOnly = true)
     public Page<ReleaseFlow> list(String projectId,
                                   FlowStatus flowStatus,
-                                  Stage stage,
+                                  String stage,
                                   String application,
                                   String snowGroup,
                                   String agent,
@@ -168,10 +174,59 @@ public class ReleaseFlowService {
         return list(projectId, flowStatus, stage, application, snowGroup, agent, null, pageable, includeArchived);
     }
 
+    /**
+     * Agent-scoped list query introduced in BA-T12 (Build Agent refactor PL-5).
+     *
+     * <p>Unlike {@link #list}, this method filters by the {@code request.agent} column
+     * rather than by free-text search on the agent column. Only release flows with at
+     * least one non-archived request owned by {@code agentId} are returned.
+     *
+     * <p>Rows with {@code agent IS NULL} are excluded (post-V13 backfill there should
+     * be none; the filter defends against future null writes).
+     */
+    @Transactional(readOnly = true)
+    public Page<ReleaseFlow> listByAgent(String agentId, ReleaseFlowFilter filter, Pageable pageable) {
+        if (agentId == null || agentId.isBlank()) {
+            throw new ValidationAppException("agentId is required for listByAgent");
+        }
+        ReleaseFlowFilter effectiveFilter = filter == null ? ReleaseFlowFilter.empty() : filter;
+
+        Page<ReleaseFlow> basePage = list(
+                effectiveFilter.projectId(),
+                effectiveFilter.flowStatus(),
+                effectiveFilter.stage(),
+                effectiveFilter.application(),
+                effectiveFilter.snowGroup(),
+                null,
+                effectiveFilter.user(),
+                Pageable.unpaged(),
+                effectiveFilter.includeArchived());
+
+        List<ReleaseFlow> baseFlows = basePage.getContent();
+        Map<String, List<Request>> requestsByReleaseFlowId = findRequestsByReleaseFlowIds(
+                baseFlows.stream().map(ReleaseFlow::getId).toList(),
+                effectiveFilter.includeArchived());
+
+        List<ReleaseFlow> filtered = baseFlows.stream()
+                .filter(releaseFlow -> requestsByReleaseFlowId
+                        .getOrDefault(releaseFlow.getId(), List.of())
+                        .stream()
+                        .anyMatch(request -> agentId.equals(request.getAgent())))
+                .toList();
+
+        if (pageable.isUnpaged()) {
+            return new PageImpl<>(filtered, pageable, filtered.size());
+        }
+
+        int fromIndex = Math.min((int) pageable.getOffset(), filtered.size());
+        int toIndex = Math.min(fromIndex + pageable.getPageSize(), filtered.size());
+        return new PageImpl<>(filtered.subList(fromIndex, toIndex), pageable, filtered.size());
+    }
+
     @Transactional(readOnly = true)
     public Page<ReleaseFlowListItemDto> listStitchedSummaries(String projectId,
                                                               FlowStatus flowStatus,
-                                                              Stage stage,
+                                                              String stage,
                                                               String application,
                                                               String snowGroup,
                                                               String agent,
@@ -205,10 +260,10 @@ public class ReleaseFlowService {
                 .stream()
                 .map(groupedFlows -> buildStitchedSummary(groupedFlows, requestsByReleaseFlowId, normalizedAttemptView))
                 .filter(candidate -> flowStatus == null || candidate.dto().flowStatus() == flowStatus)
-                .filter(candidate -> stage == null || candidate.dto().currentStage() == stage)
+                .filter(candidate -> stage == null || stage.equals(candidate.dto().currentStage()))
                 .sorted(Comparator
                         .comparing(StitchedSummaryCandidate::sortTimestamp, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(candidate -> candidate.dto().currentStage(), Comparator.reverseOrder()))
+                        .thenComparingInt((StitchedSummaryCandidate candidate) -> -stageOrdinal(candidate.dto().currentStage())))
                 .toList();
 
         int fromIndex = Math.min((int) pageable.getOffset(), stitchedSummaries.size());
@@ -300,7 +355,7 @@ public class ReleaseFlowService {
      */
     @Transactional
     public ReleaseFlow create(String projectId, String projectName,
-                              String releaseId, String normalizedReleaseId, Stage firstStage) {
+                              String releaseId, String normalizedReleaseId, String firstStage) {
         ReleaseFlow rf = new ReleaseFlow();
         rf.setProjectId(projectId);
         rf.setProjectName(projectName);
@@ -340,16 +395,22 @@ public class ReleaseFlowService {
         releaseFlowRepository.save(rf);
     }
 
-    /** Advance the Release Flow's active stage to the next one in SIT→UAT→PROD order. */
+    /** Advance the Release Flow's active stage to the next one using the agent's stage pipeline. */
     @Transactional
     public void advanceStage(String releaseFlowId) {
         ReleaseFlow rf = getById(releaseFlowId);
-        Stage next = rf.getCurrentStage().next();
-        if (next != null) {
+        List<Request> requests = requestRepository.findByReleaseFlowIdAndArchivedAtIsNull(releaseFlowId);
+        String agentId = requests.stream()
+                .map(Request::getAgent)
+                .filter(agent -> agent != null && !agent.isBlank())
+                .findFirst()
+                .orElse(null);
+        StagePipeline pipeline = stagePipelineRegistry.forAgent(agentId);
+        pipeline.next(rf.getCurrentStage()).ifPresent(next -> {
             rf.setCurrentStage(next);
             rf.setFlowStatus(FlowStatus.Running);
             releaseFlowRepository.save(rf);
-        }
+        });
     }
 
     @Transactional
@@ -395,7 +456,7 @@ public class ReleaseFlowService {
         Request refreshed = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         auditLogger.log(user, AuditActionType.request_start, releaseFlowId, requestId, null,
-                Map.of("stage", refreshed.getStage().name()));
+                Map.of("stage", refreshed.getStage()));
         return refreshed;
     }
 
@@ -431,7 +492,7 @@ public class ReleaseFlowService {
         Request refreshed = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         auditLogger.log(user, AuditActionType.request_fail, releaseFlowId, requestId, null,
-                Map.of("stage", refreshed.getStage().name()));
+                Map.of("stage", refreshed.getStage()));
         return refreshed;
     }
 
@@ -441,7 +502,7 @@ public class ReleaseFlowService {
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         ReleaseFlow releaseFlow = getById(releaseFlowId);
 
-        Instant archivedAt = Instant.now();
+        Instant archivedAt = clock.instant();
         request.setArchivedAt(archivedAt);
         request.setArchivedBy(user.userId());
         requestRepository.save(request);
@@ -460,7 +521,7 @@ public class ReleaseFlowService {
 
         auditLogger.log(user, AuditActionType.request_archive, releaseFlowId, requestId, null,
                 Map.of(
-                        "stage", request.getStage().name(),
+                        "stage", request.getStage(),
                         "releaseFlowArchived", releaseFlowArchived,
                         "activeRequestCount", activeRequests.size()));
 
@@ -494,7 +555,7 @@ public class ReleaseFlowService {
 
         auditLogger.log(user, AuditActionType.request_restore, releaseFlowId, requestId, null,
                 Map.of(
-                        "stage", request.getStage().name(),
+                        "stage", request.getStage(),
                         "activeRequestCount", activeRequests.size()));
 
         return new RequestArchiveResultDto(
@@ -514,7 +575,7 @@ public class ReleaseFlowService {
             throw new ValidationAppException("Only archived rundowns can be permanently deleted.");
         }
 
-        Stage stage = request.getStage();
+        String stage = request.getStage();
         int requestCountBeforeDelete = requestRepository.findByReleaseFlowIdWithTasks(releaseFlowId, true).size();
         boolean releaseFlowDeleted = requestCountBeforeDelete <= 1;
         requestRepository.delete(request);
@@ -530,7 +591,7 @@ public class ReleaseFlowService {
                     .toList();
             ReleaseFlow releaseFlow = getById(releaseFlowId, true);
             if (activeRequests.isEmpty()) {
-                Instant archivedAt = releaseFlow.getArchivedAt() != null ? releaseFlow.getArchivedAt() : Instant.now();
+                Instant archivedAt = releaseFlow.getArchivedAt() != null ? releaseFlow.getArchivedAt() : clock.instant();
                 String archivedBy = releaseFlow.getArchivedBy() != null ? releaseFlow.getArchivedBy() : user.userId();
                 archiveReleaseFlow(releaseFlow, archivedAt, archivedBy);
             } else {
@@ -541,7 +602,7 @@ public class ReleaseFlowService {
 
             auditLogger.log(user, AuditActionType.request_purge, releaseFlowId, requestId, null,
                     Map.of(
-                            "stage", stage.name(),
+                            "stage", stage,
                             "releaseFlowDeleted", false,
                             "remainingRequestCount", remainingRequests.size(),
                             "activeRequestCount", activeRequests.size()));
@@ -557,7 +618,7 @@ public class ReleaseFlowService {
 
         auditLogger.log(user, AuditActionType.request_purge, releaseFlowId, requestId, null,
                 Map.of(
-                        "stage", stage.name(),
+                        "stage", stage,
                         "releaseFlowDeleted", true,
                         "remainingRequestCount", 0,
                         "activeRequestCount", 0));
@@ -599,7 +660,7 @@ public class ReleaseFlowService {
 
     private FlowStatus aggregateFlowStatus(List<Request> requests, String attemptView) {
         String normalizedAttemptView = normalizeAttemptView(attemptView);
-        List<RequestStatus> stageStatuses = java.util.Arrays.stream(Stage.values())
+        List<RequestStatus> stageStatuses = allKnownStages(requests).stream()
                 .flatMap(stage -> {
                     List<RequestStatus> stageReqs = requestsForStage(requests, stage, normalizedAttemptView).stream()
                             .map(Request::getRequestStatus)
@@ -614,8 +675,8 @@ public class ReleaseFlowService {
         return ReleaseFlowAggregation.aggregateStagesToFlowStatus(stageStatuses);
     }
 
-    private Stage determineCurrentStage(List<Request> requests, Stage currentStage) {
-        if (requests.stream().anyMatch(request -> request.getStage() == currentStage)) {
+    private String determineCurrentStage(List<Request> requests, String currentStage) {
+        if (requests.stream().anyMatch(request -> currentStage.equals(request.getStage()))) {
             return currentStage;
         }
 
@@ -651,7 +712,7 @@ public class ReleaseFlowService {
     private List<Request> sortRequests(List<Request> requests) {
         return requests.stream()
                 .sorted(Comparator
-                        .comparing(Request::getStage)
+                        .comparingInt((Request r) -> stageOrdinal(r.getStage()))
                         .thenComparing(request -> request.getArchivedAt() != null)
                         .thenComparing(Request::getAttemptNumber, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Request::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -667,10 +728,16 @@ public class ReleaseFlowService {
                         .getOrDefault(releaseFlow.getId(), List.of())
                         .stream())
                 .toList());
-        Stage currentStage = deriveCurrentStage(stitchedRequests, representativeFlow.getCurrentStage());
+        String currentStage = deriveCurrentStage(stitchedRequests, representativeFlow.getCurrentStage());
         List<String> linkedReleaseIds = orderedDistinctReleaseIds(groupedFlows, requestsByReleaseFlowId, representativeFlow);
         List<String> linkedReleaseFlowIds = orderedDistinctFlowIds(groupedFlows, requestsByReleaseFlowId, representativeFlow);
         Request scopeRequest = scopeRequestForCurrentStage(stitchedRequests, currentStage);
+
+        Set<String> observedStages = observedStages(stitchedRequests);
+        Map<String, RequestStatus> stageStatuses = new LinkedHashMap<>();
+        for (String stage : observedStages) {
+            stageStatuses.put(stage, stageStatusFor(stitchedRequests, stage, attemptView));
+        }
 
         ReleaseFlowListItemDto dto = new ReleaseFlowListItemDto(
                 representativeFlow.getId(),
@@ -691,12 +758,8 @@ public class ReleaseFlowService {
                 scopeRequest != null ? scopeRequest.getSnowGroup() : null,
                 scopeRequest != null ? scopeRequest.getAgent() : null,
                 scopeRequest != null ? scopeRequest.getOwner() : null,
-                stageStatusFor(stitchedRequests, Stage.SIT, attemptView),
-                stageStatusFor(stitchedRequests, Stage.UAT, attemptView),
-                stageStatusFor(stitchedRequests, Stage.PROD, attemptView),
-                hasStage(stitchedRequests, Stage.SIT),
-                hasStage(stitchedRequests, Stage.UAT),
-                hasStage(stitchedRequests, Stage.PROD),
+                stageStatuses,
+                observedStages,
                 groupedFlows.size() > 1 || linkedReleaseIds.size() > 1,
                 linkedReleaseIds.size(),
                 linkedReleaseIds,
@@ -711,30 +774,37 @@ public class ReleaseFlowService {
                                            Map<String, List<Request>> requestsByReleaseFlowId) {
         return releaseFlows.stream()
                 .max(Comparator
-                        .comparing((ReleaseFlow releaseFlow) ->
-                                highestPresentStage(
+                        .comparingInt((ReleaseFlow releaseFlow) ->
+                                stageOrdinal(highestPresentStage(
                                         requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of()),
-                                        releaseFlow.getCurrentStage()))
+                                        releaseFlow.getCurrentStage())))
                         .thenComparing(ReleaseFlow::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(ReleaseFlow::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElseThrow(() -> new ValidationAppException("Unable to determine a representative release flow."));
     }
 
-    private Stage highestPresentStage(List<Request> requests, Stage fallbackStage) {
+    private static final List<String> STAGE_ORDER = List.of("SIT", "UAT", "PROD");
+
+    private static int stageOrdinal(String stage) {
+        int idx = STAGE_ORDER.indexOf(stage);
+        return idx >= 0 ? idx : Integer.MAX_VALUE;
+    }
+
+    private String highestPresentStage(List<Request> requests, String fallbackStage) {
         return requests.stream()
                 .map(Request::getStage)
-                .max(Comparator.naturalOrder())
+                .max(Comparator.comparingInt(ReleaseFlowService::stageOrdinal))
                 .orElse(fallbackStage);
     }
 
-    private Stage deriveCurrentStage(List<Request> requests, Stage fallbackStage) {
+    private String deriveCurrentStage(List<Request> requests, String fallbackStage) {
         return highestPresentStage(requests, fallbackStage);
     }
 
-    private Request scopeRequestForCurrentStage(List<Request> requests, Stage currentStage) {
+    private Request scopeRequestForCurrentStage(List<Request> requests, String currentStage) {
         return requests.stream()
                 .filter(request -> request.getArchivedAt() == null)
-                .filter(request -> request.getStage() == currentStage)
+                .filter(request -> currentStage.equals(request.getStage()))
                 .max(requestAttemptComparator())
                 .or(() -> requests.stream()
                         .filter(request -> request.getArchivedAt() == null)
@@ -742,15 +812,21 @@ public class ReleaseFlowService {
                 .orElse(requests.isEmpty() ? null : requests.get(0));
     }
 
-    private RequestStatus stageStatusFor(List<Request> requests, Stage stage, String attemptView) {
+    private RequestStatus stageStatusFor(List<Request> requests, String stage, String attemptView) {
         List<RequestStatus> stageStatuses = requestsForStage(requests, stage, attemptView).stream()
                 .map(Request::getRequestStatus)
                 .toList();
         return ReleaseFlowAggregation.aggregateRequestsToStageStatus(stageStatuses);
     }
 
-    private boolean hasStage(List<Request> requests, Stage stage) {
-        return requests.stream().anyMatch(request -> request.getStage() == stage);
+    private Set<String> observedStages(List<Request> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return requests.stream()
+                .map(Request::getStage)
+                .filter(stage -> stage != null && !stage.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private List<Request> requestsByAttemptView(List<Request> requests, String attemptView) {
@@ -762,25 +838,22 @@ public class ReleaseFlowService {
             return requests;
         }
 
-        Map<Stage, Request> latestByStage = requests.stream()
+        Map<String, Request> latestByStage = requests.stream()
                 .collect(Collectors.toMap(
                         Request::getStage,
                         request -> request,
                         (left, right) -> requestAttemptComparator().compare(left, right) >= 0 ? left : right));
 
-        return java.util.Arrays.stream(Stage.values())
-                .map(latestByStage::get)
-                .filter(request -> request != null)
-                .toList();
+        return latestByStage.values().stream().toList();
     }
 
-    private List<Request> requestsForStage(List<Request> requests, Stage stage, String attemptView) {
+    private List<Request> requestsForStage(List<Request> requests, String stage, String attemptView) {
         if (requests == null || requests.isEmpty()) {
             return List.of();
         }
 
         List<Request> stageRequests = requests.stream()
-                .filter(request -> request.getStage() == stage)
+                .filter(request -> stage.equals(request.getStage()))
                 .toList();
         if (stageRequests.isEmpty()) {
             return List.of();
@@ -845,11 +918,10 @@ public class ReleaseFlowService {
         return releaseFlows.stream()
                 .sorted(Comparator
                         .comparing((ReleaseFlow releaseFlow) -> !releaseFlow.getId().equals(representativeFlow.getId()))
-                        .thenComparing((ReleaseFlow releaseFlow) ->
-                                        highestPresentStage(
-                                                requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of()),
-                                                releaseFlow.getCurrentStage()),
-                                Comparator.reverseOrder())
+                        .thenComparingInt((ReleaseFlow releaseFlow) ->
+                                -stageOrdinal(highestPresentStage(
+                                        requestsByReleaseFlowId.getOrDefault(releaseFlow.getId(), List.of()),
+                                        releaseFlow.getCurrentStage())))
                         .thenComparing(ReleaseFlow::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(ReleaseFlow::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
@@ -946,6 +1018,15 @@ public class ReleaseFlowService {
         }
         return requests.stream()
                 .anyMatch(request -> user.hasScopedAccess(request.getApplication(), request.getSnowGroup()));
+    }
+
+    /** Collect distinct stages present in the given requests, preserving natural order. */
+    private List<String> allKnownStages(List<Request> requests) {
+        return requests.stream()
+                .map(Request::getStage)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     private record StitchedSummaryCandidate(

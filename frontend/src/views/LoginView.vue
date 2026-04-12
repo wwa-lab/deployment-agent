@@ -10,6 +10,20 @@ const employeeId = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const guestLoading = ref(false)
+
+async function handleGuestLogin() {
+  error.value = ''
+  guestLoading.value = true
+  try {
+    await userStore.loginAsGuest()
+    router.push('/wwa/home')
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Unable to start guest session'
+  } finally {
+    guestLoading.value = false
+  }
+}
 
 async function handleLogin() {
   error.value = ''
@@ -152,10 +166,25 @@ async function handleLogin() {
             <p class="field-hint">For local testing, any non-empty password works.</p>
           </div>
 
-          <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
+          <button type="submit" class="btn btn-primary btn-full" :disabled="loading || guestLoading">
             {{ loading ? 'Signing in...' : 'Sign In' }}
           </button>
         </form>
+
+        <div class="login-guest">
+          <span class="login-guest-divider">or</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-full login-guest-btn"
+            :disabled="loading || guestLoading"
+            @click="handleGuestLogin"
+          >
+            {{ guestLoading ? 'Entering...' : 'Continue as Guest (read-only)' }}
+          </button>
+          <p class="login-guest-hint">
+            No account needed. Browse every page read-only — uploads, executions, and edits are disabled.
+          </p>
+        </div>
 
         <div class="login-hint">
           <p>Dev accounts: emp-001 (Developer), emp-002 (TL), emp-003 (DevOps Admin), emp-004 (Audit), emp-005 (Management)</p>
@@ -539,13 +568,13 @@ async function handleLogin() {
 .login-title {
   font-size: 24px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin: 10px 0 6px;
 }
 
 .login-subtitle {
   font-size: 14px;
-  color: #5f6f8c;
+  color: var(--color-text-secondary);
 }
 
 .login-form {
@@ -565,7 +594,7 @@ async function handleLogin() {
 .form-label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .form-input {
@@ -573,7 +602,7 @@ async function handleLogin() {
   border: 1px solid #d8e3f3;
   border-radius: 10px;
   font-size: 14px;
-  color: #1e293b;
+  color: var(--color-text-primary);
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
@@ -589,7 +618,7 @@ async function handleLogin() {
 .field-hint {
   margin: 0;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .btn-full {
@@ -606,6 +635,39 @@ async function handleLogin() {
   border-radius: 10px;
   font-size: 13px;
   border: 1px solid #fecaca;
+}
+
+.login-guest {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.login-guest-divider {
+  align-self: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.login-guest-btn {
+  padding: 10px;
+  justify-content: center;
+}
+
+.login-guest-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.5;
 }
 
 .login-hint {
