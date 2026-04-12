@@ -1306,6 +1306,7 @@ onUnmounted(() => {
       :task="editingTask"
       :mode="taskDialogMode"
       :edit-task-fn="api.editTask"
+      :edit-names-fn="api.editNames"
       :edit-execution-type-fn="api.editExecutionType"
       :record-result-fn="api.recordResult"
       :start-manual-execution-fn="api.startManualExecution"

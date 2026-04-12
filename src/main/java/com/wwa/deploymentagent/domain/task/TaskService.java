@@ -148,6 +148,51 @@ public class TaskService {
     }
 
     /**
+     * Edit task name and/or step (group) name.
+     * Only allowed in Pending or Ready_For_Execution states.
+     */
+    @Transactional
+    public Task editNames(String taskId, String newTaskName, String newTaskGroupName, UserContext user) {
+        Task task = getById(taskId);
+        assertTaskRequestActive(task);
+        taskPermissionService.assertOwnerOrAdmin(task, user, "task:editNames");
+
+        if (task.getTaskStatus() != TaskStatus.Pending
+                && task.getTaskStatus() != TaskStatus.Ready_For_Execution) {
+            throw new ValidationAppException(
+                    "Task names can only be edited in Pending or Ready_For_Execution states. "
+                    + "Current state: " + task.getTaskStatus().name());
+        }
+
+        Map<String, Object> changes = new LinkedHashMap<>();
+        String oldTaskName = task.getTaskName();
+        String oldGroupName = task.getTaskGroupName();
+
+        if (newTaskName != null && !newTaskName.isBlank() && !newTaskName.equals(oldTaskName)) {
+            task.setTaskName(newTaskName.trim());
+            changes.put("taskName", Map.of("old", oldTaskName, "new", task.getTaskName()));
+        }
+        if (newTaskGroupName != null && !newTaskGroupName.isBlank() && !newTaskGroupName.equals(oldGroupName)) {
+            task.setTaskGroupName(newTaskGroupName.trim());
+            changes.put("taskGroupName", Map.of("old", oldGroupName, "new", task.getTaskGroupName()));
+        }
+
+        if (changes.isEmpty()) {
+            return task;
+        }
+
+        Task saved = save(task);
+
+        auditLogger.log(user, AuditActionType.edit,
+                task.getRequest().getReleaseFlow().getId(),
+                task.getRequest().getId(),
+                taskId,
+                Map.of("fieldsChanged", changes));
+
+        return saved;
+    }
+
+    /**
      * Change the execution type of a task (MANUAL ↔ AUTO).
      * Only allowed in Pending or Ready_For_Execution states.
      */

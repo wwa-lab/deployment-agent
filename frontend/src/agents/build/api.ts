@@ -65,6 +65,14 @@ export async function editTask(
   return response.data
 }
 
+export async function editNames(
+  taskId: string,
+  names: { taskName?: string; taskGroupName?: string },
+): Promise<Task> {
+  const response = await buildClient.put(`/tasks/${taskId}/names`, names)
+  return response.data
+}
+
 export async function editExecutionType(
   taskId: string,
   executionType: 'MANUAL' | 'AUTO',

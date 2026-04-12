@@ -7,6 +7,7 @@ import { AI_ASSIST_PREVIEW_ENABLED } from '../config/platformConfig'
 const props = withDefaults(defineProps<{
   task: Task
   editTaskFn: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  editNamesFn: (taskId: string, names: { taskName?: string; taskGroupName?: string }) => Promise<Task>
   editExecutionTypeFn: (taskId: string, executionType: 'MANUAL' | 'AUTO') => Promise<Task>
   recordResultFn: (
     taskId: string,
@@ -25,6 +26,8 @@ const getInputParams = () => ({
 })
 
 const form = reactive({
+  taskName: props.task.taskName ?? '',
+  taskGroupName: props.task.taskGroupName ?? '',
   script: getInputParams().script,
   parameters: getInputParams().parameters,
   resultSummary: '',
@@ -32,15 +35,21 @@ const form = reactive({
   executionType: props.task.executionType as ExecutionType,
 })
 
+let originalTaskName = props.task.taskName ?? ''
+let originalTaskGroupName = props.task.taskGroupName ?? ''
 let originalScript = getInputParams().script
 let originalParameters = getInputParams().parameters
 
 watch(() => props.task, (newTask) => {
+  form.taskName = newTask.taskName ?? ''
+  form.taskGroupName = newTask.taskGroupName ?? ''
   form.script = newTask.inputParameters?.script ?? ''
   form.parameters = newTask.inputParameters?.parameters ?? ''
   form.resultSummary = ''
   form.resultLogs = ''
   form.executionType = newTask.executionType
+  originalTaskName = newTask.taskName ?? ''
+  originalTaskGroupName = newTask.taskGroupName ?? ''
   originalScript = newTask.inputParameters?.script ?? ''
   originalParameters = newTask.inputParameters?.parameters ?? ''
 }, { immediate: false })
@@ -63,6 +72,10 @@ const canSubmitManualResult = computed(
   () =>
     props.task.executionType === 'MANUAL' &&
     (props.task.taskStatus === 'Ready_For_Execution' || props.task.taskStatus === 'Executing'),
+)
+
+const hasNameChanges = computed(
+  () => form.taskName !== originalTaskName || form.taskGroupName !== originalTaskGroupName,
 )
 
 const hasInputChanges = computed(
@@ -145,7 +158,7 @@ async function submit() {
     return
   }
 
-  if (!hasInputChanges.value && !hasExecutionTypeChange.value && !isSubmittingResult.value && !isStartingManualExecution.value) {
+  if (!hasNameChanges.value && !hasInputChanges.value && !hasExecutionTypeChange.value && !isSubmittingResult.value && !isStartingManualExecution.value) {
     error.value = 'No changes to save.'
     return
   }
@@ -153,6 +166,13 @@ async function submit() {
   saving.value = true
   error.value = ''
   try {
+    if (hasNameChanges.value) {
+      const names: { taskName?: string; taskGroupName?: string } = {}
+      if (form.taskName !== originalTaskName) names.taskName = form.taskName.trim()
+      if (form.taskGroupName !== originalTaskGroupName) names.taskGroupName = form.taskGroupName.trim()
+      await props.editNamesFn(props.task.id, names)
+    }
+
     if (hasExecutionTypeChange.value) {
       await props.editExecutionTypeFn(props.task.id, form.executionType)
     }
@@ -203,6 +223,24 @@ async function submit() {
             <li><strong>Record Result</strong> — come back and click "Record Result" to submit the outcome</li>
             <li><strong>Review</strong> — a reviewer will approve or reject the result</li>
           </ol>
+        </div>
+
+        <div v-if="canChangeExecutionType" class="form-group">
+          <label class="form-label">Step Name</label>
+          <input
+            v-model="form.taskName"
+            class="form-control"
+            placeholder="Step name..."
+          />
+        </div>
+
+        <div v-if="canChangeExecutionType" class="form-group">
+          <label class="form-label">Task Name</label>
+          <input
+            v-model="form.taskGroupName"
+            class="form-control"
+            placeholder="Task group name..."
+          />
         </div>
 
         <div v-if="canChangeExecutionType" class="form-group">

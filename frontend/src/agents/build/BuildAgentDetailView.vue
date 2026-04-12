@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   cloneTask as cloneTaskApi,
   editExecutionType as editExecutionTypeApi,
+  editNames as editNamesApi,
   editTask as editTaskApi,
   getTaskResult,
   listTaskExecutions as listBuildTaskExecutions,
@@ -1014,6 +1015,7 @@ const activeRequestSummary = computed(() => {
       :task="editingTask"
       :mode="taskDialogMode"
       :edit-task-fn="editTaskApi"
+      :edit-names-fn="editNamesApi"
       :edit-execution-type-fn="editExecutionTypeApi"
       :record-result-fn="recordResultApi"
       :start-manual-execution-fn="startManualExecutionApi"

@@ -28,6 +28,7 @@ import java.util.Map;
  *   GET  /api/deployment-agent/tasks/:id            – single task detail
  *   PUT  /api/deployment-agent/tasks/:id/input          – edit task input (owner or DEVOPS_ADMIN)
  *   PUT  /api/deployment-agent/tasks/:id/execution-type – change MANUAL↔AUTO (owner or DEVOPS_ADMIN)
+ *   PUT  /api/deployment-agent/tasks/:id/names          – edit task/step name (owner or DEVOPS_ADMIN)
  *   GET  /api/deployment-agent/tasks/:id/executions     – execution history
  *   POST /api/deployment-agent/tasks/:id/record-result – MANUAL task result record
  *   POST /api/deployment-agent/tasks/:id/start-manual  – MANUAL task start
@@ -93,6 +94,16 @@ public class DeploymentTaskController {
         }
         boundaryGuard.assertTaskBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
         return ResponseEntity.ok(TaskDto.from(taskService.editExecutionType(id, newType, user)));
+    }
+
+    @PutMapping("/{id}/names")
+    public ResponseEntity<TaskDto> editNames(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.DEPLOYMENT_AGENT);
+        return ResponseEntity.ok(TaskDto.from(
+                taskService.editNames(id, body.get("taskName"), body.get("taskGroupName"), user)));
     }
 
     @GetMapping("/{id}/executions")

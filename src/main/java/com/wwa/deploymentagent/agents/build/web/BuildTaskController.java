@@ -85,6 +85,16 @@ public class BuildTaskController {
         return ResponseEntity.ok(TaskDto.from(taskService.editExecutionType(id, newType, user)));
     }
 
+    @PutMapping("/{id}/names")
+    public ResponseEntity<TaskDto> editNames(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+        return ResponseEntity.ok(TaskDto.from(
+                taskService.editNames(id, body.get("taskName"), body.get("taskGroupName"), user)));
+    }
+
     @GetMapping("/{id}/executions")
     public ResponseEntity<List<TaskExecutionHistoryDto>> getExecutions(@PathVariable String id) {
         boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
