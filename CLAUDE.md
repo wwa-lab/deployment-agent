@@ -44,6 +44,8 @@ Any non-empty password works with the stub auth provider.
 | `emp-004` | David Cho | AUDIT |
 | `emp-005` | Eve Yoon | MANAGEMENT |
 
+A `GUEST` role also exists for anonymous read-only access (no employee login required). The guest session is created via `POST /api/platform/auth/guest` and enforced by `GuestReadOnlyFilter`.
+
 ## Architecture Overview
 
 ### Entity Hierarchy
@@ -53,29 +55,40 @@ ReleaseFlow (root aggregate, @Version optimistic lock)
  └─ Request (stage-specific, has optional `agent` field for multi-agent isolation)
      └─ Task (atomic execution unit, MANUAL or AUTO)
          └─ TaskExecutionHistory (immutable record of each attempt)
+
+AccessGrant (deny-by-default product entry, scoped by application + snowGroup)
+OutboxEvent (transactional outbox for domain events, PENDING → PUBLISHED)
+ScopeDirectoryEntry (curated application / SNOW group / agent choices for upload)
+ConfigurationComponent (scoped component metadata for Jenkins/Ansible/callback)
+ConfigurationItem (raw key-value configuration)
+AuditLogEntry (immutable audit trail)
 ```
 
 ### Multi-Agent Architecture
 
-The system supports multiple agents (Deployment Agent, Testing Agent) sharing the same domain services but isolated at three layers:
+The system supports multiple agents (Deployment Agent, Testing Agent, Build Agent) sharing the same domain services but isolated at three layers:
 
 **Backend isolation:**
-- Separate controller routes: `/api/deployment-agent/*` vs `/api/testing-agent/*`
+- Separate controller routes: `/api/deployment-agent/*`, `/api/testing-agent/*`, `/api/build-agent/*`
+- Agent-specific controllers live in `agents/<agent>/web/` (e.g. `agents/deployment/web/`, `agents/build/web/`)
+- Platform-shared controllers live in `platform/web/shared/` (auth, audit, config, access grants, template download)
 - Controllers force `effectiveAgent = AgentId.<AGENT>` server-side (client `?agent=` param is ignored)
 - Shared domain services receive `agentId` as a parameter; queries filter by `request.agent`
 
 **Frontend isolation:**
-- Separate Axios clients: `api/client.ts` (baseURL `/api/deployment-agent`) vs `api/testingAgentClient.ts` (baseURL `/api/testing-agent`)
-- Separate Pinia stores: `releaseFlow.ts` vs `testingAgentReleaseFlow.ts`
-- Separate view components: `ReleaseFlowSummaryView` / `ReleaseFlowDetailView` vs `TestingAgentSummaryView` / `TestingAgentDetailView`
+- `createAgentWorkspace` factory in `frontend/src/platform/composables/createAgentWorkspace.ts` produces per-agent Axios client, Pinia store, and API modules from a single configuration
+- Each agent is defined in `frontend/src/agents/<agent>/index.ts` (e.g. `agents/deployment/index.ts`, `agents/build/index.ts`)
+- `platformClient.ts` (baseURL `/api/platform`) handles shared endpoints (auth, audit, config, access grants)
+- Agent-specific views live in `frontend/src/agents/<agent>/` (e.g. `BuildAgentSummaryView`, `BuildAgentDetailView`)
 - Agent registry in `frontend/src/config/agentRegistry.ts` drives home page cards and nav
 
 ### Security Architecture
 
 1. `SessionAuthFilter` reads `UserContext` from HTTP session
 2. `HeaderAuthFilter` reads `X-User-Id` / `X-User-Role` headers (test/local only, controlled by `app.auth.header-fallback-enabled`)
-3. `UserContext` carries `roles[]`, `permissions[]`, `scopes[]` (application + snowGroup pairs)
-4. DEVOPS_ADMIN with no scopes = global admin; with scopes = scoped admin
+3. `GuestReadOnlyFilter` blocks non-GET requests from `GUEST` sessions (only exception: `/api/platform/auth/logout`)
+4. `UserContext` carries `roles[]`, `permissions[]`, `scopes[]` (application + snowGroup pairs)
+5. DEVOPS_ADMIN with no scopes = global admin; with scopes = scoped admin
 
 ### Error Handling
 
@@ -90,6 +103,8 @@ Custom `AppException` hierarchy in `errors/` maps to HTTP status codes. `GlobalE
 /wwa/deployment-agent/release-flows/:id    → ReleaseFlowDetailView
 /wwa/testing-agent                         → TestingAgentSummaryView
 /wwa/testing-agent/release-flows/:id       → TestingAgentDetailView
+/wwa/build-agent                           → BuildAgentSummaryView
+/wwa/build-agent/release-flows/:id         → BuildAgentDetailView
 /wwa/template-management                   → TemplateManagementView
 /wwa/configuration-management              → ConfigAdminView
 /wwa/audit-log                             → AuditLogView
@@ -98,18 +113,21 @@ Custom `AppException` hierarchy in `errors/` maps to HTTP status codes. `GlobalE
 
 ## Architecture Boundaries
 
-- REST controllers live in `src/main/java/com/wwa/deploymentagent/web/controller/`
+- Agent-specific controllers live in `src/main/java/com/wwa/deploymentagent/agents/<agent>/web/`
+- Platform-shared controllers live in `src/main/java/com/wwa/deploymentagent/platform/web/shared/`
 - Domain logic lives in `src/main/java/com/wwa/deploymentagent/domain/`
 - Do not put persistence logic in controllers
 - Shared types (DTOs, enums, `UserContext`) live in `src/main/java/com/wwa/deploymentagent/contracts/`
 - Security filters live in `src/main/java/com/wwa/deploymentagent/web/security/`
 - Spring configuration lives in `src/main/java/com/wwa/deploymentagent/config/`
 - Custom exceptions live in `src/main/java/com/wwa/deploymentagent/errors/`
+- Frontend agent workspaces live in `frontend/src/agents/<agent>/`
+- Frontend shared platform code lives in `frontend/src/platform/`
 - Frontend source lives in `frontend/src/`
 
 ## Technology Stack
 
-- Backend: Java 21 / Spring Boot 3.2.0 / Spring MVC / Spring Data JPA / Maven / Lombok
+- Backend: Java 21 / Spring Boot 3.4 / Spring MVC / Spring Data JPA / Maven / Lombok
 - Frontend: Vue 3 / Vite 5 / Pinia / Vue Router 4 / Axios
 - Database: Oracle (default profile) / H2 in-memory (`local` and `test`)
 - Auth: session-based login with a Team Book provider abstraction, plus optional header fallback where configured
@@ -130,10 +148,7 @@ Custom `AppException` hierarchy in `errors/` maps to HTTP status codes. `GlobalE
 
 ### Shared Components Must Be Agent-Agnostic
 
-`UploadDialog` is shared across all agents. It must NOT hardcode any agent-specific API client or store. Always inject `uploadFn`, `downloadTemplateFn`, and `onUploadSuccess` as props. Each agent view is responsible for passing its own API functions.
-
-- Deployment Agent view passes: `uploadFile` / `downloadTemplate` from `api/upload`, `store.fetchList` from `releaseFlow` store
-- Testing Agent view passes: `uploadFile` / `downloadTemplate` from `api/testingAgentUpload`, `store.fetchList` from `testingAgentReleaseFlow` store
+`UploadDialog` is shared across all agents. It must NOT hardcode any agent-specific API client or store. Always inject `uploadFn`, `downloadTemplateFn`, and `onUploadSuccess` as props. Each agent view is responsible for passing its own API functions from the workspace created by `createAgentWorkspace`.
 
 Violating this causes silent data routing bugs — uploads go to the wrong agent's backend, records are saved under the wrong `agentId`, and the list query (which filters by `agentId`) returns nothing.
 
@@ -149,17 +164,16 @@ Each agent defines its own allowed stages. Do not default to `['SIT', 'UAT', 'PR
 |-------|---------------|
 | Deployment Agent | SIT, UAT, PROD |
 | Testing Agent | UAT only |
+| Build Agent | DEV only |
 
 Enforce via `:allowed-stages` prop on `UploadDialog` and a `stages` constant in the summary view. Also update: page subtitle, WWA Today description, Stage filter (use a disabled input when only one stage is allowed), and `agentRegistry.ts` description.
 
 ### Checklist When Adding a New Agent
 
 - [ ] Add `AgentId` constant in `contracts/AgentId.java`
-- [ ] Create backend controllers under `/api/<agent-key>/` that force `effectiveAgent` server-side
-- [ ] Create frontend Axios client with `baseURL: '/api/<agent-key>'`
-- [ ] Create frontend Pinia store (parallel to `releaseFlow.ts`)
-- [ ] Create frontend API modules (parallel to `releaseFlows.ts`, `upload.ts`, `tasks.ts`)
-- [ ] Create summary and detail view components
+- [ ] Create backend controllers under `agents/<agent-key>/web/` mapped to `/api/<agent-key>/` that force `effectiveAgent` server-side
+- [ ] Create `frontend/src/agents/<agent-key>/index.ts` using `createAgentWorkspace` factory (produces Axios client, Pinia store, and API modules)
+- [ ] Create summary and detail view components in `frontend/src/agents/<agent-key>/`
 - [ ] Register in `agentRegistry.ts` with accurate description
 - [ ] Add routes in `frontend/src/router/index.ts`
 - [ ] Agent view passes its own `uploadFn`, `downloadTemplateFn`, `onUploadSuccess` to `UploadDialog`
