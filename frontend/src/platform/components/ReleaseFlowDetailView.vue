@@ -293,14 +293,34 @@ function markRequestFailedDisabledReason(request: Request): string | null {
 }
 
 const submittingAuto = ref<string | null>(null)
+const actionError = ref<string | null>(null)
+let actionErrorTimer: number | null = null
+
+function showActionError(message: string) {
+  actionError.value = message
+  if (actionErrorTimer !== null) clearTimeout(actionErrorTimer)
+  actionErrorTimer = window.setTimeout(() => {
+    actionError.value = null
+    actionErrorTimer = null
+  }, 10000)
+}
+
+function dismissActionError() {
+  actionError.value = null
+  if (actionErrorTimer !== null) {
+    clearTimeout(actionErrorTimer)
+    actionErrorTimer = null
+  }
+}
 
 async function handleSubmitAuto(task: Task) {
   submittingAuto.value = task.id
+  actionError.value = null
   try {
     await props.api.submitAutoExecution(task.id)
     await store.refreshDetail()
-  } catch {
-    // Error handled by axios interceptor
+  } catch (err) {
+    showActionError(err instanceof Error ? err.message : String(err))
   } finally {
     submittingAuto.value = null
   }
@@ -1087,6 +1107,12 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <!-- Action error banner -->
+            <div v-if="actionError" class="action-error-banner">
+              <span class="action-error-message">{{ actionError }}</span>
+              <button class="action-error-dismiss" @click="dismissActionError">&times;</button>
+            </div>
+
             <table class="data-table">
             <thead>
               <tr>
@@ -1344,6 +1370,35 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.action-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #991b1b;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.action-error-message {
+  flex: 1;
+}
+
+.action-error-dismiss {
+  background: none;
+  border: none;
+  color: #991b1b;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .detail-view {
   display: flex;
   flex-direction: column;
