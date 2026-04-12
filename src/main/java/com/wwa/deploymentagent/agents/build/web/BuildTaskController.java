@@ -5,6 +5,7 @@ import com.wwa.deploymentagent.contracts.UserContext;
 import com.wwa.deploymentagent.contracts.dto.RecordResultRequestDto;
 import com.wwa.deploymentagent.contracts.dto.TaskDto;
 import com.wwa.deploymentagent.contracts.dto.TaskExecutionHistoryDto;
+import com.wwa.deploymentagent.contracts.enums.ExecutionType;
 import com.wwa.deploymentagent.domain.execution.AutoExecutionService;
 import com.wwa.deploymentagent.domain.task.RecordResultService;
 import com.wwa.deploymentagent.domain.task.TaskExecutionHistoryService;
@@ -63,6 +64,25 @@ public class BuildTaskController {
         }
         boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
         return ResponseEntity.ok(TaskDto.from(taskService.editInput(id, newInput, user)));
+    }
+
+    @PutMapping("/{id}/execution-type")
+    public ResponseEntity<TaskDto> editExecutionType(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserContext user) {
+        String value = body != null ? body.get("executionType") : null;
+        if (value == null) {
+            throw new ValidationAppException("executionType is required");
+        }
+        ExecutionType newType;
+        try {
+            newType = ExecutionType.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new ValidationAppException("Invalid executionType: " + value + ". Must be MANUAL or AUTO");
+        }
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+        return ResponseEntity.ok(TaskDto.from(taskService.editExecutionType(id, newType, user)));
     }
 
     @GetMapping("/{id}/executions")

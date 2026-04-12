@@ -189,7 +189,20 @@ function runButtonLabel(task: Task): string {
   if (task.executionType === 'AUTO' && task.taskStatus === 'Executing') {
     return 'Running...'
   }
+  if (task.executionType === 'MANUAL') {
+    return 'Start Manual'
+  }
   return 'Run'
+}
+
+function runButtonTooltip(task: Task): string | null {
+  if (task.executionType === 'MANUAL' && task.taskStatus === 'Ready_For_Execution') {
+    return 'Mark this task as started, then perform the manual step and come back to record the result'
+  }
+  if (task.executionType === 'MANUAL' && task.taskStatus === 'Executing') {
+    return 'Record the outcome of this manual step to move it to review'
+  }
+  return null
 }
 
 function canRerun(task: Task): boolean {
@@ -1097,9 +1110,10 @@ onUnmounted(() => {
                           View Result
                         </button>
                       </span>
-                      <span class="action-tooltip" :title="taskActionReason(req, runDisabledReason(task)) ?? ''">
+                      <span class="action-tooltip" :title="taskActionReason(req, runDisabledReason(task)) ?? runButtonTooltip(task) ?? ''">
                         <button
-                          class="btn btn-primary btn-sm"
+                          class="btn btn-sm"
+                          :class="task.executionType === 'MANUAL' && task.taskStatus === 'Executing' ? 'btn-warning' : 'btn-primary'"
                           :disabled="isArchivedRequest(req) || !canRun(task) || submittingAuto === task.id"
                           @click.stop="handleRun(task)"
                         >
@@ -1196,6 +1210,7 @@ onUnmounted(() => {
       :task="editingTask"
       :mode="taskDialogMode"
       :edit-task-fn="api.editTask"
+      :edit-execution-type-fn="api.editExecutionType"
       :record-result-fn="api.recordResult"
       :start-manual-execution-fn="api.startManualExecution"
       @saved="onTaskSaved"

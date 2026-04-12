@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  editExecutionType as editExecutionTypeApi,
   editTask as editTaskApi,
   getTaskResult,
   listTaskExecutions as listBuildTaskExecutions,
@@ -930,6 +931,7 @@ const activeRequestSummary = computed(() => {
       :task="editingTask"
       :mode="taskDialogMode"
       :edit-task-fn="editTaskApi"
+      :edit-execution-type-fn="editExecutionTypeApi"
       :record-result-fn="recordResultApi"
       :start-manual-execution-fn="startManualExecutionApi"
       @saved="onTaskSaved"

@@ -143,6 +143,14 @@ export async function editTask(
   return response.data
 }
 
+export async function editExecutionType(
+  taskId: string,
+  executionType: 'MANUAL' | 'AUTO',
+): Promise<Task> {
+  const response = await testingClient.put(`/tasks/${taskId}/execution-type`, { executionType })
+  return response.data
+}
+
 export async function getTaskResult(taskId: string, executionId?: string): Promise<TaskResult> {
   const executions = await listTaskExecutions(taskId)
   const selectedExecution = executionId

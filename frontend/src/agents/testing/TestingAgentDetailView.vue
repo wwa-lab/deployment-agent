@@ -5,6 +5,7 @@ import type { ReleaseFlowDetailApi } from '../../platform/composables/releaseFlo
 import { useTestingAgentReleaseFlowStore } from './index'
 import {
   archiveRequestRundown,
+  editExecutionType,
   editTask,
   getTaskResult,
   listTaskExecutions,
@@ -29,6 +30,7 @@ const api: ReleaseFlowDetailApi = {
   markRequestFailed,
   updateRequestRundown,
   editTask,
+  editExecutionType,
   recordResult,
   submitDecision,
   submitAutoExecution,

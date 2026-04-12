@@ -148,6 +148,42 @@ public class TaskService {
     }
 
     /**
+     * Change the execution type of a task (MANUAL ↔ AUTO).
+     * Only allowed in Pending or Ready_For_Execution states.
+     */
+    @Transactional
+    public Task editExecutionType(String taskId, ExecutionType newType, UserContext user) {
+        Task task = getById(taskId);
+        assertTaskRequestActive(task);
+        taskPermissionService.assertOwnerOrAdmin(task, user, "task:editExecutionType");
+
+        if (task.getTaskStatus() != TaskStatus.Pending
+                && task.getTaskStatus() != TaskStatus.Ready_For_Execution) {
+            throw new ValidationAppException(
+                    "Execution type can only be changed in Pending or Ready_For_Execution states. "
+                    + "Current state: " + task.getTaskStatus().name());
+        }
+
+        ExecutionType oldType = task.getExecutionType();
+        if (oldType == newType) {
+            return task;
+        }
+
+        task.setExecutionType(newType);
+        Task saved = save(task);
+
+        auditLogger.log(user, AuditActionType.edit,
+                task.getRequest().getReleaseFlow().getId(),
+                task.getRequest().getId(),
+                taskId,
+                Map.of("fieldChanged", "executionType",
+                       "oldValue", oldType.name(),
+                       "newValue", newType.name()));
+
+        return saved;
+    }
+
+    /**
      * Start MANUAL execution by transitioning Ready_For_Execution → Executing.
      * Allows owners/admins to begin a manual step without first editing input fields.
      */

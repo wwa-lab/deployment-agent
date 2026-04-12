@@ -32,6 +32,7 @@ export interface ReleaseFlowDetailApi {
     },
   ) => Promise<Request>
   editTask: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
+  editExecutionType: (taskId: string, executionType: 'MANUAL' | 'AUTO') => Promise<Task>
   recordResult: (
     taskId: string,
     body: { resultSummary: Record<string, unknown>; resultLogs?: string },
