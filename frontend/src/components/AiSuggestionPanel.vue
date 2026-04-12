@@ -66,8 +66,7 @@ const mockLine = computed(() =>
   padding: 14px 16px;
   border: 1px dashed #c7d2fe;
   border-radius: 10px;
-  background:
-    linear-gradient(135deg, rgba(238, 242, 255, 0.8) 0%, rgba(245, 243, 255, 0.8) 100%);
+  background: #eef2ff;
 }
 
 .ai-panel::before {
@@ -105,7 +104,7 @@ const mockLine = computed(() =>
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #6366f1;
-  background: rgba(99, 102, 241, 0.12);
+  background: #e0e7ff;
   padding: 3px 8px;
   border-radius: 999px;
 }
@@ -154,7 +153,7 @@ const mockLine = computed(() =>
   padding: 5px 10px;
   border: 1px solid #c7d2fe;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.6);
+  background: #ffffff;
   color: #6366f1;
   cursor: not-allowed;
   opacity: 0.65;

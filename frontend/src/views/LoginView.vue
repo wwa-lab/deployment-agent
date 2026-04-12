@@ -202,33 +202,6 @@ async function handleLogin() {
   justify-content: center;
   min-height: 100vh;
   padding: 32px 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.login-page::before,
-.login-page::after {
-  content: '';
-  position: absolute;
-  border-radius: 999px;
-  pointer-events: none;
-  filter: blur(70px);
-}
-
-.login-page::before {
-  top: 6%;
-  left: 8%;
-  width: 360px;
-  height: 360px;
-  background: rgba(96, 150, 255, 0.26);
-}
-
-.login-page::after {
-  right: 5%;
-  bottom: 8%;
-  width: 320px;
-  height: 320px;
-  background: rgba(78, 221, 185, 0.18);
 }
 
 .login-shell {
@@ -237,44 +210,14 @@ async function handleLogin() {
   grid-template-columns: minmax(320px, 1.2fr) minmax(320px, 400px);
   gap: 24px;
   align-items: stretch;
-  position: relative;
-  z-index: 1;
 }
 
 .login-story {
   position: relative;
   padding: 40px;
-  border-radius: 30px;
-  background:
-    linear-gradient(180deg, rgba(17, 29, 53, 0.96) 0%, rgba(24, 39, 72, 0.92) 52%, rgba(17, 28, 53, 0.94) 100%);
-  border: 1px solid rgba(87, 122, 185, 0.4);
-  box-shadow: 0 28px 70px rgba(16, 24, 43, 0.32);
+  border-radius: 16px;
+  background: #1e293b;
   overflow: hidden;
-}
-
-.login-story::before,
-.login-story::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-}
-
-.login-story::before {
-  inset: 0;
-  background:
-    linear-gradient(rgba(113, 151, 223, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(113, 151, 223, 0.12) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.22));
-}
-
-.login-story::after {
-  top: -80px;
-  right: -60px;
-  width: 260px;
-  height: 260px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(60, 138, 255, 0.34) 0%, rgba(60, 138, 255, 0) 72%);
 }
 
 .login-story-grid {
@@ -333,42 +276,10 @@ async function handleLogin() {
 .login-console {
   position: relative;
   padding: 18px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(10, 18, 34, 0.92) 0%, rgba(14, 24, 44, 0.9) 100%);
-  border: 1px solid rgba(93, 127, 196, 0.24);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 18px 40px rgba(4, 9, 21, 0.34);
+  border-radius: 12px;
+  background: #0f172a;
+  border: 1px solid #334155;
   overflow: hidden;
-}
-
-.login-console::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(rgba(83, 118, 183, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(83, 118, 183, 0.12) 1px, transparent 1px);
-  background-size: 34px 34px;
-  opacity: 0.6;
-}
-
-.login-console::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 -30%;
-  width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(92, 164, 255, 0.08), transparent);
-  transform: skewX(-18deg);
-  animation: console-sweep 7s ease-in-out infinite;
-}
-
-.login-console-topbar,
-.login-console-metrics,
-.login-console-flow,
-.login-console-stream {
-  position: relative;
-  z-index: 1;
 }
 
 .login-console-topbar {
@@ -417,8 +328,6 @@ async function handleLogin() {
   height: 7px;
   border-radius: 50%;
   background: #4ee0b7;
-  box-shadow: 0 0 0 0 rgba(78, 224, 183, 0.45);
-  animation: status-pulse 1.8s ease-out infinite;
 }
 
 .login-console-metrics {
@@ -429,9 +338,9 @@ async function handleLogin() {
 
 .login-console-metric {
   padding: 14px 12px;
-  border-radius: 16px;
-  background: rgba(58, 78, 118, 0.16);
-  border: 1px solid rgba(105, 137, 203, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #334155;
 }
 
 .metric-label,
@@ -456,9 +365,9 @@ async function handleLogin() {
 .login-console-flow {
   margin-top: 18px;
   padding: 16px;
-  border-radius: 18px;
-  background: rgba(43, 61, 98, 0.16);
-  border: 1px solid rgba(105, 137, 203, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #334155;
 }
 
 .login-flow-track {
@@ -527,42 +436,17 @@ async function handleLogin() {
 .login-card {
   position: relative;
   width: 100%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(246, 250, 255, 0.84) 100%);
-  border: 1px solid rgba(190, 209, 243, 0.9);
-  border-radius: 24px;
-  box-shadow: 0 24px 54px rgba(31, 42, 68, 0.16);
-  backdrop-filter: blur(24px);
+  background: #ffffff;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   padding: 36px 32px;
-  overflow: hidden;
-}
-
-.login-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, rgba(70, 109, 214, 0), rgba(70, 109, 214, 0.92), rgba(70, 109, 214, 0));
-}
-
-.login-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(rgba(132, 156, 205, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(132, 156, 205, 0.08) 1px, transparent 1px);
-  background-size: 30px 30px;
-  opacity: 0.5;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.28), transparent 55%);
-  pointer-events: none;
 }
 
 .login-header {
-  position: relative;
-  z-index: 1;
   margin-bottom: 24px;
   padding-bottom: 18px;
-  border-bottom: 1px solid rgba(215, 227, 247, 0.9);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .login-title {
@@ -578,8 +462,6 @@ async function handleLogin() {
 }
 
 .login-form {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -599,20 +481,18 @@ async function handleLogin() {
 
 .form-input {
   padding: 9px 12px;
-  border: 1px solid #d8e3f3;
-  border-radius: 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
   font-size: 14px;
   color: #1e293b;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: #ffffff;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #2563eb;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .field-hint {
@@ -632,14 +512,12 @@ async function handleLogin() {
   background: #fef2f2;
   color: #dc2626;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: 6px;
   font-size: 13px;
   border: 1px solid #fecaca;
 }
 
 .login-guest {
-  position: relative;
-  z-index: 1;
   margin-top: 18px;
   display: flex;
   flex-direction: column;
@@ -671,36 +549,12 @@ async function handleLogin() {
 }
 
 .login-hint {
-  position: relative;
-  z-index: 1;
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid rgba(227, 234, 247, 0.92);
+  border-top: 1px solid var(--color-border-subtle);
   font-size: 12px;
   color: #7f90af;
   line-height: 1.6;
-}
-
-@keyframes status-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(78, 224, 183, 0.45);
-  }
-
-  60% {
-    box-shadow: 0 0 0 10px rgba(78, 224, 183, 0);
-  }
-}
-
-@keyframes console-sweep {
-  0%,
-  100% {
-    transform: translateX(-8%) skewX(-18deg);
-  }
-
-  50% {
-    transform: translateX(228%) skewX(-18deg);
-  }
 }
 
 @media (max-width: 900px) {

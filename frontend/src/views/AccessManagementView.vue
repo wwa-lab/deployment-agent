@@ -422,10 +422,10 @@ function statusClass(status: AccessGrantStatus) {
 .toolbar-card,
 .table-container {
   padding: 18px 20px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: white;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .toolbar-grid {
@@ -461,7 +461,7 @@ function statusClass(status: AccessGrantStatus) {
 .loading-state,
 .empty-state {
   padding: 28px 24px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: white;
   border: 1px dashed #cbd5e1;
   color: #64748b;

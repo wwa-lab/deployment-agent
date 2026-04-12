@@ -282,9 +282,9 @@ async function submit() {
 .template-summary-card {
   margin-bottom: 16px;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid #dbe5f4;
-  background: linear-gradient(135deg, rgba(241, 246, 255, 0.96), rgba(250, 253, 255, 0.9));
+  background: #f1f6ff;
 }
 
 .template-summary-eyebrow {
@@ -322,7 +322,7 @@ async function submit() {
 .scope-preview {
   padding: 12px 14px;
   border-radius: 8px;
-  background: rgba(247, 250, 255, 0.92);
+  background: #f7faff;
   border: 1px solid #dbe5f4;
 }
 

@@ -142,81 +142,17 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   display: flex;
   flex-direction: column;
   gap: 32px;
-  position: relative;
-}
-
-.wwa-home::before,
-.wwa-home::after {
-  content: '';
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(68px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.wwa-home::before {
-  top: 18px;
-  right: 40px;
-  width: 180px;
-  height: 180px;
-  background: rgba(220, 235, 255, 0.72);
-}
-
-.wwa-home::after {
-  top: 220px;
-  left: -30px;
-  width: 160px;
-  height: 160px;
-  background: rgba(232, 247, 242, 0.6);
-}
-
-.home-hero,
-.agent-section,
-.platform-section {
-  position: relative;
-  z-index: 1;
 }
 
 .home-hero {
-  position: relative;
   padding: 30px;
-  border-radius: 28px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82) 0%, rgba(245, 249, 255, 0.96) 58%, rgba(241, 249, 246, 0.92) 100%);
-  border: 1px solid rgba(208, 221, 245, 0.94);
-  box-shadow: 0 22px 54px rgba(31, 42, 68, 0.12);
-  backdrop-filter: blur(22px);
-  overflow: hidden;
-}
-
-.home-hero::before,
-.home-hero::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-}
-
-.home-hero::before {
-  inset: 0;
-  background:
-    linear-gradient(rgba(128, 154, 209, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(128, 154, 209, 0.1) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent 68%);
-}
-
-.home-hero::after {
-  inset: auto -70px -120px auto;
-  width: 280px;
-  height: 280px;
-  border-radius: 999px;
-  background: rgba(220, 235, 255, 0.52);
-  filter: blur(12px);
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
 }
 
 .home-hero-layout {
-  position: relative;
-  z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1.18fr) minmax(280px, 360px);
   gap: 24px;
@@ -233,7 +169,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   align-items: flex-start;
   gap: 24px;
   padding-bottom: 24px;
-  border-bottom: 1px solid rgba(227, 234, 247, 0.92);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .home-platform-label {
@@ -268,9 +204,9 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   gap: 6px;
   flex-shrink: 0;
   padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(214, 226, 245, 0.92);
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid var(--color-border-subtle);
 }
 
 .home-user-name {
@@ -301,42 +237,10 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 .home-console {
   position: relative;
   padding: 18px;
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(14, 25, 45, 0.96) 0%, rgba(16, 30, 56, 0.94) 100%);
-  border: 1px solid rgba(85, 120, 188, 0.28);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 20px 42px rgba(10, 18, 34, 0.24);
+  border-radius: 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
   overflow: hidden;
-}
-
-.home-console::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(rgba(87, 122, 190, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(87, 122, 190, 0.12) 1px, transparent 1px);
-  background-size: 34px 34px;
-  opacity: 0.58;
-}
-
-.home-console::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 -28%;
-  width: 38%;
-  background: linear-gradient(90deg, transparent, rgba(92, 164, 255, 0.08), transparent);
-  transform: skewX(-18deg);
-  animation: home-console-sweep 8s ease-in-out infinite;
-}
-
-.home-console-topbar,
-.home-console-panels,
-.home-console-track,
-.home-console-stream {
-  position: relative;
-  z-index: 1;
 }
 
 .home-console-topbar {
@@ -380,8 +284,6 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   height: 7px;
   border-radius: 50%;
   background: #4ee0b7;
-  box-shadow: 0 0 0 0 rgba(78, 224, 183, 0.45);
-  animation: home-status-pulse 1.8s ease-out infinite;
 }
 
 .home-console-panels {
@@ -392,9 +294,9 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 
 .home-console-panel {
   padding: 14px;
-  border-radius: 16px;
-  background: rgba(60, 79, 118, 0.18);
-  border: 1px solid rgba(105, 137, 203, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #334155;
 }
 
 .home-console-panel-label {
@@ -419,9 +321,9 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 .home-console-track {
   margin-top: 14px;
   padding: 14px;
-  border-radius: 16px;
-  background: rgba(43, 61, 98, 0.16);
-  border: 1px solid rgba(105, 137, 203, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #334155;
 }
 
 .home-console-track-row {
@@ -503,41 +405,23 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 }
 
 .agent-card {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 20px;
   padding: 20px 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(247, 250, 255, 0.78) 100%);
-  border: 1px solid rgba(220, 230, 246, 0.96);
-  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
-  transition: transform 0.2s, border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   width: 100%;
-  backdrop-filter: blur(18px);
-  box-shadow: 0 12px 28px rgba(31, 42, 68, 0.08);
-  overflow: hidden;
-}
-
-.agent-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(61, 107, 218, 0), rgba(61, 107, 218, 0.92), rgba(61, 107, 218, 0));
-  opacity: 0;
-  transition: opacity 0.2s;
+  box-shadow: var(--shadow-card);
 }
 
 .agent-card:hover {
   border-color: #2563eb;
-  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.12);
-  transform: translateY(-2px);
-}
-
-.agent-card:hover::before {
-  opacity: 1;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
 }
 
 .agent-card-icon {
@@ -547,10 +431,9 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, rgba(239, 244, 255, 0.98), rgba(234, 244, 241, 0.92));
-  border-radius: 10px;
+  background: #f9fafb;
+  border-radius: 8px;
   flex-shrink: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .agent-card-body {
@@ -582,69 +465,29 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 }
 
 .platform-card {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 14px 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(247, 250, 255, 0.78) 100%);
-  border: 1px solid rgba(221, 231, 247, 0.94);
-  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
   color: #374151;
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
-  transition: border-color 0.15s, background 0.15s, transform 0.2s;
+  transition: border-color 0.15s, background 0.15s;
   min-width: 200px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 10px 24px rgba(31, 42, 68, 0.06);
-  overflow: hidden;
-}
-
-.platform-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(61, 107, 218, 0), rgba(61, 107, 218, 0.82), rgba(61, 107, 218, 0));
-  opacity: 0;
-  transition: opacity 0.2s;
+  box-shadow: var(--shadow-card);
 }
 
 .platform-card:hover {
-  border-color: #9db5df;
-  background: rgba(243, 247, 255, 0.92);
-  transform: translateY(-1px);
-}
-
-.platform-card:hover::before {
-  opacity: 1;
+  border-color: #93c5fd;
+  background: #f9fafb;
 }
 
 .platform-card-icon {
   font-size: 18px;
-}
-
-@keyframes home-status-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(78, 224, 183, 0.45);
-  }
-
-  60% {
-    box-shadow: 0 0 0 10px rgba(78, 224, 183, 0);
-  }
-}
-
-@keyframes home-console-sweep {
-  0%,
-  100% {
-    transform: translateX(-8%) skewX(-18deg);
-  }
-
-  50% {
-    transform: translateX(226%) skewX(-18deg);
-  }
 }
 
 @media (max-width: 768px) {

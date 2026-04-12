@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import ConfigComponentDialog from '../components/ConfigComponentDialog.vue'
 import ScopeDirectoryDialog from '../components/ScopeDirectoryDialog.vue'
+import { getAgentDescriptor } from '../config/agentRegistry'
 import { useConfigStore } from '../stores/config'
 import { useScopeDirectoryStore } from '../stores/scopeDirectory'
 import { useUserStore } from '../stores/user'
@@ -93,6 +94,7 @@ const componentScopeFilters = reactive({
 })
 const scopeSearch = ref('')
 const scopeApplicationFilter = ref('All')
+const scopeAgentFilter = ref('All')
 const filterForm = reactive({
   owningGroup: 'All',
   application: 'All',
@@ -190,6 +192,10 @@ const scopeApplicationOptions = computed(() => [
   'All',
   ...new Set(scopeDirectoryStore.entries.map((entry) => entry.application).filter(Boolean)),
 ])
+const scopeAgentOptions = computed(() => [
+  'All',
+  ...new Set(scopeDirectoryStore.entries.map((entry) => entry.agent).filter((value): value is string => Boolean(value))),
+])
 
 const filteredScopeEntries = computed(() => {
   const query = scopeSearch.value.trim().toLowerCase()
@@ -197,12 +203,14 @@ const filteredScopeEntries = computed(() => {
   return scopeDirectoryStore.entries.filter((entry) => {
     const matchesApplication =
       scopeApplicationFilter.value === 'All' || entry.application === scopeApplicationFilter.value
+    const matchesAgent = scopeAgentFilter.value === 'All' || entry.agent === scopeAgentFilter.value
     const matchesSearch =
       query.length === 0 ||
       entry.application.toLowerCase().includes(query) ||
-      (entry.snowGroup ?? '').toLowerCase().includes(query)
+      (entry.snowGroup ?? '').toLowerCase().includes(query) ||
+      displayAgent(entry.agent).toLowerCase().includes(query)
 
-    return matchesApplication && matchesSearch
+    return matchesApplication && matchesAgent && matchesSearch
   })
 })
 
@@ -349,7 +357,7 @@ function closeScopeEditor() {
   scopeError.value = ''
 }
 
-async function saveScopeEntry(draft: { application: string; snowGroup?: string }) {
+async function saveScopeEntry(draft: { application: string; snowGroup?: string; agent?: string }) {
   if (!canEdit.value) return
 
   scopeSaving.value = true
@@ -360,6 +368,7 @@ async function saveScopeEntry(draft: { application: string; snowGroup?: string }
       id: creatingScopeEntry.value ? undefined : editingScopeEntry.value?.id,
       application: draft.application,
       snowGroup: draft.snowGroup,
+      agent: draft.agent,
     })
     closeScopeEditor()
   } catch (error: unknown) {
@@ -373,9 +382,7 @@ async function saveScopeEntry(draft: { application: string; snowGroup?: string }
 async function deleteScopeEntry(entry: ScopeDirectoryEntry) {
   if (!canEdit.value) return
 
-  const confirmed = window.confirm(
-    `Delete scope entry "${entry.application}${entry.snowGroup ? ` / ${entry.snowGroup}` : ''}"?`,
-  )
+  const confirmed = window.confirm(`Delete scope entry "${describeScopeEntry(entry)}"?`)
   if (!confirmed) return
 
   deletingScopeEntryId.value = entry.id
@@ -542,6 +549,19 @@ function formatDate(value?: string) {
 
 function displayValue(value?: string) {
   return value && value.trim().length > 0 ? value : '—'
+}
+
+function displayAgent(agent?: string) {
+  if (!agent?.trim()) return '—'
+  return getAgentDescriptor(agent)?.name ?? agent
+}
+
+function describeScopeEntry(entry: ScopeDirectoryEntry) {
+  return [
+    entry.application,
+    entry.snowGroup,
+    entry.agent ? displayAgent(entry.agent) : undefined,
+  ].filter(Boolean).join(' / ')
 }
 </script>
 
@@ -760,8 +780,9 @@ function displayValue(value?: string) {
 
     <div v-else-if="activeView === 'scope'" class="scope-workspace">
         <div class="helper-banner">
-          Maintain the curated <strong>Application + SNOW Group</strong> directory used by upload
-          dialogs. Uploaders choose from this list instead of typing free-form values each time.
+          Maintain the curated <strong>Application + SNOW Group + Agent</strong> directory used by
+          upload dialogs. Uploaders choose from this list instead of typing free-form values each
+          time.
         </div>
 
         <div v-if="scopeDirectoryStore.error || scopeError" class="alert alert-error">
@@ -776,7 +797,7 @@ function displayValue(value?: string) {
                 v-model="scopeSearch"
                 class="form-control"
                 type="text"
-                placeholder="Search application or SNOW Group"
+                placeholder="Search application, SNOW Group, or Agent"
               />
             </div>
 
@@ -792,6 +813,15 @@ function displayValue(value?: string) {
                 </option>
               </select>
             </div>
+
+            <div class="toolbar-field">
+              <label class="toolbar-label">Agent</label>
+              <select v-model="scopeAgentFilter" class="form-control">
+                <option v-for="agent in scopeAgentOptions" :key="agent" :value="agent">
+                  {{ agent === 'All' ? 'All Agents' : displayAgent(agent) }}
+                </option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -801,7 +831,7 @@ function displayValue(value?: string) {
               <h2 class="section-title">Scope Directory ({{ filteredScopeEntries.length }})</h2>
               <p class="section-subtitle">
                 Maintain reusable scope values for uploads and other workflow surfaces that need
-                controlled Application and SNOW Group choices.
+                controlled Application, SNOW Group, and Agent choices.
               </p>
             </div>
             <button
@@ -835,6 +865,7 @@ function displayValue(value?: string) {
                 <tr>
                   <th>Application</th>
                   <th>SNOW Group</th>
+                  <th>Agent</th>
                   <th>Scope Source</th>
                   <th>Updated By</th>
                   <th>Updated On</th>
@@ -845,6 +876,7 @@ function displayValue(value?: string) {
                 <tr v-for="entry in filteredScopeEntries" :key="entry.id">
                   <td>{{ entry.application }}</td>
                   <td>{{ entry.snowGroup ?? '—' }}</td>
+                  <td>{{ displayAgent(entry.agent) }}</td>
                   <td>
                     <span class="scope-source-badge">{{ entry.scopeSource }}</span>
                   </td>
@@ -1117,7 +1149,7 @@ function displayValue(value?: string) {
 .mode-tab {
   padding: 12px 16px;
   border: none;
-  border-radius: 12px 12px 0 0;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   color: #64748b;
   font-size: 14px;
@@ -1140,8 +1172,8 @@ function displayValue(value?: string) {
 
 .helper-banner {
   padding: 14px 16px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #eff6ff, #f8fafc);
+  border-radius: 8px;
+  background: #eff6ff;
   border: 1px solid #dbeafe;
   color: #1e3a8a;
   font-size: 14px;
@@ -1158,8 +1190,8 @@ function displayValue(value?: string) {
 .table-card,
 .table-container {
   background: white;
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .toolbar-card {
