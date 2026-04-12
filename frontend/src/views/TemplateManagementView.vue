@@ -204,7 +204,7 @@ const templates = ref<TemplateRecord[]>([
     id: 'tpl-004',
     name: 'PowerCARD PRD Baseline',
     version: '2.1',
-    agent: 'Deployment Agent',
+    agent: 'PowerCARD',
     category: 'production',
     snowGroup: 'HTSA-CSI-CARD-PRD',
     application: 'PowerCARD',
@@ -308,9 +308,6 @@ const defaultTemplateSites = ['HK', 'SG']
 const defaultTemplateAgents = [
   ...new Set(agentRegistry.filter((agent) => agent.enabled).map((agent) => agent.name)),
 ]
-const createTemplateAgents = computed(() =>
-  defaultTemplateAgents.length > 0 ? defaultTemplateAgents : ['Testing Agent'],
-)
 
 function mergeOptionLists(...sources: string[][]): string[] {
   return Array.from(
@@ -464,7 +461,7 @@ const createTemplateDefaults = computed<Partial<CreateTemplateDraft> | undefined
   }
 
   return {
-    agent: activeScopeFilters.value.agent ?? createTemplateAgents.value[0] ?? 'Testing Agent',
+    agent: activeScopeFilters.value.agent ?? agents.value[0] ?? 'Testing Agent',
     snowGroup: activeScopeFilters.value.snowGroup ?? snowGroups.value[0] ?? '',
     application: activeScopeFilters.value.application ?? applications.value[0] ?? '',
     site: activeScopeFilters.value.site ?? sites.value[0] ?? '',
@@ -1435,7 +1432,7 @@ onBeforeUnmount(() => {
 
     <CreateTemplateDialog
       v-if="showCreateTemplateDialog"
-      :agents="createTemplateAgents"
+      :agents="agents"
       :categories="categories"
       :snow-groups="snowGroups"
       :applications="applications"
@@ -1542,7 +1539,7 @@ onBeforeUnmount(() => {
 .scope-summary-item {
   padding: 14px 16px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #f8fafc;
 }
 
@@ -1735,9 +1732,9 @@ onBeforeUnmount(() => {
   min-width: 128px;
   padding: 6px;
   border: 1px solid #dbeafe;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
 }
 
 .more-menu-item {
@@ -1841,7 +1838,7 @@ onBeforeUnmount(() => {
 .dependency-summary-card {
   padding: 14px 16px;
   border: 1px solid #dbeafe;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #f8fbff;
 }
 
@@ -1870,7 +1867,7 @@ onBeforeUnmount(() => {
 .dependency-map-card {
   padding: 14px 16px;
   border: 1px solid #dbeafe;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #ffffff;
 }
 

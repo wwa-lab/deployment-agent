@@ -298,23 +298,51 @@ watch(
 
 <style scoped>
 .workspace {
+  position: relative;
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: var(--color-bg-base);
+  background: rgba(245, 248, 255, 0.48);
+  isolation: isolate;
+}
+
+.workspace::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(116, 143, 188, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(116, 143, 188, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.1));
+  pointer-events: none;
+  z-index: 0;
 }
 
 .sidebar {
   position: relative;
   width: 220px;
   flex-shrink: 0;
-  background: #1e293b;
+  background: linear-gradient(180deg, #172235 0%, #1d2b45 38%, #21385a 100%);
   color: #e2e8f0;
   display: flex;
   flex-direction: column;
   overflow: visible;
   z-index: 20;
-  border-right: 1px solid #334155;
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(87, 122, 190, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(87, 122, 190, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .sidebar-scroll {
@@ -340,10 +368,11 @@ watch(
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
-  background: #2563eb;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4f7cff 0%, #2f66f3 100%);
   color: white;
   font-size: 14px;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
 }
 
 .logo-copy {
@@ -410,7 +439,7 @@ watch(
   inset: 8px auto 8px 0;
   width: 2px;
   border-radius: 999px;
-  background: #3b82f6;
+  background: linear-gradient(180deg, rgba(92, 164, 255, 0.2), rgba(92, 164, 255, 0.9), rgba(92, 164, 255, 0.2));
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -445,10 +474,11 @@ watch(
   max-height: calc(100vh - 24px);
   overflow-y: auto;
   padding: 14px 12px;
-  border-radius: 8px;
-  background: #1e3a5f;
-  border: 1px solid #334155;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(37, 67, 128, 0.96) 0%, rgba(30, 53, 101, 0.96) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(16px);
   z-index: 30;
 }
 
@@ -547,18 +577,64 @@ watch(
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-bg-base);
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(245, 248, 255, 0.9) 38%,
+    rgba(240, 248, 246, 0.78) 100%
+  );
+}
+
+.main-area::before,
+.main-area::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(72px);
+  opacity: 0.8;
+  z-index: 0;
+}
+
+.main-area::before {
+  top: -140px;
+  right: -120px;
+  width: 320px;
+  height: 320px;
+  background: rgba(220, 235, 255, 0.85);
+}
+
+.main-area::after {
+  bottom: -180px;
+  left: 8%;
+  width: 280px;
+  height: 280px;
+  background: rgba(232, 247, 242, 0.68);
 }
 
 .topbar {
   min-height: 60px;
-  background: #ffffff;
-  border-bottom: 1px solid var(--color-border-subtle);
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid rgba(227, 234, 247, 0.94);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 8px 24px rgba(31, 42, 68, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(61, 107, 218, 0), rgba(61, 107, 218, 0.86), rgba(61, 107, 218, 0));
 }
 
 .topbar-branding {

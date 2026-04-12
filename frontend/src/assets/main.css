@@ -7,15 +7,22 @@
 :root {
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
   --font-mono: 'SFMono-Regular', 'SF Mono', 'Roboto Mono', Consolas, monospace;
-  --color-bg-base: #f7f8fa;
-  --color-surface: #ffffff;
-  --color-surface-strong: #ffffff;
-  --color-border-subtle: #e5e7eb;
-  --color-border-strong: #d1d5db;
+  --color-bg-base: #f5f8ff;
+  --color-surface: rgba(255, 255, 255, 0.88);
+  --color-surface-strong: rgba(255, 255, 255, 0.94);
+  --color-border-subtle: #e3eaf7;
+  --color-border-strong: #d8e3f3;
   --color-text-primary: #1f2a44;
   --color-text-secondary: #4b5b7c;
-  --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --bg-grad-start: #f8faff;
+  --bg-grad-mid: #eef4ff;
+  --bg-grad-end: #f4fbf8;
+  --bg-blob-1: rgba(220, 235, 255, 0.72);
+  --bg-blob-2: rgba(232, 247, 242, 0.68);
+  --grid-line: rgba(113, 138, 183, 0.09);
+  --grid-strong: rgba(68, 109, 181, 0.18);
+  --shadow-soft: 0 18px 48px rgba(31, 42, 68, 0.1);
+  --shadow-card: 0 6px 24px rgba(31, 42, 68, 0.06);
 }
 
 html,
@@ -28,7 +35,14 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   color: var(--color-text-primary);
-  background: var(--color-bg-base);
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(circle at top left, rgba(220, 235, 255, 0.58), transparent 34%),
+    radial-gradient(circle at 86% 12%, rgba(232, 247, 242, 0.48), transparent 26%),
+    linear-gradient(135deg, var(--bg-grad-start) 0%, var(--bg-grad-mid) 56%, var(--bg-grad-end) 100%);
+  background-size: 44px 44px, 44px 44px, auto, auto, auto;
+  background-attachment: fixed;
   line-height: 1.5;
 }
 
@@ -88,20 +102,22 @@ input, select, textarea {
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary {
-  background: #2563eb;
+  background: linear-gradient(135deg, #2f6dff 0%, #2c8dff 100%);
   color: white;
-  border-color: #2563eb;
+  border-color: #2a67f2;
+  box-shadow: 0 12px 24px rgba(47, 109, 255, 0.18);
 }
 .btn-primary:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: linear-gradient(135deg, #255eea 0%, #1f7ef0 100%);
 }
 
 .btn-secondary {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.82);
   color: #374151;
   border-color: var(--color-border-strong);
+  backdrop-filter: blur(10px);
 }
-.btn-secondary:hover:not(:disabled) { background: #f9fafb; }
+.btn-secondary:hover:not(:disabled) { background: rgba(239, 245, 255, 0.98); }
 
 .btn-danger {
   background: #ef4444;
@@ -124,10 +140,11 @@ input, select, textarea {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px);
 }
 
 .data-table th {
-  background: #f9fafb;
+  background: rgba(244, 247, 253, 0.96);
   padding: 10px 14px;
   text-align: left;
   font-size: 12px;
@@ -140,12 +157,12 @@ input, select, textarea {
 
 .data-table td {
   padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid rgba(227, 234, 247, 0.72);
   vertical-align: middle;
 }
 
 .data-table tr:last-child td { border-bottom: none; }
-.data-table tbody tr:hover { background: #f9fafb; }
+.data-table tbody tr:hover { background: rgba(236, 242, 255, 0.78); }
 .data-table tbody tr.clickable { cursor: pointer; }
 
 /* Form */
@@ -168,7 +185,8 @@ input, select, textarea {
   border-radius: 6px;
   outline: none;
   transition: border-color 0.15s;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 .form-control:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
@@ -176,7 +194,8 @@ input, select, textarea {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(18, 32, 57, 0.3);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -184,10 +203,11 @@ input, select, textarea {
 }
 
 .modal {
-  background: #ffffff;
-  border: 1px solid var(--color-border-subtle);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(227, 234, 247, 0.92);
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 24px 64px rgba(31, 42, 68, 0.18);
+  backdrop-filter: blur(24px);
   width: 540px;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 60px);
@@ -274,10 +294,11 @@ input, select, textarea {
 
 /* Card */
 .card {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.84);
   border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   box-shadow: var(--shadow-card);
+  backdrop-filter: blur(16px);
   padding: 20px;
 }
 
@@ -291,10 +312,17 @@ input, select, textarea {
 
 /* WWA intro */
 .wwa-intro-card {
-  background: #f8fafc;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(241, 247, 255, 0.98) 58%,
+    rgba(236, 249, 244, 0.96) 100%
+  );
+  border: 1px solid rgba(197, 214, 241, 0.92);
+  border-radius: 12px;
   padding: 16px 18px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px);
 }
 
 .wwa-intro-kicker {
