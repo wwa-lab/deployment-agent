@@ -95,6 +95,31 @@ public class BuildTaskController {
         return ResponseEntity.ok(dtos);
     }
 
+    @PostMapping("/{id}/clone")
+    public ResponseEntity<TaskDto> cloneTask(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+        return ResponseEntity.ok(TaskDto.from(taskService.cloneTask(id, user)));
+    }
+
+    @PutMapping("/reorder")
+    public ResponseEntity<List<TaskDto>> reorderTasks(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserContext user) {
+        @SuppressWarnings("unchecked")
+        List<String> orderedIds = (List<String>) body.get("taskIds");
+        String requestId = (String) body.get("requestId");
+        if (orderedIds == null || requestId == null) {
+            throw new ValidationAppException("requestId and taskIds are required");
+        }
+        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+        return ResponseEntity.ok(
+                taskService.reorderTasks(requestId, orderedIds, user).stream()
+                        .map(TaskDto::from)
+                        .toList());
+    }
+
     @PostMapping("/{id}/record-result")
     public ResponseEntity<TaskDto> recordResult(
             @PathVariable String id,

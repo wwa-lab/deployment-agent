@@ -2,10 +2,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  cloneTask as cloneTaskApi,
   editExecutionType as editExecutionTypeApi,
   editTask as editTaskApi,
   getTaskResult,
   listTaskExecutions as listBuildTaskExecutions,
+  reorderTasks as reorderTasksApi,
   recordResult as recordResultApi,
   startManualExecution as startManualExecutionApi,
   submitAutoExecution,
@@ -282,6 +284,65 @@ async function openViewResult(task: Task) {
     viewingResult.value = { task, result, loading: false }
   } catch {
     viewingResult.value = { task, result: null, loading: false }
+  }
+}
+
+async function handleCloneTask(task: Task) {
+  if (!canModifyTask(task)) return
+  cloningTaskId.value = task.id
+  try {
+    await cloneTaskApi(task.id)
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
+  } finally {
+    cloningTaskId.value = null
+  }
+}
+
+const cloningTaskId = ref<string | null>(null)
+
+const dragTaskId = ref<string | null>(null)
+const dragOverTaskId = ref<string | null>(null)
+
+function onDragStart(task: Task, event: DragEvent) {
+  dragTaskId.value = task.id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', task.id)
+  }
+}
+
+function onDragOver(task: Task, event: DragEvent) {
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  dragOverTaskId.value = task.id
+}
+
+function onDragLeave() { dragOverTaskId.value = null }
+function onDragEnd() { dragTaskId.value = null; dragOverTaskId.value = null }
+
+async function onDrop(request: Request, targetTask: Task, event: DragEvent) {
+  event.preventDefault()
+  dragOverTaskId.value = null
+  const sourceId = dragTaskId.value
+  dragTaskId.value = null
+  if (!sourceId || sourceId === targetTask.id) return
+  if (isArchivedRequest(request)) return
+
+  const tasks = [...request.tasks]
+  const sourceIdx = tasks.findIndex(t => t.id === sourceId)
+  const targetIdx = tasks.findIndex(t => t.id === targetTask.id)
+  if (sourceIdx === -1 || targetIdx === -1) return
+
+  const [moved] = tasks.splice(sourceIdx, 1)
+  tasks.splice(targetIdx, 0, moved)
+
+  try {
+    await reorderTasksApi(request.id, tasks.map(t => t.id))
+    await store.refreshDetail()
+  } catch {
+    // Error handled by axios interceptor
   }
 }
 
@@ -747,7 +808,20 @@ const activeRequestSummary = computed(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="task in req.tasks" :key="task.id">
+                <tr
+                  v-for="task in req.tasks"
+                  :key="task.id"
+                  :draggable="!isArchivedRequest(req) && userStore.isDevOpsAdmin"
+                  :class="{
+                    'drag-source': dragTaskId === task.id,
+                    'drag-over': dragOverTaskId === task.id && dragTaskId !== task.id,
+                  }"
+                  @dragstart="onDragStart(task, $event)"
+                  @dragover="onDragOver(task, $event)"
+                  @dragleave="onDragLeave"
+                  @dragend="onDragEnd"
+                  @drop="onDrop(req, task, $event)"
+                >
                   <td>{{ task.category ?? '—' }}</td>
                   <td>{{ task.taskGroupName }}</td>
                   <td>{{ task.stepSeq }}</td>
@@ -818,6 +892,15 @@ const activeRequestSummary = computed(() => {
                         >
                           Activity
                         </button>
+                        <span class="action-tooltip" title="Create a copy of this task">
+                          <button
+                            class="btn btn-secondary btn-sm"
+                            :disabled="isArchivedRequest(req) || !canModifyTask(task) || cloningTaskId === task.id"
+                            @click.stop="handleCloneTask(task)"
+                          >
+                            {{ cloningTaskId === task.id ? 'Cloning...' : 'Clone' }}
+                          </button>
+                        </span>
                         <span class="action-tooltip" :title="viewResultDisabledReason(task) ?? ''">
                           <button
                             class="btn btn-secondary btn-sm"
@@ -1414,4 +1497,9 @@ const activeRequestSummary = computed(() => {
     grid-template-columns: 1fr;
   }
 }
+
+tr[draggable="true"] { cursor: grab; }
+tr[draggable="true"]:active { cursor: grabbing; }
+.drag-source { opacity: 0.4; }
+.drag-over { border-top: 2px solid #3b82f6 !important; }
 </style>

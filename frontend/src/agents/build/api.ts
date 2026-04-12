@@ -73,6 +73,16 @@ export async function editExecutionType(
   return response.data
 }
 
+export async function cloneTask(taskId: string): Promise<Task> {
+  const response = await buildClient.post(`/tasks/${taskId}/clone`)
+  return response.data
+}
+
+export async function reorderTasks(requestId: string, taskIds: string[]): Promise<Task[]> {
+  const response = await buildClient.put('/tasks/reorder', { requestId, taskIds })
+  return response.data
+}
+
 export async function getTaskResult(taskId: string, executionId?: string): Promise<TaskResult> {
   const executions = await listTaskExecutions(taskId)
   const selectedExecution = executionId

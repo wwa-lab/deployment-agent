@@ -40,6 +40,8 @@ export interface ReleaseFlowDetailApi {
   submitDecision: (taskId: string, decision: string) => Promise<Task>
   submitAutoExecution: (taskId: string) => Promise<Task>
   startManualExecution: (taskId: string) => Promise<Task>
+  cloneTask: (taskId: string) => Promise<Task>
+  reorderTasks: (requestId: string, taskIds: string[]) => Promise<Task[]>
   listTaskExecutions: (taskId: string) => Promise<TaskExecutionHistory[]>
   getTaskResult: (taskId: string, executionId?: string) => Promise<TaskResult>
 }
