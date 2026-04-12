@@ -204,8 +204,7 @@ function scopeValue(value?: string): string {
         <p class="view-eyebrow">WWA Shared Capability</p>
         <h1 class="view-title">Audit Log</h1>
         <p class="view-subtitle">
-          Every meaningful action in WWA leaves a record here. Use it to trace who did what, when
-          it happened, and the key detail captured for that operation.
+          Trace who did what, when, and with what detail.
         </p>
       </div>
     </div>
@@ -232,9 +231,7 @@ function scopeValue(value?: string): string {
     </div>
 
     <div class="helper-banner helper-banner-muted">
-      Audit Log is read-only for all signed-in users. <b>Platform Events</b> cover access governance;
-      <b>Agent Activity</b> covers agent workflow actions. Use task-level Activity for step-by-step
-      execution history.
+      Read-only. Use task-level Activity dialogs for step-by-step execution history.
     </div>
 
     <div class="toolbar-card">
@@ -308,7 +305,7 @@ function scopeValue(value?: string): string {
         <div>
           <h2 class="section-title">Audit Records</h2>
           <p class="section-subtitle">
-            Latest action records, sorted by time in descending order.
+            Latest action records.
           </p>
         </div>
       </div>

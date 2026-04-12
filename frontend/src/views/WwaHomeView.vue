@@ -31,13 +31,11 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           </div>
 
           <section class="wwa-intro-card home-intro-card" aria-labelledby="wwa-home-intro-title">
-            <div class="wwa-intro-kicker">WWA Today</div>
-              <h2 id="wwa-home-intro-title" class="wwa-intro-title">A shared workflow automation workspace</h2>
+            <div class="wwa-intro-kicker">Overview</div>
+              <h2 id="wwa-home-intro-title" class="wwa-intro-title">Shared workflow automation workspace</h2>
               <p class="wwa-intro-text">
-              WWA currently serves controlled workflow operations, including Build Agent,
-              Testing Agent, Deployment Agent, and shared platform capabilities. Use this hub to
-              enter the active workspaces today, while AI-assisted capabilities are introduced in
-              later phases.
+              Build, testing, and deployment agents with shared platform controls.
+              Select a workspace below to get started.
               </p>
             </section>
         </div>
@@ -60,9 +58,9 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
               <p class="home-console-panel-copy">Configuration, access, and traceability stay centralized.</p>
             </article>
             <article class="home-console-panel">
-              <span class="home-console-panel-label">Roadmap</span>
-              <strong class="home-console-panel-value">AI Assist</strong>
-              <p class="home-console-panel-copy">Intelligence layers join after the control plane is stable.</p>
+              <span class="home-console-panel-label">Execution</span>
+              <strong class="home-console-panel-value">Jenkins + Ansible</strong>
+              <p class="home-console-panel-copy">Fire-and-forget task submission with external job tracking.</p>
             </article>
           </div>
 
@@ -82,15 +80,15 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           <div class="home-console-stream">
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
-              <span>Build, testing, and deployment workspaces stay available from one shared hub.</span>
+              <span>Upload rundowns, track stage progress, execute tasks.</span>
             </div>
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
-              <span>Shared controls stay visible from the navigation rail at all times.</span>
+              <span>Human-in-the-loop approval at every checkpoint.</span>
             </div>
             <div class="home-console-stream-row">
               <span class="home-console-stream-dot"></span>
-              <span>Future AI capability is planned as an overlay, not a replacement.</span>
+              <span>Deny-by-default access with scoped visibility.</span>
             </div>
           </div>
         </aside>

@@ -16,7 +16,7 @@ const copy: ReleaseFlowSummaryCopy = {
   introTitleId: 'wwa-deployment-intro-title',
   introHeading: 'DevOps automation with human control',
   introBody:
-    'WWA currently focuses on DevOps automation. Deployment Agent is the release-execution workspace for tracking and progressing rundowns across SIT, UAT, and PROD, with AI-assisted capabilities planned for future phases.',
+    'Track and progress release rundowns across SIT, UAT, and PROD with human-in-the-loop approval at every stage.',
   loadingLabel: 'Loading release flows...',
   emptyHeading: 'No release flows found.',
   emptyHint: 'Upload a release file to get started.',

@@ -952,7 +952,7 @@ onBeforeUnmount(() => {
         <p class="view-eyebrow">WWA Shared Capability</p>
         <h1 class="view-title">Template Management</h1>
         <p class="view-subtitle">
-          Pick a reusable template, narrow by ownership context, and start from a known workflow baseline.
+          Browse and manage reusable workflow templates.
         </p>
       </div>
     </div>
@@ -962,7 +962,7 @@ onBeforeUnmount(() => {
         <div>
           <h2 class="panel-title">Current Scope</h2>
           <p class="scope-summary-copy">
-            Narrow templates by Application, SNOW Group, Agent, and Site before choosing the right rollout blueprint.
+            Filter templates by scope. Filters also set defaults for new templates.
           </p>
         </div>
         <div class="scope-template-count">

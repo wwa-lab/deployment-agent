@@ -159,11 +159,9 @@ function statusClass(status: AccessGrantStatus) {
     <div class="view-header">
       <div>
         <p class="view-eyebrow">WWA Shared Capability</p>
-        <h1 class="view-title">WWA Access Management</h1>
-        <p class="view-subtitle">Controls platform entry and agent workspace visibility across the WWA platform.</p>
+        <h1 class="view-title">Access Management</h1>
         <p class="view-subtitle">
-          Manage who can enter WWA workspaces, what product roles they hold, and which
-          `Application + SNOW Group` scopes they can view or administer.
+          Manage product entry, roles, and Application + SNOW Group visibility scopes.
         </p>
       </div>
       <button
@@ -187,8 +185,7 @@ function statusClass(status: AccessGrantStatus) {
         locally.
       </template>
       <template v-else>
-        Access Management is restricted to `DEVOPS_ADMIN`. The menu remains visible so teammates can
-        understand the workspace model, but grant lifecycle actions are admin-only.
+        Access Management is restricted to DEVOPS_ADMIN. Grant lifecycle actions are admin-only.
       </template>
     </div>
 

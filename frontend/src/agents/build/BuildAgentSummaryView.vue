@@ -128,8 +128,7 @@ const workspaceAgent = buildAgentDescriptor
         <p class="view-eyebrow">WWA Workspace</p>
         <h1 class="view-title">Build Agent</h1>
         <p class="view-subtitle">
-          Review DEV-stage build workflows, upload packaging rundowns, and drive task execution
-          without leaving the shared WWA shell.
+          Review DEV-stage build workflows, upload packaging rundowns, and drive task execution.
         </p>
       </div>
       <div class="header-actions">
@@ -153,11 +152,10 @@ const workspaceAgent = buildAgentDescriptor
     </div>
 
     <section class="wwa-intro-card" aria-labelledby="wwa-build-intro-title">
-      <div class="wwa-intro-kicker">WWA Today</div>
+      <div class="wwa-intro-kicker">Overview</div>
       <h2 id="wwa-build-intro-title" class="wwa-intro-title">Build and packaging with human checkpoints</h2>
       <p class="wwa-intro-text">
-        Build Agent is the DEV-stage workspace for preparing release packages, running build tasks,
-        and reviewing execution evidence before anything moves into downstream deployment flows.
+        Prepare release packages, run build tasks, and review execution evidence before downstream deployment.
       </p>
     </section>
 
