@@ -65,9 +65,10 @@ async function handleLogin() {
             <div class="login-story-kicker">WWA Platform</div>
             <h1 id="login-story-title" class="login-story-title">Unified workflow automation</h1>
             <p class="login-story-copy">
-              Testing, deployment, platform controls, and audit visibility in one shared workspace.
+              Build, testing, deployment, and platform controls in one shared workspace.
             </p>
             <div class="login-story-pills">
+              <span class="login-story-pill">Build Workflow</span>
               <span class="login-story-pill">Testing Workflow</span>
               <span class="login-story-pill">Deployment Workflow</span>
               <span class="login-story-pill">Platform Controls</span>
@@ -103,6 +104,8 @@ async function handleLogin() {
             <div class="login-console-flow">
               <div class="console-block-label">Active Workspaces</div>
               <div class="login-flow-track">
+                <span class="login-flow-node is-active">Build</span>
+                <span class="login-flow-line"></span>
                 <span class="login-flow-node is-active">Testing</span>
                 <span class="login-flow-line"></span>
                 <span class="login-flow-node is-active">Deploy</span>
