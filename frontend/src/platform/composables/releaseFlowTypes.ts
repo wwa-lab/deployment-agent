@@ -99,3 +99,20 @@ export const testingCopy: ReleaseFlowDetailCopy = {
   purgeNonLastStageMessage: (stage) =>
     `Delete the ${stage} rundown permanently? This is irreversible and removes its archived task history from the system.`,
 }
+
+export const buildCopy: ReleaseFlowDetailCopy = {
+  loadingLabel: 'Loading build workflow...',
+  releaseIdLabel: 'Workflow ID',
+  stitchedPrefix: 'Grouped from',
+  flowStatusLabel: 'Workflow Status',
+  startButtonLabel: 'Start Rundown',
+  emptyRequestsLabel: 'No rundowns found.',
+  archiveLastStageMessage: (stage) =>
+    `Archive the ${stage} rundown? This is the last active stage, so the entire workflow will move into Archived and disappear from the default list.`,
+  archiveNonLastStageMessage: (stage) =>
+    `Archive the ${stage} rundown and hide it from the default workflow view?`,
+  purgeLastStageMessage: (stage) =>
+    `Delete the ${stage} rundown permanently? This is irreversible and will permanently remove the entire workflow because no other rundowns remain.`,
+  purgeNonLastStageMessage: (stage) =>
+    `Delete the ${stage} rundown permanently? This is irreversible and removes its archived task history from the system.`,
+}

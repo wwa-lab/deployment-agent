@@ -79,7 +79,8 @@ The system supports multiple agents (Deployment Agent, Testing Agent, Build Agen
 - `createAgentWorkspace` factory in `frontend/src/platform/composables/createAgentWorkspace.ts` produces per-agent Axios client, Pinia store, and API modules from a single configuration
 - Each agent is defined in `frontend/src/agents/<agent>/index.ts` (e.g. `agents/deployment/index.ts`, `agents/build/index.ts`)
 - `platformClient.ts` (baseURL `/api/platform`) handles shared endpoints (auth, audit, config, access grants)
-- Agent-specific views live in `frontend/src/agents/<agent>/` (e.g. `BuildAgentSummaryView`, `BuildAgentDetailView`)
+- Shared view components in `frontend/src/platform/components/` (`ReleaseFlowSummaryView.vue`, `ReleaseFlowDetailView.vue`) contain all presentation logic; each agent wraps them with a thin `<script setup>` that injects its own store, API module, and copy text
+- Agent-specific views live in `frontend/src/agents/<agent>/` as thin wrappers around the shared platform components
 - Agent registry in `frontend/src/config/agentRegistry.ts` drives home page cards and nav
 
 ### Security Architecture
@@ -121,8 +122,9 @@ Custom `AppException` hierarchy in `errors/` maps to HTTP status codes. `GlobalE
 - Security filters live in `src/main/java/com/wwa/deploymentagent/web/security/`
 - Spring configuration lives in `src/main/java/com/wwa/deploymentagent/config/`
 - Custom exceptions live in `src/main/java/com/wwa/deploymentagent/errors/`
-- Frontend agent workspaces live in `frontend/src/agents/<agent>/`
-- Frontend shared platform code lives in `frontend/src/platform/`
+- Frontend agent workspaces live in `frontend/src/agents/<agent>/` (thin wrappers: `index.ts`, `api.ts`, summary/detail views)
+- Frontend shared platform view components live in `frontend/src/platform/components/` (all agent views compose from these)
+- Frontend shared composables and factories live in `frontend/src/platform/composables/`
 - Frontend source lives in `frontend/src/`
 
 ## Technology Stack
@@ -173,7 +175,7 @@ Enforce via `:allowed-stages` prop on `UploadDialog` and a `stages` constant in 
 - [ ] Add `AgentId` constant in `contracts/AgentId.java`
 - [ ] Create backend controllers under `agents/<agent-key>/web/` mapped to `/api/<agent-key>/` that force `effectiveAgent` server-side
 - [ ] Create `frontend/src/agents/<agent-key>/index.ts` using `createAgentWorkspace` factory (produces Axios client, Pinia store, and API modules)
-- [ ] Create summary and detail view components in `frontend/src/agents/<agent-key>/`
+- [ ] Create summary and detail view as thin wrappers in `frontend/src/agents/<agent-key>/` that compose from `platform/components/ReleaseFlow{Summary,Detail}View.vue` (do NOT duplicate the shared view)
 - [ ] Register in `agentRegistry.ts` with accurate description
 - [ ] Add routes in `frontend/src/router/index.ts`
 - [ ] Agent view passes its own `uploadFn`, `downloadTemplateFn`, `onUploadSuccess` to `UploadDialog`
@@ -224,6 +226,20 @@ the user before proceeding.
 - Frontend changes: `cd frontend && npm run build`
 - API changes: update controller/contract tests under `src/test/java/com/wwa/deploymentagent/web/`
 - Oracle schema changes: provide DDL in `src/main/resources/db/migration/`
+
+## Cross-Cutting Sync Rules
+
+### Backend enum change → frontend type must follow
+
+When adding, removing, or renaming a value in any `contracts/enums/*.java` enum, immediately update the matching TypeScript type union in `frontend/src/types/index.ts`. This is mandatory because TypeScript's `.includes()` does not enforce that the argument belongs to the union, so `vue-tsc` will not catch the drift.
+
+### Flyway migration → regenerate Oracle greenfield DDL
+
+After adding any `db/migration/V*` script, regenerate `docs/sql/ORACLE_CURRENT_SCHEMA.sql` to include the new end-state. The greenfield DDL is never exercised by local/test runs (H2 auto-DDL), so staleness is invisible until someone tries an Oracle deployment.
+
+### Shared view refactor → all agents must follow
+
+All agent views must be thin wrappers around `platform/components/ReleaseFlow{Summary,Detail}View.vue`. Do not duplicate the shared view into an agent-specific standalone file. If an agent needs behavior that the shared view doesn't support, extend the shared view's props — do not fork it.
 
 ## Compact Instructions
 
