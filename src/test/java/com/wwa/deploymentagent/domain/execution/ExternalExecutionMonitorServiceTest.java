@@ -13,8 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 /**
  * Integration tests for ExternalExecutionMonitorService.
  *
- * <p>Uses real Spring context with H2. Adapters are replaced with @MockBean
+ * <p>Uses real Spring context with H2. Adapters are replaced with @MockitoBean
  * to control poll results precisely.
  *
  * <p>Note: {@code processSingleExecution} uses {@code @Transactional} (REQUIRED).
@@ -42,9 +42,9 @@ import static org.mockito.Mockito.when;
 class ExternalExecutionMonitorServiceTest {
 
     // Replace real adapters with mocks so no real HTTP calls are made
-    @MockBean private JenkinsExecutionAdapter jenkinsAdapter;
-    @MockBean private AnsibleExecutionAdapter ansibleAdapter;
-    @MockBean private RestTemplate restTemplate;
+    @MockitoBean private JenkinsExecutionAdapter jenkinsAdapter;
+    @MockitoBean private AnsibleExecutionAdapter ansibleAdapter;
+    @MockitoBean private RestTemplate restTemplate;
 
     @Autowired private ExternalExecutionMonitorService monitorService;
     @Autowired private TaskRepository taskRepository;
