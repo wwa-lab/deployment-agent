@@ -76,7 +76,7 @@ Build Agent is the first Agent Module delivered under this pattern. Deployment A
 
 ## Terminology
 
-- **Agent Module** — A self-contained package under `com.wwa.deploymentagent.agents.<name>/` (backend) and `frontend/src/agents/<name>/` (frontend) that owns an agent's controllers, Stage enum, `StagePipeline` bean, and UI. Agent Modules depend only on Platform Core; they do not depend on each other.
+- **Agent Module** — A self-contained package under `com.wwa.agenthub.agents.<name>/` (backend) and `frontend/src/agents/<name>/` (frontend) that owns an agent's controllers, Stage enum, `StagePipeline` bean, and UI. Agent Modules depend only on Platform Core; they do not depend on each other.
 - **Platform Core** — The stage-agnostic, agent-agnostic substrate: domain entities, task state machine, shared services (`TaskService`, `ReleaseFlowService`, `DecisionEngine`, `ReleaseFlowProgressionService`, `RecordResultService`, `ImportService`, `AutoExecutionService`, `AuditLoggerService`, `ConfigurationService`, `AuthService`), security filters, `AgentBoundaryGuard`, and frontend composables (`createAgentWorkspace`, shared `UploadDialog`).
 - **Stage Vocabulary** — The set of stage identifiers an Agent Module recognizes. Each Agent Module declares its own enum (e.g. `BuildStage { DEV }`). The persistent `Request.stage` column stores the stage as a String so the platform core never binds to a single closed enum.
 - **StagePipeline** — A per-agent `@Component` that knows the stage ordering within that agent and reports its `agentId()`. `DeploymentStagePipeline` encodes `SIT → UAT → PROD`; `TestingStagePipeline` and `BuildStagePipeline` are single-stage terminal pipelines. `ReleaseFlowProgressionService` resolves the right pipeline at call time via `StagePipelineRegistry` (keyed by `request.getAgent()`) rather than calling a hard-coded `Stage.next()`. Controllers never pass pipelines as method parameters. Unknown stages throw `IllegalArgumentException` (fail-loud).
@@ -99,7 +99,7 @@ The architectural approach has two parts.
 3. **`ReleaseFlowFamilyKey` and the stitching methods** (`listStitchedSummaries`, `getStitchedDetail`) move out of platform `ReleaseFlowService` into `agents/deployment/domain/DeploymentStitchingService`. Platform `ReleaseFlowService` exposes only stage-agnostic list/get methods. Testing Agent and Build Agent never touch stitching.
 4. **`ReleaseFlowListItemDto` is generalized.** The fixed `sitStatus / uatStatus / prodStatus / *Present` fields are replaced with `Map<String, RequestStatus> stageStatuses` and `Set<String> stagesPresent`. Each agent's frontend reads only the stage keys it cares about; adding a new stage never touches the DTO.
 5. **Deployment Agent stops being the global view.** The current `ReleaseFlowController.list` default of "show all agents" is replaced with "show only `deployment-agent` flows" (Q1 = peer agents). A separate platform-level Global View endpoint/page is out of scope for this delivery and is tracked as a follow-up.
-6. **Package structure.** All agent-specific code moves into `com.wwa.deploymentagent.agents.<name>/` (backend) and `frontend/src/agents/<name>/` (frontend). The existing `web/controller/*`, `frontend/src/api/`, `frontend/src/stores/`, and `frontend/src/views/` directories are purged of agent-specific files; only platform-level shared code remains there.
+6. **Package structure.** All agent-specific code moves into `com.wwa.agenthub.agents.<name>/` (backend) and `frontend/src/agents/<name>/` (frontend). The existing `web/controller/*`, `frontend/src/api/`, `frontend/src/stores/`, and `frontend/src/views/` directories are purged of agent-specific files; only platform-level shared code remains there.
 7. **Frontend `createAgentWorkspace(config)` factory.** New composable that returns shared workspace plumbing (`{ config, client, api, useStore, routes }`) given an agent configuration object. Each Agent Module's `index.ts` stays small while dedicated agent views and API wrappers layer on top of the shared store/client foundation.
 
 ### Part B — Build Agent Module
@@ -237,7 +237,7 @@ All v2 AD numbers are obsolete. A v2 → v3 correspondence table appears at the 
 ### PL-2: Agent Module Package Structure
 
 **Decision:** All agent-specific code lives under a dedicated agent module:
-- **Backend:** `com.wwa.deploymentagent.agents.<name>/` with subpackages `web/` (controllers) and `domain/` (Stage enum, `StagePipeline`, agent-specific services).
+- **Backend:** `com.wwa.agenthub.agents.<name>/` with subpackages `web/` (controllers) and `domain/` (Stage enum, `StagePipeline`, agent-specific services).
 - **Frontend:** `frontend/src/agents/<name>/` with `index.ts`, `api.ts`, `store.ts`, `SummaryView.vue`, `DetailView.vue`.
 
 **Boundary rules:**
@@ -574,7 +574,7 @@ This section lists components by module. Platform Core is the agent-agnostic sub
 
 ### Backend — Deployment Agent Module
 
-**New location:** `com.wwa.deploymentagent.agents.deployment/`
+**New location:** `com.wwa.agenthub.agents.deployment/`
 
 **New components**
 - `domain/DeploymentStage { SIT, UAT, PROD }` — agent-local enum (PL-3).
@@ -595,7 +595,7 @@ This section lists components by module. Platform Core is the agent-agnostic sub
 
 ### Backend — Testing Agent Module
 
-**New location:** `com.wwa.deploymentagent.agents.testing/`
+**New location:** `com.wwa.agenthub.agents.testing/`
 
 Testing Agent has not been publicly released; it is still in internal testing. The v2 → v3 migration treats Testing Agent as unshipped, so no "behavior-preserving" hedging applies — the module simply lands in its final v3 shape.
 
@@ -611,7 +611,7 @@ Testing Agent has not been publicly released; it is still in internal testing. T
 
 ### Backend — Build Agent Module
 
-**New location:** `com.wwa.deploymentagent.agents.build/`
+**New location:** `com.wwa.agenthub.agents.build/`
 
 **All new components**
 - `domain/BuildStage { DEV }` — single-value enum.

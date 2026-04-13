@@ -29,7 +29,7 @@
 
 ### 1.3 File-path convention
 
-All file paths in this document use the **post-refactor target location** under `com.wwa.deploymentagent.platform.*` for Platform Core code and `com.wwa.deploymentagent.agents.<name>.*` for Agent Module code. Before this delivery's Phase H migration, Platform Core code currently lives under flat packages (`com.wwa.deploymentagent.domain.*`, `com.wwa.deploymentagent.contracts.*`, `com.wwa.deploymentagent.web.*`). When a path in this document is prefixed with `platform/` or `agents/`, read it as "the location after Phase H has landed". Where the pre-refactor location matters for a specific line edit (e.g. `ReleaseFlowProgressionService.java:72` which is the current `domain/decision/` location), it is stated explicitly alongside the target path.
+All file paths in this document use the **post-refactor target location** under `com.wwa.agenthub.platform.*` for Platform Core code and `com.wwa.agenthub.agents.<name>.*` for Agent Module code. Before this delivery's Phase H migration, Platform Core code currently lives under flat packages (`com.wwa.agenthub.domain.*`, `com.wwa.agenthub.contracts.*`, `com.wwa.agenthub.web.*`). When a path in this document is prefixed with `platform/` or `agents/`, read it as "the location after Phase H has landed". Where the pre-refactor location matters for a specific line edit (e.g. `ReleaseFlowProgressionService.java:72` which is the current `domain/decision/` location), it is stated explicitly alongside the target path.
 
 ---
 
@@ -48,7 +48,7 @@ Eleven platform-level modules (M1–M11) constitute Part A of the delivery. Each
 **File:** `src/main/java/com/wwa/deploymentagent/platform/domain/StagePipeline.java`
 
 ```java
-package com.wwa.deploymentagent.platform.domain;
+package com.wwa.agenthub.platform.domain;
 
 import java.util.List;
 import java.util.Optional;
@@ -100,7 +100,7 @@ public interface StagePipeline {
 **File:** `src/main/java/com/wwa/deploymentagent/platform/domain/StagePipelineRegistry.java`
 
 ```java
-package com.wwa.deploymentagent.platform.domain;
+package com.wwa.agenthub.platform.domain;
 
 import org.springframework.stereotype.Component;
 
@@ -117,7 +117,7 @@ import java.util.stream.Collectors;
  * <p>Duplicate agentId detection and missing-agent lookup are fail-loud:
  * startup fails with IllegalStateException on duplicate; runtime lookup throws
  * on missing agent. This is the single source of truth that
- * {@link com.wwa.deploymentagent.platform.domain.decision.ReleaseFlowProgressionService}
+ * {@link com.wwa.agenthub.platform.domain.decision.ReleaseFlowProgressionService}
  * uses to resolve the correct pipeline for a release flow.
  */
 @Component
@@ -193,14 +193,14 @@ public class StagePipelineRegistry {
 **File:** `src/main/java/com/wwa/deploymentagent/platform/web/security/AgentBoundaryGuard.java`
 
 ```java
-package com.wwa.deploymentagent.platform.web.security;
+package com.wwa.agenthub.platform.web.security;
 
-import com.wwa.deploymentagent.platform.domain.releaseflow.ReleaseFlowRepository;
-import com.wwa.deploymentagent.platform.domain.releaseflow.Request;
-import com.wwa.deploymentagent.platform.domain.releaseflow.RequestRepository;
-import com.wwa.deploymentagent.platform.domain.task.Task;
-import com.wwa.deploymentagent.platform.domain.task.TaskRepository;
-import com.wwa.deploymentagent.errors.NotFoundAppException;
+import com.wwa.agenthub.platform.domain.releaseflow.ReleaseFlowRepository;
+import com.wwa.agenthub.platform.domain.releaseflow.Request;
+import com.wwa.agenthub.platform.domain.releaseflow.RequestRepository;
+import com.wwa.agenthub.platform.domain.task.Task;
+import com.wwa.agenthub.platform.domain.task.TaskRepository;
+import com.wwa.agenthub.errors.NotFoundAppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -459,7 +459,7 @@ private String stage;
 
 **Schema impact:** None. DB column is `VARCHAR(10)` on Oracle and H2 already; existing persisted values (`"SIT"`, `"UAT"`, `"PROD"`) remain valid.
 
-**Import impact:** Any import statement referencing `com.wwa.deploymentagent.contracts.enums.Stage` is removed throughout Platform Core. Agent Modules import their own per-agent Stage enum at their controller layer only.
+**Import impact:** Any import statement referencing `com.wwa.agenthub.contracts.enums.Stage` is removed throughout Platform Core. Agent Modules import their own per-agent Stage enum at their controller layer only.
 
 **Test regression:** The existing `ReleaseFlowRepositoryIntegrationTest` and `RequestRepositoryIntegrationTest` must continue to pass after changing `.setStage(Stage.SIT)` to `.setStage("SIT")`. A one-time mechanical refactor.
 
@@ -823,13 +823,13 @@ export function createAgentWorkspace(config: AgentWorkspaceConfig): AgentWorkspa
 
 ## 3. Module Design — Deployment Agent Module
 
-**Location:** `com.wwa.deploymentagent.agents.deployment.*` (backend), `frontend/src/agents/deployment/` (frontend)
+**Location:** `com.wwa.agenthub.agents.deployment.*` (backend), `frontend/src/agents/deployment/` (frontend)
 
 ### D1. `DeploymentStage` + `DeploymentStagePipeline`
 
 ```java
 // agents/deployment/domain/DeploymentStage.java
-package com.wwa.deploymentagent.agents.deployment.domain;
+package com.wwa.agenthub.agents.deployment.domain;
 
 public enum DeploymentStage {
     SIT, UAT, PROD;
@@ -842,10 +842,10 @@ public enum DeploymentStage {
 
 ```java
 // agents/deployment/domain/DeploymentStagePipeline.java
-package com.wwa.deploymentagent.agents.deployment.domain;
+package com.wwa.agenthub.agents.deployment.domain;
 
-import com.wwa.deploymentagent.platform.contracts.AgentId;
-import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import com.wwa.agenthub.platform.contracts.AgentId;
+import com.wwa.agenthub.platform.domain.StagePipeline;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -1028,10 +1028,10 @@ public enum TestingStage {
 
 ```java
 // agents/testing/domain/TestingStagePipeline.java
-package com.wwa.deploymentagent.agents.testing.domain;
+package com.wwa.agenthub.agents.testing.domain;
 
-import com.wwa.deploymentagent.platform.contracts.AgentId;
-import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import com.wwa.agenthub.platform.contracts.AgentId;
+import com.wwa.agenthub.platform.domain.StagePipeline;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -1113,10 +1113,10 @@ public enum BuildStage {
 
 ```java
 // agents/build/domain/BuildStagePipeline.java
-package com.wwa.deploymentagent.agents.build.domain;
+package com.wwa.agenthub.agents.build.domain;
 
-import com.wwa.deploymentagent.platform.contracts.AgentId;
-import com.wwa.deploymentagent.platform.domain.StagePipeline;
+import com.wwa.agenthub.platform.contracts.AgentId;
+import com.wwa.agenthub.platform.domain.StagePipeline;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -1403,7 +1403,7 @@ BuildAgentDetailView.vue:
 **Rules:**
 
 ```java
-@AnalyzeClasses(packages = "com.wwa.deploymentagent")
+@AnalyzeClasses(packages = "com.wwa.agenthub")
 public class AgentModuleBoundaryTest {
 
     @ArchTest
