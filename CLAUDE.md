@@ -72,6 +72,7 @@ The system supports multiple agents (Deployment Agent, Testing Agent, Build Agen
 - Separate controller routes: `/api/deployment-agent/*`, `/api/testing-agent/*`, `/api/build-agent/*`
 - Agent-specific controllers live in `agents/<agent>/web/` (e.g. `agents/deployment/web/`, `agents/build/web/`)
 - Platform-shared controllers live in `platform/web/shared/` (auth, audit, config, access grants, template download)
+- `AgentBoundaryGuard` (in `platform/web/security/`) enforces that each controller only accesses data belonging to its agent
 - Controllers force `effectiveAgent = AgentId.<AGENT>` server-side (client `?agent=` param is ignored)
 - Shared domain services receive `agentId` as a parameter; queries filter by `request.agent`
 
@@ -119,7 +120,7 @@ Custom `AppException` hierarchy in `errors/` maps to HTTP status codes. `GlobalE
 - Domain logic lives in `src/main/java/com/wwa/deploymentagent/domain/`
 - Do not put persistence logic in controllers
 - Shared types (DTOs, enums, `UserContext`) live in `src/main/java/com/wwa/deploymentagent/contracts/`
-- Security filters live in `src/main/java/com/wwa/deploymentagent/web/security/`
+- Security filters live in `src/main/java/com/wwa/deploymentagent/web/security/` (SessionAuthFilter, HeaderAuthFilter, GuestReadOnlyFilter) and `src/main/java/com/wwa/deploymentagent/platform/web/security/` (AgentBoundaryGuard)
 - Spring configuration lives in `src/main/java/com/wwa/deploymentagent/config/`
 - Custom exceptions live in `src/main/java/com/wwa/deploymentagent/errors/`
 - Frontend agent workspaces live in `frontend/src/agents/<agent>/` (thin wrappers: `index.ts`, `api.ts`, summary/detail views)

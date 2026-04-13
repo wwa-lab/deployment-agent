@@ -7,6 +7,29 @@ import type {
   TaskResult,
 } from '../../types'
 
+export interface TaskDocLink {
+  label: string
+  url: string
+  note?: string
+  required?: boolean
+}
+
+export interface TaskSkillRef {
+  key: string
+  label: string
+  role: 'primary' | 'review' | 'related'
+}
+
+export interface TaskDocSpec {
+  primarySkill: TaskSkillRef
+  relatedSkills?: TaskSkillRef[]
+  inputs: TaskDocLink[]
+  outputs: TaskDocLink[]
+  suggestedInputs?: TaskDocLink[]
+  suggestedOutputs?: TaskDocLink[]
+  hasOverrides?: boolean
+}
+
 /**
  * Full Release Flow API bundle consumed by the shared
  * `ReleaseFlowDetailView.vue`. Each agent's detail wrapper builds this from
@@ -34,6 +57,10 @@ export interface ReleaseFlowDetailApi {
   editTask: (taskId: string, inputParameters: Record<string, unknown>) => Promise<Task>
   editNames: (taskId: string, names: { taskName?: string; taskGroupName?: string }) => Promise<Task>
   editExecutionType: (taskId: string, executionType: 'MANUAL' | 'AUTO') => Promise<Task>
+  saveTaskDocs?: (
+    taskId: string,
+    docs: { inputs: TaskDocLink[]; outputs: TaskDocLink[] },
+  ) => Promise<Task>
   recordResult: (
     taskId: string,
     body: { resultSummary: Record<string, unknown>; resultLogs?: string },

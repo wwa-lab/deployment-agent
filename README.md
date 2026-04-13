@@ -16,7 +16,7 @@ This README reflects the current repository code and the current design baseline
 - Active agent workspaces: **Build Agent**, **Deployment Agent**, **Testing Agent**
 - Current technical identifiers:
   - repository / artifact: `deployment-agent`
-  - Java package: `com.wwa.deploymentagent`
+  - Java package: `com.wwa.agenthub`
   - Deployment Agent: route `/wwa/deployment-agent`, API `/api/deployment-agent`
   - Testing Agent: route `/wwa/testing-agent`, API `/api/testing-agent`
   - Build Agent: route `/wwa/build-agent`, API `/api/build-agent`

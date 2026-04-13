@@ -85,7 +85,7 @@ The 28 tasks are organized into 10 phases. Phase ordering is mandatory; inter-ph
 - **Design ref:** M1 precondition
 - **Architecture ref:** PL-2
 - **Effort:** S
-- **Description:** Create empty package directories with `package-info.java` files for `com.wwa.deploymentagent.agents.deployment`, `.testing`, `.build` and their `domain/` / `web/` subpackages. Same for `com.wwa.deploymentagent.platform`. This gives ArchUnit rules targets to bind to before any real code lands.
+- **Description:** Create empty package directories with `package-info.java` files for `com.wwa.agenthub.agents.deployment`, `.testing`, `.build` and their `domain/` / `web/` subpackages. Same for `com.wwa.agenthub.platform`. This gives ArchUnit rules targets to bind to before any real code lands.
 - **Files created:** 12 `package-info.java` files
 - **Acceptance criteria:**
   - `mvn test` still green.

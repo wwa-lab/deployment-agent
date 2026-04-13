@@ -13,6 +13,7 @@ import type {
   TaskResult,
   UploadResponse,
 } from '../../types'
+import type { TaskDocLink } from '../../platform/composables/releaseFlowTypes'
 
 export interface ListReleaseFlowsParams {
   project?: string
@@ -154,6 +155,14 @@ export async function editExecutionType(
   executionType: 'MANUAL' | 'AUTO',
 ): Promise<Task> {
   const response = await buildClient.put(`/tasks/${taskId}/execution-type`, { executionType })
+  return response.data
+}
+
+export async function saveTaskDocs(
+  taskId: string,
+  docs: { inputs: TaskDocLink[]; outputs: TaskDocLink[] },
+): Promise<Task> {
+  const response = await buildClient.put(`/tasks/${taskId}/docs`, docs)
   return response.data
 }
 

@@ -1,0 +1,35 @@
+package com.wwa.agenthub.contracts.dto;
+
+import com.wwa.agenthub.domain.configuration.ConfigurationScope;
+import com.wwa.agenthub.domain.configuration.ScopeDirectoryEntry;
+import jakarta.validation.constraints.NotBlank;
+
+import java.time.Instant;
+
+public record ScopeDirectoryEntryDto(
+        String id,
+        String application,
+        String snowGroup,
+        String agent,
+        String scopeSource,
+        String updatedBy,
+        Instant updatedAt
+) {
+    public static ScopeDirectoryEntryDto from(ScopeDirectoryEntry entry) {
+        return new ScopeDirectoryEntryDto(
+                entry.getId(),
+                entry.getApplication(),
+                entry.getSnowGroup(),
+                entry.getAgent(),
+                new ConfigurationScope(entry.getApplication(), entry.getSnowGroup(), entry.getAgent()).scopeSource(),
+                entry.getUpdatedBy(),
+                entry.getUpdatedAt());
+    }
+
+    public record UpsertRequest(
+            String id,
+            @NotBlank String application,
+            String snowGroup,
+            String agent
+    ) {}
+}

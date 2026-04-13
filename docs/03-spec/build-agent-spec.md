@@ -96,7 +96,7 @@ Same as Deployment Agent:
 
 All terms from the Deployment Agent and Testing Agent specs apply. Additional terms introduced by v3:
 
-- **Agent Module**: A self-contained package owning one agent's controllers, Stage enum, `StagePipeline` bean, and frontend store/views. Backend location: `com.wwa.deploymentagent.agents.<name>/`. Frontend location: `frontend/src/agents/<name>/`. Agent Modules depend only on Platform Core; they do not depend on each other.
+- **Agent Module**: A self-contained package owning one agent's controllers, Stage enum, `StagePipeline` bean, and frontend store/views. Backend location: `com.wwa.agenthub.agents.<name>/`. Frontend location: `frontend/src/agents/<name>/`. Agent Modules depend only on Platform Core; they do not depend on each other.
 - **Platform Core**: The stage-agnostic, agent-agnostic substrate shared by all Agent Modules. Contains `TaskService`, `ReleaseFlowService` (list/get only — stitching is not in platform), `DecisionEngine`, `ReleaseFlowProgressionService`, `ImportService`, `AutoExecutionService`, `AuditLoggerService`, security filters, `AgentBoundaryGuard`, and frontend composables (`createAgentWorkspace`, `UploadDialog`).
 - **Agent Identifier**: A String value (`"deployment-agent"`, `"testing-agent"`, `"build-agent"`) stored on the `Request.agent` column that determines which Agent Module owns the row. Defined by `AgentId` constants (backend) and `frontend/src/config/agentId.ts` (frontend).
 - **DEV Stage**: The SDLC stage preceding SIT, where developers write, build, and locally validate code. Owned exclusively by Build Agent and defined as `agents/build/domain/BuildStage.DEV`. DEV is terminal because `BuildStagePipeline.next("DEV")` returns `Optional.empty()`.
@@ -249,7 +249,7 @@ Build Agent cannot be delivered as a standalone feature. Its delivery includes a
 - `StagePipeline` is introduced as a platform interface; each Agent Module provides an implementation (§5.4).
 - `ReleaseFlowFamilyKey` and stitching move from Platform Core into `agents/deployment/domain/DeploymentStitchingService` (§5.5).
 - `ReleaseFlowListItemDto` replaces positional per-stage fields with a generic `Map<String, RequestStatus>` (§5.6).
-- Deployment Agent and Testing Agent migrate into the Agent Module package structure (`com.wwa.deploymentagent.agents.<name>/` backend, `frontend/src/agents/<name>/` frontend).
+- Deployment Agent and Testing Agent migrate into the Agent Module package structure (`com.wwa.agenthub.agents.<name>/` backend, `frontend/src/agents/<name>/` frontend).
 - Platform capability routes (`/auth/*`, `/audit-logs`, `/config`, `/access-grants`, `/templates/*`) move from `/api/deployment-agent/*` to a new `/api/platform/*` prefix (§10.1).
 - `AgentBoundaryGuard` is promoted to a Platform Core component used by every Agent Module (not just Build Agent as v2 originally scoped).
 - `AuditLoggerService.log` derives `agentName` dynamically from `scope.agent()` (closes a pre-existing defect in Testing Agent).
@@ -341,7 +341,7 @@ The following Platform Core services keep their business logic unchanged (only S
 
 - **BFR-40**: The Build Agent task controller (`PUT /api/build-agent/tasks/{id}/input`, `GET /api/build-agent/tasks/{id}/executions`, `POST /api/build-agent/tasks/{id}/record-result`, `POST /api/build-agent/tasks/{id}/start-manual`, `POST /api/build-agent/tasks/{id}/submit-auto`) and the Build Agent decision controller (`POST /api/build-agent/tasks/{id}/decision`) shall invoke `AgentBoundaryGuard.assertTaskBelongsToAgent(taskId, AgentId.BUILD_AGENT)` before delegating to any Platform Core service. The guard loads the target task's parent request and rejects the operation if `request.agent != "build-agent"`. *(Source: BA-06)*
 - **BFR-41**: The rejection response shall be HTTP 404 (Not Found) rather than 403 (Forbidden), to avoid leaking the existence of tasks in other agent namespaces. *(Source: BA-06)*
-- **BFR-42**: `AgentBoundaryGuard` is a **Platform Core component** (`com.wwa.deploymentagent.platform.web.security.AgentBoundaryGuard`) invoked by every Agent Module's controllers, not only Build Agent's. No changes to `TaskService`, `RecordResultService`, `DecisionEngine`, or `AutoExecutionService` are required — they remain agent-agnostic. *(Source: BA-06; architecture PL-9)*
+- **BFR-42**: `AgentBoundaryGuard` is a **Platform Core component** (`com.wwa.agenthub.platform.web.security.AgentBoundaryGuard`) invoked by every Agent Module's controllers, not only Build Agent's. No changes to `TaskService`, `RecordResultService`, `DecisionEngine`, or `AutoExecutionService` are required — they remain agent-agnostic. *(Source: BA-06; architecture PL-9)*
 - **BFR-43**: Build Agent read endpoints (`GET /api/build-agent/release-flows/{id}`, `GET /api/build-agent/tasks?requestId=X`, `GET /api/build-agent/tasks/{id}`) shall also enforce agent boundary via `assertFlowBelongsToAgent` and `assertRequestBelongsToAgent` respectively. A 404 is returned if the flow or task does not belong to `"build-agent"`. *(Source: BA-06)*
 - **BFR-44**: Deployment Agent and Testing Agent controllers shall also invoke `AgentBoundaryGuard` on their ID-bearing endpoints, closing the pre-existing Testing Agent gap (v2 R-08). This is a side-effect of promoting the guard to Platform Core in v3 and is included in this spec because it is part of the same delivery. *(Source: architecture PL-9)*
 
@@ -452,7 +452,7 @@ Session cookies (`JSESSIONID`) survive the move because `application.properties:
 
 ### 10.2 Build Agent Endpoint Specification
 
-All Build Agent endpoints are served by `com.wwa.deploymentagent.agents.build.web.*` controllers. Each endpoint invokes `AgentBoundaryGuard` before delegating to Platform Core services.
+All Build Agent endpoints are served by `com.wwa.agenthub.agents.build.web.*` controllers. Each endpoint invokes `AgentBoundaryGuard` before delegating to Platform Core services.
 
 | Endpoint | Method | Controller | Behavior |
 |---|---|---|---|
@@ -601,7 +601,7 @@ Same as Deployment Agent spec section 12. Build Agent reuses the same Jenkins, A
 4. All existing tests must continue to pass after the refactor, accounting for the type-signature changes that accompany `Stage` enum removal (`mvn test`, `cd frontend && npm run build`).
 5. `BuildUploadController` must force `stage = "DEV"` and `agent = "build-agent"` server-side and must not trust any client-supplied value.
 6. Every Agent Module's controllers must invoke `AgentBoundaryGuard` before delegating any ID-bearing call.
-7. No class in Platform Core (`com.wwa.deploymentagent.platform.*`) may import any Stage enum class from any `agents/*` package. Enforced by an ArchUnit test.
+7. No class in Platform Core (`com.wwa.agenthub.platform.*`) may import any Stage enum class from any `agents/*` package. Enforced by an ArchUnit test.
 8. No class in Platform Core may branch on a specific `AgentId` constant value (e.g. `if (agentId.equals(BUILD_AGENT))` is forbidden outside controllers). Enforced by an ArchUnit test.
 9. `SecurityConfig.java:36` whitelist for the login route must update to `/api/platform/auth/login` in the same commit that moves `AuthController`. Verified by an integration test that POSTs to the new route as unauthenticated and expects a 2xx response.
 10. Platform capability route cutover (`/api/deployment-agent/*` → `/api/platform/*` for auth/audit/config/access-grants/templates) is a hard cutover — no route aliases, no deprecation window. Frontend migrations ship in the same commit set.
