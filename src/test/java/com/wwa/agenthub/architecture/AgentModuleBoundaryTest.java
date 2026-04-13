@@ -1,4 +1,4 @@
-package com.wwa.deploymentagent.architecture;
+package com.wwa.agenthub.architecture;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -28,7 +28,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * deferred to a grep-based CI check and is not enforced here.
  */
 @AnalyzeClasses(
-        packages = "com.wwa.deploymentagent",
+        packages = "com.wwa.agenthub",
         importOptions = ImportOption.DoNotIncludeTests.class)
 public class AgentModuleBoundaryTest {
 
@@ -66,7 +66,7 @@ public class AgentModuleBoundaryTest {
     static final ArchRule platform_does_not_reference_stage_enums =
             noClasses().that().resideInAPackage("..platform..")
                     .should().dependOnClassesThat()
-                    .haveFullyQualifiedName("com.wwa.deploymentagent.contracts.enums.Stage")
+                    .haveFullyQualifiedName("com.wwa.agenthub.contracts.enums.Stage")
                     .because("Platform must speak String stages only; the shared Stage enum is forbidden (PL-3)");
 
     // ─── Rule 4 — platform does not reference per-agent Stage enums (PL-3) ─
@@ -83,7 +83,7 @@ public class AgentModuleBoundaryTest {
     static final ArchRule platform_does_not_reference_agent_id_constants =
             noClasses().that().resideInAPackage("..platform..")
                     .should().dependOnClassesThat()
-                    .haveFullyQualifiedName("com.wwa.deploymentagent.contracts.AgentId")
+                    .haveFullyQualifiedName("com.wwa.agenthub.contracts.AgentId")
                     .because("Platform Core must not branch on specific agents (PL-2). "
                             + "Agent resolution happens through StagePipelineRegistry, not by literal comparison.");
 
