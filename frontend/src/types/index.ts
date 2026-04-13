@@ -12,7 +12,7 @@ export type TaskStatus =
   | 'Skipped'
   | 'Failed'
 export type ExecutionType = 'MANUAL' | 'AUTO'
-export type RequestStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Rejected'
+export type RequestStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'Rejected'
 export type UserRole = 'DEVELOPER' | 'TL' | 'DEVOPS_ADMIN' | 'AUDIT' | 'MANAGEMENT' | 'GUEST'
 export type AccessGrantStatus = 'ACTIVE' | 'SUSPENDED'
 export type UserPermission =
