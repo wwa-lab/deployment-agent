@@ -2,6 +2,8 @@ package com.wwa.deploymentagent.agents.build.web;
 
 import com.wwa.deploymentagent.contracts.AgentId;
 import com.wwa.deploymentagent.contracts.UserContext;
+import com.wwa.deploymentagent.contracts.dto.TaskDocLinkDto;
+import com.wwa.deploymentagent.contracts.dto.TaskDocsUpdateRequestDto;
 import com.wwa.deploymentagent.contracts.dto.RecordResultRequestDto;
 import com.wwa.deploymentagent.contracts.dto.TaskDto;
 import com.wwa.deploymentagent.contracts.dto.TaskExecutionHistoryDto;
@@ -17,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +67,21 @@ public class BuildTaskController {
         }
         boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
         return ResponseEntity.ok(TaskDto.from(taskService.editInput(id, newInput, user)));
+    }
+
+    @PutMapping("/{id}/docs")
+    public ResponseEntity<TaskDto> editDocs(
+            @PathVariable String id,
+            @RequestBody TaskDocsUpdateRequestDto body,
+            @AuthenticationPrincipal UserContext user) {
+        if (body == null) {
+            throw new ValidationAppException("Request body must not be null");
+        }
+        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+        return ResponseEntity.ok(TaskDto.from(taskService.editCustomFields(id, Map.of(
+                "taskDocs", Map.of(
+                        "inputs", normalizeDocs(body.inputs()),
+                        "outputs", normalizeDocs(body.outputs()))), user)));
     }
 
     @PutMapping("/{id}/execution-type")
@@ -156,5 +174,41 @@ public class BuildTaskController {
         boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
         return ResponseEntity.ok(
                 TaskDto.from(autoExecutionService.submitAutoExecution(id, user)));
+    }
+
+    private List<Map<String, Object>> normalizeDocs(List<TaskDocLinkDto> docs) {
+        if (docs == null) {
+            return List.of();
+        }
+
+        return docs.stream()
+                .map(this::normalizeDoc)
+                .toList();
+    }
+
+    private Map<String, Object> normalizeDoc(TaskDocLinkDto doc) {
+        if (doc == null) {
+            throw new ValidationAppException("Task docs must not contain null items");
+        }
+
+        String label = doc.label() != null ? doc.label().trim() : "";
+        String url = doc.url() != null ? doc.url().trim() : "";
+        String note = doc.note() != null ? doc.note().trim() : "";
+
+        if (label.isBlank()) {
+            throw new ValidationAppException("Each task doc link must include a label");
+        }
+        if (url.isBlank()) {
+            throw new ValidationAppException("Each task doc link must include a url");
+        }
+
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("label", label);
+        normalized.put("url", url);
+        if (!note.isBlank()) {
+            normalized.put("note", note);
+        }
+        normalized.put("required", Boolean.TRUE.equals(doc.required()));
+        return normalized;
     }
 }

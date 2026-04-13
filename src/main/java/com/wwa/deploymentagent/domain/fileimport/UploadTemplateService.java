@@ -59,7 +59,7 @@ public class UploadTemplateService {
 
     private byte[] generateFromSchema(TemplateSchema schema) throws IOException {
         List<String> headers = schema.headers();
-        List<String> sampleRow = schema.sampleRow();
+        List<List<String>> sampleRows = schema.sampleRows();
 
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
@@ -70,8 +70,12 @@ public class UploadTemplateService {
                 header.createCell(i).setCellValue(headers.get(i));
             }
 
-            if (!sampleRow.isEmpty()) {
-                Row sample = sheet.createRow(1);
+            for (int rowIndex = 0; rowIndex < sampleRows.size(); rowIndex++) {
+                List<String> sampleRow = sampleRows.get(rowIndex);
+                if (sampleRow.isEmpty()) {
+                    continue;
+                }
+                Row sample = sheet.createRow(rowIndex + 1);
                 for (int i = 0; i < sampleRow.size(); i++) {
                     sample.createCell(i).setCellValue(sampleRow.get(i));
                 }

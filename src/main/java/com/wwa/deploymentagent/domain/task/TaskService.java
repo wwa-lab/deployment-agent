@@ -148,6 +148,42 @@ public class TaskService {
     }
 
     /**
+     * Edit per-agent custom fields.
+     * Unlike execution input parameters, these fields are presentation metadata
+     * and may be updated whenever the owning request is still active.
+     */
+    @Transactional
+    public Task editCustomFields(String taskId, Map<String, Object> newCustomFields, UserContext user) {
+        Task task = getById(taskId);
+        assertTaskRequestActive(task);
+        taskPermissionService.assertOwnerOrAdmin(task, user, "task:editCustomFields");
+
+        if (newCustomFields == null) {
+            throw new ValidationAppException("Custom fields must not be null");
+        }
+
+        Map<String, Object> oldCustomFields = task.getCustomFields();
+        Map<String, Object> mergedCustomFields = new LinkedHashMap<>();
+        if (oldCustomFields != null) {
+            mergedCustomFields.putAll(oldCustomFields);
+        }
+        mergedCustomFields.putAll(newCustomFields);
+
+        task.setCustomFields(mergedCustomFields);
+        Task saved = save(task);
+
+        auditLogger.log(user, AuditActionType.edit,
+                task.getRequest().getReleaseFlow().getId(),
+                task.getRequest().getId(),
+                taskId,
+                Map.of("fieldChanged", "customFields",
+                       "oldValue", oldCustomFields != null ? oldCustomFields : Map.of(),
+                       "newValue", mergedCustomFields));
+
+        return saved;
+    }
+
+    /**
      * Edit task name and/or step (group) name.
      * Only allowed in Pending or Ready_For_Execution states.
      */

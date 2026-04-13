@@ -63,6 +63,7 @@ export interface Task {
   owner?: string
   plannedStartTime?: string
   plannedEndTime?: string
+  customFields?: Record<string, unknown>
   currentResultSummary?: Record<string, unknown>
   latestExecutionId?: string
   startTime?: string

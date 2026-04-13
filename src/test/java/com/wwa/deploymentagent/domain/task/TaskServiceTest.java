@@ -201,6 +201,26 @@ class TaskServiceTest {
                 .isInstanceOf(ValidationAppException.class);
     }
 
+    @Test
+    @DisplayName("editCustomFields merges task doc overrides without dropping existing custom fields")
+    void editCustomFields_mergesOverrides() {
+        Task task = helper.seedTask(request, TaskStatus.Pending);
+        task.setCustomFields(Map.of("source", "template"));
+
+        Task updated = taskService.editCustomFields(task.getId(), Map.of(
+                "taskDocs", Map.of(
+                        "inputs", java.util.List.of(Map.of(
+                                "label", "Requirement Package",
+                                "url", "https://github.com/example/requirement.md",
+                                "required", true)),
+                        "outputs", java.util.List.of())), ownerUser);
+
+        assertThat(updated.getCustomFields())
+                .containsEntry("source", "template");
+        assertThat(updated.getCustomFields())
+                .containsKey("taskDocs");
+    }
+
     // ─── startManualExecution ────────────────────────────────────────────────
 
     @Test

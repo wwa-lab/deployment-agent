@@ -24,6 +24,7 @@ public record TaskDto(
         String owner,
         Instant plannedStartTime,
         Instant plannedEndTime,
+        Map<String, Object> customFields,
         Map<String, Object> currentResultSummary,
         String latestExecutionId,
         long version
@@ -50,6 +51,7 @@ public record TaskDto(
                 task.getOwner(),
                 task.getPlannedStartTime(),
                 task.getPlannedEndTime(),
+                task.getCustomFields(),
                 task.getCurrentResultSummary(),
                 task.getLatestExecutionId(),
                 task.getVersion() != null ? task.getVersion() : 0L

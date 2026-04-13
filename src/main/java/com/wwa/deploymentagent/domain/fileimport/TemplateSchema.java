@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * Describes a single XLSX upload template: sheet name, downloadable file name,
  * the ordered list of column headers that appear in row 0, the matching sample
- * row rendered in row 1, and the subset of headers whose values should flow
+ * rows rendered below the header, and the subset of headers whose values should flow
  * into {@code Task.customFields} rather than being read by the shared parser.
  *
  * <p>This is a <b>descriptor</b>, not a full parsing DSL. The day-1 parser
@@ -25,20 +25,44 @@ public record TemplateSchema(
         String sheetName,
         String fileName,
         List<String> headers,
-        List<String> sampleRow,
+        List<List<String>> sampleRows,
         List<String> customFieldColumns
 ) {
+    public static TemplateSchema withSampleRow(
+            String sheetName,
+            String fileName,
+            List<String> headers,
+            List<String> sampleRow,
+            List<String> customFieldColumns
+    ) {
+        return new TemplateSchema(
+                sheetName,
+                fileName,
+                headers,
+                sampleRow == null ? List.of() : List.of(sampleRow),
+                customFieldColumns
+        );
+    }
+
     public TemplateSchema {
         if (headers == null || headers.isEmpty()) {
             throw new IllegalArgumentException("TemplateSchema.headers must not be empty");
         }
-        if (sampleRow != null && sampleRow.size() > headers.size()) {
-            throw new IllegalArgumentException(
-                    "TemplateSchema.sampleRow has more cells than headers");
+        if (sampleRows != null) {
+            for (List<String> row : sampleRows) {
+                if (row != null && row.size() > headers.size()) {
+                    throw new IllegalArgumentException(
+                            "TemplateSchema.sampleRows contains a row with more cells than headers");
+                }
+            }
         }
         // Defensive copies to preserve immutability
         headers = List.copyOf(headers);
-        sampleRow = sampleRow == null ? List.of() : List.copyOf(sampleRow);
+        sampleRows = sampleRows == null
+                ? List.of()
+                : sampleRows.stream()
+                .map(row -> row == null ? List.<String>of() : List.copyOf(row))
+                .toList();
         customFieldColumns = customFieldColumns == null
                 ? List.of()
                 : List.copyOf(customFieldColumns);
