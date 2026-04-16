@@ -85,18 +85,30 @@ public class TestDataHelper {
 
     @Transactional
     public Task seedTask(Request request, TaskStatus status, boolean critical) {
+        return seedTask(request, status, critical, "Deploy App", "deploy-app", null);
+    }
+
+    @Transactional
+    public Task seedTask(
+            Request request,
+            TaskStatus status,
+            boolean critical,
+            String taskGroupName,
+            String taskName,
+            java.util.Map<String, Object> importMetadata) {
         Task task = new Task();
         task.setRequest(request);
         task.setTaskGroupId("TG-001");
-        task.setTaskGroupName("Deploy App");
+        task.setTaskGroupName(taskGroupName);
         task.setStepSeq(1);
-        task.setTaskName("deploy-app");
+        task.setTaskName(taskName);
         task.setExecutionType(ExecutionType.AUTO);
         task.setCritical(critical);
         task.setTaskStatus(status);
         task.setInputParameters(java.util.Map.of("script", "deploy.sh", "parameters", "--env staging"));
         task.setExpectedOutput("Deployment successful");
         task.setOwner("alice");
+        task.setImportMetadata(importMetadata);
         Task saved = taskRepository.save(task);
         entityManager.flush();
         entityManager.refresh(request);

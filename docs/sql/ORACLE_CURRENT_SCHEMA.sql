@@ -14,7 +14,7 @@ CREATE TABLE DA_RELEASE_FLOW (
     project_name          VARCHAR2(255)  NOT NULL,
     release_id            VARCHAR2(255),
     normalized_release_id VARCHAR2(255)  NOT NULL,
-    current_stage         VARCHAR2(10)   NOT NULL,
+    current_stage         VARCHAR2(64)   NOT NULL,
     flow_status           VARCHAR2(30)   NOT NULL,
     review_status         VARCHAR2(30)   NOT NULL,
     review_owner          VARCHAR2(255),
@@ -36,7 +36,7 @@ CREATE UNIQUE INDEX IDX_RF_PROJECT_RELEASE
 CREATE TABLE DA_REQUEST (
     id                          VARCHAR2(36)   NOT NULL,
     release_flow_id             VARCHAR2(36)   NOT NULL,
-    stage                       VARCHAR2(10)   NOT NULL,
+    stage                       VARCHAR2(64)   NOT NULL,
     attempt_number              NUMBER(10,0)   DEFAULT 1 NOT NULL,
     request_status              VARCHAR2(30)   NOT NULL,
     snow_group                  VARCHAR2(255),

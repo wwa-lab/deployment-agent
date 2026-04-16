@@ -40,7 +40,7 @@ public class Request {
     @JoinColumn(name = "release_flow_id", nullable = false)
     private ReleaseFlow releaseFlow;
 
-    @Column(name = "stage", length = 10, nullable = false)
+    @Column(name = "stage", length = 64, nullable = false)
     private String stage;
 
     @Column(name = "attempt_number", nullable = false)

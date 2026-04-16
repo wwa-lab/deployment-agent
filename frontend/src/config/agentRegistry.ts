@@ -9,7 +9,7 @@
  * docs/00-context/multi-agent-integration-standard.md section 8.
  */
 
-export type AgentCategory = 'deployment' | 'testing' | 'build' | 'platform' | 'other'
+export type AgentCategory = 'deployment' | 'testing' | 'build' | 'project' | 'platform' | 'other'
 
 export type AgentDescriptor = {
   /** Unique stable key. Used as route segment and CSS key. */
@@ -55,6 +55,15 @@ export const agentRegistry: AgentDescriptor[] = [
     icon: '🛠️',
     enabled: true,
     category: 'build',
+  },
+  {
+    key: 'project-agent',
+    name: 'Project Agent',
+    description: 'End-to-end project lifecycle workspace from requirement intake through post-implementation.',
+    route: '/wwa/project-agent',
+    icon: '📁',
+    enabled: true,
+    category: 'project',
   },
 ]
 

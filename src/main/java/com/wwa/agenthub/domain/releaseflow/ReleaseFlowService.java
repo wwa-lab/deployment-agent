@@ -1,5 +1,6 @@
 package com.wwa.agenthub.domain.releaseflow;
 
+import com.wwa.agenthub.contracts.AgentId;
 import com.wwa.agenthub.contracts.UserContext;
 import com.wwa.agenthub.contracts.dto.RequestArchiveResultDto;
 import com.wwa.agenthub.contracts.dto.ReleaseFlowDetailDto;
@@ -293,6 +294,35 @@ public class ReleaseFlowService {
     }
 
     @Transactional(readOnly = true)
+    public String resolveCurrentStage(List<Request> requests, String fallbackStage) {
+        return determineCurrentStage(requests, fallbackStage, detectAgentId(requests));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, RequestStatus> resolveStageStatuses(List<Request> requests, String attemptView) {
+        String agentId = detectAgentId(requests);
+        if (AgentId.PROJECT_AGENT.equals(agentId)) {
+            return buildProjectStageStatuses(requests);
+        }
+
+        Set<String> observedStages = observedStages(requests);
+        Map<String, RequestStatus> statuses = new LinkedHashMap<>();
+        for (String stage : observedStages) {
+            statuses.put(stage, stageStatusFor(requests, stage, attemptView));
+        }
+        return statuses;
+    }
+
+    @Transactional(readOnly = true)
+    public Set<String> resolveObservedStages(List<Request> requests) {
+        String agentId = detectAgentId(requests);
+        if (AgentId.PROJECT_AGENT.equals(agentId)) {
+            return buildProjectStageStatuses(requests).keySet();
+        }
+        return observedStages(requests);
+    }
+
+    @Transactional(readOnly = true)
     public ReleaseFlowDetailDto getStitchedDetail(String releaseFlowId,
                                                   List<String> linkedFlowIds,
                                                   boolean includeArchived,
@@ -328,7 +358,7 @@ public class ReleaseFlowService {
                 ReleaseFlowFamilyKey.fromStoredRelease(
                         representativeFlow.getReleaseId(),
                         representativeFlow.getNormalizedReleaseId()),
-                deriveCurrentStage(stitchedRequests, representativeFlow.getCurrentStage()),
+                determineCurrentStage(stitchedRequests, representativeFlow.getCurrentStage(), detectAgentId(stitchedRequests)),
                 aggregateFlowStatus(stitchedRequests),
                 determineReviewStatus(stitchedRequests),
                 archivedAtFor(releaseFlows),
@@ -390,6 +420,7 @@ public class ReleaseFlowService {
             }
         }
 
+        rf.setCurrentStage(determineCurrentStage(requests, rf.getCurrentStage(), detectAgentId(requests)));
         rf.setFlowStatus(aggregateFlowStatus(requests));
         rf.setReviewStatus(determineReviewStatus(requests));
         releaseFlowRepository.save(rf);
@@ -637,7 +668,10 @@ public class ReleaseFlowService {
             return;
         }
 
-        releaseFlow.setCurrentStage(determineCurrentStage(visibleRequests, releaseFlow.getCurrentStage()));
+        releaseFlow.setCurrentStage(determineCurrentStage(
+                visibleRequests,
+                releaseFlow.getCurrentStage(),
+                detectAgentId(visibleRequests)));
         releaseFlow.setFlowStatus(aggregateFlowStatus(visibleRequests));
         releaseFlow.setReviewStatus(determineReviewStatus(visibleRequests));
         releaseFlow.setReviewOwner(null);
@@ -675,7 +709,15 @@ public class ReleaseFlowService {
         return ReleaseFlowAggregation.aggregateStagesToFlowStatus(stageStatuses);
     }
 
-    private String determineCurrentStage(List<Request> requests, String currentStage) {
+    private String determineCurrentStage(List<Request> requests, String currentStage, String agentId) {
+        if (requests == null || requests.isEmpty()) {
+            return currentStage;
+        }
+
+        if (AgentId.PROJECT_AGENT.equals(agentId)) {
+            return determineProjectLifecycleCurrentStage(requests, currentStage);
+        }
+
         if (requests.stream().anyMatch(request -> currentStage.equals(request.getStage()))) {
             return currentStage;
         }
@@ -687,6 +729,129 @@ public class ReleaseFlowService {
                 .map(Request::getStage)
                 .findFirst()
                 .orElse(sortedRequests.get(sortedRequests.size() - 1).getStage());
+    }
+
+    private String determineProjectLifecycleCurrentStage(List<Request> requests, String fallbackStage) {
+        if (requests == null || requests.isEmpty()) {
+            return fallbackStage;
+        }
+
+        StagePipeline pipeline = stagePipelineRegistry.forAgent(AgentId.PROJECT_AGENT);
+        List<String> orderedStages = pipeline.orderedStages();
+        Map<String, List<com.wwa.agenthub.domain.task.Task>> tasksByStage = new LinkedHashMap<>();
+
+        Request latestRequest = requests.stream()
+                .filter(request -> request.getArchivedAt() == null)
+                .max(requestAttemptComparator())
+                .orElse(requests.get(0));
+
+        for (var task : latestRequest.getTasks()) {
+            String normalizedCategory = normalizeLifecycleStage(task.getImportMetadata() != null
+                    ? (String) task.getImportMetadata().get("activity_category")
+                    : null);
+            if (normalizedCategory == null || !orderedStages.contains(normalizedCategory)) {
+                continue;
+            }
+            tasksByStage.computeIfAbsent(normalizedCategory, ignored -> new ArrayList<>()).add(task);
+        }
+
+        if (tasksByStage.isEmpty()) {
+            return fallbackStage;
+        }
+
+        for (String stage : orderedStages) {
+            List<com.wwa.agenthub.domain.task.Task> stageTasks = tasksByStage.get(stage);
+            if (stageTasks == null || stageTasks.isEmpty()) {
+                continue;
+            }
+            boolean stageComplete = stageTasks.stream().allMatch(task -> isProjectStageTaskComplete(task.getTaskStatus()));
+            if (!stageComplete) {
+                return stage;
+            }
+        }
+
+        return tasksByStage.keySet().stream()
+                .reduce((first, second) -> second)
+                .orElse(fallbackStage);
+    }
+
+    private Map<String, RequestStatus> buildProjectStageStatuses(List<Request> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        StagePipeline pipeline = stagePipelineRegistry.forAgent(AgentId.PROJECT_AGENT);
+        List<String> orderedStages = pipeline.orderedStages();
+        Request latestRequest = requests.stream()
+                .filter(request -> request.getArchivedAt() == null)
+                .max(requestAttemptComparator())
+                .orElse(requests.get(0));
+
+        Map<String, List<com.wwa.agenthub.domain.task.Task>> tasksByStage = new LinkedHashMap<>();
+        for (var task : latestRequest.getTasks()) {
+            String normalizedCategory = normalizeLifecycleStage(task.getImportMetadata() != null
+                    ? (String) task.getImportMetadata().get("activity_category")
+                    : null);
+            if (normalizedCategory == null || !orderedStages.contains(normalizedCategory)) {
+                continue;
+            }
+            tasksByStage.computeIfAbsent(normalizedCategory, ignored -> new ArrayList<>()).add(task);
+        }
+
+        Map<String, RequestStatus> statuses = new LinkedHashMap<>();
+        for (String stage : orderedStages) {
+            List<com.wwa.agenthub.domain.task.Task> stageTasks = tasksByStage.get(stage);
+            if (stageTasks == null || stageTasks.isEmpty()) {
+                continue;
+            }
+            statuses.put(stage, aggregateProjectStageStatus(stageTasks));
+        }
+        return statuses;
+    }
+
+    private RequestStatus aggregateProjectStageStatus(List<com.wwa.agenthub.domain.task.Task> tasks) {
+        if (tasks.stream().anyMatch(task -> task.getTaskStatus() == TaskStatus.Rejected)) {
+            return RequestStatus.Rejected;
+        }
+        if (tasks.stream().anyMatch(task -> task.getTaskStatus() == TaskStatus.Failed)) {
+            return RequestStatus.Failed;
+        }
+        if (tasks.stream().anyMatch(task -> task.getTaskStatus() == TaskStatus.Executing
+                || task.getTaskStatus() == TaskStatus.Awaiting_Review
+                || task.getTaskStatus() == TaskStatus.Ready_For_Execution)) {
+            return RequestStatus.Running;
+        }
+        if (tasks.stream().allMatch(task -> isProjectStageTaskComplete(task.getTaskStatus()))) {
+            return RequestStatus.Completed;
+        }
+        return RequestStatus.Pending;
+    }
+
+    private boolean isProjectStageTaskComplete(TaskStatus status) {
+        return status == TaskStatus.Approved
+                || status == TaskStatus.Skipped;
+    }
+
+    private String normalizeLifecycleStage(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim()
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", "_")
+                .replaceAll("^_+", "")
+                .replaceAll("_+$", "");
+    }
+
+    private String detectAgentId(List<Request> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return null;
+        }
+        return requests.stream()
+                .map(Request::getAgent)
+                .filter(agent -> agent != null && !agent.isBlank())
+                .findFirst()
+                .orElse(null);
     }
 
     private ReviewStatus determineReviewStatus(List<Request> requests) {

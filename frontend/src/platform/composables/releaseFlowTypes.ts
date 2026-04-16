@@ -85,6 +85,11 @@ export interface ReleaseFlowDetailCopy {
   releaseIdLabel: string
   stitchedPrefix: string
   flowStatusLabel: string
+  currentStageLabel?: string
+  stageFieldLabel?: string
+  hideInitialAttempt?: boolean
+  lifecycleMode?: boolean
+  orderedStages?: string[]
   startButtonLabel: string
   emptyRequestsLabel: string
   archiveLastStageMessage: (stage: string) => string
@@ -98,6 +103,10 @@ export const deploymentCopy: ReleaseFlowDetailCopy = {
   releaseIdLabel: 'Release ID',
   stitchedPrefix: 'Stitched from',
   flowStatusLabel: 'Flow Status',
+  currentStageLabel: 'Current Stage',
+  stageFieldLabel: 'Environment',
+  hideInitialAttempt: false,
+  lifecycleMode: false,
   startButtonLabel: 'Start Deployment',
   emptyRequestsLabel: 'No requests found.',
   archiveLastStageMessage: (stage) =>
@@ -115,6 +124,10 @@ export const testingCopy: ReleaseFlowDetailCopy = {
   releaseIdLabel: 'Workflow ID',
   stitchedPrefix: 'Grouped from',
   flowStatusLabel: 'Workflow Status',
+  currentStageLabel: 'Current Stage',
+  stageFieldLabel: 'Environment',
+  hideInitialAttempt: false,
+  lifecycleMode: false,
   startButtonLabel: 'Start Rundown',
   emptyRequestsLabel: 'No rundowns found.',
   archiveLastStageMessage: (stage) =>
@@ -132,6 +145,10 @@ export const buildCopy: ReleaseFlowDetailCopy = {
   releaseIdLabel: 'Workflow ID',
   stitchedPrefix: 'Grouped from',
   flowStatusLabel: 'Workflow Status',
+  currentStageLabel: 'Current Stage',
+  stageFieldLabel: 'Environment',
+  hideInitialAttempt: false,
+  lifecycleMode: false,
   startButtonLabel: 'Start Rundown',
   emptyRequestsLabel: 'No rundowns found.',
   archiveLastStageMessage: (stage) =>
@@ -140,6 +157,40 @@ export const buildCopy: ReleaseFlowDetailCopy = {
     `Archive the ${stage} rundown and hide it from the default workflow view?`,
   purgeLastStageMessage: (stage) =>
     `Delete the ${stage} rundown permanently? This is irreversible and will permanently remove the entire workflow because no other rundowns remain.`,
+  purgeNonLastStageMessage: (stage) =>
+    `Delete the ${stage} rundown permanently? This is irreversible and removes its archived task history from the system.`,
+}
+
+export const projectCopy: ReleaseFlowDetailCopy = {
+  loadingLabel: 'Loading project workflow...',
+  releaseIdLabel: 'Lifecycle ID',
+  stitchedPrefix: 'Grouped from',
+  flowStatusLabel: 'Workflow Status',
+  currentStageLabel: 'Current Lifecycle Stage',
+  stageFieldLabel: 'Stage',
+  hideInitialAttempt: true,
+  lifecycleMode: true,
+  orderedStages: [
+    'REQUIREMENT',
+    'FUNCTIONAL_DESIGN',
+    'TECHNICAL_DESIGN',
+    'DEVELOPMENT',
+    'TESTING',
+    'PERFORMANCE_TEST',
+    'RESULT_SIGNOFF',
+    'BUSINESS_ENDORSEMENT',
+    'CAB',
+    'DEPLOYMENT',
+    'POST_IMPLEMENTATION',
+  ],
+  startButtonLabel: 'Start Rundown',
+  emptyRequestsLabel: 'No lifecycle rundowns found.',
+  archiveLastStageMessage: (stage) =>
+    `Archive the ${stage} rundown? This is the last active stage, so the entire project workflow will move into Archived and disappear from the default list.`,
+  archiveNonLastStageMessage: (stage) =>
+    `Archive the ${stage} rundown and hide it from the default project workflow view?`,
+  purgeLastStageMessage: (stage) =>
+    `Delete the ${stage} rundown permanently? This is irreversible and will permanently remove the entire project workflow because no other rundowns remain.`,
   purgeNonLastStageMessage: (stage) =>
     `Delete the ${stage} rundown permanently? This is irreversible and removes its archived task history from the system.`,
 }

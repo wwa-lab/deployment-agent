@@ -6,6 +6,7 @@ import CreateRundownDialog from '../components/CreateRundownDialog.vue'
 import CreateTemplateDialog from '../components/CreateTemplateDialog.vue'
 import { createRundownFromTemplate as createBuildRundownFromTemplate } from '../agents/build/api'
 import { createRundownFromTemplate as createDeploymentRundownFromTemplate } from '../agents/deployment/api'
+import { createRundownFromTemplate as createProjectRundownFromTemplate } from '../agents/project/api'
 import { createRundownFromTemplate as createTestingRundownFromTemplate } from '../agents/testing/api'
 import DeleteTemplateDialog from '../components/DeleteTemplateDialog.vue'
 import TemplateTaskDialog from '../components/TemplateTaskDialog.vue'
@@ -23,6 +24,598 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const templates = ref<TemplateRecord[]>([
+  {
+    id: 'tpl-project-001',
+    name: 'Project Agent Lifecycle Baseline',
+    version: '1.0',
+    agent: 'Project Agent',
+    category: 'project',
+    snowGroup: 'HTSA-CSI-HCC-AMH-PRJ',
+    application: 'AMH HCC',
+    site: 'HK',
+    estDuration: '28h',
+    description: 'Project lifecycle template derived from the bulletin-to-post-implementation flow in project-lifecycle-example.txt.',
+    createdBy: 'Admin User',
+    createdAt: '2026-04-16T08:00:00Z',
+    updatedAt: '2026-04-16T08:00:00Z',
+    tasks: [
+      {
+        id: 'tpl-project-001-task-1',
+        category: 'requirement',
+        taskName: 'Download Bulletin',
+        step: 1,
+        stepName: 'download bulletin',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'project.lead',
+        estDuration: '30m',
+      },
+      {
+        id: 'tpl-project-001-task-2',
+        category: 'requirement',
+        taskName: 'Review Bulletin Summary',
+        step: 2,
+        stepName: 'review bulletin and generate requirement summary',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'project.lead',
+        estDuration: '1h',
+        dependencies: 'Download Bulletin',
+      },
+      {
+        id: 'tpl-project-001-task-3',
+        category: 'requirement',
+        taskName: 'Collect SD and IT Comments',
+        step: 3,
+        stepName: 'perform system analysis and collect SD and IT comments',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'solution.design',
+        estDuration: '1h',
+        dependencies: 'Review Bulletin Summary',
+      },
+      {
+        id: 'tpl-project-001-task-4',
+        category: 'requirement',
+        taskName: 'Assess Requirement Impact',
+        step: 4,
+        stepName: 'assess impact and decide follow-up path',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'project.lead',
+        estDuration: '45m',
+        dependencies: 'Collect SD and IT Comments',
+      },
+      {
+        id: 'tpl-project-001-task-5',
+        category: 'requirement',
+        taskName: 'Capture Bulletin Critical Info',
+        step: 5,
+        stepName: 'capture critical bulletin information',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'business.analyst',
+        estDuration: '45m',
+        dependencies: 'Assess Requirement Impact',
+      },
+      {
+        id: 'tpl-project-001-task-6',
+        category: 'requirement',
+        taskName: 'Prepare Biz and SD Walkthrough List',
+        step: 6,
+        stepName: 'prepare walkthrough list for business and SD',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'business.analyst',
+        estDuration: '30m',
+        dependencies: 'Capture Bulletin Critical Info',
+      },
+      {
+        id: 'tpl-project-001-task-7',
+        category: 'requirement',
+        taskName: 'Launch Requirement Clarification',
+        step: 7,
+        stepName: 'initiate requirement clarification with surrounding teams and scheme',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'project.lead',
+        estDuration: '1h',
+        dependencies: 'Prepare Biz and SD Walkthrough List',
+      },
+      {
+        id: 'tpl-project-001-task-8',
+        category: 'functional design',
+        taskName: 'Draft Functional Change Background',
+        step: 8,
+        stepName: 'document change background and key changes',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'business.analyst',
+        estDuration: '1h',
+        dependencies: 'Launch Requirement Clarification',
+      },
+      {
+        id: 'tpl-project-001-task-9',
+        category: 'functional design',
+        taskName: 'Raise Functional Spec Signoff',
+        step: 9,
+        stepName: 'raise functional specification signoff',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'solution.design',
+        estDuration: '30m',
+        dependencies: 'Draft Functional Change Background',
+      },
+      {
+        id: 'tpl-project-001-task-10',
+        category: 'functional design',
+        taskName: 'Archive Functional Spec Records',
+        step: 10,
+        stepName: 'upload signed off functional spec to FinBlock and knowledge base',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'solution.design',
+        estDuration: '30m',
+        dependencies: 'Raise Functional Spec Signoff',
+      },
+      {
+        id: 'tpl-project-001-task-11',
+        category: 'technical design',
+        taskName: 'Draft Technical Change Background',
+        step: 11,
+        stepName: 'document technical change background and key changes',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'solution.design',
+        estDuration: '1h',
+        dependencies: 'Archive Functional Spec Records',
+      },
+      {
+        id: 'tpl-project-001-task-12',
+        category: 'technical design',
+        taskName: 'Complete Technical Impact Analysis',
+        step: 12,
+        stepName: 'complete impact analysis',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'solution.design',
+        estDuration: '1h',
+        dependencies: 'Draft Technical Change Background',
+      },
+      {
+        id: 'tpl-project-001-task-13',
+        category: 'technical design',
+        taskName: 'Prepare Object and Job Lists',
+        step: 13,
+        stepName: 'prepare object list and refresh job list',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'tech.lead',
+        estDuration: '45m',
+        dependencies: 'Complete Technical Impact Analysis',
+      },
+      {
+        id: 'tpl-project-001-task-14',
+        category: 'technical design',
+        taskName: 'Register Technical Design Walkthrough',
+        step: 14,
+        stepName: 'register TD walkthrough and request signoff',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'tech.lead',
+        estDuration: '45m',
+        dependencies: 'Prepare Object and Job Lists',
+      },
+      {
+        id: 'tpl-project-001-task-15',
+        category: 'technical design',
+        taskName: 'Archive Technical Design Records',
+        step: 15,
+        stepName: 'upload signed off technical design to FinBlock and knowledge base',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'tech.lead',
+        estDuration: '30m',
+        dependencies: 'Register Technical Design Walkthrough',
+      },
+      {
+        id: 'tpl-project-001-task-16',
+        category: 'development',
+        taskName: 'Generate Development Object List',
+        step: 16,
+        stepName: 'generate and download object list',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'developer.lead',
+        estDuration: '45m',
+        dependencies: 'Archive Technical Design Records',
+      },
+      {
+        id: 'tpl-project-001-task-17',
+        category: 'development',
+        taskName: 'Implement Code Changes',
+        step: 17,
+        stepName: 'implement code changes',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'developer.lead',
+        estDuration: '4h',
+        dependencies: 'Generate Development Object List',
+      },
+      {
+        id: 'tpl-project-001-task-18',
+        category: 'development',
+        taskName: 'Run Unit Test',
+        step: 18,
+        stepName: 'run unit test',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'developer.lead',
+        estDuration: '1h',
+        dependencies: 'Implement Code Changes',
+      },
+      {
+        id: 'tpl-project-001-task-19',
+        category: 'development',
+        taskName: 'Prepare One Click Deployment Input',
+        step: 19,
+        stepName: 'prepare deployment input for one click deployment',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'developer.lead',
+        estDuration: '45m',
+        dependencies: 'Run Unit Test',
+      },
+      {
+        id: 'tpl-project-001-task-20',
+        category: 'development',
+        taskName: 'Deploy to SIT and UAT',
+        step: 20,
+        stepName: 'deploy to SIT and UAT',
+        type: 'AUTO',
+        critical: true,
+        owner: 'developer.lead',
+        estDuration: '1h',
+        dependencies: 'Prepare One Click Deployment Input',
+      },
+      {
+        id: 'tpl-project-001-task-21',
+        category: 'development',
+        taskName: 'Complete CyberFlow Review',
+        step: 21,
+        stepName: 'complete CyberFlow source review',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'security.reviewer',
+        estDuration: '45m',
+        dependencies: 'Deploy to SIT and UAT',
+      },
+      {
+        id: 'tpl-project-001-task-22',
+        category: 'development',
+        taskName: 'Create Development Defect Ticket',
+        step: 22,
+        stepName: 'create testing defect in JIRA if needed',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'developer.lead',
+        estDuration: '30m',
+        dependencies: 'Complete CyberFlow Review',
+      },
+      {
+        id: 'tpl-project-001-task-23',
+        category: 'testing',
+        taskName: 'Draft SAT Plan',
+        step: 23,
+        stepName: 'draft SAT plan',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'test.lead',
+        estDuration: '1h',
+        dependencies: 'Create Development Defect Ticket',
+      },
+      {
+        id: 'tpl-project-001-task-24',
+        category: 'testing',
+        taskName: 'Review SAT Plan',
+        step: 24,
+        stepName: 'review test plan',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'test.manager',
+        estDuration: '30m',
+        dependencies: 'Draft SAT Plan',
+      },
+      {
+        id: 'tpl-project-001-task-25',
+        category: 'testing',
+        taskName: 'Prepare Testing Data',
+        step: 25,
+        stepName: 'prepare testing data',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'test.lead',
+        estDuration: '1h',
+        dependencies: 'Review SAT Plan',
+      },
+      {
+        id: 'tpl-project-001-task-26',
+        category: 'testing',
+        taskName: 'Run SAT Script',
+        step: 26,
+        stepName: 'run SAT script',
+        type: 'AUTO',
+        critical: true,
+        owner: 'test.lead',
+        estDuration: '1h',
+        dependencies: 'Prepare Testing Data',
+      },
+      {
+        id: 'tpl-project-001-task-27',
+        category: 'testing',
+        taskName: 'Log Testing Defect',
+        step: 27,
+        stepName: 'log testing defect in JIRA if required',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'test.lead',
+        estDuration: '30m',
+        dependencies: 'Run SAT Script',
+      },
+      {
+        id: 'tpl-project-001-task-28',
+        category: 'performance test',
+        taskName: 'Prepare Performance Test Data',
+        step: 28,
+        stepName: 'prepare performance and regression data',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'performance.qa',
+        estDuration: '1h',
+        dependencies: 'Log Testing Defect',
+      },
+      {
+        id: 'tpl-project-001-task-29',
+        category: 'performance test',
+        taskName: 'Raise GIS Request',
+        step: 29,
+        stepName: 'raise GIS request',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'performance.qa',
+        estDuration: '30m',
+        dependencies: 'Prepare Performance Test Data',
+      },
+      {
+        id: 'tpl-project-001-task-30',
+        category: 'performance test',
+        taskName: 'Trigger Performance Scripts',
+        step: 30,
+        stepName: 'trigger performance and regression scripts',
+        type: 'AUTO',
+        critical: true,
+        owner: 'performance.qa',
+        estDuration: '1h',
+        dependencies: 'Raise GIS Request',
+      },
+      {
+        id: 'tpl-project-001-task-31',
+        category: 'performance test',
+        taskName: 'Validate Performance Results',
+        step: 31,
+        stepName: 'validate performance and regression results',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'performance.qa',
+        estDuration: '45m',
+        dependencies: 'Trigger Performance Scripts',
+      },
+      {
+        id: 'tpl-project-001-task-32',
+        category: 'result signoff',
+        taskName: 'Send Testing Result to SD',
+        step: 32,
+        stepName: 'capture testing result and send to SD for review',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'test.lead',
+        estDuration: '30m',
+        dependencies: 'Validate Performance Results',
+      },
+      {
+        id: 'tpl-project-001-task-33',
+        category: 'result signoff',
+        taskName: 'Retrieve Testing Signoff',
+        step: 33,
+        stepName: 'retrieve signoff',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'solution.design',
+        estDuration: '30m',
+        dependencies: 'Send Testing Result to SD',
+      },
+      {
+        id: 'tpl-project-001-task-34',
+        category: 'business endorsement',
+        taskName: 'Register Business Endorsement',
+        step: 34,
+        stepName: 'register business endorsement in confluence',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'business.owner',
+        estDuration: '30m',
+        dependencies: 'Retrieve Testing Signoff',
+      },
+      {
+        id: 'tpl-project-001-task-35',
+        category: 'cab',
+        taskName: 'Register CAB Meeting',
+        step: 35,
+        stepName: 'register CAB meeting and prepare entry',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'change.manager',
+        estDuration: '30m',
+        dependencies: 'Register Business Endorsement',
+      },
+      {
+        id: 'tpl-project-001-task-36',
+        category: 'cab',
+        taskName: 'Join CAB Review',
+        step: 36,
+        stepName: 'join CAB and capture outcome',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'change.manager',
+        estDuration: '30m',
+        dependencies: 'Register CAB Meeting',
+      },
+      {
+        id: 'tpl-project-001-task-37',
+        category: 'deployment',
+        taskName: 'Draft Change Request',
+        step: 37,
+        stepName: 'draft change request',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'release.manager',
+        estDuration: '45m',
+        dependencies: 'Join CAB Review',
+      },
+      {
+        id: 'tpl-project-001-task-38',
+        category: 'deployment',
+        taskName: 'Prepare eITSA Details',
+        step: 38,
+        stepName: 'prepare eITSA page details',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'release.manager',
+        estDuration: '30m',
+        dependencies: 'Draft Change Request',
+      },
+      {
+        id: 'tpl-project-001-task-39',
+        category: 'deployment',
+        taskName: 'Perform CR Auto Review',
+        step: 39,
+        stepName: 'perform CR auto review',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'release.manager',
+        estDuration: '30m',
+        dependencies: 'Prepare eITSA Details',
+      },
+      {
+        id: 'tpl-project-001-task-40',
+        category: 'deployment',
+        taskName: 'Prepare Implementation Plan',
+        step: 40,
+        stepName: 'prepare implementation plan and health check plan',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'release.manager',
+        estDuration: '45m',
+        dependencies: 'Perform CR Auto Review',
+      },
+      {
+        id: 'tpl-project-001-task-41',
+        category: 'deployment',
+        taskName: 'Run ARCAD Build',
+        step: 41,
+        stepName: 'run ARCAD build',
+        type: 'AUTO',
+        critical: true,
+        owner: 'release.engineer',
+        estDuration: '1h',
+        dependencies: 'Prepare Implementation Plan',
+      },
+      {
+        id: 'tpl-project-001-task-42',
+        category: 'deployment',
+        taskName: 'Complete Rehearsal',
+        step: 42,
+        stepName: 'complete rehearsal',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'release.engineer',
+        estDuration: '1h',
+        dependencies: 'Run ARCAD Build',
+      },
+      {
+        id: 'tpl-project-001-task-43',
+        category: 'deployment',
+        taskName: 'Upload Deployment Package',
+        step: 43,
+        stepName: 'upload package',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'release.engineer',
+        estDuration: '30m',
+        dependencies: 'Complete Rehearsal',
+      },
+      {
+        id: 'tpl-project-001-task-44',
+        category: 'deployment',
+        taskName: 'Obtain CO Approval',
+        step: 44,
+        stepName: 'obtain CO approval',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'release.manager',
+        estDuration: '30m',
+        dependencies: 'Upload Deployment Package',
+      },
+      {
+        id: 'tpl-project-001-task-45',
+        category: 'deployment',
+        taskName: 'Send FF Reminder',
+        step: 45,
+        stepName: 'send FF reminder',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'release.manager',
+        estDuration: '15m',
+        dependencies: 'Obtain CO Approval',
+      },
+      {
+        id: 'tpl-project-001-task-46',
+        category: 'post implementation',
+        taskName: 'Walk Through FF Outcome',
+        step: 46,
+        stepName: 'walk through FF outcome',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'support.lead',
+        estDuration: '30m',
+        dependencies: 'Send FF Reminder',
+      },
+      {
+        id: 'tpl-project-001-task-47',
+        category: 'post implementation',
+        taskName: 'Close Change Request',
+        step: 47,
+        stepName: 'close change request',
+        type: 'MANUAL',
+        critical: true,
+        owner: 'change.manager',
+        estDuration: '30m',
+        dependencies: 'Walk Through FF Outcome',
+      },
+      {
+        id: 'tpl-project-001-task-48',
+        category: 'post implementation',
+        taskName: 'Update Inventory Records',
+        step: 48,
+        stepName: 'update inventory and knowledge base',
+        type: 'MANUAL',
+        critical: false,
+        owner: 'support.lead',
+        estDuration: '30m',
+        dependencies: 'Close Change Request',
+      },
+    ],
+  },
   {
     id: 'tpl-001',
     name: 'Deployment Agent POC',
@@ -304,7 +897,7 @@ const defaultActivityCategories = [
   'post-release',
 ]
 
-const defaultTemplateCategories = ['development', 'release', 'production']
+const defaultTemplateCategories = ['development', 'release', 'production', 'project']
 const defaultTemplateApplications = ['AMH HCC']
 const defaultTemplateSnowGroups = ['HTSA-CSI-HCC-AMH-PRJ']
 const defaultTemplateSites = ['HK', 'SG']
@@ -747,6 +1340,7 @@ function createRundownFnForAgent(
   agentName?: string,
 ): (input: CreateRundownFromTemplateInput) => Promise<UploadResponse> {
   const normalized = agentName?.trim().toLowerCase()
+  if (normalized === 'project agent') return createProjectRundownFromTemplate
   if (normalized === 'build agent') return createBuildRundownFromTemplate
   if (normalized === 'testing agent') return createTestingRundownFromTemplate
   return createDeploymentRundownFromTemplate
@@ -754,6 +1348,9 @@ function createRundownFnForAgent(
 
 function allowedStagesForAgent(agentName?: string): string[] {
   const normalized = agentName?.trim().toLowerCase()
+  if (normalized === 'project agent') {
+    return ['REQUIREMENT']
+  }
   if (normalized === 'build agent') return ['DEV']
   if (normalized === 'testing agent') return ['UAT']
   return ['SIT', 'UAT', 'PROD']
@@ -1095,94 +1692,96 @@ onBeforeUnmount(() => {
             No templates match the current filters.
           </div>
 
-          <table v-else class="data-table">
-            <thead>
-              <tr>
-                <th>Template Name</th>
-                <th>Version</th>
-                <th>Category</th>
-                <th>Agent</th>
-                <th>SNOW Group</th>
-                <th>Application</th>
-                <th>Site</th>
-                <th>Tasks</th>
-                <th>Est. Duration</th>
-                <th>Description</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="template in filteredTemplates"
-                :key="template.id"
-                class="clickable"
-                :class="{ 'selected-row': selectedTemplate?.id === template.id }"
-                @click="selectTemplate(template.id)"
-              >
-                <td class="template-name-cell">{{ template.name }}</td>
-                <td class="mono-cell">{{ template.version }}</td>
-                <td>
-                  <span class="category-pill">{{ template.category }}</span>
-                </td>
-                <td>{{ template.agent }}</td>
-                <td>{{ template.snowGroup }}</td>
-                <td>{{ template.application }}</td>
-                <td>
-                  <span class="site-pill">{{ template.site }}</span>
-                </td>
-                <td>{{ template.tasks.length }}</td>
-                <td>{{ template.estDuration }}</td>
-                <td class="description-cell">{{ template.description }}</td>
-                <td>
-                  <div class="action-btns" @click.stop>
-                    <button
-                      class="btn btn-primary btn-sm"
-                      type="button"
-                      :disabled="!!createRundownDisabledReason(template)"
-                      :title="createRundownDisabledReason(template)"
-                      @click="openCreateRundownDialog(template)"
-                    >
-                      Create Rundown
-                    </button>
-                    <div class="more-menu-wrap">
+          <div v-else class="template-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Template Name</th>
+                  <th>Version</th>
+                  <th>Category</th>
+                  <th>Agent</th>
+                  <th>SNOW Group</th>
+                  <th>Application</th>
+                  <th>Site</th>
+                  <th>Tasks</th>
+                  <th>Est. Duration</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="template in filteredTemplates"
+                  :key="template.id"
+                  class="clickable"
+                  :class="{ 'selected-row': selectedTemplate?.id === template.id }"
+                  @click="selectTemplate(template.id)"
+                >
+                  <td class="template-name-cell">{{ template.name }}</td>
+                  <td class="mono-cell">{{ template.version }}</td>
+                  <td>
+                    <span class="category-pill">{{ template.category }}</span>
+                  </td>
+                  <td>{{ template.agent }}</td>
+                  <td>{{ template.snowGroup }}</td>
+                  <td>{{ template.application }}</td>
+                  <td>
+                    <span class="site-pill">{{ template.site }}</span>
+                  </td>
+                  <td>{{ template.tasks.length }}</td>
+                  <td>{{ template.estDuration }}</td>
+                  <td class="description-cell">{{ template.description }}</td>
+                  <td>
+                    <div class="action-btns" @click.stop>
                       <button
-                        class="btn btn-secondary btn-sm"
+                        class="btn btn-primary btn-sm"
                         type="button"
-                        :aria-expanded="activeMoreMenuId === template.id"
-                        @click="toggleMoreMenu(template.id)"
+                        :disabled="!!createRundownDisabledReason(template)"
+                        :title="createRundownDisabledReason(template)"
+                        @click="openCreateRundownDialog(template)"
                       >
-                        More
+                        Create Rundown
                       </button>
+                      <div class="more-menu-wrap">
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          type="button"
+                          :aria-expanded="activeMoreMenuId === template.id"
+                          @click="toggleMoreMenu(template.id)"
+                        >
+                          More
+                        </button>
 
-                      <div v-if="activeMoreMenuId === template.id" class="more-menu">
-                        <button
-                          class="more-menu-item"
-                          type="button"
-                          @click="handleTemplateAction('clone', template)"
-                        >
-                          Clone
-                        </button>
-                        <button
-                          class="more-menu-item"
-                          type="button"
-                          @click="handleTemplateAction('edit', template)"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          class="more-menu-item more-menu-item-danger"
-                          type="button"
-                          @click="handleTemplateAction('delete', template)"
-                        >
-                          Delete
-                        </button>
+                        <div v-if="activeMoreMenuId === template.id" class="more-menu">
+                          <button
+                            class="more-menu-item"
+                            type="button"
+                            @click="handleTemplateAction('clone', template)"
+                          >
+                            Clone
+                          </button>
+                          <button
+                            class="more-menu-item"
+                            type="button"
+                            @click="handleTemplateAction('edit', template)"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            class="more-menu-item more-menu-item-danger"
+                            type="button"
+                            @click="handleTemplateAction('delete', template)"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section v-if="selectedTemplate" class="card details-card">
@@ -1285,56 +1884,67 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
-              <div class="dependency-map">
-                <article
-                  v-for="task in selectedTemplateTaskStates"
-                  :key="`${task.id}-dependency-map`"
-                  class="dependency-map-card"
-                >
-                  <div class="dependency-map-head">
-                    <span class="dependency-step-pill">Step {{ task.step }}</span>
-                    <span class="dependency-map-title">{{ task.taskName }}</span>
-                  </div>
-                  <div class="dependency-map-row">
-                    <span class="dependency-map-label">Blocked By</span>
-                    <div v-if="task.blockedBy.length > 0" class="dependency-chip-list">
-                      <span
-                        v-for="dependency in task.blockedBy"
-                        :key="`${task.id}-blocked-by-${dependency}`"
-                        class="dependency-chip"
-                      >
-                        {{ dependency }}
-                      </span>
-                    </div>
-                    <span v-else class="dependency-empty-chip">None</span>
-                  </div>
-                  <div class="dependency-map-row">
-                    <span class="dependency-map-label">Blocks</span>
-                    <div v-if="task.blocks.length > 0" class="dependency-chip-list">
-                      <span
-                        v-for="dependency in task.blocks"
-                        :key="`${task.id}-blocks-${dependency}`"
-                        class="dependency-chip dependency-chip-outbound"
-                      >
-                        {{ dependency }}
-                      </span>
-                    </div>
-                    <span v-else class="dependency-empty-chip">None</span>
-                  </div>
-                  <div v-if="task.unresolvedDependencies.length > 0" class="dependency-warning-row">
-                    <span class="dependency-map-label">Missing Links</span>
-                    <div class="dependency-chip-list">
-                      <span
-                        v-for="dependency in task.unresolvedDependencies"
-                        :key="`${task.id}-missing-${dependency}`"
-                        class="dependency-chip dependency-chip-warning"
-                      >
-                        {{ dependency }}
-                      </span>
+              <details class="dependency-inspector">
+                <summary class="dependency-inspector-summary">
+                  <div>
+                    <div class="dependency-inspector-title">Dependency Overview</div>
+                    <div class="dependency-inspector-copy">
+                      Expand to inspect the task-by-task dependency map.
                     </div>
                   </div>
-                </article>
-              </div>
+                </summary>
+
+                <div class="dependency-map">
+                  <article
+                    v-for="task in selectedTemplateTaskStates"
+                    :key="`${task.id}-dependency-map`"
+                    class="dependency-map-card"
+                  >
+                    <div class="dependency-map-head">
+                      <span class="dependency-step-pill">Step {{ task.step }}</span>
+                      <span class="dependency-map-title">{{ task.taskName }}</span>
+                    </div>
+                    <div class="dependency-map-row">
+                      <span class="dependency-map-label">Blocked By</span>
+                      <div v-if="task.blockedBy.length > 0" class="dependency-chip-list">
+                        <span
+                          v-for="dependency in task.blockedBy"
+                          :key="`${task.id}-blocked-by-${dependency}`"
+                          class="dependency-chip"
+                        >
+                          {{ dependency }}
+                        </span>
+                      </div>
+                      <span v-else class="dependency-empty-chip">None</span>
+                    </div>
+                    <div class="dependency-map-row">
+                      <span class="dependency-map-label">Blocks</span>
+                      <div v-if="task.blocks.length > 0" class="dependency-chip-list">
+                        <span
+                          v-for="dependency in task.blocks"
+                          :key="`${task.id}-blocks-${dependency}`"
+                          class="dependency-chip dependency-chip-outbound"
+                        >
+                          {{ dependency }}
+                        </span>
+                      </div>
+                      <span v-else class="dependency-empty-chip">None</span>
+                    </div>
+                    <div v-if="task.unresolvedDependencies.length > 0" class="dependency-warning-row">
+                      <span class="dependency-map-label">Missing Links</span>
+                      <div class="dependency-chip-list">
+                        <span
+                          v-for="dependency in task.unresolvedDependencies"
+                          :key="`${task.id}-missing-${dependency}`"
+                          class="dependency-chip dependency-chip-warning"
+                        >
+                          {{ dependency }}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </details>
 
               <div
                 v-if="selectedTemplateDependencySummary.unresolvedTasks > 0"
@@ -1579,10 +2189,9 @@ onBeforeUnmount(() => {
 }
 
 .template-layout {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  align-items: start;
 }
 
 .filters-panel {
@@ -1597,10 +2206,11 @@ onBeforeUnmount(() => {
 }
 
 .filter-stack {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
   gap: 16px;
   margin-top: 14px;
+  align-items: end;
 }
 
 .filter-item {
@@ -1622,6 +2232,7 @@ onBeforeUnmount(() => {
 .toolbar-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
 }
@@ -1639,14 +2250,29 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .table-card {
-  overflow: visible;
+  overflow: hidden;
 }
 
-.table-card > .data-table {
-  overflow: visible;
+.template-table-wrap {
+  overflow-x: auto;
+  margin: 16px 18px 18px;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.template-table-wrap :deep(.data-table) {
+  min-width: 1320px;
+}
+
+.template-table-wrap :deep(.data-table thead th) {
+  white-space: nowrap;
+  background: #f8fafc;
 }
 
 .table-head {
@@ -1855,6 +2481,48 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 }
 
+.dependency-inspector {
+  margin-bottom: 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.dependency-inspector-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+}
+
+.dependency-inspector-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dependency-inspector-summary::after {
+  content: 'Show';
+  float: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.dependency-inspector[open] .dependency-inspector-summary::after {
+  content: 'Hide';
+}
+
+.dependency-inspector-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.dependency-inspector-copy {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 .dependency-summary-card {
   padding: 14px 16px;
   border: 1px solid #dbeafe;
@@ -2001,8 +2669,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1200px) {
-  .template-layout {
-    grid-template-columns: 1fr;
+  .filter-stack {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
 }
 
@@ -2017,6 +2685,19 @@ onBeforeUnmount(() => {
 
   .toolbar-category {
     width: 100%;
+  }
+
+  .toolbar-search {
+    flex-basis: 100%;
+  }
+
+  .toolbar-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .filter-stack {
+    grid-template-columns: 1fr;
   }
 
   .dependency-overview-grid,

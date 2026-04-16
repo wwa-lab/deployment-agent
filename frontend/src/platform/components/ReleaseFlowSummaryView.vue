@@ -17,6 +17,15 @@ export interface ReleaseFlowSummaryCopy {
   emptyHeading: string
   emptyHint: string
   releaseIdColumnLabel: string
+  lifecycleMode?: boolean
+  currentStageColumnLabel?: string
+  stageFilterLabel?: string
+  orderedStages?: Stage[]
+  showApplicationFilter?: boolean
+  showSnowGroupFilter?: boolean
+  showAgentFilter?: boolean
+  showStageFilter?: boolean
+  showAttemptViewFilter?: boolean
 }
 
 interface Props {
@@ -148,6 +157,13 @@ const workspaceAgent = computed(() => {
   return descriptor ? { key: descriptor.key, name: descriptor.name } : undefined
 })
 const multiStage = computed(() => props.stages.length > 1)
+const lifecycleMode = computed(() => props.copy.lifecycleMode === true)
+const lifecycleStages = computed(() => props.copy.orderedStages ?? props.stages)
+const showApplicationFilter = computed(() => props.copy.showApplicationFilter ?? true)
+const showSnowGroupFilter = computed(() => props.copy.showSnowGroupFilter ?? true)
+const showAgentFilter = computed(() => props.copy.showAgentFilter ?? true)
+const showStageFilter = computed(() => props.copy.showStageFilter ?? true)
+const showAttemptViewFilter = computed(() => props.copy.showAttemptViewFilter ?? true)
 
 function scopeSummary(flow: {
   application?: string
@@ -175,6 +191,44 @@ function toggleArchivedVisibility() {
   if (!userStore.isDevOpsAdmin) return
   store.setFilter('includeArchived', showArchived.value ? undefined : true)
   store.fetchList()
+}
+
+function lifecycleSegments(flow: ReleaseFlowListItem) {
+  return lifecycleStages.value.map((stage) => ({
+    stage,
+    status: stageStatus(flow, stage),
+    present: stagePresent(flow, stage),
+    isCurrent: flow.currentStage === stage,
+  }))
+}
+
+function lifecycleCompletedCount(flow: ReleaseFlowListItem) {
+  return lifecycleSegments(flow).filter((segment) => segment.status === 'Completed').length
+}
+
+function lifecycleTotalCount() {
+  return lifecycleStages.value.length
+}
+
+function lifecycleNextStage(flow: ReleaseFlowListItem) {
+  return lifecycleStages.value.find((stage) => {
+    if (stage === flow.currentStage) return false
+    return stageStatus(flow, stage) !== 'Completed'
+  })
+}
+
+function lifecycleSegmentClass(flow: ReleaseFlowListItem, stage: Stage) {
+  const status = stageStatus(flow, stage)
+  if (flow.currentStage === stage) return 'lifecycle-segment-current'
+  if (status === 'Completed') return 'lifecycle-segment-completed'
+  if (status === 'Running') return 'lifecycle-segment-running'
+  if (status === 'Failed' || status === 'Rejected') return 'lifecycle-segment-blocked'
+  return 'lifecycle-segment-pending'
+}
+
+function lifecycleStageLabel(stage?: string) {
+  if (!stage) return '—'
+  return stage.replaceAll('_', ' ')
 }
 </script>
 
@@ -235,7 +289,7 @@ function toggleArchivedVisibility() {
           <option v-for="s in flowStatuses" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
-      <div class="filter-group">
+      <div v-if="showApplicationFilter" class="filter-group">
         <label class="form-label">Application</label>
         <input
           class="form-control"
@@ -245,7 +299,7 @@ function toggleArchivedVisibility() {
           @input="onFilterChange('application', ($event.target as HTMLInputElement).value)"
         />
       </div>
-      <div class="filter-group">
+      <div v-if="showSnowGroupFilter" class="filter-group">
         <label class="form-label">SNOW Group</label>
         <input
           class="form-control"
@@ -255,7 +309,7 @@ function toggleArchivedVisibility() {
           @input="onFilterChange('snowGroup', ($event.target as HTMLInputElement).value)"
         />
       </div>
-      <div class="filter-group">
+      <div v-if="showAgentFilter" class="filter-group">
         <label class="form-label">Agent</label>
         <input
           class="form-control"
@@ -265,8 +319,8 @@ function toggleArchivedVisibility() {
           @input="onFilterChange('agent', ($event.target as HTMLInputElement).value)"
         />
       </div>
-      <div class="filter-group">
-        <label class="form-label">Stage</label>
+      <div v-if="showStageFilter" class="filter-group">
+        <label class="form-label">{{ copy.stageFilterLabel ?? 'Stage' }}</label>
         <select
           v-if="multiStage"
           class="form-control"
@@ -278,7 +332,7 @@ function toggleArchivedVisibility() {
         </select>
         <input v-else class="form-control" type="text" :value="stages[0]" disabled />
       </div>
-      <div class="filter-group">
+      <div v-if="showAttemptViewFilter" class="filter-group">
         <label class="form-label">Attempt View</label>
         <select
           class="form-control"
@@ -313,15 +367,18 @@ function toggleArchivedVisibility() {
             <th>{{ copy.releaseIdColumnLabel }}</th>
             <th>Scope</th>
             <th>Rundown Owner</th>
-            <th>Current Stage</th>
-            <th
-              v-for="stage in stages"
-              :key="stage"
-              class="stage-column stage-header"
-              :class="stageToneClass(stage)"
-            >
-              {{ stage }}
-            </th>
+            <th>{{ copy.currentStageColumnLabel ?? 'Current Stage' }}</th>
+            <template v-if="!lifecycleMode">
+              <th
+                v-for="stage in stages"
+                :key="stage"
+                class="stage-column stage-header"
+                :class="stageToneClass(stage)"
+              >
+                {{ stage }}
+              </th>
+            </template>
+            <th v-else class="lifecycle-progress-column">Lifecycle Progress</th>
             <th>Overall Status</th>
           </tr>
         </thead>
@@ -349,18 +406,39 @@ function toggleArchivedVisibility() {
             <td class="owner-cell">{{ rundownOwnerLabel(flow.owner) }}</td>
             <td class="stage-column">
               <span class="badge current-stage-badge" :class="stageToneClass(flow.currentStage)">
-                {{ flow.currentStage }}
+                {{ lifecycleStageLabel(flow.currentStage) }}
               </span>
             </td>
-            <td v-for="stage in stages" :key="`${flow.id}-${stage}`" class="stage-column">
-              <span
-                v-if="stagePresent(flow, stage)"
-                class="badge stage-status-badge"
-                :class="[statusBadgeClass(stageStatus(flow, stage)), stageToneClass(stage)]"
-              >
-                {{ statusLabel(stageStatus(flow, stage)) }}
-              </span>
-              <span v-else class="stage-empty">—</span>
+            <template v-if="!lifecycleMode">
+              <td v-for="stage in stages" :key="`${flow.id}-${stage}`" class="stage-column">
+                <span
+                  v-if="stagePresent(flow, stage)"
+                  class="badge stage-status-badge"
+                  :class="[statusBadgeClass(stageStatus(flow, stage)), stageToneClass(stage)]"
+                >
+                  {{ statusLabel(stageStatus(flow, stage)) }}
+                </span>
+                <span v-else class="stage-empty">—</span>
+              </td>
+            </template>
+            <td v-else class="lifecycle-progress-cell">
+              <div class="lifecycle-progress-meta">
+                <span class="lifecycle-progress-text">
+                  {{ lifecycleCompletedCount(flow) }} / {{ lifecycleTotalCount() }} stages complete
+                </span>
+                <span class="lifecycle-progress-next">
+                  Next: {{ lifecycleStageLabel(lifecycleNextStage(flow)) }}
+                </span>
+              </div>
+              <div class="lifecycle-progress-bar" aria-hidden="true">
+                <span
+                  v-for="segment in lifecycleSegments(flow)"
+                  :key="`${flow.id}-${segment.stage}-segment`"
+                  class="lifecycle-segment"
+                  :class="lifecycleSegmentClass(flow, segment.stage)"
+                  :title="`${lifecycleStageLabel(segment.stage)}: ${statusLabel(segment.status)}`"
+                ></span>
+              </div>
             </td>
             <td>
               <span class="badge overall-status-badge" :class="statusBadgeClass(flow.flowStatus)">
@@ -523,6 +601,72 @@ function toggleArchivedVisibility() {
 
 .stage-header {
   letter-spacing: 0.04em;
+}
+
+.lifecycle-progress-column {
+  min-width: 260px;
+}
+
+.lifecycle-progress-cell {
+  min-width: 280px;
+}
+
+.lifecycle-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.lifecycle-progress-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.lifecycle-progress-next {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.lifecycle-progress-bar {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.lifecycle-segment {
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: #e5e7eb;
+}
+
+.lifecycle-segment-completed {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.lifecycle-segment-current {
+  background: #dbeafe;
+  border-color: #60a5fa;
+}
+
+.lifecycle-segment-running {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+
+.lifecycle-segment-blocked {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.lifecycle-segment-pending {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
 }
 
 .stage-tone-sit {

@@ -1,7 +1,22 @@
 // Enums
 export type FlowStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Rejected'
 export type ReviewStatus = 'Pending_Review' | 'Approved' | 'Rejected'
-export type Stage = 'DEV' | 'SIT' | 'UAT' | 'PROD'
+export type Stage =
+  | 'DEV'
+  | 'SIT'
+  | 'UAT'
+  | 'PROD'
+  | 'REQUIREMENT'
+  | 'FUNCTIONAL_DESIGN'
+  | 'TECHNICAL_DESIGN'
+  | 'DEVELOPMENT'
+  | 'TESTING'
+  | 'PERFORMANCE_TEST'
+  | 'RESULT_SIGNOFF'
+  | 'BUSINESS_ENDORSEMENT'
+  | 'CAB'
+  | 'DEPLOYMENT'
+  | 'POST_IMPLEMENTATION'
 export type TaskStatus =
   | 'Pending'
   | 'Ready_For_Execution'

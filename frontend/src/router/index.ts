@@ -102,6 +102,24 @@ const router = createRouter({
           },
         },
         {
+          path: 'project-agent',
+          name: 'wwa-project-agent',
+          component: () => import('../agents/project/ProjectAgentSummaryView.vue'),
+          meta: {
+            section: 'project-agent',
+            sectionTitle: 'Project Agent',
+          },
+        },
+        {
+          path: 'project-agent/release-flows/:id',
+          name: 'wwa-project-agent-detail',
+          component: () => import('../agents/project/ProjectAgentDetailView.vue'),
+          meta: {
+            section: 'project-agent',
+            sectionTitle: 'Project Agent',
+          },
+        },
+        {
           path: 'template-management',
           name: 'wwa-template-management',
           component: () => import('../views/TemplateManagementView.vue'),

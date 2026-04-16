@@ -34,7 +34,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
             <div class="wwa-intro-kicker">Overview</div>
               <h2 id="wwa-home-intro-title" class="wwa-intro-title">Shared workflow automation workspace</h2>
               <p class="wwa-intro-text">
-              Build, testing, and deployment agents with shared platform controls.
+              Project, build, testing, and deployment agents with shared platform controls.
               Select a workspace below to get started.
               </p>
             </section>
@@ -50,7 +50,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
             <article class="home-console-panel">
               <span class="home-console-panel-label">Current Focus</span>
               <strong class="home-console-panel-value">Agent Workflows</strong>
-              <p class="home-console-panel-copy">Build, testing, and deployment workspaces with human checkpoints.</p>
+              <p class="home-console-panel-copy">Project, build, testing, and deployment workspaces with human checkpoints.</p>
             </article>
             <article class="home-console-panel">
               <span class="home-console-panel-label">Shared Controls</span>
@@ -67,6 +67,8 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           <div class="home-console-track">
             <div class="home-console-track-label">Active Workspaces</div>
             <div class="home-console-track-row">
+              <span class="home-console-node is-active">Project</span>
+              <span class="home-console-line"></span>
               <span class="home-console-node is-active">Build</span>
               <span class="home-console-line"></span>
               <span class="home-console-node is-active">Testing</span>

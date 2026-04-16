@@ -2,6 +2,7 @@ package com.wwa.agenthub.platform.domain;
 
 import com.wwa.agenthub.agents.build.domain.BuildStagePipeline;
 import com.wwa.agenthub.agents.deployment.domain.DeploymentStagePipeline;
+import com.wwa.agenthub.agents.project.domain.ProjectStagePipeline;
 import com.wwa.agenthub.agents.testing.domain.TestingStagePipeline;
 import com.wwa.agenthub.contracts.AgentId;
 import org.junit.jupiter.api.Named;
@@ -22,7 +23,8 @@ class StagePipelineContractTest {
         return Stream.of(
                 Named.of("DeploymentStagePipeline", new DeploymentStagePipeline()),
                 Named.of("TestingStagePipeline", new TestingStagePipeline()),
-                Named.of("BuildStagePipeline", new BuildStagePipeline())
+                Named.of("BuildStagePipeline", new BuildStagePipeline()),
+                Named.of("ProjectStagePipeline", new ProjectStagePipeline())
         );
     }
 
@@ -124,9 +126,32 @@ class StagePipelineContractTest {
             case "DeploymentStagePipeline" -> AgentId.DEPLOYMENT_AGENT;
             case "TestingStagePipeline" -> AgentId.TESTING_AGENT;
             case "BuildStagePipeline" -> AgentId.BUILD_AGENT;
+            case "ProjectStagePipeline" -> AgentId.PROJECT_AGENT;
             default -> throw new IllegalStateException("Unknown pipeline: " + pipeline.getClass());
         };
         assertThat(pipeline.agentId()).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @MethodSource("pipelines")
+    void project_ordering(StagePipeline pipeline) {
+        if (pipeline instanceof ProjectStagePipeline) {
+            assertThat(pipeline.orderedStages()).containsExactly(
+                    "REQUIREMENT",
+                    "FUNCTIONAL_DESIGN",
+                    "TECHNICAL_DESIGN",
+                    "DEVELOPMENT",
+                    "TESTING",
+                    "PERFORMANCE_TEST",
+                    "RESULT_SIGNOFF",
+                    "BUSINESS_ENDORSEMENT",
+                    "CAB",
+                    "DEPLOYMENT",
+                    "POST_IMPLEMENTATION");
+            assertThat(pipeline.next("REQUIREMENT")).contains("FUNCTIONAL_DESIGN");
+            assertThat(pipeline.next("DEPLOYMENT")).contains("POST_IMPLEMENTATION");
+            assertThat(pipeline.next("POST_IMPLEMENTATION")).isEmpty();
+        }
     }
 
     // Deployment-specific ordering

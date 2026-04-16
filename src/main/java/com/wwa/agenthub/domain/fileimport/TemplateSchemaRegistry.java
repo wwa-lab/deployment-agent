@@ -46,6 +46,18 @@ public class TemplateSchemaRegistry {
     private static final String BUILD_TASK_GROUP_ID = "BT-IBM-I-001";
     private static final String BUILD_TASK_GROUP_NAME = "IBM i Skill Starter Pack";
     private static final String BUILD_OWNER = "carol";
+    private static final TemplateSchema PROJECT_SCHEMA = TemplateSchema.withSampleRow(
+            SHEET_NAME, FILE_NAME, HEADERS,
+            List.of(
+                    "PRJ-PROJ-001", "Project Lifecycle Example", "PJ-REQ-001", "Bulletin Intake and Impact Assessment",
+                    "1", "Capture bulletin details", "MANUAL",
+                    "project-requirement-intake", "{\"stage\":\"requirement\",\"artifact\":\"bulletin-summary.md\"}",
+                    "Requirement summary, impact notes, and follow-up decision are documented", "david",
+                    "2026-03-22T08:30:00Z", "2026-03-22T09:00:00Z",
+                    "Project", "Y", "", "Business and SD walkthrough list is prepared", "Y"
+            ),
+            NO_CUSTOM_COLUMNS
+    );
 
     /**
      * The shared default template schema (fallback for unknown agents).
@@ -200,7 +212,8 @@ public class TemplateSchemaRegistry {
     private final Map<String, TemplateSchema> schemasByAgent = Map.of(
             AgentId.DEPLOYMENT_AGENT, DEPLOYMENT_SCHEMA,
             AgentId.TESTING_AGENT, TESTING_SCHEMA,
-            AgentId.BUILD_AGENT, BUILD_SCHEMA
+            AgentId.BUILD_AGENT, BUILD_SCHEMA,
+            AgentId.PROJECT_AGENT, PROJECT_SCHEMA
     );
 
     /**

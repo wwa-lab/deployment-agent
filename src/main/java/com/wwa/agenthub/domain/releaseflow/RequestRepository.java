@@ -32,7 +32,8 @@ public interface RequestRepository extends JpaRepository<Request, String> {
     }
 
     @Query("""
-            SELECT r FROM Request r
+            SELECT DISTINCT r FROM Request r
+            LEFT JOIN FETCH r.tasks
             WHERE r.releaseFlow.id IN :releaseFlowIds
               AND (:includeArchived = TRUE OR r.archivedAt IS NULL)
             """)

@@ -8,8 +8,6 @@ import type {
   UploadResponse,
 } from '../types'
 
-const RELEASE_IDENTIFIER_PATTERN = /^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>dev|sit|uat|prod)-(?<sequence>0[1-9]|[1-9][0-9])$/i
-
 const props = withDefaults(defineProps<{
   template: TemplateRecord
   createRundownFromTemplateFn: (input: CreateRundownFromTemplateInput) => Promise<UploadResponse>
@@ -47,24 +45,36 @@ const form = reactive({
 const estimatedRemainingMinutes = computed(() =>
   props.template.tasks.reduce((sum, task) => sum + parseDurationToMinutes(task.estDuration), 0),
 )
+const hasFixedStage = computed(() => props.allowedStages.length === 1)
+const usesStageFreeIdentifier = computed(
+  () => props.template.category.trim().toLowerCase() === 'project',
+)
+const identifierLabel = computed(
+  () => (usesStageFreeIdentifier.value ? 'Lifecycle Identifier' : 'Workflow Identifier'),
+)
 
 const releaseIdentifierPlaceholder = computed(
-  () => `e.g. amh-hcc-${form.stage.toLowerCase()}-01`,
+  () => (usesStageFreeIdentifier.value ? 'e.g. amh-hcc-project-01' : `e.g. amh-hcc-${stageSlug(form.stage)}-01`),
 )
 
 const canSubmit = computed(
   () =>
     props.template.tasks.length > 0 &&
     form.projectName.trim().length > 0 &&
-    form.releaseId.trim().length > 0 &&
+    (usesStageFreeIdentifier.value || form.releaseId.trim().length > 0) &&
     !saving.value,
 )
 
 function defaultStageForCategory(category: string): Stage {
   const normalized = category.trim().toLowerCase()
+  if (normalized === 'project') return 'REQUIREMENT'
   if (normalized === 'production') return 'PROD'
   if (normalized === 'release') return 'UAT'
   return 'SIT'
+}
+
+function stageSlug(stage: Stage): string {
+  return stage.toLowerCase().replaceAll('_', '-')
 }
 
 function parseDurationToMinutes(value: string): number {
@@ -95,14 +105,20 @@ function validateForm(): boolean {
   }
 
   const releaseId = form.releaseId.trim()
-  if (!releaseId) {
-    fieldErrors.releaseId = 'Workflow Identifier is required.'
-  } else {
-    const match = releaseId.match(RELEASE_IDENTIFIER_PATTERN)
-    if (!match) {
-      fieldErrors.releaseId = `Use format xxx-${form.stage.toLowerCase()}-01.`
-    } else if ((match.groups?.stage ?? '').toUpperCase() !== form.stage) {
-      fieldErrors.releaseId = `Workflow Identifier must match the selected stage ${form.stage}.`
+  if (!releaseId && !usesStageFreeIdentifier.value) {
+    fieldErrors.releaseId = `${identifierLabel.value} is required.`
+  } else if (releaseId) {
+    if (!usesStageFreeIdentifier.value) {
+      const pattern = new RegExp(
+        `^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>${stageSlug(form.stage)})-(?<sequence>0[1-9]|[1-9][0-9])$`,
+        'i',
+      )
+      const match = releaseId.match(pattern)
+      if (!match) {
+        fieldErrors.releaseId = `Use format xxx-${stageSlug(form.stage)}-01.`
+      } else if ((match.groups?.stage ?? '').toLowerCase() !== stageSlug(form.stage)) {
+        fieldErrors.releaseId = `Workflow Identifier must match the selected stage ${form.stage}.`
+      }
     }
   }
 
@@ -194,19 +210,29 @@ async function submit() {
         </div>
 
         <div class="create-grid">
-          <div class="form-group">
+          <div v-if="!hasFixedStage" class="form-group">
             <label class="form-label">Stage</label>
             <select
               v-model="form.stage"
               class="form-control"
-              :disabled="allowedStages.length === 1"
             >
               <option v-for="s in allowedStages" :key="s" :value="s">{{ s }}</option>
             </select>
           </div>
 
+          <div v-else class="form-group">
+            <label class="form-label">Start Stage</label>
+            <input :value="form.stage" type="text" class="form-control" disabled />
+            <div class="field-hint">
+              This template represents a full workflow, so the system always starts it from the first stage.
+            </div>
+          </div>
+
           <div class="form-group">
-            <label class="form-label">Workflow Identifier <span class="required">*</span></label>
+            <label class="form-label">
+              {{ identifierLabel }}
+              <span v-if="!usesStageFreeIdentifier" class="required">*</span>
+            </label>
             <input
               v-model="form.releaseId"
               type="text"
@@ -214,7 +240,11 @@ async function submit() {
               :class="{ 'input-error': attemptedSubmit && !!fieldErrors.releaseId }"
               :placeholder="releaseIdentifierPlaceholder"
             />
-            <div class="field-hint">Format: `xxx-{{ allowedStages[0]?.toLowerCase() ?? 'sit' }}-01`</div>
+            <div class="field-hint">
+              {{ usesStageFreeIdentifier
+                ? 'Optional. If left blank, the system will generate a UUID. Recommended example: `amh-hcc-project-01`.'
+                : `Format: \`xxx-${stageSlug(form.stage)}-01\`` }}
+            </div>
             <div v-if="attemptedSubmit && fieldErrors.releaseId" class="field-error">
               {{ fieldErrors.releaseId }}
             </div>

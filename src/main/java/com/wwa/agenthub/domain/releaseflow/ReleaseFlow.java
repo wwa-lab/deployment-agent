@@ -60,7 +60,7 @@ public class ReleaseFlow {
     @Column(name = "normalized_release_id", length = 255, nullable = false)
     private String normalizedReleaseId;
 
-    @Column(name = "current_stage", length = 10, nullable = false)
+    @Column(name = "current_stage", length = 64, nullable = false)
     private String currentStage;
 
     @Enumerated(EnumType.STRING)

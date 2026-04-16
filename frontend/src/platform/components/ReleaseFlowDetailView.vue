@@ -650,8 +650,16 @@ function activeStageIndex(requests: Request[]): number {
 }
 
 function requestTabLabel(request: Request): string {
-  const attemptLabel = `Attempt #${request.attemptNumber ?? 1}`
-  const baseLabel = `${request.stage} (${attemptLabel})`
+  if (props.copy.lifecycleMode) {
+    const shouldShowAttempt = !props.copy.hideInitialAttempt || (request.attemptNumber ?? 1) > 1
+    const attemptLabel = shouldShowAttempt ? ` (Attempt #${request.attemptNumber ?? 1})` : ''
+    const baseLabel = `Project Lifecycle${attemptLabel}`
+    return request.archivedAt ? `${baseLabel} (Archived)` : baseLabel
+  }
+
+  const shouldShowAttempt = !props.copy.hideInitialAttempt || (request.attemptNumber ?? 1) > 1
+  const attemptLabel = shouldShowAttempt ? ` (Attempt #${request.attemptNumber ?? 1})` : ''
+  const baseLabel = `${request.stage}${attemptLabel}`
   return request.archivedAt ? `${baseLabel} (Archived)` : baseLabel
 }
 
@@ -677,7 +685,7 @@ const activeRequestSummary = computed(() => {
   if (!request) return null
 
   const uniqueTaskGroups = new Set(request.tasks.map((task: Task) => task.taskGroupId))
-  const taskNames = new Set(request.tasks.map((task: Task) => task.taskName))
+  const taskNames = new Set(request.tasks.map((task: Task) => task.taskGroupName))
   const manualCount = request.tasks.filter((task: Task) => task.executionType === 'MANUAL').length
   const autoCount = request.tasks.filter((task: Task) => task.executionType === 'AUTO').length
   const pendingReviewCount = request.tasks.filter((task: Task) => task.taskStatus === 'Awaiting_Review').length
@@ -746,6 +754,80 @@ const activeRequestSummary = computed(() => {
   }
 })
 
+function normalizeLifecycleStageKey(value?: string | null): string | null {
+  if (!value) return null
+  const normalized = value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return normalized || null
+}
+
+function lifecycleStageDisplay(stage: string): string {
+  return stage.replaceAll('_', ' ')
+}
+
+const lifecycleTaskGroups = computed(() => {
+  if (!props.copy.lifecycleMode) return []
+
+  const request = activeRequest.value
+  if (!request) return []
+
+  const orderedStages = props.copy.orderedStages ?? []
+  const grouped = new Map<string, Task[]>()
+  const uncategorized: Task[] = []
+
+  for (const task of request.tasks) {
+    const stageKey = normalizeLifecycleStageKey(task.category)
+    if (stageKey && orderedStages.includes(stageKey)) {
+      grouped.set(stageKey, [...(grouped.get(stageKey) ?? []), task])
+    } else {
+      uncategorized.push(task)
+    }
+  }
+
+  const groups = orderedStages
+    .map((stage) => {
+      const tasks = grouped.get(stage) ?? []
+      if (tasks.length === 0) return null
+      const completedCount = tasks.filter((task) =>
+        ['Approved', 'Rejected', 'Skipped', 'Completed', 'Failed'].includes(task.taskStatus),
+      ).length
+      return {
+        key: stage,
+        title: lifecycleStageDisplay(stage),
+        tasks,
+        completedCount,
+        totalCount: tasks.length,
+      }
+    })
+    .filter((group): group is NonNullable<typeof group> => group !== null)
+
+  if (uncategorized.length > 0) {
+    groups.push({
+      key: 'UNCATEGORIZED',
+      title: 'Uncategorized',
+      tasks: uncategorized,
+      completedCount: uncategorized.filter((task) =>
+        ['Approved', 'Rejected', 'Skipped', 'Completed', 'Failed'].includes(task.taskStatus),
+      ).length,
+      totalCount: uncategorized.length,
+    })
+  }
+
+  return groups
+})
+
+const derivedLifecycleCurrentStage = computed(() => {
+  if (!props.copy.lifecycleMode) return store.detail?.currentStage ?? null
+  const groups = lifecycleTaskGroups.value
+  if (groups.length === 0) return store.detail?.currentStage ?? null
+
+  const currentGroup = groups.find((group) => group.completedCount < group.totalCount)
+  return currentGroup?.key ?? groups[groups.length - 1]?.key ?? store.detail?.currentStage ?? null
+})
+
+function isLifecycleCurrentStage(stageKey: string): boolean {
+  return derivedLifecycleCurrentStage.value === stageKey
+}
+
 function formatDateTime(value: string | Date | null | undefined): string {
   if (!value) return '—'
   const date = value instanceof Date ? value : new Date(value)
@@ -777,12 +859,25 @@ function parseDependencyList(value?: string): string[] {
 
 function getBlockingTaskNames(task: Task, tasks: Task[]): string[] {
   return tasks
-    .filter((candidate) => parseDependencyList(candidate.dependencies).includes(task.taskName))
-    .map((candidate) => candidate.taskName)
+    .filter((candidate) => parseDependencyList(candidate.dependencies).includes(task.taskGroupName))
+    .map((candidate) => candidate.taskGroupName)
+}
+
+function isDependencySatisfied(task: Task | undefined): boolean {
+  if (!task) return false
+  return ['Approved', 'Skipped', 'Completed'].includes(task.taskStatus)
+}
+
+function getActiveBlockingDependencyNames(task: Task, tasks: Task[]): string[] {
+  const taskMap = new Map(tasks.map((candidate) => [candidate.taskGroupName, candidate]))
+  return parseDependencyList(task.dependencies).filter((dependency) => {
+    const dependencyTask = taskMap.get(dependency)
+    return !isDependencySatisfied(dependencyTask)
+  })
 }
 
 function getMissingDependencyNames(task: Task, tasks: Task[]): string[] {
-  const taskNames = new Set(tasks.map((candidate) => candidate.taskName))
+  const taskNames = new Set(tasks.map((candidate) => candidate.taskGroupName))
   return parseDependencyList(task.dependencies).filter((dependency) => !taskNames.has(dependency))
 }
 
@@ -790,6 +885,10 @@ function plannedWindowLabel(start: Date | null, end: Date | null): string {
   if (!start && !end) return '—'
   if (start && end) return `${formatDateTime(start)} to ${formatDateTime(end)}`
   return start ? formatDateTime(start) : formatDateTime(end)
+}
+
+function shouldShowAttempt(request: Request): boolean {
+  return !props.copy.hideInitialAttempt || (request.attemptNumber ?? 1) > 1
 }
 
 // Watch for detail load
@@ -853,8 +952,8 @@ onUnmounted(() => {
             </span>
           </div>
           <div class="header-field">
-            <span class="field-label">Current Stage</span>
-            <span class="badge badge-pending">{{ store.detail.currentStage }}</span>
+            <span class="field-label">{{ copy.currentStageLabel ?? 'Current Stage' }}</span>
+            <span class="badge badge-pending">{{ props.copy.lifecycleMode ? derivedLifecycleCurrentStage : store.detail.currentStage }}</span>
           </div>
           <div class="header-field">
             <span class="field-label">{{ copy.flowStatusLabel }}</span>
@@ -976,10 +1075,20 @@ onUnmounted(() => {
                     {{ req.requestStatus }}
                   </span>
                 </div>
-                <div class="rundown-field">
-                  <span class="rundown-field-label">Environment:</span>
+                <div v-if="!copy.lifecycleMode" class="rundown-field">
+                  <span class="rundown-field-label">{{ copy.stageFieldLabel ?? 'Environment' }}:</span>
                   <span class="badge badge-pending">{{ req.stage }}</span>
-                  <span class="rundown-field-value" style="margin-left:8px;">Attempt #{{ req.attemptNumber ?? 1 }}</span>
+                  <span
+                    v-if="shouldShowAttempt(req)"
+                    class="rundown-field-value"
+                    style="margin-left:8px;"
+                  >
+                    Attempt #{{ req.attemptNumber ?? 1 }}
+                  </span>
+                </div>
+                <div v-else class="rundown-field">
+                  <span class="rundown-field-label">Current Lifecycle Stage:</span>
+                  <span class="badge badge-pending">{{ derivedLifecycleCurrentStage }}</span>
                 </div>
                 <div v-if="hasValue(req.snowGroup)" class="rundown-field">
                   <span class="rundown-field-label">SNOW Group:</span>
@@ -1100,6 +1209,26 @@ onUnmounted(() => {
                 </button>
               </div>
             </div>
+
+            <div v-if="copy.lifecycleMode && lifecycleTaskGroups.length > 0" class="rundown-section">
+              <div class="rundown-section-title">Lifecycle Stages</div>
+              <div class="lifecycle-stage-grid">
+                <div
+                  v-for="group in lifecycleTaskGroups"
+                  :key="group.key"
+                  class="lifecycle-stage-card"
+                  :class="{ 'lifecycle-stage-card-current': isLifecycleCurrentStage(group.key) }"
+                >
+                  <div class="lifecycle-stage-head">
+                    <span class="lifecycle-stage-title">{{ group.title }}</span>
+                    <span v-if="isLifecycleCurrentStage(group.key)" class="badge badge-pending">Current</span>
+                  </div>
+                  <div class="lifecycle-stage-meta">
+                    {{ group.completedCount }} / {{ group.totalCount }} tasks completed
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div v-if="req.tasks.length === 0" class="empty-state">No tasks in this request.</div>
@@ -1147,7 +1276,188 @@ onUnmounted(() => {
               <button class="action-error-dismiss" @click="dismissActionError">&times;</button>
             </div>
 
-            <table class="data-table">
+            <template v-if="copy.lifecycleMode && lifecycleTaskGroups.length > 0">
+            <div
+              v-for="group in lifecycleTaskGroups"
+              :key="group.key"
+              class="lifecycle-task-group"
+            >
+              <div class="lifecycle-task-group-head">
+                <div>
+                  <div class="lifecycle-task-group-title">{{ group.title }}</div>
+                  <div class="lifecycle-task-group-meta">
+                    {{ group.completedCount }} / {{ group.totalCount }} completed
+                  </div>
+                </div>
+                <span v-if="isLifecycleCurrentStage(group.key)" class="badge badge-pending">Current Stage</span>
+              </div>
+
+              <div class="lifecycle-task-table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Activity Category</th>
+                      <th>Task Name</th>
+                      <th>Step</th>
+                      <th>Step Name</th>
+                  <th>Type</th>
+                      <th>Critical</th>
+                      <th>Status</th>
+                      <th>Owner</th>
+                      <th>Blocked By</th>
+                      <th>Blocks</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="task in group.tasks"
+                      :key="task.id"
+                      :draggable="!isArchivedRequest(req) && canEditRundown()"
+                      :class="{
+                        'drag-source': dragTaskId === task.id,
+                        'drag-over': dragOverTaskId === task.id && dragTaskId !== task.id,
+                      }"
+                      @dragstart="onDragStart(task, $event)"
+                      @dragover="onDragOver(task, $event)"
+                      @dragleave="onDragLeave"
+                      @dragend="onDragEnd"
+                      @drop="onDrop(req, task, $event)"
+                    >
+                      <td>{{ task.category ?? '—' }}</td>
+                      <td>{{ task.taskGroupName }}</td>
+                      <td>{{ task.stepSeq }}</td>
+                      <td>{{ task.taskName }}</td>
+                      <td>
+                        <span class="badge" :class="executionTypeBadgeClass(task.executionType)">
+                          {{ task.executionType }}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          class="badge"
+                          :class="criticalBadgeClass(task.critical)"
+                          :title="task.critical ? 'Must be reviewed before the next task can be released' : 'Does not block the next task from being released'"
+                        >
+                          {{ criticalLabel(task.critical) }}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="badge" :class="statusBadgeClass(task.taskStatus)">
+                          {{ task.taskStatus }}
+                        </span>
+                      </td>
+                      <td>{{ task.owner ?? '—' }}</td>
+                      <td>
+                        <div v-if="getActiveBlockingDependencyNames(task, req.tasks).length > 0" class="dependency-chip-list">
+                          <span
+                            v-for="dependency in getActiveBlockingDependencyNames(task, req.tasks)"
+                            :key="`${task.id}-blocked-by-${dependency}`"
+                            class="dependency-chip"
+                          >
+                            {{ dependency }}
+                          </span>
+                        </div>
+                        <span v-else class="dependency-empty-chip">—</span>
+                        <div v-if="getMissingDependencyNames(task, req.tasks).length > 0" class="dependency-warning-text">
+                          Missing:
+                          {{ getMissingDependencyNames(task, req.tasks).join(', ') }}
+                        </div>
+                      </td>
+                      <td>
+                        <div v-if="getBlockingTaskNames(task, req.tasks).length > 0" class="dependency-chip-list">
+                          <span
+                            v-for="dependency in getBlockingTaskNames(task, req.tasks)"
+                            :key="`${task.id}-blocks-${dependency}`"
+                            class="dependency-chip dependency-chip-outbound"
+                          >
+                            {{ dependency }}
+                          </span>
+                        </div>
+                        <span v-else class="dependency-empty-chip">—</span>
+                      </td>
+                      <td>
+                        <div class="task-action-panel">
+                          <div class="action-btns">
+                            <button
+                              v-if="getTaskDocs(task)"
+                              class="btn btn-secondary btn-sm"
+                              @click.stop="openTaskDocs(task)"
+                            >
+                              Docs
+                            </button>
+                            <span class="action-tooltip" :title="taskActionReason(req, editDisabledReason(task)) ?? ''">
+                              <button
+                                class="btn btn-secondary btn-sm"
+                                :disabled="isArchivedRequest(req) || !canEdit(task)"
+                                @click.stop="openEditTask(task)"
+                              >
+                                Edit
+                              </button>
+                            </span>
+                            <button
+                              class="btn btn-secondary btn-sm"
+                              @click.stop="viewingActivityTask = task"
+                            >
+                              Activity
+                            </button>
+                            <span class="action-tooltip" title="Create a copy of this task">
+                              <button
+                                class="btn btn-secondary btn-sm"
+                                :disabled="isArchivedRequest(req) || !canModifyTask(task) || cloningTaskId === task.id"
+                                @click.stop="handleCloneTask(task)"
+                              >
+                                {{ cloningTaskId === task.id ? 'Cloning...' : 'Clone' }}
+                              </button>
+                            </span>
+                            <span class="action-tooltip" :title="viewResultDisabledReason(task) ?? ''">
+                              <button
+                                class="btn btn-secondary btn-sm"
+                                :disabled="!canViewResult(task)"
+                                @click.stop="canViewResult(task) && openViewResult(task)"
+                              >
+                                View Result
+                              </button>
+                            </span>
+                            <span class="action-tooltip" :title="taskActionReason(req, runDisabledReason(task)) ?? runButtonTooltip(task) ?? ''">
+                              <button
+                                class="btn btn-sm"
+                                :class="task.executionType === 'MANUAL' && task.taskStatus === 'Executing' ? 'btn-warning' : 'btn-primary'"
+                                :disabled="isArchivedRequest(req) || !canRun(task) || submittingAuto === task.id"
+                                @click.stop="handleRun(task)"
+                              >
+                                {{ runButtonLabel(task) }}
+                              </button>
+                            </span>
+                            <span class="action-tooltip" :title="taskActionReason(req, rerunDisabledReason(task)) ?? ''">
+                              <button
+                                class="btn btn-secondary btn-sm"
+                                :disabled="isArchivedRequest(req) || !canRerun(task)"
+                                @click.stop="canRerun(task) && openRerun(task)"
+                              >
+                                Rerun
+                              </button>
+                            </span>
+                          </div>
+                          <span class="action-tooltip" :title="taskActionReason(req, decisionDisabledReason(task)) ?? ''">
+                            <select
+                              class="decision-select"
+                              :disabled="isArchivedRequest(req) || !canDecide(task)"
+                              @change="handleDecisionSelect(task, $event)"
+                            >
+                              <option value="">Review Decision</option>
+                              <option v-for="opt in getAllowedDecisions(task)" :key="opt" :value="opt">{{ opt }}</option>
+                            </select>
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            </template>
+            <table v-else class="data-table">
             <thead>
               <tr>
                 <th>Activity Category</th>
@@ -1210,9 +1520,9 @@ onUnmounted(() => {
                 </td>
                 <td>{{ task.owner ?? '—' }}</td>
                 <td>
-                  <div v-if="parseDependencyList(task.dependencies).length > 0" class="dependency-chip-list">
+                  <div v-if="getActiveBlockingDependencyNames(task, req.tasks).length > 0" class="dependency-chip-list">
                     <span
-                      v-for="dependency in parseDependencyList(task.dependencies)"
+                      v-for="dependency in getActiveBlockingDependencyNames(task, req.tasks)"
                       :key="`${task.id}-blocked-by-${dependency}`"
                       class="dependency-chip"
                     >
@@ -1787,6 +2097,88 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
+.lifecycle-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lifecycle-stage-card {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #dbe4f0;
+  background: #f8fafc;
+}
+
+.lifecycle-stage-card-current {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.lifecycle-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lifecycle-stage-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.lifecycle-stage-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.lifecycle-task-group {
+  margin-bottom: 18px;
+}
+
+.lifecycle-task-group:last-child {
+  margin-bottom: 0;
+}
+
+.lifecycle-task-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.lifecycle-task-group-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.lifecycle-task-group-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.lifecycle-task-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.lifecycle-task-table-wrap :deep(.data-table) {
+  min-width: 1280px;
+}
+
+.lifecycle-task-table-wrap :deep(.data-table thead th) {
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
 .dependency-chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -1856,6 +2248,10 @@ onUnmounted(() => {
   .task-dependency-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .lifecycle-stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -1865,6 +2261,10 @@ onUnmounted(() => {
   }
 
   .task-dependency-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lifecycle-stage-grid {
     grid-template-columns: 1fr;
   }
 }

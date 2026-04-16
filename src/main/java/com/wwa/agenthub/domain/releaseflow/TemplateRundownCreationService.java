@@ -20,15 +20,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class TemplateRundownCreationService {
-    private static final Pattern RELEASE_IDENTIFIER_PATTERN = Pattern.compile(
+    private static final Pattern CLASSIC_RELEASE_IDENTIFIER_PATTERN = Pattern.compile(
             "^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>dev|sit|uat|prod)-(?<sequence>0[1-9]|[1-9][0-9])$",
             Pattern.CASE_INSENSITIVE);
-
     private final ReleaseFlowRepository releaseFlowRepository;
     private final ReleaseFlowService releaseFlowService;
     private final RequestRepository requestRepository;
@@ -304,22 +304,45 @@ public class TemplateRundownCreationService {
     }
 
     private String validateReleaseIdentifier(String releaseIdentifier, String stage) {
-        String normalized = requireValue(releaseIdentifier, "Release identifier is required.");
-        var matcher = RELEASE_IDENTIFIER_PATTERN.matcher(normalized);
+        String normalizedStage = stage == null ? null : stage.trim().toLowerCase().replace('_', '-');
+        if (normalizedStage == null || normalizedStage.isBlank()) {
+            throw new ValidationAppException("Stage is required.");
+        }
+
+        boolean classicStage = java.util.Set.of("dev", "sit", "uat", "prod").contains(normalizedStage);
+        boolean projectLifecycleStage = "requirement".equals(normalizedStage);
+        String normalized = normalizeBlank(releaseIdentifier);
+        if (projectLifecycleStage) {
+            return normalized != null ? normalized : UUID.randomUUID().toString();
+        }
+
+        if (normalized == null) {
+            throw new ValidationAppException("Release identifier is required.");
+        }
+
+        Pattern releaseIdentifierPattern = classicStage
+                ? CLASSIC_RELEASE_IDENTIFIER_PATTERN
+                : Pattern.compile(
+                        "^(?<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?<stage>"
+                                + Pattern.quote(normalizedStage)
+                                + ")-(?<sequence>0[1-9]|[1-9][0-9])$",
+                        Pattern.CASE_INSENSITIVE);
+        var matcher = releaseIdentifierPattern.matcher(normalized);
         if (!matcher.matches()) {
             throw new ValidationAppException(
-                    "Release identifier must match xxx-dev-01 / xxx-sit-01 / xxx-uat-01 / xxx-prod-01.");
+                    classicStage
+                            ? "Release identifier must match xxx-dev-01 / xxx-sit-01 / xxx-uat-01 / xxx-prod-01."
+                            : "Release identifier must match xxx-" + normalizedStage + "-01.");
         }
 
         String releaseStage = matcher.group("stage");
-        if (!stage.equalsIgnoreCase(releaseStage)) {
+        if (!normalizedStage.equalsIgnoreCase(releaseStage)) {
             throw new ValidationAppException(
                     "Release identifier stage segment must match the selected stage '" + stage + "'.");
         }
 
         return normalized;
     }
-
     private String resolveRequestOwner(
             String preferredOwner,
             List<CreateRundownFromTemplateTaskDto> tasks,
