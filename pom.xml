@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>com.wwa</groupId>
-    <artifactId>deployment-agent</artifactId>
+    <artifactId>agenthub</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>deployment-agent</name>
+    <name>agenthub</name>
     <description>WWA Deployment Agent – controlled, human-in-the-loop deployment workflow</description>
 
     <properties>

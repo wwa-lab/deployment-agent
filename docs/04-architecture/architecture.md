@@ -41,7 +41,7 @@ Shared capabilities (Audit Log, Access Management, Configuration Management, Tem
 **Backend** (`src/main/java/com/wwa/deploymentagent/`):
 
 ```
-com.wwa.deploymentagent/
+com.wwa.agenthub/
 ├── platform/                          ← Platform Core (agent-agnostic)
 │   ├── domain/
 │   │   ├── StagePipeline.java         ← Interface; each agent provides an impl
@@ -415,7 +415,7 @@ Deployment Agent is a controlled, human-in-the-loop release orchestration worksp
 
 **Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a deny-by-default authorization layer that combines platform entry grants with scoped visibility governance.
 
-**Naming note:** `Deployment Agent` is the workspace display name. `WWA` is the short label for the `WWA Agent Workspace Hub`. Current technical identifiers remain unchanged for now, including `/wwa/deployment-agent`, `/api/deployment-agent`, and the `com.wwa.deploymentagent` package namespace.
+**Naming note:** `Deployment Agent` is the workspace display name. `WWA` is the short label for the `WWA Agent Workspace Hub`. Current technical identifiers remain unchanged for now, including `/wwa/deployment-agent`, `/api/deployment-agent`, and the `com.wwa.agenthub` package namespace.
 
 ---
 

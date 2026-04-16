@@ -7,8 +7,13 @@ import TaskEditDialog from '../../components/TaskEditDialog.vue'
 import DecisionDialog from '../../components/DecisionDialog.vue'
 import RundownEditDialog from '../../components/RundownEditDialog.vue'
 import TaskActivityDialog from '../../components/TaskActivityDialog.vue'
+import TaskDocsDialog from '../../components/TaskDocsDialog.vue'
 import type { Task, TaskResult, Request } from '../../types'
-import type { ReleaseFlowDetailApi, ReleaseFlowDetailCopy } from '../composables/releaseFlowTypes'
+import type {
+  ReleaseFlowDetailApi,
+  ReleaseFlowDetailCopy,
+  TaskDocSpec,
+} from '../composables/releaseFlowTypes'
 
 type DecisionOption = 'Approve' | 'Reject' | 'Rerun' | 'Skip'
 type TaskDialogMode = 'edit' | 'run'
@@ -18,6 +23,7 @@ interface Props {
   store: Store<string, any>
   api: ReleaseFlowDetailApi
   copy: ReleaseFlowDetailCopy
+  taskDocsResolver?: (task: Task) => TaskDocSpec | null
   autoRefresh?: boolean
 }
 
@@ -41,6 +47,7 @@ const editingTask = ref<Task | null>(null)
 const taskDialogMode = ref<TaskDialogMode>('edit')
 const decidingTask = ref<Task | null>(null)
 const viewingActivityTask = ref<Task | null>(null)
+const viewingDocsTask = ref<{ task: Task; taskDocs: TaskDocSpec } | null>(null)
 const initialDecision = ref<DecisionOption | null>(null)
 const allowedDecisionOptions = ref<DecisionOption[]>(['Approve', 'Reject', 'Skip'])
 const editingRundown = ref<Request | null>(null)
@@ -344,6 +351,20 @@ function openEditTask(task: Task) {
   editingTask.value = task
 }
 
+function getTaskDocs(task: Task): TaskDocSpec | null {
+  return props.taskDocsResolver?.(task) ?? null
+}
+
+function getPrimarySkillLabel(task: Task): string | null {
+  return getTaskDocs(task)?.primarySkill.label ?? null
+}
+
+function openTaskDocs(task: Task) {
+  const taskDocs = getTaskDocs(task)
+  if (!taskDocs) return
+  viewingDocsTask.value = { task, taskDocs }
+}
+
 function canViewResult(task: Task): boolean {
   return !!task.latestExecutionId
 }
@@ -360,6 +381,19 @@ async function openViewResult(task: Task) {
     viewingResult.value = { task, result, loading: false }
   } catch {
     viewingResult.value = { task, result: null, loading: false }
+  }
+}
+
+async function onTaskDocsSaved(updatedTask: Task) {
+  const updatedDocs = getTaskDocs(updatedTask)
+  if (updatedDocs) {
+    viewingDocsTask.value = { task: updatedTask, taskDocs: updatedDocs }
+  }
+
+  try {
+    await store.refreshDetail()
+  } catch {
+    // Axios interceptors already surface refresh errors when relevant.
   }
 }
 
@@ -1120,6 +1154,7 @@ onUnmounted(() => {
                 <th>Task Name</th>
                 <th>Step</th>
                 <th>Step Name</th>
+                <th>Skill</th>
                 <th>Type</th>
                 <th>Critical</th>
                 <th>Status</th>
@@ -1148,6 +1183,12 @@ onUnmounted(() => {
                 <td>{{ task.taskGroupName }}</td>
                 <td>{{ task.stepSeq }}</td>
                 <td>{{ task.taskName }}</td>
+                <td>
+                  <span v-if="getPrimarySkillLabel(task)" class="task-skill-chip">
+                    {{ getPrimarySkillLabel(task) }}
+                  </span>
+                  <span v-else class="dependency-empty-chip">—</span>
+                </td>
                 <td>
                   <span class="badge" :class="executionTypeBadgeClass(task.executionType)">
                     {{ task.executionType }}
@@ -1199,6 +1240,13 @@ onUnmounted(() => {
                 <td>
                   <div class="task-action-panel">
                     <div class="action-btns">
+                      <button
+                        v-if="getTaskDocs(task)"
+                        class="btn btn-secondary btn-sm"
+                        @click.stop="openTaskDocs(task)"
+                      >
+                        Docs
+                      </button>
                       <span class="action-tooltip" :title="taskActionReason(req, editDisabledReason(task)) ?? ''">
                         <button
                           class="btn btn-secondary btn-sm"
@@ -1330,6 +1378,7 @@ onUnmounted(() => {
     <TaskEditDialog
       v-if="editingTask"
       :task="editingTask"
+      :task-docs="getTaskDocs(editingTask)"
       :mode="taskDialogMode"
       :edit-task-fn="api.editTask"
       :edit-names-fn="api.editNames"
@@ -1365,6 +1414,15 @@ onUnmounted(() => {
       :task="viewingActivityTask"
       :list-task-executions-fn="api.listTaskExecutions"
       @close="viewingActivityTask = null"
+    />
+
+    <TaskDocsDialog
+      v-if="viewingDocsTask"
+      :task="viewingDocsTask.task"
+      :task-docs="viewingDocsTask.taskDocs"
+      :save-task-docs-fn="api.saveTaskDocs"
+      @saved="onTaskDocsSaved"
+      @close="viewingDocsTask = null"
     />
   </div>
 </template>
@@ -1754,6 +1812,18 @@ onUnmounted(() => {
 .dependency-chip-outbound {
   background: #ecfdf5;
   color: #047857;
+}
+
+.task-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .dependency-empty-chip {

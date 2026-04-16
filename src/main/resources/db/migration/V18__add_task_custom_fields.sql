@@ -8,7 +8,7 @@
 -- that later phases can introduce agent-specific template customization
 -- without a schema migration per field.
 --
--- Pair with: com.wwa.deploymentagent.domain.fileimport.TemplateSchemaRegistry
+-- Pair with: com.wwa.agenthub.domain.fileimport.TemplateSchemaRegistry
 -- See docs/04-architecture/architecture.md §MVP Foundation Seams.
 
 ALTER TABLE DA_TASK

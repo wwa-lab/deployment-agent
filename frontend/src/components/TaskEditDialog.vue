@@ -3,6 +3,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import type { Task, ExecutionType } from '../types'
 import AiSuggestionPanel from './AiSuggestionPanel.vue'
 import { AI_ASSIST_PREVIEW_ENABLED } from '../config/platformConfig'
+import type { TaskDocSpec } from '../platform/composables/releaseFlowTypes'
+import TaskDocsPanel from './TaskDocsPanel.vue'
 
 const props = withDefaults(defineProps<{
   task: Task
@@ -14,6 +16,7 @@ const props = withDefaults(defineProps<{
     body: { resultSummary: Record<string, unknown>; resultLogs?: string }
   ) => Promise<Task>
   startManualExecutionFn: (taskId: string) => Promise<Task>
+  taskDocs?: TaskDocSpec | null
   mode?: 'edit' | 'run'
 }>(), {
   mode: 'edit',
@@ -215,6 +218,11 @@ async function submit() {
       <div class="modal-body">
         <div v-if="error" class="alert alert-error">{{ error }}</div>
 
+        <div v-if="taskDocs" class="task-docs-section">
+          <div class="task-docs-title">Task Docs</div>
+          <TaskDocsPanel :task-docs="taskDocs" />
+        </div>
+
         <div v-if="isStartingManualExecution" class="manual-steps-hint">
           <div class="manual-steps-title">Manual task workflow</div>
           <ol class="manual-steps-list">
@@ -346,6 +354,21 @@ async function submit() {
 </template>
 
 <style scoped>
+.task-docs-section {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.task-docs-title {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
 .input-error {
   border-color: #ef4444 !important;
 }

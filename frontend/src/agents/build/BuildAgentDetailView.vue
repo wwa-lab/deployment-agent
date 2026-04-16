@@ -3,6 +3,7 @@ import ReleaseFlowDetailView from '../../platform/components/ReleaseFlowDetailVi
 import { buildCopy } from '../../platform/composables/releaseFlowTypes'
 import type { ReleaseFlowDetailApi } from '../../platform/composables/releaseFlowTypes'
 import { useBuildAgentStore } from './index'
+import { resolveBuildTaskDocs } from './taskDocs'
 import {
   archiveRequestRundown,
   cloneTask,
@@ -16,6 +17,7 @@ import {
   recordResult,
   reorderTasks,
   restoreRequestRundown,
+  saveTaskDocs,
   startManualExecution,
   startRequestDeployment,
   submitAutoExecution,
@@ -35,6 +37,7 @@ const api: ReleaseFlowDetailApi = {
   editTask,
   editNames,
   editExecutionType,
+  saveTaskDocs,
   recordResult,
   submitDecision,
   submitAutoExecution,
@@ -52,5 +55,6 @@ const api: ReleaseFlowDetailApi = {
     :store="store"
     :api="api"
     :copy="buildCopy"
+    :task-docs-resolver="resolveBuildTaskDocs"
   />
 </template>
