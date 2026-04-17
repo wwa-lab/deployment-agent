@@ -1,0 +1,60 @@
+package com.wwa.agenthub.agents.project.domain;
+
+import com.wwa.agenthub.contracts.AgentId;
+import com.wwa.agenthub.platform.domain.StagePipeline;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Optional;
+
+@Component
+public class ProjectStagePipeline implements StagePipeline {
+
+    private static final List<String> STAGES = List.of(
+            "REQUIREMENT",
+            "FUNCTIONAL_DESIGN",
+            "TECHNICAL_DESIGN",
+            "DEVELOPMENT",
+            "TESTING",
+            "PERFORMANCE_TEST",
+            "RESULT_SIGNOFF",
+            "BUSINESS_ENDORSEMENT",
+            "CAB",
+            "DEPLOYMENT",
+            "POST_IMPLEMENTATION"
+    );
+
+    @Override
+    public String agentId() {
+        return AgentId.PROJECT_AGENT;
+    }
+
+    @Override
+    public Optional<String> next(String currentStage) {
+        int idx = indexOf(currentStage);
+        return idx + 1 < STAGES.size()
+                ? Optional.of(STAGES.get(idx + 1))
+                : Optional.empty();
+    }
+
+    @Override
+    public boolean isTerminal(String stage) {
+        int idx = indexOf(stage);
+        return idx == STAGES.size() - 1;
+    }
+
+    @Override
+    public List<String> orderedStages() {
+        return STAGES;
+    }
+
+    private int indexOf(String stage) {
+        int idx = STAGES.indexOf(stage);
+        if (idx < 0) {
+            throw new IllegalArgumentException(
+                    "Stage '" + stage + "' is not declared in ProjectStagePipeline. "
+                            + "Valid stages: " + STAGES);
+        }
+        return idx;
+    }
+}
