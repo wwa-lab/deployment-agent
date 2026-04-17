@@ -898,7 +898,7 @@ watch(() => store.detail, (val) => {
   }
 })
 
-// Optional auto-refresh (Deployment Agent only, per design)
+// Optional auto-refresh for agent detail views that opt in.
 let pollingInterval: number | null = null
 
 onMounted(() => {

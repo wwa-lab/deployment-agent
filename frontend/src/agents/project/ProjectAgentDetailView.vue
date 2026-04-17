@@ -52,5 +52,6 @@ const api: ReleaseFlowDetailApi = {
     :store="store"
     :api="api"
     :copy="projectCopy"
+    :auto-refresh="true"
   />
 </template>

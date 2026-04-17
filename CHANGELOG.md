@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Unified 30-second task-status auto-refresh across all agent detail pages (`Deployment Agent`, `Testing Agent`, `Build Agent`, and `Project Agent`) so AUTO/MANUAL task state changes now surface without requiring users to click `Refresh`; also clarified the shared detail-view comment so the opt-in behavior is documented accurately.
 - Fixed `Project Agent` list/detail lifecycle lookups so project instances created from Project Templates no longer fail with a Hibernate lazy-loading error when resolving the current lifecycle stage; batched request loading now fetches task rows eagerly before lifecycle stage/status aggregation runs.
 - Redesigned the `Project Agent` summary table for full lifecycle workflows: instead of expanding every lifecycle stage into its own column, the list now shows `Current Lifecycle Stage` plus a compact `Lifecycle Progress` view with completed-stage count, next stage, and a condensed stage bar so long project workflows remain readable on one screen.
 - Simplified `Project Agent` list filters so the workspace no longer inherits deployment-oriented fields like `Agent`, `Application`, or `Attempt View`, and it no longer defaults the page to `REQUIREMENT`; the remaining stage filter is now explicitly labeled `Current Lifecycle Stage` to match what users are actually filtering.

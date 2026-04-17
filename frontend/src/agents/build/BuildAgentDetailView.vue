@@ -56,5 +56,6 @@ const api: ReleaseFlowDetailApi = {
     :api="api"
     :copy="buildCopy"
     :task-docs-resolver="resolveBuildTaskDocs"
+    :auto-refresh="true"
   />
 </template>
