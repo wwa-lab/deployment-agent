@@ -56,6 +56,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExternalExecutionMonitorService {
 
+    private static final int URL_MAX_LENGTH = 2000;
+    private static final int STATUS_MESSAGE_MAX_LENGTH = 2000;
+
     @Value("${execution.monitor.enabled:false}")
     private boolean enabled;
 
@@ -140,16 +143,16 @@ public class ExternalExecutionMonitorService {
             history.setExternalStatus(poll.externalStatus());
         }
         if (poll.statusMessage() != null) {
-            history.setExternalStatusMessage(poll.statusMessage());
+            history.setExternalStatusMessage(truncate(poll.statusMessage(), STATUS_MESSAGE_MAX_LENGTH));
         }
         if (poll.jobUrl() != null) {
-            history.setExternalJobUrl(poll.jobUrl());
+            history.setExternalJobUrl(truncate(poll.jobUrl(), URL_MAX_LENGTH));
         }
         if (poll.logUrl() != null) {
-            history.setExternalLogUrl(poll.logUrl());
+            history.setExternalLogUrl(truncate(poll.logUrl(), URL_MAX_LENGTH));
         }
         if (poll.approvalUrl() != null) {
-            history.setExternalApprovalUrl(poll.approvalUrl());
+            history.setExternalApprovalUrl(truncate(poll.approvalUrl(), URL_MAX_LENGTH));
         }
         if (poll.externalExecutionId() != null) {
             history.setExternalExecutionId(poll.externalExecutionId());
@@ -211,5 +214,12 @@ public class ExternalExecutionMonitorService {
             log.error("Monitor: progression recompute failed for task {} after execution {}: {}",
                     task.getId(), history.getId(), e.getMessage(), e);
         }
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 }

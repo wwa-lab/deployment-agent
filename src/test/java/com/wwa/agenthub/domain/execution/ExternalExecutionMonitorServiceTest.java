@@ -218,6 +218,22 @@ class ExternalExecutionMonitorServiceTest {
         assertThat(refreshedTask.getTaskStatus()).isEqualTo(TaskStatus.Executing);
     }
 
+    @Test
+    @DisplayName("long poll status message is truncated before persistence")
+    void process_longStatusMessage_truncatesBeforeSave() {
+        Task task = seedAutoTask(TaskStatus.Executing);
+        TaskExecutionHistory history = seedHistory(task, ExecutionStatus.Running, ExternalStatus.RUNNING, "JENKINS");
+        String longMessage = "x".repeat(24_951);
+
+        when(jenkinsAdapter.pollStatus(any())).thenReturn(AutoPollResult.unknown(longMessage));
+
+        monitorService.processSingleExecution(history.getId());
+
+        TaskExecutionHistory refreshed = executionHistoryRepository.findById(history.getId()).orElseThrow();
+        assertThat(refreshed.getExternalStatusMessage()).hasSize(2000).endsWith("...");
+        assertThat(refreshed.getExecutionStatus()).isEqualTo(ExecutionStatus.Running);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private Task seedAutoTask(TaskStatus status) {
