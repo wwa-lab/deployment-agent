@@ -49,6 +49,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AutoExecutionService {
 
+    private static final int URL_MAX_LENGTH = 2000;
+    private static final int STATUS_MESSAGE_MAX_LENGTH = 2000;
+
     private final TaskRepository taskRepository;
     private final TaskExecutionHistoryRepository executionHistoryRepository;
     private final TaskPermissionService taskPermissionService;
@@ -121,19 +124,19 @@ public class AutoExecutionService {
 
         if (result.success()) {
             savedHistory.setSubmissionStatus("SUBMITTED");
-            savedHistory.setSubmissionMessage(result.message());
+            savedHistory.setSubmissionMessage(truncate(result.message(), STATUS_MESSAGE_MAX_LENGTH));
             savedHistory.setExternalExecutionId(result.executionId());
-            savedHistory.setExternalJobUrl(result.jobUrl());
-            savedHistory.setExternalLogUrl(result.logUrl());
-            savedHistory.setExternalApprovalUrl(result.approvalUrl());
+            savedHistory.setExternalJobUrl(truncate(result.jobUrl(), URL_MAX_LENGTH));
+            savedHistory.setExternalLogUrl(truncate(result.logUrl(), URL_MAX_LENGTH));
+            savedHistory.setExternalApprovalUrl(truncate(result.approvalUrl(), URL_MAX_LENGTH));
             savedHistory.setExternalStatus(ExternalStatus.QUEUED);
             savedHistory.setExternalStatusMessage("Queued in " + target.systemType());
         } else {
             savedHistory.setSubmissionStatus("FAILED");
-            savedHistory.setSubmissionMessage(result.message());
+            savedHistory.setSubmissionMessage(truncate(result.message(), STATUS_MESSAGE_MAX_LENGTH));
             savedHistory.setExecutionStatus(ExecutionStatus.Failed);
             savedHistory.setExternalStatus(ExternalStatus.FAILED);
-            savedHistory.setExternalStatusMessage(result.message());
+            savedHistory.setExternalStatusMessage(truncate(result.message(), STATUS_MESSAGE_MAX_LENGTH));
             savedHistory.setEndTime(clock.instant());
             task.setTaskStatus(TaskStatus.Failed);
             task.setEndTime(clock.instant());
@@ -182,5 +185,12 @@ public class AutoExecutionService {
                 .findFirst()
                 .orElseThrow(() -> new ConflictAppException(
                         "No execution adapter found for system type: " + systemType));
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 }

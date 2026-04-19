@@ -246,6 +246,27 @@ class AutoExecutionServiceTest {
         assertThat(history.get(0).getExternalStatus()).isEqualTo(ExternalStatus.FAILED);
     }
 
+    @Test
+    @DisplayName("adapter failure with long message is truncated before persistence")
+    void submitAuto_adapterFailure_longMessageTruncated() {
+        Task task = seedAutoTask(TaskStatus.Ready_For_Execution, "deploy-job");
+        seedJenkinsConfig();
+        String longMessage = "Jenkins error: " + "x".repeat(24_951);
+
+        when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
+                .thenThrow(new org.springframework.web.client.ResourceAccessException(longMessage));
+
+        Task result = autoExecutionService.submitAutoExecution(task.getId(), ownerUser);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.Failed);
+
+        TaskExecutionHistory history = executionHistoryRepository
+                .findByTaskIdOrderByAttemptNumberAsc(task.getId())
+                .get(0);
+        assertThat(history.getSubmissionMessage()).hasSize(2000).endsWith("...");
+        assertThat(history.getExternalStatusMessage()).hasSize(2000).endsWith("...");
+    }
+
     // ─── Guard violations ─────────────────────────────────────────────────────
 
     @Test
