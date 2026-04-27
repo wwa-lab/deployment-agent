@@ -19,7 +19,29 @@ const canSubmit = computed(() => files.value.length >= 2 && !comparing.value)
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
-  files.value = Array.from(input.files ?? [])
+  const selectedFiles = Array.from(input.files ?? [])
+  const existingKeys = new Set(files.value.map(fileKey))
+  files.value = [
+    ...files.value,
+    ...selectedFiles.filter((file) => !existingKeys.has(fileKey(file))),
+  ]
+  result.value = null
+  error.value = null
+  input.value = ''
+}
+
+function fileKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`
+}
+
+function removeFile(index: number) {
+  files.value = files.value.filter((_, fileIndex) => fileIndex !== index)
+  result.value = null
+  error.value = null
+}
+
+function clearFiles() {
+  files.value = []
   result.value = null
   error.value = null
 }
@@ -75,11 +97,17 @@ async function submit() {
             @change="onFileChange"
           />
           <p class="compare-hint">
-            The first selected file is the base. Files must share the same header row.
+            Add files in one or more selections. The first file in the list is the base.
           </p>
         </div>
 
         <div v-if="files.length > 0" class="selected-files">
+          <div class="selected-files-header">
+            <span>{{ files.length }} file{{ files.length === 1 ? '' : 's' }} selected</span>
+            <button class="btn btn-secondary btn-sm" type="button" :disabled="comparing" @click="clearFiles">
+              Clear
+            </button>
+          </div>
           <div
             v-for="(file, index) in files"
             :key="`${file.name}-${file.size}-${index}`"
@@ -88,6 +116,14 @@ async function submit() {
             <span class="file-role">{{ index === 0 ? 'Base' : 'Compare' }}</span>
             <span class="file-name">{{ file.name }}</span>
             <span class="file-size">{{ formatNumber(file.size) }} bytes</span>
+            <button
+              class="btn btn-secondary btn-sm"
+              type="button"
+              :disabled="comparing"
+              @click="removeFile(index)"
+            >
+              Remove
+            </button>
           </div>
         </div>
 
@@ -206,9 +242,18 @@ async function submit() {
   gap: 8px;
 }
 
+.selected-files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
 .selected-file {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr) auto;
+  grid-template-columns: 92px minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
