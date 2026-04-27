@@ -4,8 +4,16 @@ import { useRouter } from 'vue-router'
 import type { Store } from 'pinia'
 import { useUserStore } from '../../stores/user'
 import UploadDialog from '../../components/UploadDialog.vue'
+import CsvCompareDialog from '../../components/CsvCompareDialog.vue'
 import { getAgentDescriptor } from '../../config/agentRegistry'
-import type { FlowStatus, ReleaseFlowListItem, RequestStatus, Stage, UploadResponse } from '../../types'
+import type {
+  CsvCompareResult,
+  FlowStatus,
+  ReleaseFlowListItem,
+  RequestStatus,
+  Stage,
+  UploadResponse,
+} from '../../types'
 
 export interface ReleaseFlowSummaryCopy {
   agentTitle: string
@@ -30,6 +38,7 @@ interface Props {
     options?: { releaseId?: string; snowGroup?: string; application?: string; agent?: string },
   ) => Promise<UploadResponse>
   downloadTemplateFn: () => Promise<Blob>
+  compareCsvFilesFn?: (files: File[]) => Promise<CsvCompareResult>
   copy: ReleaseFlowSummaryCopy
   supportsStitching?: boolean
 }
@@ -43,6 +52,7 @@ const userStore = useUserStore()
 const store = props.store
 
 const showUpload = ref(false)
+const showCompareFiles = ref(false)
 
 const flowStatuses: FlowStatus[] = ['Pending', 'Running', 'Completed', 'Failed', 'Rejected']
 const attemptViews = [
@@ -194,6 +204,16 @@ function toggleArchivedVisibility() {
           @click="toggleArchivedVisibility"
         >
           {{ showArchived ? 'Hide Archived' : 'Show Archived' }}
+        </button>
+        <button
+          v-if="compareCsvFilesFn"
+          class="btn btn-secondary"
+          type="button"
+          :disabled="!userStore.canUploadRelease"
+          :title="userStore.canUploadRelease ? '' : 'Compare Files is available to DEVELOPER, TL, and DEVOPS_ADMIN.'"
+          @click="userStore.canUploadRelease && (showCompareFiles = true)"
+        >
+          Compare Files
         </button>
         <button
           class="btn btn-primary"
@@ -412,6 +432,12 @@ function toggleArchivedVisibility() {
       :download-template-fn="downloadTemplateFn"
       :on-upload-success="store.fetchList"
       @close="showUpload = false"
+    />
+
+    <CsvCompareDialog
+      v-if="showCompareFiles && compareCsvFilesFn"
+      :compare-fn="compareCsvFilesFn"
+      @close="showCompareFiles = false"
     />
   </div>
 </template>

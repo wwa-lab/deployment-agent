@@ -12,6 +12,7 @@ import type {
   TaskExecutionHistory,
   TaskResult,
   UploadResponse,
+  CsvCompareResult,
 } from '../../types'
 
 // ─── Release Flow API ───────────────────────────────────────────────────────
@@ -238,6 +239,18 @@ export async function uploadFile(
 export async function downloadTemplate(): Promise<Blob> {
   const response = await testingClient.get('/upload/template', {
     responseType: 'blob',
+  })
+  return response.data
+}
+
+export async function compareCsvFiles(files: File[]): Promise<CsvCompareResult> {
+  const formData = new FormData()
+  files.forEach((file) => formData.append('files', file))
+
+  const response = await testingClient.post('/file-compare', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
   })
   return response.data
 }

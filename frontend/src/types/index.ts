@@ -46,6 +46,36 @@ export interface AccessScope {
   snowGroup: string
 }
 
+export interface CsvDifference {
+  rowNumber: number
+  type: 'CHANGED' | 'ADDED' | 'REMOVED'
+  column?: string
+  baseValue?: string | null
+  compareValue?: string | null
+  baseRow?: string[] | null
+  compareRow?: string[] | null
+}
+
+export interface CsvCompareFileResult {
+  fileName: string
+  headers: string[]
+  matchedRows: number
+  changedRows: number
+  addedRows: number
+  removedRows: number
+  totalDifferences: number
+  truncated: boolean
+  differences: CsvDifference[]
+}
+
+export interface CsvCompareResult {
+  baseFileName: string
+  fileCount: number
+  comparisons: CsvCompareFileResult[]
+  totalDifferences: number
+  truncated: boolean
+}
+
 // Task
 export interface Task {
   id: string

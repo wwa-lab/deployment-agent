@@ -2,7 +2,7 @@
 import ReleaseFlowSummaryView from '../../platform/components/ReleaseFlowSummaryView.vue'
 import type { ReleaseFlowSummaryCopy } from '../../platform/components/ReleaseFlowSummaryView.vue'
 import { useTestingAgentReleaseFlowStore } from './index'
-import { uploadFile, downloadTemplate } from './api'
+import { uploadFile, downloadTemplate, compareCsvFiles } from './api'
 import type { Stage } from '../../types'
 
 const store = useTestingAgentReleaseFlowStore()
@@ -32,6 +32,7 @@ const copy: ReleaseFlowSummaryCopy = {
     :allowed-upload-stages="stages"
     :upload-fn="uploadFile"
     :download-template-fn="downloadTemplate"
+    :compare-csv-files-fn="compareCsvFiles"
     :copy="copy"
   />
 </template>
