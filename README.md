@@ -2,6 +2,9 @@
 
 This repository hosts the **WWA Agent Workspace Hub** — a multi-agent platform for controlled, human-in-the-loop operational workflows. It currently contains three active agent workspaces:
 
+
+![architecture](architecture.png)
+
 | Agent | Purpose | Stages |
 |-------|---------|--------|
 | **Build Agent** | DEV-stage build and packaging workflow with task-level execution and review controls | DEV |
