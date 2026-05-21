@@ -1,0 +1,37 @@
+schema: spec-driven
+context: |
+  This repository already has a staged SDLC workflow under docs/02-user-stories,
+  docs/03-spec, docs/04-architecture, docs/05-design, and docs/06-tasks, plus
+  repository agent guidance in AGENTS.md, CLAUDE.md, and .agents/skills.
+
+  Use OpenSpec as the change-entry layer only. An active OpenSpec change under
+  openspec/changes/<change-id>/ is the source of truth for the approved scope,
+  rationale, and acceptance of that change while it is active.
+
+  Keep the existing local SDLC documents as the deeper implementation layer.
+  Do not bulk-copy or replace those documents with OpenSpec artifacts. Instead,
+  reference the relevant local documents from the OpenSpec change, and update
+  the affected local documents only when the implemented change makes their
+  long-lived requirements, architecture, design, or task plan stale.
+
+  Avoid dual-track documentation. For any single active change, do not maintain
+  competing requirements or design decisions in both OpenSpec and docs/. If a
+  conflict appears, reconcile the decision in the active OpenSpec change first,
+  then update the affected deeper implementation document in the same work.
+
+  Preserve the repository rules in AGENTS.md and CLAUDE.md, including build and
+  test commands, architecture boundaries, safety rails, changelog expectations,
+  and human-in-the-loop restrictions.
+rules:
+  proposal:
+    - State whether the change is lightweight, medium, or high-risk, and only use OpenSpec for work that benefits from an explicit change record.
+    - Reference existing docs/02-user-stories through docs/06-tasks artifacts instead of duplicating their full content.
+  specs:
+    - Treat OpenSpec specs as change-scoped capability deltas unless the change is intentionally defining a new durable capability.
+    - If a durable requirement changes, name the local docs file that must be updated during implementation or archive.
+  design:
+    - Keep design notes focused on integration decisions and risks; use docs/05-design as the deeper implementation layer when detailed design already exists.
+    - Preserve package boundaries, shared component rules, security rules, and data model constraints from AGENTS.md and CLAUDE.md.
+  tasks:
+    - Include verification steps matching the repository contract, such as mvn test for backend changes and frontend npm run build for UI changes.
+    - Include documentation update tasks only when the change affects user-facing behavior or makes existing long-lived docs stale.
