@@ -111,6 +111,15 @@ const router = createRouter({
           },
         },
         {
+          path: 'trading-dashboard',
+          name: 'wwa-trading-dashboard',
+          component: () => import('../views/TradingDashboardView.vue'),
+          meta: {
+            section: 'trading-dashboard',
+            sectionTitle: 'Trading Dashboard',
+          },
+        },
+        {
           path: 'configuration-management',
           name: 'wwa-configuration-management',
           component: () => import('../views/ConfigAdminView.vue'),

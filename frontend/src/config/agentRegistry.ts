@@ -80,6 +80,12 @@ export const platformCapabilities: PlatformCapabilityDescriptor[] = [
     icon: '🧩',
   },
   {
+    key: 'trading-dashboard',
+    label: 'Trading Dashboard',
+    to: '/wwa/trading-dashboard',
+    icon: '📈',
+  },
+  {
     key: 'configuration-management',
     label: 'Configuration Management',
     to: '/wwa/configuration-management',
