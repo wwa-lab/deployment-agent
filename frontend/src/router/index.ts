@@ -11,6 +11,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/trading-dashboard-preview',
+      name: 'trading-dashboard-preview',
+      component: () => import('../views/TradingDashboardView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/',
       redirect: '/wwa/home',
     },
