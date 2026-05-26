@@ -39,6 +39,7 @@ out/
 .DS_Store
 *.iml
 .idea/
+.vscode/
 
 # Agent / assistant local artifacts
 .claude/Claude-to-IM/
