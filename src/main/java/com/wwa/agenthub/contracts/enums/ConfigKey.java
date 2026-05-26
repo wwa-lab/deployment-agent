@@ -17,17 +17,34 @@ package com.wwa.agenthub.contracts.enums;
  */
 public enum ConfigKey {
     // --- Agent-private: Deployment Agent execution integrations ---
-    jenkins_url,
-    jenkins_user,
-    jenkins_api_token,
-    ansible_url,
-    ansible_user,
-    ansible_api_token,
-    execution_callback_endpoint;
+    jenkins_url("Deployment Agent", "Deployment Agent"),
+    jenkins_user("Deployment Agent", "Deployment Agent"),
+    jenkins_api_token("Deployment Agent", "Deployment Agent"),
+    ansible_url("Deployment Agent", "Deployment Agent"),
+    ansible_user("Deployment Agent", "Deployment Agent"),
+    ansible_api_token("Deployment Agent", "Deployment Agent"),
+    execution_callback_endpoint("Deployment Agent", "Deployment Agent"),
 
-    // --- Platform-shared: (none yet) ---
+    // --- Platform-shared ---
     // Add platform-level config keys here when a genuine shared concern arises.
     // Do not add agent-specific settings to this section.
+    agent_contribution_dashboard_statuses("WWA Platform", "Agent Contribute Dashboard");
+
+    private final String auditApplication;
+    private final String auditAgent;
+
+    ConfigKey(String auditApplication, String auditAgent) {
+        this.auditApplication = auditApplication;
+        this.auditAgent = auditAgent;
+    }
+
+    public String auditApplication() {
+        return auditApplication;
+    }
+
+    public String auditAgent() {
+        return auditAgent;
+    }
 
     public boolean isSensitive() {
         return this == jenkins_api_token || this == ansible_api_token;

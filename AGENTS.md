@@ -11,6 +11,16 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 - Frontend install/dev: `cd frontend && npm install && npm run dev`
 - Frontend build/typecheck: `cd frontend && npm run build`
 
+## SDD Workflow Gate
+
+This repository should be operated in strict Spec Driven Development mode for non-trivial or user-facing changes.
+
+- Before implementation, create or update the relevant SDD artifacts under `docs/01-requirements`, `docs/02-user-stories`, `docs/03-spec`, `docs/04-architecture`, `docs/05-design`, and `docs/06-tasks`.
+- If a change has already been implemented without SDD artifacts, backfill the full SDD chain immediately and mark the documents as `Backfilled` rather than pretending they preceded the code.
+- Treat SDD documents as the primary source of change intent and scope. Code, tests, and changelog entries must trace back to the SDD artifacts.
+- For small bug fixes, copy edits, or metadata-only cleanup, update the nearest existing SDD artifact only when behavior or scope changes.
+- Do not add a new user-facing feature as code-only work.
+
 ## Architecture Boundaries
 
 - REST controllers live in `src/main/java/com/wwa/deploymentagent/web/controller/`

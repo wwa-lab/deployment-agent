@@ -1,0 +1,436 @@
+{
+  "summary": {
+    "updatedAt": "2026-05-26",
+    "evidenceSource": "Manual baseline from the Qilianshan SDLC article",
+    "cultureGoal": "Show the seven Qilianshan SDLC stages, distinguish implementation status, and list each agent-owned contribution item with Agent Owner, Sub-agent Owner, Process Owner, Technical Leader, and Co-Build attribution."
+  },
+  "stages": [
+    {
+      "key": "planning",
+      "name": "Planning",
+      "focus": "Project planning",
+      "implementationStatus": "implemented",
+      "implementationLabel": "Implemented",
+      "implementationNote": "This stage is available in the current platform baseline.",
+      "description": "Defines project intent, approval readiness, scope, boundaries, and delivery direction.",
+      "gate": "Project goals, scope, boundaries, and approval evidence must be ready before downstream work starts.",
+      "resourceLinks": [
+        {
+          "label": "Guideline",
+          "description": "Open Planning stage guideline",
+          "href": "https://confluence.example.com/display/WWA/Planning+Stage+Guideline"
+        },
+        {
+          "label": "Feedback",
+          "description": "Write Planning stage feedback",
+          "href": "https://confluence.example.com/display/WWA/Planning+Stage+Feedback"
+        }
+      ],
+      "workstreams": [
+        {
+          "name": "Project framing",
+          "agentName": "Planning Agent",
+          "contribution": "Captures goals, delivery boundaries, key milestones, and business priorities.",
+          "subAgentOwner": "Portfolio Planning Team",
+          "processOwner": "Product Owner",
+          "technicalLeader": "Tech Lead",
+          "coBuild": [
+            "Project Sponsor",
+            "Product Owner"
+          ]
+        },
+        {
+          "name": "Approval readiness",
+          "agentName": "Planning Agent",
+          "contribution": "Collects approval evidence so the project enters a traceable delivery path.",
+          "subAgentOwner": "Governance Owner",
+          "processOwner": "Governance Owner",
+          "technicalLeader": "Risk Reviewer",
+          "coBuild": [
+            "Finance Reviewer",
+            "Risk Reviewer"
+          ]
+        },
+        {
+          "name": "Scope alignment",
+          "agentName": "Planning Agent",
+          "contribution": "Clarifies what is in scope, what is out of scope, and where scope drift should be stopped.",
+          "subAgentOwner": "Product Owner",
+          "processOwner": "Product Owner",
+          "technicalLeader": "Tech Lead",
+          "coBuild": [
+            "Business SME",
+            "Tech Lead"
+          ]
+        }
+      ],
+      "agentOwner": "Portfolio Planning Team"
+    },
+    {
+      "key": "estimation",
+      "name": "Estimation",
+      "focus": "Quantified estimation",
+      "implementationStatus": "implemented",
+      "implementationLabel": "Implemented",
+      "implementationNote": "This stage is available in the current platform baseline.",
+      "description": "Turns schedule, cost, resource, and risk assumptions into a delivery baseline.",
+      "gate": "The estimation baseline must be reviewed before discovery work can exceed time, budget, or risk boundaries.",
+      "resourceLinks": [
+        {
+          "label": "Guideline",
+          "description": "Open Estimation stage guideline",
+          "href": "https://confluence.example.com/display/WWA/Estimation+Stage+Guideline"
+        },
+        {
+          "label": "Feedback",
+          "description": "Write Estimation stage feedback",
+          "href": "https://confluence.example.com/display/WWA/Estimation+Stage+Feedback"
+        }
+      ],
+      "workstreams": [
+        {
+          "name": "Schedule estimate",
+          "agentName": "Estimation Agent",
+          "contribution": "Converts delivery timing from informal judgment into a reviewable baseline.",
+          "subAgentOwner": "Delivery Manager",
+          "processOwner": "Delivery Manager",
+          "technicalLeader": "Tech Lead",
+          "coBuild": [
+            "Tech Lead",
+            "QA Lead"
+          ]
+        },
+        {
+          "name": "Cost and resource estimate",
+          "agentName": "Estimation Agent",
+          "contribution": "Clarifies staffing, environment, tooling, and budget constraints.",
+          "subAgentOwner": "Resource Owner",
+          "processOwner": "Resource Owner",
+          "technicalLeader": "Engineering Manager",
+          "coBuild": [
+            "Engineering Manager",
+            "Finance Partner"
+          ]
+        },
+        {
+          "name": "Risk baseline",
+          "agentName": "Estimation Agent",
+          "contribution": "Locks key risks and mitigation actions as inputs for later stages.",
+          "subAgentOwner": "Risk Owner",
+          "processOwner": "Risk Owner",
+          "technicalLeader": "Security Reviewer",
+          "coBuild": [
+            "Security Reviewer",
+            "Operations Owner"
+          ]
+        }
+      ],
+      "agentOwner": "Delivery Planning Team"
+    },
+    {
+      "key": "discovery",
+      "name": "Discovery",
+      "focus": "Research and design",
+      "implementationStatus": "not-implemented",
+      "implementationLabel": "Not implemented",
+      "implementationNote": "This stage is part of the target SDLC map, but it is not implemented in the current platform baseline.",
+      "description": "Collects requirements, aligns requirement intent, and creates executable solution design.",
+      "gate": "Build work should not start from verbal understanding when the requirement and design baseline is incomplete.",
+      "resourceLinks": [
+        {
+          "label": "Guideline",
+          "description": "Open Discovery stage guideline",
+          "href": "https://confluence.example.com/display/WWA/Discovery+Stage+Guideline"
+        },
+        {
+          "label": "Feedback",
+          "description": "Write Discovery stage feedback",
+          "href": "https://confluence.example.com/display/WWA/Discovery+Stage+Feedback"
+        }
+      ],
+      "workstreams": [
+        {
+          "name": "Requirement intake",
+          "agentName": "Discovery Agent",
+          "contribution": "Turns business input into a traceable requirement candidate set.",
+          "subAgentOwner": "Business Analyst",
+          "processOwner": "Business Analyst",
+          "technicalLeader": "Solution Architect",
+          "coBuild": [
+            "Product Owner",
+            "Business SME"
+          ]
+        },
+        {
+          "name": "Requirement baseline",
+          "agentName": "Discovery Agent",
+          "contribution": "Aligns requirement language so development and testing work from the same source.",
+          "subAgentOwner": "Business Analyst",
+          "processOwner": "Business Analyst",
+          "technicalLeader": "Tech Lead",
+          "coBuild": [
+            "Tech Lead",
+            "QA Lead"
+          ]
+        },
+        {
+          "name": "Solution design",
+          "agentName": "Architecture Agent",
+          "contribution": "Creates executable design, interfaces, constraints, and acceptance boundaries.",
+          "subAgentOwner": "Solution Architect",
+          "processOwner": "Solution Architect",
+          "technicalLeader": "Security Reviewer",
+          "coBuild": [
+            "Security Reviewer",
+            "Operations Owner"
+          ]
+        }
+      ],
+      "agentOwner": "Solution Discovery Team"
+    },
+    {
+      "key": "build",
+      "name": "Build",
+      "focus": "Development and build",
+      "implementationStatus": "implemented",
+      "implementationLabel": "Implemented",
+      "implementationNote": "This stage is available in the current platform baseline.",
+      "description": "Turns the approved baseline into code changes, local verification, and archived build artifacts.",
+      "gate": "Testing should not start without compliant artifacts and local verification evidence.",
+      "resourceLinks": [
+        {
+          "label": "Guideline",
+          "description": "Open Build stage guideline",
+          "href": "https://confluence.example.com/display/WWA/Build+Stage+Guideline"
+        },
+        {
+          "label": "Feedback",
+          "description": "Write Build stage feedback",
+          "href": "https://confluence.example.com/display/WWA/Build+Stage+Feedback"
+        }
+      ],
+      "workstreams": [
+        {
+          "name": "Standardized development",
+          "agentName": "Build Agent",
+          "contribution": "Turns design intent into reviewable, buildable code changes.",
+          "subAgentOwner": "Build Engineering Team",
+          "processOwner": "Build Engineering Team",
+          "technicalLeader": "Tech Lead",
+          "coBuild": [
+            "Developer",
+            "Code Reviewer"
+          ]
+        },
+        {
+          "name": "Unit verification",
+          "agentName": "Build Agent",
+          "contribution": "Completes the minimum local quality gate before formal testing starts.",
+          "subAgentOwner": "Developer",
+          "processOwner": "Developer",
+          "technicalLeader": "Tech Lead",
+          "coBuild": [
+            "QA Engineer",
+            "Tech Lead"
+          ]
+        },
+        {
+          "name": "Artifact build",
+          "agentName": "Build Agent",
+          "contribution": "Produces archived, releasable, and traceable build artifacts.",
+          "subAgentOwner": "Build Engineering Team",
+          "processOwner": "Build Engineering Team",
+          "technicalLeader": "DevOps Admin",
+          "coBuild": [
+            "DevOps Admin",
+            "Automation Engineer"
+          ]
+        }
+      ],
+      "agentOwner": "Build Engineering Team"
+    },
+    {
+      "key": "testing",
+      "name": "Testing",
+      "focus": "Verification and testing",
+      "implementationStatus": "in-progress",
+      "implementationLabel": "In Progress",
+      "implementationNote": "This stage is being built out in the current platform baseline.",
+      "description": "Covers functional, performance, security, and compatibility validation with defect feedback into build.",
+      "gate": "Deployment should not proceed until test acceptance evidence is complete.",
+      "resourceLinks": [
+        {
+          "label": "Guideline",
+          "description": "Open Testing stage guideline",
+          "href": "https://confluence.example.com/display/WWA/Testing+Stage+Guideline"
+        },
+        {
+          "label": "Feedback",
+          "description": "Write Testing stage feedback",
+          "href": "https://confluence.example.com/display/WWA/Testing+Stage+Feedback"
+        }
+      ],
+      "workstreams": [
+        {
+          "name": "Functional validation",
+          "agentName": "Testing Agent",
+          "contribution": "Verifies business behavior against the requirement and design baseline.",
+          "subAgentOwner": "QA Automation Team",
+          "processOwner": "QA Automation Team",
+          "technicalLeader": "QA Lead",
+          "coBuild": [
+            "Test Operator",
+            "Business SME"
+          ]
+        },
+        {
+          "name": "Non-functional validation",
+          "agentName": "Testing Agent",
+          "contribution": "Adds performance, security, and compatibility evidence before release.",
+          "subAgentOwner": "Quality Owner",
+          "processOwner": "Quality Owner",
+          "technicalLeader": "Performance Engineer",
+          "coBuild": [
+            "Performance Engineer",
+            "Security Reviewer"
+          ]
+        },
+        {
+          "name": "Defect feedback",
+          "agentName": "Testing Agent",
+          "contribution": "Routes defects back into build instead of resolving them informally inside testing.",
+          "subAgentOwner": "QA Lead",
+          "processOwner": "QA Lead",
+          "technicalLeader": "Developer",
+          "coBuild": [
+            "Developer",
+            "Product Owner"
+          ]
+        }
+      ],
+      "agentOwner": "QA Automation Team"
+    },
+    {
+      "key": "deployment",
+      "name": "Deployment",
+      "focus": "Release and deployment",
+      "implementationStatus": "implemented",
+      "implementationLabel": "Implemented",
+      "implementationNote": "This stage is available in the current platform baseline.",
+      "description": "Coordinates test environment validation, production deployment, and launch acceptance.",
+      "gate": "Operations should not take ownership until launch acceptance evidence is complete.",
+      "resourceLinks": [
+        {
+          "label": "Guideline",
+          "description": "Open Deployment stage guideline",
+          "href": "https://confluence.example.com/display/WWA/Deployment+Stage+Guideline"
+        },
+        {
+          "label": "Feedback",
+          "description": "Write Deployment stage feedback",
+          "href": "https://confluence.example.com/display/WWA/Deployment+Stage+Feedback"
+        }
+      ],
+      "workstreams": [
+        {
+          "name": "Test environment deployment",
+          "agentName": "Deployment Agent",
+          "contribution": "Confirms package, environment, and test results are aligned before production release.",
+          "subAgentOwner": "Release Operations Team",
+          "processOwner": "Release Operations Team",
+          "technicalLeader": "Environment Owner",
+          "coBuild": [
+            "QA Lead",
+            "Environment Owner"
+          ]
+        },
+        {
+          "name": "Production deployment",
+          "agentName": "Deployment Agent",
+          "contribution": "Runs controlled production deployment with evidence and rollback path.",
+          "subAgentOwner": "DevOps Admin",
+          "processOwner": "DevOps Admin",
+          "technicalLeader": "Release SME",
+          "coBuild": [
+            "Release SME",
+            "Operations Owner"
+          ]
+        },
+        {
+          "name": "Launch acceptance",
+          "agentName": "Deployment Agent",
+          "contribution": "Records launch acceptance before handoff to operations.",
+          "subAgentOwner": "Release Owner",
+          "processOwner": "Release Owner",
+          "technicalLeader": "Operations Owner",
+          "coBuild": [
+            "Business Owner",
+            "Operations Owner"
+          ]
+        }
+      ],
+      "agentOwner": "Release Operations Team"
+    },
+    {
+      "key": "maintenance",
+      "name": "Maintenance",
+      "focus": "Operations and maintenance",
+      "implementationStatus": "not-implemented",
+      "implementationLabel": "Not implemented",
+      "implementationNote": "This stage is part of the target SDLC map, but it is not implemented in the current platform baseline.",
+      "description": "Owns monitoring, incident response, improvement feedback, and change traceability after launch.",
+      "gate": "Production feedback must be routed to the right SDLC stage instead of bypassing the process.",
+      "resourceLinks": [
+        {
+          "label": "Guideline",
+          "description": "Open Maintenance stage guideline",
+          "href": "https://confluence.example.com/display/WWA/Maintenance+Stage+Guideline"
+        },
+        {
+          "label": "Feedback",
+          "description": "Write Maintenance stage feedback",
+          "href": "https://confluence.example.com/display/WWA/Maintenance+Stage+Feedback"
+        }
+      ],
+      "workstreams": [
+        {
+          "name": "Continuous monitoring",
+          "agentName": "Maintenance Agent",
+          "contribution": "Monitors service health and triggers the response path when exceptions appear.",
+          "subAgentOwner": "Operations Team",
+          "processOwner": "Operations Team",
+          "technicalLeader": "SRE",
+          "coBuild": [
+            "SRE",
+            "Application Owner"
+          ]
+        },
+        {
+          "name": "Incident response",
+          "agentName": "Maintenance Agent",
+          "contribution": "Records incidents, response actions, impact scope, and review evidence.",
+          "subAgentOwner": "Incident Commander",
+          "processOwner": "Incident Commander",
+          "technicalLeader": "SRE",
+          "coBuild": [
+            "SRE",
+            "Developer"
+          ]
+        },
+        {
+          "name": "Improvement feedback",
+          "agentName": "Maintenance Agent",
+          "contribution": "Routes production feedback back into the correct SDLC stage.",
+          "subAgentOwner": "Operations Owner",
+          "processOwner": "Operations Owner",
+          "technicalLeader": "Tech Lead",
+          "coBuild": [
+            "Product Owner",
+            "Tech Lead"
+          ]
+        }
+      ],
+      "agentOwner": "Operations Team"
+    }
+  ]
+}

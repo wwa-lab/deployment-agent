@@ -111,6 +111,15 @@ const router = createRouter({
           },
         },
         {
+          path: 'agent-contribute-dashboard',
+          name: 'wwa-agent-contribute-dashboard',
+          component: () => import('../views/AgentContributionDashboardView.vue'),
+          meta: {
+            section: 'agent-contribute-dashboard',
+            sectionTitle: 'Agent Contribute Dashboard',
+          },
+        },
+        {
           path: 'configuration-management',
           name: 'wwa-configuration-management',
           component: () => import('../views/ConfigAdminView.vue'),
