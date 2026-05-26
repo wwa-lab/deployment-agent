@@ -39,6 +39,7 @@ export type ConfigKey =
   | 'ansible_user'
   | 'ansible_api_token'
   | 'execution_callback_endpoint'
+  | 'agent_contribution_dashboard_statuses'
 export type ConfigIntegrationId = 'jenkins' | 'ansible' | 'callback'
 
 export interface AccessScope {

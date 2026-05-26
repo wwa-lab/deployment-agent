@@ -48,6 +48,10 @@ public class ConfigurationService {
                 (v != null && !v.isBlank()) ? null : "ansible_api_token must not be blank");
         CONFIG_VALIDATION.put(ConfigKey.execution_callback_endpoint, v ->
                 HTTPS_PATTERN.matcher(v).matches() ? null : "execution_callback_endpoint must use HTTPS");
+        CONFIG_VALIDATION.put(ConfigKey.agent_contribution_dashboard_statuses, v ->
+                (v != null && !v.isBlank() && v.length() <= 1900)
+                        ? null
+                        : "agent_contribution_dashboard_statuses must be a non-blank JSON payload under 1900 characters");
     }
 
     private final ConfigurationRepository configurationRepository;
@@ -105,9 +109,9 @@ public class ConfigurationService {
 
         Map<String, Object> auditContext = new java.util.LinkedHashMap<>();
         auditContext.put("configKey", key.name());
-        auditContext.put("application", "Deployment Agent");
+        auditContext.put("application", key.auditApplication());
         auditContext.put("snowGroup", "WWA Platform");
-        auditContext.put("agent", "Deployment Agent");
+        auditContext.put("agent", key.auditAgent());
 
         if (key.isSensitive()) {
             auditContext.put("sensitive", true);

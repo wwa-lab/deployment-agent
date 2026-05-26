@@ -74,6 +74,12 @@ export type PlatformCapabilityDescriptor = {
 
 export const platformCapabilities: PlatformCapabilityDescriptor[] = [
   {
+    key: 'agent-contribute-dashboard',
+    label: 'Agent Contribute Dashboard',
+    to: '/wwa/agent-contribute-dashboard',
+    icon: '▦',
+  },
+  {
     key: 'template-management',
     label: 'Template Management',
     to: '/wwa/template-management',
