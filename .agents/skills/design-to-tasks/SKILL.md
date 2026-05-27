@@ -19,6 +19,20 @@ Transform a design document (`design.md`) into a `tasks.md` file that:
 
 ## Workflow
 
+### Step 0: Codebase Grounding Pass + Upstream Re-Verification (MANDATORY)
+
+Before writing any task, scan the design document for every claim about existing code — method names, class names, file paths, line anchors — and verify each one against the real codebase. Even if the design document was itself produced by a grounded skill, **do not blindly trust** its claims. Spot-check at least one anchor per module to catch silent drift.
+
+For every method or service the tasks will invoke:
+1. Grep to confirm the method name, signature, and return type
+2. If a task says "call `Foo.bar()`", make sure `Foo.bar()` exists with the signature the design implies
+3. If the design defers a decision ("implementation will determine DTO order"), **make that decision now** — do not forward a deferred decision into a task
+4. Tag any unverifiable reference `[UNVERIFIED]`
+
+**Commit All Decisions:** tasks-level documents must not carry forward any "implementation will decide" language from upstream. If the design deferred a choice, the task document must either pick a default (with tradeoff noted) or raise it as a blocking Open Question before task dispatch.
+
+See `../_shared/grounding-rules.md` (Rules 1, 5, 6) for the full protocol.
+
 ### Step 1: Ingest and Analyze the Design
 
 Read the provided design document carefully. Extract and identify:
@@ -141,6 +155,24 @@ Produce a `tasks.md` file with the following structure:
 
 ---
 
+## Pre-Ship Self-Review (MANDATORY)
+
+Before outputting tasks.md, run the **shared Pre-Ship Checklist** from `../_shared/grounding-rules.md`:
+
+- [ ] F1 — Every method/class reference in a task is grep-verified against the real codebase
+- [ ] F2 — "The existing X already does Y" claims in task Scope are verified
+- [ ] F3 — Tasks doc does not contain product decisions, architectural tradeoffs, or module-level design (those belong in design/architecture)
+- [ ] F4 — Dependency graph is self-consistent (no cycles; every stated dependency is real; no phantom deps that would force unnecessary serialization)
+- [ ] F5 — Rules/thresholds baked into task scope (e.g. "80% coverage", "append field at end") are explicitly traced
+- [ ] F6 — **Critical for tasks layer:** no task says "implementation will decide" — every ordering, naming, or dependency choice is committed here
+- [ ] F7 — Upstream design claims about existing method/class names have been re-verified at least via spot-check
+
+**Task-specific contradiction hotspots:**
+- Dependency graph vs. parallel workstreams section (a task claiming no deps but being in a later phase)
+- Size estimates totals vs. summary table (they must match)
+- Risk table vs. Out-of-Scope list (a risk can't be tracked if it's out of scope)
+- Task scope wording vs. the method names it will invoke (did the design's method names actually land?)
+
 ## Key Rules
 
 1. **Derive tasks from the design.** Do not invent major features not supported by the source document.
@@ -164,5 +196,5 @@ Optionally prefix by domain for large breakdowns: `BE-001`, `FE-001`, `INT-001`,
 
 ## Output File
 
-Write the result to `docs/tasks.md` by default.
+Write the result to `docs/06-tasks/tasks.md` by default.
 If the user explicitly requests a different location, follow the user's requested path.

@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=../../../../docs/00-context/execution-manifest.schema.json
+manifest_schema_version: "1.0"
+manifest_id: example-YYYYMMDD-task
+created_at: YYYY-MM-DDTHH:MM:SSZ
+created_by: human-or-agent
+
+workspace:
+  project_name: example
+  repo_path: /absolute/path/to/repo
+  repo_url: https://github.com/org/repo
+  branch: main
+  commit_sha: null
+
+task:
+  title: Short task title
+  objective: What the agent should accomplish
+  mode: docs-only | code-change | review | migration | research
+  sdd_profile: standard-java-sdd
+
+inputs:
+  source_references:
+    - type: github | jira | confluence | local-file | url
+      ref: example
+      version: null
+      notes: null
+  documents:
+    - path: docs/03-spec/example-spec.md
+      required: true
+      version: null
+  adrs:
+    - path: docs/00-context/decisions/ADR-0001-example.md
+      required: false
+
+constraints:
+  allowed_paths:
+    - docs/
+    - src/
+  forbidden_paths:
+    - .env
+    - secrets/
+  external_actions_require_approval: true
+
+outputs:
+  expected_artifacts:
+    - path: docs/06-tasks/example-tasks.md
+      kind: markdown
+  completion_report:
+    include_changed_files: true
+    include_verification: true
+    include_risks: true
+
+verification:
+  commands:
+    - command: mvn test
+      required: true
+  quality_gates:
+    - docs_trace_to_spec
+    - no_unreviewed_adr_conflict
+
+stop_conditions:
+  - required input document missing
+  - accepted ADR conflicts with requested change
+  - command requires external write without approval

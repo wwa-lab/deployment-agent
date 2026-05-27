@@ -29,7 +29,7 @@ The user should provide some combination of:
 | `design.md` | Yes | The source design or architecture document |
 | `tasks.md` | Recommended | Implementation task list or ticket breakdown |
 | Source files / repo | Yes | The code to review |
-| Code diff / PR | Optional | Output from Codex or another agent |
+| Code diff / PR | Optional | Output from Claude Code or another agent |
 
 If `tasks.md` is absent, perform coverage analysis against `design.md` only and note the gap.
 

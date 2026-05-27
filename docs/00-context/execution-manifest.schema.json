@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wwa-lab.local/schemas/execution-manifest.schema.json",
+  "title": "Agentic SDLC Execution Manifest",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "manifest_schema_version",
+    "manifest_id",
+    "created_at",
+    "created_by",
+    "workspace",
+    "task",
+    "inputs",
+    "constraints",
+    "outputs",
+    "verification",
+    "stop_conditions"
+  ],
+  "properties": {
+    "manifest_schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "created_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workspace": {
+      "type": "object",
+      "required": [
+        "project_name",
+        "repo_path",
+        "branch"
+      ],
+      "properties": {
+        "project_name": {
+          "type": "string"
+        },
+        "repo_path": {
+          "type": "string"
+        },
+        "repo_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branch": {
+          "type": "string"
+        },
+        "commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": [
+        "title",
+        "objective",
+        "mode",
+        "sdd_profile"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "objective": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "docs-only",
+            "code-change",
+            "review",
+            "migration",
+            "research"
+          ]
+        },
+        "sdd_profile": {
+          "type": "string"
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": [
+        "source_references",
+        "documents",
+        "adrs"
+      ],
+      "properties": {
+        "source_references": {
+          "type": "array"
+        },
+        "documents": {
+          "type": "array"
+        },
+        "adrs": {
+          "type": "array"
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "required": [
+        "allowed_paths",
+        "forbidden_paths",
+        "external_actions_require_approval"
+      ],
+      "properties": {
+        "allowed_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "external_actions_require_approval": {
+          "type": "boolean"
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "required": [
+        "expected_artifacts",
+        "completion_report"
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "commands",
+        "quality_gates"
+      ]
+    },
+    "stop_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}
