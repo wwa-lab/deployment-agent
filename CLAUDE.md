@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `docs/05-design/design.md`
   - `docs/06-tasks/tasks.md`
 - Default repository documents, code, and comments to English unless the user explicitly asks for another language.
+- For durable project memory, use the `context-engineering-adr` skill when a task changes architecture, cross-project conventions, AI-agent working context, platform boundaries, integrations, security posture, or data ownership.
 
 # Project Contract
 
@@ -23,6 +24,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Backend local run: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
 - Frontend dev: `cd frontend && npm install && npm run dev` (Vite on `:5173`, proxies `/api` to `:8080`)
 - Frontend build/typecheck: `cd frontend && npm run build` (runs `vue-tsc && vite build`)
+
+## Context Engineering And ADRs
+
+- Use `docs/00-context/` as the durable project context layer for background, terminology, boundaries, onboarding knowledge, and cross-agent working rules.
+- The active SDD profile is `docs/00-context/sdd-profile.md`.
+- Use `docs/00-context/decisions/` for Architecture Decision Records (ADRs).
+- Before changing architecture, platform boundaries, security posture, data ownership, integrations, or shared agent conventions, read the relevant context documents and ADRs.
+- Capture significant new or reversed decisions as ADRs instead of leaving rationale only in chat, PRs, or implementation notes.
+- Keep SDD artifacts as the source of feature scope; use ADRs for the "why" behind architecture and cross-cutting choices.
+- For reusable ADR/context workflow guidance, use `.claude/skills/context-engineering-adr/`.
+
+## Global Agentic SDLC Skills
+
+- Treat `.agents/skills/` as the canonical project-local source for reusable SDD and Agentic SDLC workflows.
+- Use `sdd-profile-manager` before applying SDD to a new project shape.
+- Use `sdd-slice-bootstrap` when starting or auditing a feature slice.
+- Use `execution-manifest` before handing work to a coding agent, remote agent, or automation.
+- Use `freshness-gate` before approving, implementing, or releasing from potentially stale docs/code/tests.
+- Use `cross-ide-skill-router` when keeping Codex, Claude Code, OpenCode, Gemini, or another tool aligned on the same workflow source.
+- Use `agentic-sdlc-orchestrator` for propose/apply/verify/archive lifecycle work.
+- Use `agentic-sdlc-doctor` after global skill sync or routing changes.
+- Track global skill versions and supporting assets in `docs/00-context/agentic-sdlc-registry.md`.
+- Validate execution manifests against `docs/00-context/execution-manifest.schema.json`.
+- GitHub Copilot routing lives in `.github/copilot-instructions.md` and `.github/instructions/agentic-sdlc.instructions.md`; keep those files as thin bridges to this contract and `.agents/skills/`.
 
 ## Spring Profiles
 

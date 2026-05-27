@@ -11,6 +11,25 @@ Converts a structured engineering specification (`spec.md` or equivalent) into a
 
 ## Workflow
 
+### Step 0 — Codebase Grounding Pass (MANDATORY)
+
+Before writing the architecture document, scan the source spec for every non-trivial claim about existing code and verify each one against the real codebase. This is the single highest-leverage step — the Build Agent architecture v1 collected 2 Critical findings and 1 Major finding because this step was skipped.
+
+What to grep / Read:
+- Every method name, class name, file path, or line reference in the spec
+- Every claim like "the existing X already supports Y"
+- Every `@Annotation` or configuration reference
+- Every column, enum value, or table mentioned
+
+For each claim:
+1. Match → OK
+2. Wrong → correct in the generated architecture AND flag to user at the top of your response
+3. Unverifiable → tag downstream as `[UNVERIFIED]`, do not assert as fact
+
+**Kill Phantom Inheritance:** Do not carry forward a claim from the spec just because it's written confidently. The spec may itself be wrong — re-verify.
+
+See `../_shared/grounding-rules.md` (Rules 1, 2, 6) for the full protocol.
+
 ### Step 1 — Locate and ingest the specification
 
 Check for the specification in this order:
@@ -38,7 +57,15 @@ Read the entire spec carefully. Extract and mentally model:
 Transform the spec analysis into a coherent architecture. Follow these principles:
 
 - **Derive, don't invent.** Only include architectural elements supported by the spec. If you infer something, label it as an assumption.
-- **Stay high-level.** Produce component-level, not class-level design. No code, no database schemas, no API request/response bodies.
+- **Stay high-level — FORBIDDEN LIST FOR ARCHITECTURE DOCS:** the following belong in `design.md` or `tasks.md`, NOT in architecture. Omit them entirely:
+  - Specific file paths (`src/main/java/.../FooController.java`)
+  - Class signatures, method signatures, or class skeletons
+  - Code blocks that contain implementation (Java / TypeScript / SQL bodies)
+  - LOC estimates (`~60 lines`)
+  - Test file names or test class names (`FooControllerTest`, `StageTest`)
+  - Task IDs, PR decomposition, phase gates, owner assignments
+  - Concrete repository method names or parameter lists
+  The correct architecture abstraction level is "Component X is responsible for Y and interacts with Z via protocol P" — not "class Foo implements method bar(String x)".
 - **Group by capability domain.** Where the system has multiple functional areas, organize components around those domains.
 - **Be explicit about layers.** Clearly separate frontend, backend, orchestration/execution, configuration, persistence, monitoring/audit, and integration adapters.
 - **Model state where it matters.** For workflow or DevOps platforms, lifecycle state, execution state, task state, and audit history are architecturally significant — call them out.
@@ -106,9 +133,54 @@ Write the output as a well-structured `architecture.md`. Use the template below.
 
 ## High-Level Architecture
 
-## Architecture Diagram (Mermaid)
+### Architecture Diagram
 
-Provide a high-level Mermaid diagram showing the major components, logical layers, and key integration paths.
+**REQUIRED**: Produce a plain-text / ASCII block diagram inside a markdown fenced code block.
+
+The diagram must:
+- Show the system as layered boxes drawn with box-drawing characters (┌ ─ ┐ │ └ ┘ ├ ┤ ┬ ┴ ▼ ▲)
+- Be laid out in monospace, top-to-bottom: Users → Frontend → API / Backend → Core Domain → Database, with external systems alongside
+- Compress to **4–8 primary boxes** — group related internals into a single labeled box rather than exploding every service
+- Label connections between layers only when the protocol matters (e.g., REST / JSON, JDBC)
+- Use the spec/design as the content source — real component names at a grouped level (e.g., "Import & Workflow Engine", not individual class names)
+- Match the abstraction level of a documentation block diagram: readable in 10 seconds, not an implementation map
+
+Do NOT use Mermaid syntax. Do NOT generate a workflow, sequence diagram, or decision flowchart.
+Do NOT skip this diagram. It is essential for architecture communication and review.
+
+Example style (structure only — replace content with real system components):
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Users                                                       │
+│  Role A · Role B · Role C                                    │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ HTTPS
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Web App                                                     │
+│  [Frontend framework] · [State management] · [HTTP client]   │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ REST / JSON
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│  API Service                                                 │
+│  [Backend framework] · [Controllers] · [Auth]                │
+├──────────────────────────────────────────────────────────────┤
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐ │
+│  │  Domain Group A │  │  Domain Group B │  │  Domain Group C│ │
+│  └────────────────┘  └────────────────┘  └────────────────┘ │
+├──────────────────────────────────────────────────────────────┤
+│  Persistence · [ORM / data access layer]                     │
+└──────────────┬──────────────────────┬────────────────────────┘
+               │                      │
+               ▼                      ▼
+┌──────────────────┐      ┌────────────────────┐
+│  Database        │      │  External System   │
+└──────────────────┘      └────────────────────┘
+```
+
+### Layer Summary
 
 [Describe the major layers or subsystems and how they relate. Use a brief narrative + a logical layer breakdown. For example:]
 
@@ -273,19 +345,42 @@ The system is organized into four primary layers:
 
 ## Quality Checklist
 
-Before finalizing the output, verify:
+Before finalizing the output, verify the architecture-specific items:
 
 - [ ] All major sections are present (or explicitly omitted with a reason)
 - [ ] Every inferred element is labeled `[ASSUMPTION]`
-- [ ] No low-level implementation detail (no code, no schemas, no API response shapes)
+- [ ] No low-level implementation detail (no code, no schemas, no API response shapes, no file paths, no LOC estimates, no test file names)
 - [ ] State model is explicit for any stateful workflow or execution entity
 - [ ] External integrations each have a described interaction pattern
 - [ ] Gaps in the spec are surfaced in Risks or Open Questions, not silently resolved
 - [ ] Language is concise, professional, and engineering-appropriate
+- [ ] **High-Level Architecture Diagram** (plain-text ASCII block diagram in fenced code block) is present and complete
+
+Then run the **shared Pre-Ship Checklist** from `../_shared/grounding-rules.md`:
+
+- [ ] F1 — Every method/class/file/annotation reference is grep-verified or tagged `[UNVERIFIED]`
+- [ ] F2 — Every "the existing X already supports Y" claim is verified against real code
+- [ ] F3 — No architecture-forbidden content (file paths, class signatures, code, LOC, test names, task IDs)
+- [ ] F4 — Scope / Assumptions / Risks / Open Questions do not contradict each other; component responsibilities match the stated state model
+- [ ] F5 — Every new rule (interaction pattern, ordering, algorithm) traced against 3 edge cases
+- [ ] F6 — No "implementation will decide" deferrals; architectural decisions are committed
+- [ ] F7 — Inherited claims from the spec were re-verified against the codebase, not carried forward blindly
 
 ---
 
 ## Output
 
-Save the final document as `docs/architecture.md` by default.
+### Primary Output
+Save the final document as `docs/04-architecture/architecture.md` by default.
 If the user requests a different location, follow the user's requested path.
+
+### Companion Artifact: Data Flow Document
+After producing the architecture document, also produce a companion `data-flow.md` that describes how data moves through the system. This document should include:
+- ASCII block diagrams or simple text diagrams for each major data flow
+- Field mapping tables where applicable (e.g., input fields to domain entities)
+- Data objects and their lifecycle
+- End-to-end data path summary
+
+Use the same plain-text diagram style as the architecture diagram. Only use Mermaid if the user explicitly requests it.
+
+Save as `docs/04-architecture/data-flow.md` by default.
