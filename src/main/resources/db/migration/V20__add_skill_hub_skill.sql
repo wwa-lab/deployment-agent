@@ -1,0 +1,22 @@
+CREATE TABLE SKILL_HUB_SKILL (
+    id VARCHAR2(36) PRIMARY KEY,
+    name VARCHAR2(160) NOT NULL,
+    description VARCHAR2(2000) NOT NULL,
+    category VARCHAR2(80) NOT NULL,
+    tags CLOB NOT NULL,
+    owner VARCHAR2(160) NOT NULL,
+    status VARCHAR2(30) NOT NULL,
+    current_version VARCHAR2(40) NOT NULL,
+    version_notes VARCHAR2(2000),
+    created_by VARCHAR2(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_by VARCHAR2(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    version NUMBER(19) NOT NULL
+);
+
+CREATE INDEX IDX_SKILL_HUB_STATUS_CATEGORY
+    ON SKILL_HUB_SKILL (status, category);
+
+CREATE INDEX IDX_SKILL_HUB_UPDATED_AT
+    ON SKILL_HUB_SKILL (updated_at);

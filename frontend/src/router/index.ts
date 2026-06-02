@@ -120,6 +120,15 @@ const router = createRouter({
           },
         },
         {
+          path: 'skill-hub',
+          name: 'wwa-skill-hub',
+          component: () => import('../views/SkillHubView.vue'),
+          meta: {
+            section: 'skill-hub',
+            sectionTitle: 'Skill Hub',
+          },
+        },
+        {
           path: 'configuration-management',
           name: 'wwa-configuration-management',
           component: () => import('../views/ConfigAdminView.vue'),

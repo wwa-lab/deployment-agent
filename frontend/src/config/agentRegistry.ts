@@ -80,6 +80,12 @@ export const platformCapabilities: PlatformCapabilityDescriptor[] = [
     icon: '▦',
   },
   {
+    key: 'skill-hub',
+    label: 'Skill Hub',
+    to: '/wwa/skill-hub',
+    icon: 'S',
+  },
+  {
     key: 'template-management',
     label: 'Template Management',
     to: '/wwa/template-management',
