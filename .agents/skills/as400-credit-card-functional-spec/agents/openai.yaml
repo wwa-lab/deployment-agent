@@ -1,0 +1,3 @@
+display_name: AS/400 Credit Card Spec
+short_description: Reverse-engineer AS/400 credit-card code into traceable functional specs.
+default_prompt: Analyze this AS/400 credit-card function and produce a functional spec with business rules, data access, exceptions, open questions, and source traceability.
