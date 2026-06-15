@@ -45,7 +45,10 @@ public class SkillHubService {
     public Page<SkillHubSkill> list(String query, String category, SkillStatus status, Pageable pageable) {
         String normalizedQuery = normalizeSearch(query);
         String normalizedCategory = normalizeSearch(category);
-        List<SkillHubSkill> filtered = repository.findAll(Sort.by(Sort.Direction.DESC, "updatedAt")).stream()
+        Sort sort = Sort.by(Sort.Direction.DESC, "updatedAt")
+                .and(Sort.by(Sort.Direction.DESC, "createdAt"))
+                .and(Sort.by(Sort.Direction.DESC, "name"));
+        List<SkillHubSkill> filtered = repository.findAll(sort).stream()
                 .filter(skill -> status == null || skill.getStatus() == status)
                 .filter(skill -> normalizedCategory == null
                         || skill.getCategory().toLowerCase(Locale.ROOT).equals(normalizedCategory))
