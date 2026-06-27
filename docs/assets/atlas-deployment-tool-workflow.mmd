@@ -1,0 +1,36 @@
+flowchart TB
+    upstream["Validated M4/M5 evidence<br/>artifact, test result, release scope"]
+    upload["Upload Excel or create from template<br/>explicit stage: SIT / UAT / PROD"]
+    validate["Validate workbook, stage, scope, owner, task rows"]
+    model["Create or update<br/>Release Flow -> Request -> Task"]
+    ready["Promote first eligible task<br/>Ready For Execution"]
+    execute{"Execution type"}
+    manual["MANUAL<br/>owner starts task and records result"]
+    auto["AUTO<br/>submit to Jenkins or Ansible/AWX"]
+    history["Execution history<br/>result, links, attempt metadata"]
+    review["Human review gate<br/>Approve / Reject / Rerun / Skip"]
+    progress{"Progression outcome"}
+    next["Next task or next stage"]
+    fail["Failed or rejected state<br/>rerun / rollback handoff"]
+    complete["Release flow completed<br/>maintenance-ready evidence"]
+    audit["Audit log and correlation context"]
+
+    upstream --> upload --> validate --> model --> ready --> execute
+    execute --> manual --> history
+    execute --> auto --> history
+    history --> review --> progress
+    progress --> next --> ready
+    progress --> fail
+    progress --> complete
+    upload --> audit
+    model --> audit
+    history --> audit
+    review --> audit
+
+    classDef default fill:#f8fafc,stroke:#64748b,color:#111827;
+    classDef gate fill:#fef3c7,stroke:#d97706,color:#111827,stroke-width:2px;
+    classDef evidence fill:#dcfce7,stroke:#16a34a,color:#052e16;
+    classDef risk fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+    class execute,review,progress gate;
+    class upstream,history,audit,complete evidence;
+    class fail risk;

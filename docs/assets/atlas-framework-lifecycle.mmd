@@ -1,0 +1,28 @@
+flowchart LR
+    subgraph framework["Atlas Engineering Delivery Hub"]
+        lifecycle["Seven Mountains SDLC"]
+        gates["Seven Gates Flow / I-E-O-V"]
+        platform["Platform Core: auth, access, audit, config, tasks"]
+        modules["Agent Modules and Sub-Capabilities"]
+    end
+
+    lifecycle --> gates
+    gates --> platform
+    platform --> modules
+
+    modules --> planning["Planning and Estimation coverage"]
+    modules --> discovery["Discovery example: Atlas Phoenix Lens"]
+    modules --> build["Build Agent"]
+    modules --> testing["Testing Agent"]
+    modules --> deployment["Deployment Agent"]
+    modules --> maintenance["Maintenance target stage"]
+
+    planning --> evidence["Lifecycle visibility"]
+    discovery --> evidence
+    build --> evidence
+    testing --> evidence
+    deployment --> evidence
+    maintenance --> evidence
+
+    evidence --> governance["Traceability, validation, and always-on operations"]
+

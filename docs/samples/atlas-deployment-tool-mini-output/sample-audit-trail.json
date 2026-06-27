@@ -1,0 +1,45 @@
+{
+  "auditTrail": [
+    {
+      "timestamp": "2026-06-27T00:00:00Z",
+      "operatorId": "sample.operator",
+      "actionType": "upload_excel",
+      "releaseFlowId": "rf-sample-001",
+      "requestId": "req-sample-sit-001",
+      "context": {
+        "stage": "SIT",
+        "workflowIdentifier": "DEMO-RELEASE-001"
+      }
+    },
+    {
+      "timestamp": "2026-06-27T00:05:00Z",
+      "operatorId": "sample.operator",
+      "actionType": "view_result",
+      "taskId": "task-sample-001",
+      "context": {
+        "resultSummary": "Checksum matched synthetic evidence bundle."
+      }
+    },
+    {
+      "timestamp": "2026-06-27T00:06:00Z",
+      "operatorId": "sample.reviewer",
+      "actionType": "approve_task",
+      "taskId": "task-sample-001",
+      "context": {
+        "decisionType": "Approve",
+        "actorKind": "HUMAN"
+      }
+    },
+    {
+      "timestamp": "2026-06-27T00:10:00Z",
+      "operatorId": "sample.devops",
+      "actionType": "auto_submit",
+      "taskId": "task-sample-002",
+      "context": {
+        "systemType": "JENKINS",
+        "targetKind": "PIPELINE",
+        "externalJobUrl": "https://example.invalid/jobs/sample-release-pipeline/42"
+      }
+    }
+  ]
+}

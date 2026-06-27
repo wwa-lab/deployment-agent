@@ -1,0 +1,17 @@
+flowchart TB
+    stage["Every Mountain Stage"]
+    input["Input<br/>Scope, owners, artifacts, constraints"]
+    execute["Execute<br/>Human, agent, automation, tool work"]
+    output["Output<br/>Artifacts, decisions, task records"]
+    validate["Validate<br/>Review, tests, approval, audit"]
+    decision{"Gate decision"}
+    proceed["Proceed downstream"]
+    rerun["Rerun or rework"]
+    hold["Hold or stop"]
+
+    stage --> input --> execute --> output --> validate --> decision
+    decision --> proceed
+    decision --> rerun
+    decision --> hold
+    rerun --> execute
+

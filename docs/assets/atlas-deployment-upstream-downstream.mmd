@@ -1,0 +1,20 @@
+flowchart LR
+    build["M4 Build<br/>package, build log, artifact reference"]
+    testing["M5 Testing<br/>validation result, defect status, acceptance notes"]
+    bundle["Release evidence bundle<br/>scope, owner, expected output"]
+    deployment["M6 Deployment Tool<br/>SIT / UAT / PROD release rundown"]
+    outputs["Controlled release outputs<br/>tasks, decisions, execution links, audit"]
+    maintenance["M7 Maintenance<br/>operations feedback, incident or improvement"]
+    backlog["Future planning input<br/>new requirement or remediation"]
+
+    build --> bundle
+    testing --> bundle
+    bundle --> deployment --> outputs --> maintenance --> backlog
+    backlog -. feedback .-> build
+
+    classDef upstream fill:#e0f2fe,stroke:#0284c7,color:#082f49;
+    classDef highlight fill:#fbbf24,stroke:#92400e,color:#111827,stroke-width:3px;
+    classDef downstream fill:#dcfce7,stroke:#16a34a,color:#052e16;
+    class build,testing,bundle upstream;
+    class deployment highlight;
+    class outputs,maintenance,backlog downstream;

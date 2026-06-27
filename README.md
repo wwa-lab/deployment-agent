@@ -1,167 +1,135 @@
-# WWA Agent Workspace Hub
+# Atlas Engineering Delivery Hub - Deployment
 
-This repository hosts the **WWA Agent Workspace Hub** — a multi-agent platform for controlled, human-in-the-loop operational workflows. It currently contains three active agent workspaces:
+**Category:** Tool
+**Lifecycle stage:** M6 Deployment
+**Chinese README:** [README.zh-CN.md](README.zh-CN.md)
 
-| Agent | Purpose | Stages |
-|-------|---------|--------|
-| **Build Agent** | DEV-stage build and packaging workflow with task-level execution and review controls | DEV |
-| **Deployment Agent** | Release orchestration — creating, running, reviewing, and auditing deployment rundowns | SIT, UAT, PROD |
-| **Testing Agent** | iSeries A/B testing — tracking and progressing test rundowns by program level | UAT |
+Atlas Engineering Delivery Hub - Deployment is the M6 Deployment-stage tool within the Atlas Engineering Delivery Hub. It helps teams convert validated delivery outputs into controlled, traceable release operations.
 
-This README reflects the current repository code and the current design baseline in [`docs/05-design/design.md`](docs/05-design/design.md).
+This repository contains the current WWA Agent Workspace Hub implementation baseline for release orchestration. The Deployment tool is one stage capability inside the larger Atlas Engineering Delivery Hub / Seven Mountains SDLC narrative; it is not the whole framework.
 
-## Current Baseline
+![Atlas Engineering Delivery Hub mobile vertical artwork](docs/assets/atlas-engineering-delivery-hub-mobile-vertical.png)
 
-- Platform shell name: **WWA Agent Workspace Hub** (`WWA`)
-- Active agent workspaces: **Build Agent**, **Deployment Agent**, **Testing Agent**
-- Current technical identifiers:
-  - repository / artifact: `deployment-agent`
-  - Java package: `com.wwa.agenthub`
-  - Deployment Agent: route `/wwa/deployment-agent`, API `/api/deployment-agent`
-  - Testing Agent: route `/wwa/testing-agent`, API `/api/testing-agent`
-  - Build Agent: route `/wwa/build-agent`, API `/api/build-agent`
-  - Shared platform capabilities: API `/api/platform`
-- Current implementation status: MVP release orchestration, iSeries A/B testing workspace, scoped access-governance foundations, template-based rundown creation, rundown archive lifecycle, scoped configuration management, Agent Contribute Dashboard, and WWA shell integration
+![M6 Deployment lifecycle positioning](docs/assets/atlas-deployment-lifecycle-positioning.svg)
 
-## What Is Implemented Today
+## Lifecycle Positioning
 
-### Platform (shared across all agents)
-
-- Session-based login through a configurable authentication-provider abstraction (`TeamBookAuthenticationProvider` in code)
-- Deny-by-default product access via local `AccessGrant` records
-- Effective auth/session payload with compatibility `role`, plus `roles[]`, `permissions[]`, and `scopes[]`
-- Scoped visibility and delegated administration based on `Application + SNOW Group`
-- Configuration Management with scoped component overrides: `Platform Default`, `Application Default`, `SNOW Group Default`, `Agent Override`
-- Encrypted storage for sensitive configuration values
-- Audit Log with `application`, `snowGroup`, and `agent` trace fields
-- WWA Access Management for listing, creating, updating, suspending, reactivating, and directory-searching access grants
-- Shared `UploadDialog` component with agent-injected API functions and per-agent stage restrictions
-- Agent Contribute Dashboard for seven-stage Qilianshan SDLC contribution coverage, owner attribution, Confluence guideline/feedback links, and admin-maintained stage implementation status
-
-### Deployment Agent
-
-- Release-flow summary and detail pages inside the WWA shell
-- Stitched rollout views that group related SIT / UAT / PROD uploads together
-- Attempt-aware rundown history with `latest` and `history` views for repeated stage uploads
-- Excel upload flow using the fixed `AMH_HCC_task` worksheet plus downloadable template
-- Template-based rundown creation through `POST /api/deployment-agent/release-flows/from-template`
-- Task lifecycle actions for edit input, start MANUAL execution, submit AUTO execution, record results, and apply review decisions
-- Execution history per task attempt, including reruns and external job links
-- Rundown-level controls for editing scope metadata, starting deployment, marking failed, archiving, restoring, and purging
-
-### Build Agent
-
-- DEV-only build workspace with upload, summary, and detail pages inside the WWA shell
-- Upload flow reusing the shared Excel template while forcing `agent = "build-agent"` and `stage = "DEV"` server-side
-- Task lifecycle actions for edit input, start MANUAL execution, submit AUTO execution, record results, view activity, and apply review decisions
-- Attempt-aware detail view that keeps repeated DEV uploads grouped under the same workflow summary while exposing request attempts in the detail page
-- Shared audit/access/config/session platform services under `/api/platform/*`
-
-### Testing Agent
-
-- iSeries A/B testing workspace for tracking test rundowns by program level
-- UAT-only stage (SIT and PROD are not applicable)
-- Separate summary and detail views with testing-specific descriptions
-- Isolated data path — backend controllers force `AgentId.TESTING_AGENT`, frontend uses dedicated API client and Pinia store
-- Shared upload, template download, task lifecycle, archive/restore/purge, and rundown editing with Deployment Agent via common domain services
-
-## Important Current Boundaries
-
-- Real Team Book integration is still future work. Current environments use the provider abstraction, and local/test runs use `StubTeamBookAuthenticationProvider`.
-- Product authorization is owned by Deployment Agent. Enterprise identity is authenticated first, then resolved through local Access Grants.
-- Primary authorization scope is currently `Application + SNOW Group`. `Agent` is runtime execution context, not the primary auth boundary.
-- Template Management is only partially backed by the backend today:
-  - creating a rundown from a template is real backend behavior
-  - template authoring and storage in the current UI are still frontend-local draft data
-  - the template upload tab is not backed by a dedicated template-import API yet
-- Agent Contribute Dashboard is not an agent registration system. It is a descriptive dashboard for SDLC stages, ownership, contribution items, and implementation status.
-- Agent Contribute Dashboard baseline content is frontend JSON. Stage status overrides are persisted through the existing configuration table, not through a dedicated dashboard table.
-- AUTO execution callback ingestion is not the main model. A polling monitor exists in code, but `execution.monitor.enabled=false` by default.
-- The `test` backend profile expects an Oracle schema that already exists. Use the `local` profile for the fastest local setup.
-
-## Technology Stack
-
-- Frontend: Vue 3.4, Vue Router 4.3, Pinia 2.1, Axios, Vite 5
-- Backend: Java 21, Spring Boot 3.2.0, Spring MVC, Spring Security, Spring Data JPA
-- Database:
-  - default profile: Oracle
-  - `local` / `test`: H2
-- Build tooling:
-  - backend: Maven
-  - frontend: npm
-
-## Repository Layout
-
-The current implementation is split between a Spring Boot backend and a Vue frontend:
+Seven Mountains SDLC:
 
 ```text
-src/main/java/com/wwa/deploymentagent/
-  agents/           Agent-specific controllers and domain helpers
-    build/
-    deployment/
-    testing/
-  config/           Spring configuration
-  contracts/        DTOs, enums, request/response contracts, user context
-  domain/           Shared business logic and persistence-facing services
-    audit/
-    auth/
-    configuration/
-    decision/
-    execution/
-    fileimport/
-    releaseflow/
-    task/
-  errors/           Shared application exceptions
-  platform/
-    web/shared/     Platform capability controllers (`/api/platform/*`)
-    web/security/   Session/header auth filters and Spring Security glue
-  util/             Shared converters and helpers
-
-src/main/resources/
-  application.properties
-  application-local.properties
-  db/migration/     SQL change history kept with the repo
-
-frontend/
-  src/
-    api/            Axios clients and endpoint wrappers
-    agents/         Agent-specific entrypoints, API wrappers, and views
-    components/     Dialogs and reusable UI pieces
-    config/         WWA shell and agent registry config
-    router/         Vue Router setup
-    stores/         Pinia stores
-    types/          Frontend TypeScript contracts
-    views/          Page-level views
-
-docs/
-  03-spec/
-  04-architecture/
-  05-design/
-  06-tasks/
-  UAT_RUNBOOK.md
-  sql/ORACLE_CURRENT_SCHEMA.sql
+M1 Planning -> M2 Estimation -> M3 Discovery -> M4 Build -> M5 Testing -> M6 Deployment -> M7 Maintenance
 ```
 
-## Running Locally
+This repo is **M6 Deployment**. It consumes upstream build and testing evidence and turns it into controlled SIT / UAT / PROD release operations with explicit human review, auditability, scoped access, and rollback-aware workflow records.
 
-This repository is not wired as a root `pnpm` workspace. Start the backend and frontend separately.
+Related stage examples:
 
-### 1. Backend (recommended local path)
+| Stage | Role in the Atlas narrative | Relationship to this repo |
+|---|---|---|
+| M3 Discovery | Turns business intent into requirements and design evidence. Atlas Phoenix Lens / Legacy Spec Factory is an upstream example. | Upstream source of release intent, not implemented here. |
+| M4 Build | Produces build-stage work items and delivery artifacts. | Upstream evidence source; this repo also contains a Build Agent workspace in the shared platform baseline. |
+| M5 Testing | Produces validation evidence and acceptance feedback. | Immediate upstream gate before release operations. |
+| M6 Deployment | Packages, runs, reviews, and audits controlled release operations. | Primary project positioning for this competition entry. |
+| M7 Maintenance | Feeds production learning, incidents, and improvements back into the lifecycle. | Downstream feedback target; production maintenance automation is planned/TBD. |
 
-Use the `local` profile to run against in-memory H2:
+## Current Delivery Scope
+
+Implemented today:
+
+- Spring Boot backend and Vue 3 frontend for a controlled release workspace.
+- Deployment Agent workspace under `/wwa/deployment-agent`.
+- Deployment APIs under `/api/deployment-agent/*`.
+- Excel-based release request onboarding using the fixed `AMH_HCC_task` worksheet.
+- Stage-aware release flow tracking for `SIT`, `UAT`, and `PROD`.
+- Request and task lifecycle management with manual run, auto submission, result recording, review decisions, rerun, skip, fail, archive, restore, and purge controls.
+- Human-in-the-loop decision gates before downstream progression.
+- Execution history for task attempts, including external job and log links.
+- AUTO submission adapters for Jenkins and Ansible/AWX, with configuration-driven endpoints and credentials.
+- Optional external execution polling support in code, disabled by default in current configuration.
+- Scoped access governance through local Access Grants.
+- Audit logs with release flow, request, task, application, SNOW group, agent, and correlation context.
+- Platform shared services for authentication, access management, configuration, audit, template download, and reusable workflow UI.
+
+Not claimed as complete production capability:
+
+- Full autonomous release approval is out of scope; decisions are human-controlled in the current baseline.
+- Real enterprise Team Book rollout is future work; local/test flows use the provider abstraction and stub users.
+- Template authoring/storage is partially frontend-local today; template-based rundown creation is implemented.
+- Callback-based AUTO completion ingestion is not the primary current model.
+- Maintenance-stage incident routing and long-running operations feedback loops are planned/TBD.
+- This package does not include internal screenshots, customer data, kubeconfigs, real credentials, or production environment names.
+
+## Main Capabilities
+
+| Capability | What it does | Evidence in this repo |
+|---|---|---|
+| Release onboarding | Accepts an Excel file, explicit stage, release identifier, and optional runtime scope. | Upload controllers, import services, template download, parser tests. |
+| Release flow tracking | Groups release work into Release Flow -> Request -> Task records across SIT / UAT / PROD. | Release flow domain, controllers, frontend summary/detail views. |
+| Human review gates | Requires explicit Approve / Reject / Rerun / Skip decisions instead of silently advancing after execution. | Decision engine, task state machine, progression service, decision dialogs. |
+| Manual execution support | Lets owners/admins start a manual task and record the execution result. | Task service, record-result service, execution history. |
+| AUTO execution support | Submits AUTO tasks to Jenkins or Ansible/AWX through configured adapters. | Auto execution service, execution target resolver, Jenkins/Ansible adapters. |
+| Release safety controls | Supports archive/restore/purge, mark failed, rerun attempts, status recomputation, and audit records. | Release flow service, audit logger, request/task state tests. |
+| Scoped governance | Enforces deny-by-default product access, roles, permissions, and `Application + SNOW Group` visibility. | Access grants, auth service, security filters, access management UI. |
+| Traceability | Keeps audit logs, task execution history, import metadata, SDD documents, and sample package artifacts. | Docs, migrations, tests, audit and execution tables. |
+
+## Inputs And Outputs
+
+Primary inputs:
+
+- Upstream release intent and validated delivery evidence from M4 Build and M5 Testing.
+- Excel upload based on the downloadable task template.
+- Upload-time stage: `SIT`, `UAT`, or `PROD`.
+- Optional workflow identifier / release ID for grouping stage attempts.
+- Optional `Application`, `SNOW Group`, and agent context.
+- Task execution type: `MANUAL` or `AUTO`.
+- Human decisions and result notes from task owners or DevOps admins.
+- Jenkins / Ansible target metadata stored in task input parameters.
+
+Primary outputs:
+
+- Release Flow summary rows with stage status and current stage.
+- Stage-scoped Requests with rundown owner, runtime scope, and archive state.
+- Ordered Tasks with status, input parameters, expected output, result summary, and execution history.
+- External execution references such as job URL and log URL when AUTO tasks are submitted.
+- Audit records for upload, edits, execution, decisions, access changes, and lifecycle actions.
+- Outbox event rows for future downstream notification dispatch.
+- SDD and competition-package documents for reviewers and contributors.
+
+## Deployment Workflow
+
+![Deployment tool internal workflow](docs/assets/atlas-deployment-tool-workflow.svg)
+
+1. A release operator uploads the task workbook or creates a rundown from a template.
+2. The user explicitly selects `SIT`, `UAT`, or `PROD`; stage is not trusted from the spreadsheet.
+3. The backend validates and imports rows into a Release Flow, Request, and Task set.
+4. The first eligible task becomes runnable.
+5. A task owner or DevOps admin starts manual execution or submits AUTO execution.
+6. Manual results are recorded by the user; AUTO submissions store external job metadata and may be polled when monitoring is enabled.
+7. A human review decision approves, rejects, reruns, or skips the task.
+8. Progression logic promotes the next task or advances/completes the release flow.
+9. Audit logs and execution history preserve who did what, when, and under which release context.
+10. Failed, rejected, archived, or rollback-needed work stays visible through controlled state and history instead of being silently overwritten.
+
+## Upstream And Downstream Flow
+
+![M4/M5 to M6 to M7 relationship](docs/assets/atlas-deployment-upstream-downstream.svg)
+
+The Deployment tool is intended to sit after build and testing gates:
+
+- **Input:** build artifact references, task manifests, test evidence, release scope, owners, and approval context.
+- **Execute:** staged release rundown across SIT / UAT / PROD with manual and AUTO task execution.
+- **Output:** release records, task results, external execution links, approvals, audit history, and failed/rollback state.
+- **Validate:** human review, traceable decisions, status recomputation, audit inspection, and post-release feedback into M7 Maintenance.
+
+## Quick Start
+
+Backend:
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-What this does today:
-
-- starts the backend on `http://localhost:8080`
-- uses H2 instead of Oracle
-- keeps the current session-login flow
-- bootstraps local Access Grants for the known stub employees
-
-### 2. Frontend
+Frontend:
 
 ```bash
 cd frontend
@@ -169,147 +137,87 @@ npm install
 npm run dev
 ```
 
-Frontend details:
-
-- Vite dev server runs on `http://localhost:5173`
-- `/api` is proxied to `http://localhost:8080`
-- the frontend uses `withCredentials: true`, so session cookies are required
-
-### 3. Oracle-backed backend run
-
-The `test` profile expects Oracle and validates the schema on startup.
-
-```bash
-export DB_URL='jdbc:oracle:thin:@localhost:1521/XEPDB1'
-export DB_USERNAME='da_user'
-export DB_PASSWORD='changeme'
-mvn spring-boot:run -Dspring-boot.run.profiles=test
-```
-
-Before using the `test` profile:
-
-- create the schema from [`docs/sql/ORACLE_CURRENT_SCHEMA.sql`](docs/sql/ORACLE_CURRENT_SCHEMA.sql), or
-- provision an equivalent Oracle schema out of band
-
-## Local Login Accounts
-
-In `local` / `test`, the configured stub authentication provider recognizes these known users and bootstrap grants are created for them automatically. Any non-empty password works.
-
-| Employee ID | Display Name | Role |
-| --- | --- | --- |
-| `emp-001` | Alice Park (Developer) | `DEVELOPER` |
-| `emp-002` | Bob Kim (Tech Lead) | `TL` |
-| `emp-003` | Carol Lee (DevOps Admin) | `DEVOPS_ADMIN` |
-| `emp-004` | David Cho (Auditor) | `AUDIT` |
-| `emp-005` | Eve Yoon (Management) | `MANAGEMENT` |
-
-The stub directory search also includes additional employees such as `emp-006`, `emp-007`, and `emp-008` for Access Management add-user flows.
-
-## Agent Contribute Dashboard Internal Test
-
-The Agent Contribute Dashboard is available at:
+Open:
 
 ```text
-/wwa/agent-contribute-dashboard
+http://localhost:5173/wwa/deployment-agent
 ```
 
-Use it to review seven-stage Qilianshan SDLC coverage, ownership, contribution items, and guideline/feedback links. Viewers can read the dashboard. Users with `DEVOPS_ADMIN` can update the selected stage's implementation status from the right-side admin controls.
+Local/test stub users are documented in [the preserved implementation baseline](docs/wwa-agent-workspace-hub-current-baseline.md). In local mode, any non-empty password works for the configured stub authentication provider.
 
-Recommended smoke test:
+## Example Release Flow
 
-1. Start the backend with `mvn spring-boot:run -Dspring-boot.run.profiles=local`.
-2. Start the frontend with `cd frontend && npm run dev`.
-3. Open `http://localhost:5173/wwa/agent-contribute-dashboard`.
-4. Sign in as `emp-003` with any non-empty password to test admin status updates.
-5. Confirm the default stage statuses: Discovery and Maintenance are `Not Implemented`; Testing is `In Progress`.
-6. Change one stage to `Backlog`, save, refresh the page, and confirm the saved status still appears.
-7. Sign out or use guest mode to confirm read-only users can browse but cannot write.
+Synthetic demo story:
 
-Persistence and Flyway notes:
+1. M4 Build produces a candidate package and build evidence.
+2. M5 Testing records validation evidence and known acceptance notes.
+3. The release operator opens Deployment Agent and uploads a sanitized task workbook for `SIT`.
+4. The tool creates or updates a release flow and promotes the first deployment task.
+5. Task owners run manual steps or submit AUTO tasks to configured Jenkins/Ansible targets.
+6. A reviewer approves each completed task after checking the result and expected output.
+7. The same workflow identifier is reused for `UAT` and `PROD` uploads so stage attempts stay linked.
+8. If a task fails, the team records failure, reruns or rejects as needed, and keeps the audit/execution history.
+9. After PROD approval, the release record becomes maintenance-ready evidence for downstream operations.
 
-- No new table or existing table shape change was introduced for this dashboard.
-- No Flyway migration is required for the dashboard feature itself.
-- Stage status overrides are stored as a JSON payload under `agent_contribution_dashboard_statuses` in `DA_CONFIGURATION_ITEM`.
-- Internal environments must already have `DA_CONFIGURATION_ITEM`; that table is part of the current Oracle schema baseline.
+See the sanitized sample package at [docs/samples/atlas-deployment-tool-mini-output](docs/samples/atlas-deployment-tool-mini-output/README.md).
 
-Useful DB check after saving a status:
+## Directory Overview
 
-```sql
-SELECT config_key, config_value, updated_by, updated_at
-FROM DA_CONFIGURATION_ITEM
-WHERE config_key = 'agent_contribution_dashboard_statuses';
+| Path | Purpose |
+|---|---|
+| `src/main/java/com/wwa/agenthub/agents/deployment/` | Deployment Agent stage vocabulary and REST controllers. |
+| `src/main/java/com/wwa/agenthub/domain/` | Shared release flow, task, decision, execution, audit, auth, configuration, and import services. |
+| `src/main/java/com/wwa/agenthub/platform/` | Shared platform contracts and security boundaries used by all agent workspaces. |
+| `src/main/resources/db/migration/` | Oracle migration history and schema evolution. |
+| `frontend/src/agents/deployment/` | Deployment workspace entry, API client, summary, and detail views. |
+| `frontend/src/platform/` | Shared frontend release-flow workspace factory and platform components. |
+| `docs/` | SDD artifacts, architecture/design references, competition materials, diagrams, and samples. |
+| `scripts/check-markdown-links.mjs` | Lightweight relative-link validation for Markdown docs. |
+
+## Key Documents
+
+- [Deployment tool documentation index](docs/atlas-engineering-delivery-hub-deployment-index.md)
+- [Open collaboration submission](docs/open-collaboration-submission.md)
+- [Chinese submission](docs/open-collaboration-submission.zh-CN.md)
+- [Deployment pitch](docs/atlas-engineering-delivery-hub-deployment-pitch.md)
+- [Contribution guide](CONTRIBUTING.md)
+- [Current implementation baseline](docs/wwa-agent-workspace-hub-current-baseline.md)
+- [Deployment Agent requirement baseline](docs/01-requirements/requirement.md)
+- [Deployment Agent spec baseline](docs/03-spec/spec.md)
+- [Platform and Deployment architecture](docs/04-architecture/architecture.md)
+- [Detailed design baseline](docs/05-design/design.md)
+- [M6 packaging traceability](docs/00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
+
+## Approval, Traceability, Rollback, And Review Notes
+
+- **Approval:** Current task progression requires human decisions. The MVP decision gate is manual by design.
+- **Traceability:** Release flows, requests, tasks, execution history, audit logs, correlation IDs, and SDD artifacts form the trace chain.
+- **Rollback / recovery posture:** The tool does not claim one-click infrastructure rollback. It supports failed state marking, rerun, reject, archive/restore, purge controls, and history retention so teams can execute documented rollback or remediation procedures.
+- **Validation:** Upload validation, state-machine checks, role checks, boundary guards, and tests protect the workflow. Human review remains mandatory for release decisions.
+- **Secret safety:** Credentials belong in configuration/secret management, not in docs, samples, screenshots, or committed workbooks.
+
+## Roadmap
+
+- Add clearer upstream evidence ingestion contracts from Build and Testing stages.
+- Complete backend-backed template management for reusable deployment runbooks.
+- Expand AUTO execution monitoring and callback ingestion after environment-specific verification.
+- Add notification dispatchers over the existing transactional outbox seam.
+- Add maintenance-stage feedback templates for incident, rollback, and post-release learning.
+- Add approved, redacted demo screenshots only after explicit review.
+- Continue improving SDD and documentation validation automation.
+
+## Verification
+
+Recommended documentation/package checks:
+
+```bash
+git diff --check
+node scripts/check-markdown-links.mjs
 ```
 
-Before broader internal rollout, replace placeholder Confluence links in [`frontend/src/config/agentContributionDashboard.json`](frontend/src/config/agentContributionDashboard.json) with real internal guideline and feedback pages.
-
-## Verification Commands
-
-Backend:
+Runtime checks for code changes:
 
 ```bash
 mvn test
+cd frontend && npm run build
 ```
-
-Frontend:
-
-```bash
-cd frontend
-npm run build
-```
-
-`npm run build` currently performs both `vue-tsc` and the Vite production build.
-
-## Key UI / API Surfaces
-
-WWA shell pages currently exposed by the frontend:
-
-- `/wwa/home` — agent workspace selector
-- `/wwa/build-agent` — Build Agent summary and detail
-- `/wwa/deployment-agent` — Deployment Agent summary and detail
-- `/wwa/testing-agent` — Testing Agent summary and detail
-- `/wwa/template-management` — template authoring (platform)
-- `/wwa/agent-contribute-dashboard` — SDLC contribution coverage dashboard (platform)
-- `/wwa/configuration-management` — scoped config management (platform)
-- `/wwa/audit-log` — audit trail viewer (platform)
-- `/wwa/access-management` — user access grants (platform)
-
-Main backend API groups:
-
-Platform:
-- `/api/platform/auth`
-- `/api/platform/access-grants`
-- `/api/platform/config`
-- `/api/platform/agent-contribute-dashboard`
-- `/api/platform/audit-logs`
-- `/api/platform/upload/template`
-
-Deployment Agent:
-- `/api/deployment-agent/upload`
-- `/api/deployment-agent/release-flows`
-- `/api/deployment-agent/tasks`
-
-Testing Agent:
-- `/api/testing-agent/upload`
-- `/api/testing-agent/release-flows`
-- `/api/testing-agent/tasks`
-
-Build Agent:
-- `/api/build-agent/upload`
-- `/api/build-agent/release-flows`
-- `/api/build-agent/tasks`
-
-## Source Documents
-
-- Product requirements: [`docs/03-spec/spec.md`](docs/03-spec/spec.md)
-- Architecture baseline: [`docs/04-architecture/architecture.md`](docs/04-architecture/architecture.md)
-- Detailed design baseline: [`docs/05-design/design.md`](docs/05-design/design.md)
-- Remaining implementation work: [`docs/06-tasks/tasks.md`](docs/06-tasks/tasks.md)
-- Agent Contribute Dashboard SDD chain:
-  [`requirement`](docs/01-requirements/agent-contribute-dashboard-requirement.md),
-  [`user stories`](docs/02-user-stories/agent-contribute-dashboard-user-stories.md),
-  [`spec`](docs/03-spec/agent-contribute-dashboard-spec.md),
-  [`architecture`](docs/04-architecture/agent-contribute-dashboard-architecture.md),
-  [`design`](docs/05-design/agent-contribute-dashboard-design.md),
-  [`tasks`](docs/06-tasks/agent-contribute-dashboard-tasks.md),
-  [`prompts`](docs/07-prompts/agent-contribute-dashboard-prompts.md)
-- UAT setup/runbook: [`docs/UAT_RUNBOOK.md`](docs/UAT_RUNBOOK.md)

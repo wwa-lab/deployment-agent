@@ -1,0 +1,43 @@
+{
+  "releaseFlow": {
+    "id": "rf-sample-001",
+    "releaseId": "DEMO-RELEASE-001",
+    "currentStage": "SIT",
+    "flowStatus": "Running",
+    "reviewStatus": "Pending",
+    "stageStatuses": {
+      "SIT": "Running",
+      "UAT": "Pending",
+      "PROD": "Pending"
+    }
+  },
+  "request": {
+    "id": "req-sample-sit-001",
+    "stage": "SIT",
+    "owner": "sample.release.owner",
+    "application": "SAMPLE_APP",
+    "snowGroup": "SAMPLE_RELEASE_GROUP",
+    "requestStatus": "Running"
+  },
+  "tasks": [
+    {
+      "id": "task-sample-001",
+      "taskName": "Confirm artifact checksum",
+      "executionType": "MANUAL",
+      "status": "Approved",
+      "currentResultSummary": "Checksum matched synthetic evidence bundle.",
+      "decision": "Approve",
+      "reviewedBy": "sample.reviewer"
+    },
+    {
+      "id": "task-sample-002",
+      "taskName": "Submit deployment job",
+      "executionType": "AUTO",
+      "status": "Awaiting_Review",
+      "externalSystemType": "JENKINS",
+      "externalJobUrl": "https://example.invalid/jobs/sample-release-pipeline/42",
+      "externalLogUrl": "https://example.invalid/jobs/sample-release-pipeline/42/console",
+      "currentResultSummary": "Synthetic external job submitted successfully."
+    }
+  ]
+}
