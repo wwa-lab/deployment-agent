@@ -1,0 +1,44 @@
+{
+  "workflowIdentifier": "DEMO-RELEASE-001",
+  "stage": "SIT",
+  "application": "SAMPLE_APP",
+  "snowGroup": "SAMPLE_RELEASE_GROUP",
+  "releaseOwner": "sample.release.owner",
+  "upstreamEvidence": {
+    "buildArtifact": "artifact://sample-app/1.2.3",
+    "buildVerification": "Passed",
+    "testingEvidence": "test-evidence://DEMO-RELEASE-001/uat-readiness",
+    "knownRisks": [
+      "Synthetic sample only",
+      "No real environment or customer data"
+    ]
+  },
+  "tasks": [
+    {
+      "taskGroupId": "DEPLOY-001",
+      "taskGroupName": "Prepare release package",
+      "stepSeq": 1,
+      "taskName": "Confirm artifact checksum",
+      "executionType": "MANUAL",
+      "owner": "sample.operator",
+      "expectedOutput": "Checksum matches upstream build evidence"
+    },
+    {
+      "taskGroupId": "DEPLOY-002",
+      "taskGroupName": "Run deployment automation",
+      "stepSeq": 2,
+      "taskName": "Submit deployment job",
+      "executionType": "AUTO",
+      "owner": "sample.devops",
+      "inputParameters": {
+        "system": "JENKINS",
+        "script": "sample-release-pipeline",
+        "parameters": {
+          "artifactRef": "artifact://sample-app/1.2.3",
+          "targetStage": "SIT"
+        }
+      },
+      "expectedOutput": "External job completes and publishes release log"
+    }
+  ]
+}

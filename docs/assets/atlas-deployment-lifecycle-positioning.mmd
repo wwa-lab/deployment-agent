@@ -1,0 +1,20 @@
+flowchart LR
+    m1["M1 Planning<br/>Intent and scope"]
+    m2["M2 Estimation<br/>Cost, schedule, risk"]
+    m3["M3 Discovery<br/>Requirements and design"]
+    m4["M4 Build<br/>Artifacts and build evidence"]
+    m5["M5 Testing<br/>Validation evidence"]
+    m6["M6 Deployment<br/>Controlled release operations"]
+    m7["M7 Maintenance<br/>Operations feedback"]
+
+    m1 --> m2 --> m3 --> m4 --> m5 --> m6 --> m7
+    m7 -. feedback .-> m1
+
+    phoenix["Atlas Phoenix Lens<br/>M3 Discovery example"] -. upstream .-> m3
+    m6 --> tool["This repository<br/>Deployment Tool"]
+
+    classDef default fill:#eef2ff,stroke:#64748b,color:#111827;
+    classDef highlight fill:#fbbf24,stroke:#92400e,color:#111827,stroke-width:3px;
+    classDef context fill:#ecfeff,stroke:#0891b2,color:#0f172a;
+    class m6,tool highlight;
+    class phoenix context;
