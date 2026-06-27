@@ -13,6 +13,7 @@ This file is retained as framework context from the broader Atlas Engineering De
 - [Deployment Tool documentation index](atlas-engineering-delivery-hub-deployment-index.md)
 - [Deployment Tool open collaboration submission](open-collaboration-submission.md)
 - [Deployment Tool pitch](atlas-engineering-delivery-hub-deployment-pitch.md)
+- [Deployment mobile vertical artwork](assets/atlas-engineering-delivery-hub-mobile-vertical.png)
 - [Contribution guide](../CONTRIBUTING.md)
 
 ## Umbrella Framework Context

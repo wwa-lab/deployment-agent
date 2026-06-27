@@ -18,6 +18,7 @@ This index collects the M6 Deployment Tool packaging materials for reviewers and
 
 ## Visuals
 
+- [Mobile vertical artwork](assets/atlas-engineering-delivery-hub-mobile-vertical.png)
 - [M6 lifecycle positioning diagram](assets/atlas-deployment-lifecycle-positioning.svg)
 - [M6 lifecycle positioning Mermaid source](assets/atlas-deployment-lifecycle-positioning.mmd)
 - [Deployment tool workflow diagram](assets/atlas-deployment-tool-workflow.svg)

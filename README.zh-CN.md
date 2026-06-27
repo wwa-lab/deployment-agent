@@ -8,6 +8,8 @@ Atlas Engineering Delivery Hub - Deployment 是 Atlas Engineering Delivery Hub /
 
 本仓库承载的是当前 WWA Agent Workspace Hub 中的发布编排实现基线。它属于 Atlas Engineering Delivery Hub 叙事中的一个阶段能力，不代表整个 Atlas Engineering Delivery Hub 框架本身。
 
+![Atlas Engineering Delivery Hub mobile vertical artwork](docs/assets/atlas-engineering-delivery-hub-mobile-vertical.png)
+
 ![M6 Deployment lifecycle positioning](docs/assets/atlas-deployment-lifecycle-positioning.svg)
 
 ## 生命周期定位

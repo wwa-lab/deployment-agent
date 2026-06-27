@@ -8,6 +8,8 @@ Atlas Engineering Delivery Hub - Deployment is the M6 Deployment-stage tool with
 
 This repository contains the current WWA Agent Workspace Hub implementation baseline for release orchestration. The Deployment tool is one stage capability inside the larger Atlas Engineering Delivery Hub / Seven Mountains SDLC narrative; it is not the whole framework.
 
+![Atlas Engineering Delivery Hub mobile vertical artwork](docs/assets/atlas-engineering-delivery-hub-mobile-vertical.png)
+
 ![M6 Deployment lifecycle positioning](docs/assets/atlas-deployment-lifecycle-positioning.svg)
 
 ## Lifecycle Positioning
