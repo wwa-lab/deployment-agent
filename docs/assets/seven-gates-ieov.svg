@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 554.5450000000001 802.2370000000001" width="554.5450000000001" height="802.2370000000001" style="--bg:#ffffff;--fg:#1f2328;--line:#d1d9e0;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<polyline class="edge" data-from="stage" data-to="input" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="365.5755833333333,76.9 365.5755833333333,124.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="input" data-to="execute" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="365.5755833333333,178.70000000000002 365.5755833333333,226.70000000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="execute" data-to="output" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="324.74491666666665,280.5 324.74491666666665,316.5 243.24825,316.5 243.24825,328.5" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="output" data-to="validate" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="243.24825,382.30000000000007 243.24824999999998,430.30000000000007" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="validate" data-to="decision" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="243.24824999999998,484.1 243.24825,532.1" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="decision" data-to="proceed" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="243.24825,677.337 243.24825,695.337 263.1935,695.337 263.1935,713.3370000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="decision" data-to="rerun" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="243.24825,677.337 243.24825,695.337 444.664,695.337 444.664,713.3370000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="decision" data-to="hold" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="243.24825,677.337 243.24825,695.337 95.80199999999999,695.337 95.80199999999999,713.3370000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="rerun" data-to="execute" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="467.9576666666667,713.3370000000001 467.9576666666667,677.3370000000001 406.40625,677.3370000000001 406.40625,280.5" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="node" data-id="stage" data-label="Every Mountain Stage" data-shape="rectangle">
+  <rect x="279.7630833333333" y="40" width="171.62499999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="365.5755833333333" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Every Mountain Stage</text>
+</g>
+<g class="node" data-id="input" data-label="Input
+Scope, owners, artifacts, constraints" data-shape="rectangle">
+  <rect x="238.26708333333335" y="124.9" width="254.61699999999996" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="365.5755833333333" y="151.8" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="365.5755833333333" dy="-3.9000000000000012">Input</tspan><tspan x="365.5755833333333" dy="16.900000000000002">Scope, owners, artifacts, constraints</tspan></text>
+</g>
+<g class="node" data-id="execute" data-label="Execute
+Human, agent, automation, tool work" data-shape="rectangle">
+  <rect x="243.08358333333337" y="226.70000000000002" width="244.98399999999995" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="365.5755833333333" y="253.60000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="365.5755833333333" dy="-3.9000000000000012">Execute</tspan><tspan x="365.5755833333333" dy="16.900000000000002">Human, agent, automation, tool work</tspan></text>
+</g>
+<g class="node" data-id="output" data-label="Output
+Artifacts, decisions, task records" data-shape="rectangle">
+  <rect x="125.57275000000001" y="328.5" width="235.351" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="243.24825" y="355.4" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="243.24825" dy="-3.9000000000000012">Output</tspan><tspan x="243.24825" dy="16.900000000000002">Artifacts, decisions, task records</tspan></text>
+</g>
+<g class="node" data-id="validate" data-label="Validate
+Review, tests, approval, audit" data-shape="rectangle">
+  <rect x="138.16975000000002" y="430.30000000000007" width="210.15699999999995" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="243.24824999999998" y="457.20000000000005" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="243.24824999999998" dy="-3.9000000000000012">Validate</tspan><tspan x="243.24824999999998" dy="16.900000000000002">Review, tests, approval, audit</tspan></text>
+</g>
+<g class="node" data-id="decision" data-label="Gate decision" data-shape="diamond">
+  <polygon points="243.24825,532.1 315.86675,604.7185000000001 243.24825,677.3370000000001 170.62975,604.7185000000001" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="243.24825" y="604.7185000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Gate decision</text>
+</g>
+<g class="node" data-id="proceed" data-label="Proceed downstream" data-shape="rectangle">
+  <rect x="179.60399999999998" y="713.3370000000001" width="167.179" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="263.1935" y="731.7870000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Proceed downstream</text>
+</g>
+<g class="node" data-id="rerun" data-label="Rerun or rework" data-shape="rectangle">
+  <rect x="374.783" y="713.3370000000001" width="139.762" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="444.664" y="731.7870000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Rerun or rework</text>
+</g>
+<g class="node" data-id="hold" data-label="Hold or stop" data-shape="rectangle">
+  <rect x="40" y="713.3370000000001" width="111.604" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="95.80199999999999" y="731.7870000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Hold or stop</text>
+</g>
+</svg>

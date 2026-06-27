@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2136.14 441.4" width="2136.14" height="441.4" style="--bg:#ffffff;--fg:#1f2328;--line:#d1d9e0;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="framework" data-label="Atlas Engineering Delivery Hub">
+  <rect x="40" y="151.7" width="1166.886" height="110" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="151.7" width="1166.886" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="165.7" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Atlas Engineering Delivery Hub</text>
+</g>
+<polyline class="edge" data-from="planning" data-to="evidence" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1547.5099999999998,58.45 1560.1429999999998,58.45 1560.1429999999998,233.47500000000002 1571.5099999999998,233.47500000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="discovery" data-to="evidence" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1535.5099999999998,123.35 1560.1429999999998,123.35 1560.1429999999998,233.47500000000002 1571.5099999999998,233.47500000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="build" data-to="evidence" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1510.2439999999997,188.25 1560.1429999999998,188.25 1560.1429999999998,233.47500000000002 1571.5099999999998,233.47500000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="testing" data-to="evidence" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1525.0639999999999,253.14999999999998 1560.1429999999998,253.14999999999998 1560.1429999999998,233.47500000000002 1571.5099999999998,233.47500000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="deployment" data-to="evidence" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1548.7759999999998,318.05 1560.1429999999998,318.05 1560.1429999999998,233.47500000000002 1571.5099999999998,233.47500000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="maintenance" data-to="evidence" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1547.5099999999998,382.95 1560.1429999999998,382.95 1560.1429999999998,233.47500000000002 1571.5099999999998,233.47500000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="evidence" data-to="governance" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1717.9409999999998,233.47500000000002 1765.9409999999998,233.47500000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="modules" data-to="planning" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1142.886,220.7 1201.886,220.7 1201.886,58.45 1307.7129999999997,58.45" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="modules" data-to="discovery" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1142.886,220.7 1201.886,220.7 1201.886,123.35 1260.886,123.35" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="modules" data-to="build" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1142.886,220.7 1201.886,220.7 1201.886,188.25 1402.3449999999998,188.25" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="modules" data-to="testing" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1142.886,220.7 1201.886,220.7 1201.886,253.14999999999998 1402.3449999999998,253.14999999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="modules" data-to="deployment" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1142.886,220.7 1201.886,220.7 1201.886,318.05 1402.3449999999998,318.05" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="modules" data-to="maintenance" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1142.886,220.7 1201.886,220.7 1201.886,382.95 1358.1009999999997,382.95" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="lifecycle" data-to="gates" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="237.99899999999997,220.7 285.99899999999997,220.7" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="gates" data-to="platform" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="482.077,220.7 530.077,220.7" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="platform" data-to="modules" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="843.233,220.7 891.233,220.7" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="node" data-id="planning" data-label="Planning and Estimation coverage" data-shape="rectangle">
+  <rect x="1307.7129999999997" y="40" width="239.79699999999994" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1427.6114999999998" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Planning and Estimation coverage</text>
+</g>
+<g class="node" data-id="discovery" data-label="Discovery example: Atlas Phoenix Lens" data-shape="rectangle">
+  <rect x="1260.886" y="104.89999999999999" width="274.6239999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1398.1979999999999" y="123.35" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Discovery example: Atlas Phoenix Lens</text>
+</g>
+<g class="node" data-id="build" data-label="Build Agent" data-shape="rectangle">
+  <rect x="1402.3449999999998" y="169.8" width="107.899" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1456.2944999999997" y="188.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Build Agent</text>
+</g>
+<g class="node" data-id="testing" data-label="Testing Agent" data-shape="rectangle">
+  <rect x="1402.3449999999998" y="234.7" width="122.71900000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1463.7044999999998" y="253.14999999999998" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Testing Agent</text>
+</g>
+<g class="node" data-id="deployment" data-label="Deployment Agent" data-shape="rectangle">
+  <rect x="1402.3449999999998" y="299.6" width="146.43099999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1475.5604999999998" y="318.05" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Deployment Agent</text>
+</g>
+<g class="node" data-id="maintenance" data-label="Maintenance target stage" data-shape="rectangle">
+  <rect x="1358.1009999999997" y="364.5" width="189.409" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1452.8054999999997" y="382.95" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Maintenance target stage</text>
+</g>
+<g class="node" data-id="evidence" data-label="Lifecycle visibility" data-shape="rectangle">
+  <rect x="1571.5099999999998" y="215.025" width="146.43099999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1644.7254999999998" y="233.47500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Lifecycle visibility</text>
+</g>
+<g class="node" data-id="governance" data-label="Traceability, validation, and always-on operations" data-shape="rectangle">
+  <rect x="1765.9409999999998" y="215.025" width="330.19899999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1931.0404999999998" y="233.47500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Traceability, validation, and always-on operations</text>
+</g>
+<g class="node" data-id="lifecycle" data-label="Seven Mountains SDLC" data-shape="rectangle">
+  <rect x="56" y="202.25" width="181.99899999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="146.99949999999998" y="220.7" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Seven Mountains SDLC</text>
+</g>
+<g class="node" data-id="gates" data-label="Seven Gates Flow / I-E-O-V" data-shape="rectangle">
+  <rect x="285.99899999999997" y="202.25" width="196.078" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="384.03799999999995" y="220.7" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Seven Gates Flow / I-E-O-V</text>
+</g>
+<g class="node" data-id="platform" data-label="Platform Core: auth, access, audit, config, tasks" data-shape="rectangle">
+  <rect x="530.077" y="202.25" width="313.15599999999995" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="686.655" y="220.7" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Platform Core: auth, access, audit, config, tasks</text>
+</g>
+<g class="node" data-id="modules" data-label="Agent Modules and Sub-Capabilities" data-shape="rectangle">
+  <rect x="891.233" y="202.25" width="251.65299999999993" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1017.0595" y="220.7" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Agent Modules and Sub-Capabilities</text>
+</g>
+</svg>

@@ -1,0 +1,14 @@
+flowchart LR
+    planning["1. Planning<br/>Intent, scope, approval"]
+    estimation["2. Estimation<br/>Schedule, cost, risk"]
+    discovery["3. Discovery<br/>Requirements and design"]
+    build["4. Build<br/>Code and artifacts"]
+    testing["5. Testing<br/>Validation evidence"]
+    deployment["6. Deployment<br/>SIT / UAT / PROD rollout"]
+    maintenance["7. Maintenance<br/>Operations feedback"]
+
+    planning --> estimation --> discovery --> build --> testing --> deployment --> maintenance
+    maintenance -. feedback loop .-> planning
+
+    discovery -. sub-capability .-> phoenix["Atlas Phoenix Lens<br/>Discovery example"]
+
