@@ -57,6 +57,12 @@ These tasks package the repository as Atlas Engineering Delivery Hub for the int
 - **Status:** Complete
 - **Validation:** `git diff --check`; Markdown relative-link existence check; Mermaid SVG render verification.
 
+### AEDH-TASK-009: Reposition Root Entry And Split Deployment Function Package
+
+- **Objective:** Reposition the root README and framework docs as the Atlas Engineering Delivery Hub team framework, while preserving Deployment as a separate Tool / Function entry with its own submission links and IBM iSeries one-click release UTL design direction.
+- **Status:** Complete
+- **Artifacts:** `README.md`, `README.zh-CN.md`, `docs/atlas-engineering-delivery-hub-index.md`, `docs/open-collaboration-submission.md`, `docs/open-collaboration-submission.zh-CN.md`, `docs/atlas-engineering-delivery-hub-pitch.md`, `docs/atlas-engineering-delivery-hub-deployment-index.md`, `docs/open-collaboration-submission-deployment.md`, `docs/open-collaboration-submission-deployment.zh-CN.md`, `docs/atlas-engineering-delivery-hub-deployment-pitch.md`
+
 ## 3. Validation Results
 
 | Check | Result |
@@ -72,3 +78,4 @@ These tasks package the repository as Atlas Engineering Delivery Hub for the int
 | OQ-1 | Should future Atlas Phoenix Lens packaging link to this parent framework docs index? | Open |
 | OQ-2 | Should Discovery and Maintenance capabilities receive separate implementation SDD slices when work begins? | Open |
 | OQ-3 | Should a future competition submission add screenshots after explicit redaction approval? | Open |
+| OQ-4 | Should the IBM iSeries one-click release UTL design receive its own deeper SDD slice under the Deployment function? | Open |

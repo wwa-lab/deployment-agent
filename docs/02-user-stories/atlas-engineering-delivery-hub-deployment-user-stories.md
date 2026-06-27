@@ -8,11 +8,12 @@
 
 ### M6-US-01 - Reviewer Understands The Stage Positioning
 
-As a competition reviewer, I want the repository entry point to clearly say this is the M6 Deployment Tool so that I do not confuse it with the whole Atlas Engineering Delivery Hub framework.
+As a competition reviewer, I want the Deployment entry point to clearly say this is the M6 Deployment Tool / Function so that I do not confuse it with the whole Atlas Engineering Delivery Hub framework.
 
 Acceptance criteria:
 
-- README states Tool category and M6 Deployment stage near the top.
+- Deployment index and submission state Tool / Function category and M6 Deployment stage near the top.
+- Root README states the parent Hub framework first and links to Deployment as one function.
 - Lifecycle order is shown as `M1 Planning -> ... -> M6 Deployment -> M7 Maintenance`.
 - M6 Deployment is highlighted in a diagram.
 
@@ -33,8 +34,8 @@ As a bilingual reviewer or contributor, I want English and Chinese materials so 
 Acceptance criteria:
 
 - English README links to Chinese README.
-- Chinese README is natural Chinese and preserves M6 Deployment positioning.
-- Chinese submission mirrors the Tool-category story.
+- Chinese README is natural Chinese and links Deployment as a function inside the Hub.
+- Chinese Deployment submission mirrors the Tool / Function story.
 
 ### M6-US-04 - Reviewer Has Competition Materials
 
@@ -72,8 +73,8 @@ As a maintainer, I want existing technical docs preserved so that the packaging 
 
 Acceptance criteria:
 
-- Detailed baseline docs remain linked from the new README and deployment index.
-- Older umbrella framework files are retained only as context and not as the current Tool submission.
+- Detailed baseline docs remain linked from the README and deployment index.
+- Parent framework files remain the Hub submission, while Deployment files remain the function submission.
 
 ### M6-US-08 - Maintainer Can Trust The Package
 
@@ -85,4 +86,14 @@ Acceptance criteria:
 - Markdown relative links pass.
 - Mermaid rendering is attempted when tooling is available.
 - Cheap existing tests are run when discoverable.
-- Commit message is `docs: package atlas engineering delivery hub deployment tool`.
+- Commit message follows conventional commit style when a commit is requested.
+
+### M6-US-09 - Reviewer Understands IBM iSeries One-Click Direction
+
+As a reviewer, I want the Deployment function to explain the IBM iSeries one-click release UTL direction so that I can see why this function is a meaningful independent project.
+
+Acceptance criteria:
+
+- Deployment submission describes the iSeries one-click release UTL direction as a sanitized design focus.
+- Materials explain the reusable task/evidence/review shell without claiming unsafe full autonomy.
+- No real environment names, credentials, customer details, or production-only runbooks are included.

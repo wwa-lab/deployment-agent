@@ -5,18 +5,18 @@
 
 ## Design Objective
 
-Create a reviewer-ready documentation package that accurately presents the existing Deployment Agent as the Atlas Engineering Delivery Hub - Deployment Tool.
+Create a reviewer-ready documentation package that accurately presents the existing Deployment Agent as the Atlas Engineering Delivery Hub - Deployment Tool / Function inside the parent Atlas Engineering Delivery Hub framework.
 
 ## Public Entry Design
 
-- `README.md` is the default English entry point.
-- `README.zh-CN.md` is linked near the top and preserves the same M6 Deployment positioning.
-- The README emphasizes: project positioning, lifecycle stage, current scope, capabilities, inputs/outputs, workflow, quick start, example release flow, docs, roadmap, and safety notes.
+- `README.md` is the default English framework entry point and links Deployment as one function.
+- `README.zh-CN.md` mirrors the Hub-first positioning in Chinese.
+- Deployment-specific entry points emphasize: function positioning, lifecycle stage, current scope, capabilities, inputs/outputs, workflow, quick start, sample release flow, docs, roadmap, safety notes, and IBM iSeries one-click release UTL design direction.
 
 ## Competition Material Design
 
-- `docs/open-collaboration-submission.md` is the English Tool-category submission.
-- `docs/open-collaboration-submission.zh-CN.md` is the Chinese submission.
+- `docs/open-collaboration-submission-deployment.md` is the English Tool / Function-category submission.
+- `docs/open-collaboration-submission-deployment.zh-CN.md` is the Chinese Tool / Function submission.
 - `docs/atlas-engineering-delivery-hub-deployment-pitch.md` is a short presentation aid.
 - `docs/atlas-engineering-delivery-hub-deployment-index.md` is the reviewer navigation hub.
 
@@ -58,7 +58,7 @@ Additional validation:
 
 | Edge case | Expected design response |
 |---|---|
-| Old framework docs imply this repo is the whole framework | Mark old index/pitch as framework context and route reviewers to the M6 Tool index. |
+| Framework and Deployment entries become confused | Keep separate framework and Deployment indexes, submissions, and pitch docs. |
 | Diagram renderer unavailable | Keep Mermaid source files committed and report rendering status. |
 | Sample needs environment-like labels | Use synthetic labels and avoid real environment names. |
 | A capability is only planned | Mark it as planned/TBD and do not place it in implemented scope. |

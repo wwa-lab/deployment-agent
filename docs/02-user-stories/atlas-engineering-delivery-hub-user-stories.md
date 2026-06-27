@@ -90,3 +90,15 @@ Acceptance criteria:
 2. A Markdown relative-link existence check passes or known external links are excluded.
 3. The final response reports validation commands and results.
 
+## Story AEDH-US-08: Distinguish The Two Competition Entries
+
+**As a** competition reviewer,
+**I want** the repository to clearly separate the parent Framework entry from the Deployment function entry,
+**so that** I can evaluate Atlas Engineering Delivery Hub as a team framework without losing the independent Deployment project.
+
+Acceptance criteria:
+
+1. The root README identifies Atlas Engineering Delivery Hub as the primary Framework entry.
+2. The docs explain that Deployment is one function inside the Hub, not the whole Hub.
+3. Deployment has its own function-level submission links.
+4. The Deployment materials mention the IBM iSeries one-click release UTL design direction without exposing internal or sensitive details.

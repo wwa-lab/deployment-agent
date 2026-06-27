@@ -79,10 +79,24 @@ The sample should be small enough to copy into a real team's planning docs after
 
 Primary links:
 
-- README links to docs index, contribution guide, submission, pitch, sample, diagrams, and preserved baseline.
-- Docs index links to every package artifact.
+- README links to the framework docs index, contribution guide, framework submission, framework pitch, sample, diagrams, preserved baseline, and Deployment function entry.
+- Docs index links to every framework package artifact and the separate Deployment function package.
 - Submission and pitch link back to README and docs index.
 - SDD docs link to traceability and source documents.
+
+## 7.1 Two-Project Link Design
+
+The link model must keep the two competition entries distinct:
+
+| Link surface | Framework target | Deployment target |
+|---|---|---|
+| Root README | Primary entry and framework summary. | Function table row and Deployment docs section. |
+| Docs index | `atlas-engineering-delivery-hub-index.md` | `atlas-engineering-delivery-hub-deployment-index.md` |
+| Submission | `open-collaboration-submission.md` | `open-collaboration-submission-deployment.md` |
+| Chinese submission | `open-collaboration-submission.zh-CN.md` | `open-collaboration-submission-deployment.zh-CN.md` |
+| Pitch | `atlas-engineering-delivery-hub-pitch.md` | `atlas-engineering-delivery-hub-deployment-pitch.md` |
+
+Deployment copy may mention IBM iSeries one-click release UTL as design direction, but it must stay sanitized and avoid real environment names, credentials, customer details, or production-only runbooks.
 
 ## 8. Validation Design
 
@@ -92,4 +106,3 @@ Required lightweight checks:
 - Markdown relative-link existence check
 - Render Mermaid diagrams and confirm SVG files exist
 - Existing tests only if cheap and relevant; this slice is documentation-only, so heavy backend/frontend suites are not required.
-
