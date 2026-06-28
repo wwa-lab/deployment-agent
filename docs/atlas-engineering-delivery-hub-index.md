@@ -4,16 +4,16 @@
 **Status:** Open-collaboration package
 **Primary repository entry:** Atlas Engineering Delivery Hub
 **Companion function entry:** [Atlas Engineering Delivery Hub - Deployment](atlas-engineering-delivery-hub-deployment-index.md)
-**Last updated:** 2026-06-27
+**Last updated:** 2026-06-29
 
-This index collects the framework-level packaging materials for reviewers, adopting teams, and contributors. The Hub is the team framework; Deployment is one function inside it and is also packaged as a separate Tool / Function entry.
+This index collects the framework-level packaging materials for reviewers, adopting teams, and contributors. The Hub is the team framework; Deployment Agent is one agent/function inside it and is also packaged as a separate Tool / Function entry.
 
 ## Competition Entry Split
 
 | Entry | Category | Scope | Main materials |
 |---|---|---|---|
 | Atlas Engineering Delivery Hub | Framework | Team operating framework across Seven Mountains SDLC, shared gates, evidence, governance, and contribution patterns. | [README](../README.md), [submission](open-collaboration-submission.md), [pitch](atlas-engineering-delivery-hub-pitch.md) |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | M6 Deployment function for controlled SIT / UAT / PROD release operations and IBM iSeries one-click release UTL design direction. | [Deployment index](atlas-engineering-delivery-hub-deployment-index.md), [Deployment submission](open-collaboration-submission-deployment.md), [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md) |
+| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent as the M6 Deployment capability for controlled SIT / UAT / PROD release operations and IBM iSeries one-click release UTL design direction. | [Deployment index](atlas-engineering-delivery-hub-deployment-index.md), [Deployment submission](open-collaboration-submission-deployment.md), [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md) |
 
 ## Framework Entry Points
 

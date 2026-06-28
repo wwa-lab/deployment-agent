@@ -4,9 +4,9 @@
 **Stage:** M6 Deployment
 **Status:** Open-collaboration package
 **Parent framework:** [Atlas Engineering Delivery Hub](atlas-engineering-delivery-hub-index.md)
-**Last updated:** 2026-06-27
+**Last updated:** 2026-06-29
 
-This index collects the M6 Deployment function packaging materials for reviewers and contributors. Deployment is one function inside Atlas Engineering Delivery Hub and is also packaged as a separate competition project because it carries the controlled release workflow and IBM iSeries one-click release UTL design direction.
+This index collects the M6 Deployment Agent packaging materials for reviewers and contributors. Deployment Agent is one agent/function inside Atlas Engineering Delivery Hub and is also packaged as a separate competition project because it carries the controlled release workflow and IBM iSeries one-click release UTL design direction.
 
 ## Entry Points
 

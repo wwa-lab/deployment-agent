@@ -158,7 +158,7 @@ function statusClass(status: AccessGrantStatus) {
   <div class="access-view">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">WWA Shared Capability</p>
+        <p class="view-eyebrow">WWA-Atlas Hub Shared Capability</p>
         <h1 class="view-title">Access Management</h1>
         <p class="view-subtitle">
           Manage product entry, roles, and Application + SNOW Group visibility scopes.
@@ -244,7 +244,7 @@ function statusClass(status: AccessGrantStatus) {
           <div>
             <h2 class="section-title">Product Access Grants</h2>
             <p class="section-subtitle">
-              Effective WWA workspace access, sorted by latest admin change.
+              Effective WWA-Atlas Hub workspace access, sorted by latest admin change.
             </p>
           </div>
         </div>

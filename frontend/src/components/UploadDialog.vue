@@ -269,7 +269,7 @@ function close() {
             <div class="field-hint">
               Recommended for repeated uploads. Reuse the same identifier when later uploads should
               stay grouped under one workflow summary across SIT, UAT, and PROD. Re-uploading the
-              same stage under the same identifier creates a new attempt. If left blank, WWA creates
+              same stage under the same identifier creates a new attempt. If left blank, WWA-Atlas Hub creates
               a new rollout instead of implicitly merging stages.
             </div>
           </div>

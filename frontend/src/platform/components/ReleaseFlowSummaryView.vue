@@ -182,7 +182,7 @@ function toggleArchivedVisibility() {
   <div class="summary-view">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">WWA Workspace</p>
+        <p class="view-eyebrow">WWA-Atlas Hub Agent Workspace</p>
         <h1 class="view-title">{{ copy.agentTitle }}</h1>
         <p class="view-subtitle">{{ copy.agentSubtitle }}</p>
       </div>

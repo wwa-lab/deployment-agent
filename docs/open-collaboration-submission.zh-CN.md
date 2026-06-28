@@ -4,7 +4,7 @@
 
 Atlas Engineering Delivery Hub 是一个 Framework 类参赛项目，面向团队交付治理。它用 Seven Mountains SDLC 组织工程工作，并为每个阶段提供统一的 I-E-O-V 运行模型：Input、Execute、Output、Validate。
 
-当前仓库通过 WWA Agent Workspace Hub 的实现基线展示这个 framework：Spring Boot 后端、Vue 3 前端、共享工作台、Agent/function 工作区、范围化访问治理、配置管理、审计日志、SDD 追踪链，以及 Human-in-the-Loop 工作流控制。
+当前仓库通过 Atlas Engineering Delivery Hub 的实现基线展示这个 framework：Spring Boot 后端、Vue 3 前端、共享工作台、Agent/function 工作区、范围化访问治理、配置管理、审计日志、SDD 追踪链，以及 Human-in-the-Loop 工作流控制。`/wwa/*` 等历史技术标识会为了兼容暂时保留，但可见产品品牌统一为 Atlas Engineering Delivery Hub。
 
 ## 参赛类别
 
@@ -17,9 +17,9 @@ Atlas Engineering Delivery Hub 是一个 Framework 类参赛项目，面向团�
 | 项目 | 类别 | 关系 |
 |---|---|---|
 | Atlas Engineering Delivery Hub | Framework | 上层 team framework，也是这个仓库的主定位。 |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Hub 中的一个 function，作为 M6 Deployment 和 IBM iSeries one-click release UTL 设计方向的独立项目。 |
+| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Hub 中的 Deployment Agent，作为 M6 Deployment 和 IBM iSeries one-click release UTL 设计方向的独立项目。 |
 
-Deployment 是 Hub 的一个 function，不是整个 Hub。
+Deployment Agent 是 Hub 的一个 agent/function，不是整个 Hub。
 
 ## 解决的问题
 

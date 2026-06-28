@@ -7,12 +7,12 @@
 
 Atlas Engineering Delivery Hub is a team framework for making software delivery visible, governed, traceable, and reusable across the full engineering lifecycle. It organizes delivery work around the Seven Mountains SDLC and a repeatable I-E-O-V gate model: Input, Execute, Output, Validate.
 
-This repository is the current WWA Agent Workspace Hub implementation baseline that demonstrates the framework in working software. Deployment is one implemented function inside the Hub, not the whole story. For the open-collaboration competition, the repository supports two related entries:
+This repository is the current Atlas Engineering Delivery Hub implementation baseline that demonstrates the framework in working software. The visible product brand is **WWA-Atlas Engineering Delivery Hub** / **WWA-Atlas Hub**, preserving the WWA name that early adopters already recognize while connecting it to the Atlas framework. Some technical identifiers still use `WWA` or `deployment-agent` for compatibility. Deployment Agent is one implemented agent inside the Hub, not the whole story. For the open-collaboration competition, the repository supports two related entries:
 
 | Entry | Category | What it shows | Where to start |
 |---|---|---|---|
 | Atlas Engineering Delivery Hub | Framework | A reusable team operating model for SDLC stages, shared workflow surfaces, human-in-the-loop governance, evidence, auditability, and contribution patterns. | This README, [framework docs index](docs/atlas-engineering-delivery-hub-index.md), [framework submission](docs/open-collaboration-submission.md) |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | The M6 Deployment function: controlled SIT / UAT / PROD release operations, including the design direction for IBM iSeries one-click release UTL workflows. | [Deployment docs index](docs/atlas-engineering-delivery-hub-deployment-index.md), [Deployment submission](docs/open-collaboration-submission-deployment.md) |
+| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent as the M6 Deployment capability: controlled SIT / UAT / PROD release operations, including the design direction for IBM iSeries one-click release UTL workflows. | [Deployment docs index](docs/atlas-engineering-delivery-hub-deployment-index.md), [Deployment submission](docs/open-collaboration-submission-deployment.md) |
 
 ![Atlas Engineering Delivery Hub framework lifecycle](docs/assets/atlas-framework-lifecycle.svg)
 
@@ -58,7 +58,7 @@ This lets teams reuse one governance language across planning, build, testing, d
 Implemented and documented capability areas include:
 
 - Shared workspace shell for multiple delivery functions.
-- Agent/function workspaces for Build, Testing, and Deployment style workflows.
+- Agent/function workspaces for Build Agent, Testing Agent, and Deployment Agent workflows.
 - Human-in-the-loop task progression and review decisions.
 - Release Flow -> Request -> Task traceability model.
 - Scoped access governance with local Access Grants.
@@ -69,9 +69,9 @@ Implemented and documented capability areas include:
 
 ## Deployment Function
 
-Deployment is the most concrete function currently packaged from this repository. It sits at M6 and converts validated build/testing outputs into controlled SIT / UAT / PROD release work.
+Deployment Agent is the most concrete agent currently packaged from this repository. It sits at M6 Deployment and converts validated build/testing outputs into controlled SIT / UAT / PROD release work.
 
-The Deployment function includes:
+Deployment Agent includes:
 
 - Excel-based deployment request onboarding.
 - Stage-aware release flow tracking for `SIT`, `UAT`, and `PROD`.
@@ -81,7 +81,7 @@ The Deployment function includes:
 - Execution history, external job/log links, and audit records.
 - Access governance and release safety controls.
 
-For the second competition project, this function can be presented independently as **Atlas Engineering Delivery Hub - Deployment**. Its differentiator is the one-click release UTL direction for IBM iSeries: the framework provides the controlled release shell, while the Deployment function captures the task model, evidence, review gates, and adapter design needed to package iSeries release activity into a repeatable one-click operating flow.
+For the second competition project, this agent can be presented independently as **Atlas Engineering Delivery Hub - Deployment**. Its differentiator is the one-click release UTL direction for IBM iSeries: the framework provides the controlled release shell, while Deployment Agent captures the task model, evidence, review gates, and adapter design needed to package iSeries release activity into a repeatable one-click operating flow.
 
 ![Deployment tool workflow](docs/assets/atlas-deployment-tool-workflow.svg)
 
@@ -93,6 +93,12 @@ This package does claim:
 - A framework narrative that can host multiple SDLC functions.
 - A fully documented Deployment function slice with SDD traceability and sample outputs.
 - Bilingual reviewer entry points for the framework and Deployment function.
+
+Compatibility note:
+
+- Visible product brand: WWA-Atlas Engineering Delivery Hub / WWA-Atlas Hub.
+- Agent name: Deployment Agent.
+- Compatibility identifiers retained for now: `/wwa/*`, `/wwa/deployment-agent`, `/api/deployment-agent`, Maven `artifactId=agenthub`, and Java package `com.wwa.agenthub`.
 
 This package does not claim:
 
