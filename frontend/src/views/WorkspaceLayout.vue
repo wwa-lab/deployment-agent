@@ -26,10 +26,10 @@ type PrimaryNavItem = {
 }
 
 const primaryNavItems: PrimaryNavItem[] = [
-  { key: 'wwa', label: 'Atlas Hub', icon: '◫', expandable: true },
+  { key: 'wwa', label: 'WWA-Atlas Hub', icon: '◫', expandable: true },
 ]
 
-const activeSectionTitle = computed(() => (route.meta.sectionTitle as string) ?? 'Atlas Hub')
+const activeSectionTitle = computed(() => (route.meta.sectionTitle as string) ?? 'WWA-Atlas Hub')
 const isWwaWorkspace = computed(() => route.path.startsWith('/wwa'))
 const isWwaHomeRoute = computed(() => route.name === 'wwa-home')
 
@@ -162,7 +162,7 @@ watch(
       <div class="sidebar-logo">
         <span class="logo-icon">▣</span>
         <div class="logo-copy">
-          <span class="logo-text">Atlas Hub</span>
+          <span class="logo-text">WWA-Atlas Hub</span>
           <span class="logo-subtitle">Engineering Delivery Hub</span>
         </div>
       </div>
@@ -204,14 +204,14 @@ watch(
         :style="{ top: `${flyoutTop}px` }"
       >
         <div class="secondary-nav">
-          <!-- Atlas Hub Home -->
+          <!-- WWA-Atlas Hub Home -->
           <router-link
             to="/wwa/home"
             class="nav-link secondary-link flyout-home"
             @click="closeWwaFlyout"
           >
             <span class="nav-icon" aria-hidden="true">🏠</span>
-            <span class="nav-label">Atlas Hub Home</span>
+            <span class="nav-label">WWA-Atlas Hub Home</span>
           </router-link>
 
           <!-- Agent Workspaces -->
@@ -259,7 +259,7 @@ watch(
     <div class="main-area">
       <header class="topbar">
         <div class="topbar-branding">
-          <div class="topbar-kicker">Atlas Hub</div>
+          <div class="topbar-kicker">WWA-Atlas Hub</div>
           <div class="topbar-title">
             <span v-if="shouldShowWorkspaceBreadcrumb" class="breadcrumb-workspace">{{ activeWorkspaceLabel }}</span>
             <span v-if="shouldShowWorkspaceBreadcrumb" class="breadcrumb-sep" aria-hidden="true"> › </span>
@@ -272,7 +272,7 @@ watch(
             class="workspace-topbar-link wwa-home-topbar-link"
             :aria-current="isWwaHomeRoute ? 'page' : undefined"
           >
-            ← Atlas Hub Home
+            ← WWA-Atlas Hub Home
           </router-link>
           <a :href="FINBLOCK_URL" class="finblock-topbar-link" title="Return to FinBlock">← FinBlock</a>
           <span

@@ -10,7 +10,7 @@
 |---|---|---|
 | AHB-TASK-001 | Inventory current UI and metadata branding references. | Complete |
 | AHB-TASK-002 | Add SDD traceability for the branding slice. | Complete |
-| AHB-TASK-003 | Update frontend visible labels to Atlas Engineering Delivery Hub / Atlas Hub while keeping Deployment Agent as the agent name. | Complete |
+| AHB-TASK-003 | Update frontend visible labels to WWA-Atlas Engineering Delivery Hub / WWA-Atlas Hub while keeping Deployment Agent as the agent name. | Complete |
 | AHB-TASK-004 | Preserve route/API/package technical identifiers. | Complete |
 | AHB-TASK-005 | Update README, architecture naming note, changelog, and package metadata. | Complete |
 | AHB-TASK-006 | Run frontend build and documentation validation. | Complete |

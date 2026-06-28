@@ -7,7 +7,7 @@
 
 Atlas Engineering Delivery Hub is a team framework for making software delivery visible, governed, traceable, and reusable across the full engineering lifecycle. It organizes delivery work around the Seven Mountains SDLC and a repeatable I-E-O-V gate model: Input, Execute, Output, Validate.
 
-This repository is the current Atlas Engineering Delivery Hub implementation baseline that demonstrates the framework in working software. Some legacy technical identifiers still use `WWA` or `deployment-agent` for compatibility, but the visible product brand is Atlas Engineering Delivery Hub. Deployment Agent is one implemented agent inside the Hub, not the whole story. For the open-collaboration competition, the repository supports two related entries:
+This repository is the current Atlas Engineering Delivery Hub implementation baseline that demonstrates the framework in working software. The visible product brand is **WWA-Atlas Engineering Delivery Hub** / **WWA-Atlas Hub**, preserving the WWA name that early adopters already recognize while connecting it to the Atlas framework. Some technical identifiers still use `WWA` or `deployment-agent` for compatibility. Deployment Agent is one implemented agent inside the Hub, not the whole story. For the open-collaboration competition, the repository supports two related entries:
 
 | Entry | Category | What it shows | Where to start |
 |---|---|---|---|
@@ -96,7 +96,7 @@ This package does claim:
 
 Compatibility note:
 
-- Visible product brand: Atlas Engineering Delivery Hub / Atlas Hub.
+- Visible product brand: WWA-Atlas Engineering Delivery Hub / WWA-Atlas Hub.
 - Agent name: Deployment Agent.
 - Compatibility identifiers retained for now: `/wwa/*`, `/wwa/deployment-agent`, `/api/deployment-agent`, Maven `artifactId=agenthub`, and Java package `com.wwa.agenthub`.
 

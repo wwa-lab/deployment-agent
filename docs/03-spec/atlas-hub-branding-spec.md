@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-This specification updates visible product naming from the legacy WWA-centered shell toward **Atlas Engineering Delivery Hub** while preserving **Deployment Agent** as the M6 Deployment agent/workspace.
+This specification updates visible product naming from the legacy WWA-centered shell toward the joint brand **WWA-Atlas Engineering Delivery Hub** while preserving **Deployment Agent** as the M6 Deployment agent/workspace.
 
 The change is intentionally presentation-layer first. It is not a technical rename.
 
@@ -14,7 +14,7 @@ The change is intentionally presentation-layer first. It is not a technical rena
 
 | Actor | Need |
 |---|---|
-| Competition reviewer | See Atlas Engineering Delivery Hub as the top-level product immediately. |
+| Competition reviewer | See WWA-Atlas Engineering Delivery Hub as the top-level product immediately. |
 | Release contributor | Continue finding Deployment Agent as the M6 deployment workspace. |
 | Maintainer | Preserve route/API/package stability. |
 | Future contributor | Understand the naming boundary before making deeper technical changes. |
@@ -25,8 +25,9 @@ The change is intentionally presentation-layer first. It is not a technical rena
 
 Visible root-product surfaces must use:
 
-- Full brand: `Atlas Engineering Delivery Hub`
-- Short shell label: `Atlas Hub`
+- Full visible brand: `WWA-Atlas Engineering Delivery Hub`
+- Short shell label: `WWA-Atlas Hub`
+- Framework name: `Atlas Engineering Delivery Hub`
 
 Surfaces include browser title, login hero, home hero, sidebar logo, sidebar primary nav, flyout home link, topbar kicker, topbar home link, and shared capability eyebrow copy.
 
@@ -37,7 +38,7 @@ Deployment Agent remains the agent/workspace name. It must not be replaced by `D
 Approved relationship wording:
 
 ```text
-Deployment Agent is the M6 Deployment capability inside Atlas Engineering Delivery Hub.
+Deployment Agent is the M6 Deployment capability inside WWA-Atlas Engineering Delivery Hub.
 ```
 
 ### 3.3 Compatibility Boundary
@@ -77,6 +78,6 @@ Backend tests are not required for this presentation-layer change unless backend
 
 | Risk | Mitigation |
 |---|---|
-| Reviewer still sees WWA as the product | Replace top-level UI labels with Atlas Engineering Delivery Hub / Atlas Hub. |
+| Reviewer does not connect the old WWA name to the new Atlas framework | Use WWA-Atlas Engineering Delivery Hub / WWA-Atlas Hub on top-level UI surfaces. |
 | Contributor thinks Deployment Agent was renamed away | Keep agent cards, page titles, and route metadata as Deployment Agent. |
 | Technical rename accidentally breaks links | Keep routes/API/package identifiers unchanged and document the boundary. |

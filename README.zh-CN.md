@@ -7,7 +7,7 @@
 
 Atlas Engineering Delivery Hub 是一个面向团队交付的框架，用来把软件交付过程变得可见、可治理、可追踪、可复用。它围绕 Seven Mountains SDLC，并用统一的 I-E-O-V gate 模型描述每个阶段：Input、Execute、Output、Validate。
 
-这个仓库承载的是当前 Atlas Engineering Delivery Hub 的实现基线，用真实软件展示这个 framework。部分历史技术标识仍然保留 `WWA` 或 `deployment-agent` 以保证兼容，但可见产品品牌统一为 Atlas Engineering Delivery Hub。Deployment Agent 是 Hub 里的一个已实现 Agent，不是整个 Hub。针对这次公司开源/开放协作大赛，本仓库支持两个相关但层级不同的项目：
+这个仓库承载的是当前 Atlas Engineering Delivery Hub 的实现基线，用真实软件展示这个 framework。可见产品品牌采用 **WWA-Atlas Engineering Delivery Hub** / **WWA-Atlas Hub**，保留前期大家已经接受的 WWA 名称，同时接住 Atlas framework 叙事。部分历史技术标识仍然保留 `WWA` 或 `deployment-agent` 以保证兼容。Deployment Agent 是 Hub 里的一个已实现 Agent，不是整个 Hub。针对这次公司开源/开放协作大赛，本仓库支持两个相关但层级不同的项目：
 
 | 项目 | 类别 | 展示重点 | 入口 |
 |---|---|---|---|
@@ -96,7 +96,7 @@ Deployment Agent 包括：
 
 兼容性说明：
 
-- 可见产品品牌：Atlas Engineering Delivery Hub / Atlas Hub。
+- 可见产品品牌：WWA-Atlas Engineering Delivery Hub / WWA-Atlas Hub。
 - Agent 名称：Deployment Agent。
 - 目前保留的兼容技术标识：`/wwa/*`、`/wwa/deployment-agent`、`/api/deployment-agent`、Maven `artifactId=agenthub`、Java package `com.wwa.agenthub`。
 

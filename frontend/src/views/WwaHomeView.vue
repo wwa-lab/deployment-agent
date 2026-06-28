@@ -17,8 +17,8 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
         <div class="home-hero-main">
           <div class="home-header">
             <div class="home-header-text">
-              <div class="home-platform-label">Atlas Engineering Delivery Hub</div>
-              <h1 class="home-title">Atlas Hub Control Center</h1>
+              <div class="home-platform-label">WWA-Atlas Engineering Delivery Hub</div>
+              <h1 class="home-title">WWA-Atlas Hub Control Center</h1>
               <p class="home-subtitle">
                 Operate delivery agents, shared controls, and traceable team workflows from one hub.
               </p>
@@ -34,13 +34,13 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
             <div class="wwa-intro-kicker">Overview</div>
               <h2 id="wwa-home-intro-title" class="wwa-intro-title">Shared team delivery workspace</h2>
               <p class="wwa-intro-text">
-              Build, testing, and Deployment Agent workspaces with shared Atlas Hub controls.
+              Build, testing, and Deployment Agent workspaces with shared WWA-Atlas Hub controls.
               Select a workspace below to get started.
               </p>
             </section>
         </div>
 
-        <aside class="home-console" aria-label="Atlas Hub control summary">
+        <aside class="home-console" aria-label="WWA-Atlas Hub control summary">
           <div class="home-console-topbar">
             <span class="home-console-kicker">Control Plane</span>
             <span class="home-console-status">Online</span>

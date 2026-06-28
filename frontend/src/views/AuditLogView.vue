@@ -201,7 +201,7 @@ function scopeValue(value?: string): string {
   <div class="audit-view">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">Atlas Hub Shared Capability</p>
+        <p class="view-eyebrow">WWA-Atlas Hub Shared Capability</p>
         <h1 class="view-title">Audit Log</h1>
         <p class="view-subtitle">
           Trace who did what, when, and with what detail.

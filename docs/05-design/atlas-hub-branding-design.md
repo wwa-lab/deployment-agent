@@ -10,17 +10,17 @@ Use these labels:
 
 | Surface | Label |
 |---|---|
-| Browser title | Atlas Engineering Delivery Hub |
-| Login kicker | Atlas Engineering Delivery Hub |
+| Browser title | WWA-Atlas Engineering Delivery Hub |
+| Login kicker | WWA-Atlas Engineering Delivery Hub |
 | Login headline | Team delivery framework |
-| Login access card | Atlas Hub Access |
-| Sidebar logo title | Atlas Hub |
+| Login access card | WWA-Atlas Hub Access |
+| Sidebar logo title | WWA-Atlas Hub |
 | Sidebar logo subtitle | Engineering Delivery Hub |
-| Primary nav | Atlas Hub |
-| Flyout home | Atlas Hub Home |
-| Topbar kicker | Atlas Hub |
-| Topbar home link | Atlas Hub Home |
-| Shared capability eyebrow | Atlas Hub Shared Capability |
+| Primary nav | WWA-Atlas Hub |
+| Flyout home | WWA-Atlas Hub Home |
+| Topbar kicker | WWA-Atlas Hub |
+| Topbar home link | WWA-Atlas Hub Home |
+| Shared capability eyebrow | WWA-Atlas Hub Shared Capability |
 
 ## 2. Agent Copy Design
 
@@ -36,7 +36,8 @@ Keep these labels:
 
 README and architecture docs should explain:
 
-- Atlas Engineering Delivery Hub is the visible product brand.
+- WWA-Atlas Engineering Delivery Hub is the visible product brand.
+- Atlas Engineering Delivery Hub remains the framework name.
 - Deployment Agent is one agent inside the Hub.
 - `WWA` and `deployment-agent` technical identifiers remain temporarily for compatibility.
 

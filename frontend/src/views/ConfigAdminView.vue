@@ -549,7 +549,7 @@ function displayValue(value?: string) {
   <div class="config-view">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">Atlas Hub Shared Capability</p>
+        <p class="view-eyebrow">WWA-Atlas Hub Shared Capability</p>
         <h1 class="view-title">Configuration Management</h1>
         <p class="view-subtitle">
           Manage the shared system integrations used by agent execution and review workflows.

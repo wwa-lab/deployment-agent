@@ -415,7 +415,7 @@ Deployment Agent is a controlled, human-in-the-loop release orchestration worksp
 
 **Architectural style:** Layered service architecture with a Vue 3 SPA frontend, Spring Boot REST API backend, Oracle persistence, and a deny-by-default authorization layer that combines platform entry grants with scoped visibility governance.
 
-**Naming note:** `Atlas Engineering Delivery Hub` is the visible product brand, with `Atlas Hub` used as the compact UI shell label. `Deployment Agent` remains the M6 Deployment agent/workspace display name. Current technical identifiers remain unchanged for compatibility, including `/wwa/*`, `/wwa/deployment-agent`, `/api/deployment-agent`, Maven `artifactId=agenthub`, and the `com.wwa.agenthub` package namespace.
+**Naming note:** `WWA-Atlas Engineering Delivery Hub` is the visible product brand, with `WWA-Atlas Hub` used as the compact UI shell label. `Atlas Engineering Delivery Hub` remains the framework name in docs and competition taxonomy. `Deployment Agent` remains the M6 Deployment agent/workspace display name. Current technical identifiers remain unchanged for compatibility, including `/wwa/*`, `/wwa/deployment-agent`, `/api/deployment-agent`, Maven `artifactId=agenthub`, and the `com.wwa.agenthub` package namespace.
 
 ---
 

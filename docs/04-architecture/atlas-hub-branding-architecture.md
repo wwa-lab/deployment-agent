@@ -6,14 +6,15 @@
 
 ## 1. Decision
 
-Adopt **Atlas Engineering Delivery Hub** as the visible root product brand while preserving existing technical identifiers for compatibility.
+Adopt **WWA-Atlas Engineering Delivery Hub** as the visible root product brand while preserving existing technical identifiers for compatibility.
 
 ## 2. Branding Layers
 
 | Layer | Name after this slice | Notes |
 |---|---|---|
-| Root product | Atlas Engineering Delivery Hub | Used in browser title, login hero, home hero, README, and submission docs. |
-| Short UI shell | Atlas Hub | Used where compact navigation text is needed. |
+| Root product | WWA-Atlas Engineering Delivery Hub | Used in browser title, login hero, home hero, README, and submission docs. |
+| Short UI shell | WWA-Atlas Hub | Used where compact navigation text is needed. |
+| Framework name | Atlas Engineering Delivery Hub | Used for framework docs and competition taxonomy. |
 | Deployment workspace | Deployment Agent | Remains the agent name. |
 | Lifecycle stage | M6 Deployment | Describes where Deployment Agent sits in the Seven Mountains SDLC. |
 | Route/API compatibility | `/wwa/deployment-agent`, `/api/deployment-agent` | Unchanged. |

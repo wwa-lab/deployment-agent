@@ -1,7 +1,7 @@
 /**
  * Agent Registry — static configuration for Phase 1.
  *
- * Each entry defines the metadata Atlas Hub uses to render agent cards on the home page
+ * Each entry defines the metadata WWA-Atlas Hub uses to render agent cards on the home page
  * and drive the shell flyout navigation. When a second agent is onboarded (WWA-019),
  * add an entry here. No shell code changes should be required.
  *
@@ -62,7 +62,7 @@ export function getAgentDescriptor(key: string): AgentDescriptor | undefined {
   return agentRegistry.find((agent) => agent.key === key)
 }
 
-/** Atlas Hub-owned shared capability nav items. Not agent workspaces. */
+/** WWA-Atlas Hub-owned shared capability nav items. Not agent workspaces. */
 export type PlatformCapabilityDescriptor = {
   key: string
   label: string

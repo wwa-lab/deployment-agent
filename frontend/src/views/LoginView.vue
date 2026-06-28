@@ -62,7 +62,7 @@ async function handleLogin() {
       <section class="login-story" aria-labelledby="login-story-title">
         <div class="login-story-grid">
           <div class="login-story-copy-block">
-            <div class="login-story-kicker">Atlas Engineering Delivery Hub</div>
+            <div class="login-story-kicker">WWA-Atlas Engineering Delivery Hub</div>
             <h1 id="login-story-title" class="login-story-title">Team delivery framework</h1>
             <p class="login-story-copy">
               Plan, build, test, deploy, and govern delivery work from one shared hub.
@@ -82,7 +82,7 @@ async function handleLogin() {
                 <span></span>
                 <span></span>
               </div>
-              <span class="login-console-caption">ATLAS HUB CONTROL PLANE</span>
+              <span class="login-console-caption">WWA-ATLAS HUB CONTROL PLANE</span>
               <span class="login-console-status">Live</span>
             </div>
 
@@ -134,9 +134,9 @@ async function handleLogin() {
 
       <div class="login-card">
         <div class="login-header">
-          <div class="login-kicker">Atlas Hub Access</div>
+          <div class="login-kicker">WWA-Atlas Hub Access</div>
           <h2 class="login-title">Sign in to continue</h2>
-          <p class="login-subtitle">Use your Team Book credentials to enter Atlas Engineering Delivery Hub.</p>
+          <p class="login-subtitle">Use your Team Book credentials to enter WWA-Atlas Engineering Delivery Hub.</p>
         </div>
 
         <form class="login-form" @submit.prevent="handleLogin">

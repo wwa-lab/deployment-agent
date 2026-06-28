@@ -968,7 +968,7 @@ onBeforeUnmount(() => {
   <div class="template-view">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">Atlas Hub Shared Capability</p>
+        <p class="view-eyebrow">WWA-Atlas Hub Shared Capability</p>
         <h1 class="view-title">Template Management</h1>
         <p class="view-subtitle">
           Browse and manage reusable workflow templates.
