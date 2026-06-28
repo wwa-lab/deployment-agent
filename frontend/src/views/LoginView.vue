@@ -62,10 +62,10 @@ async function handleLogin() {
       <section class="login-story" aria-labelledby="login-story-title">
         <div class="login-story-grid">
           <div class="login-story-copy-block">
-            <div class="login-story-kicker">WWA Platform</div>
-            <h1 id="login-story-title" class="login-story-title">Unified workflow automation</h1>
+            <div class="login-story-kicker">Atlas Engineering Delivery Hub</div>
+            <h1 id="login-story-title" class="login-story-title">Team delivery framework</h1>
             <p class="login-story-copy">
-              Build, testing, deployment, and platform controls in one shared workspace.
+              Plan, build, test, deploy, and govern delivery work from one shared hub.
             </p>
             <div class="login-story-pills">
               <span class="login-story-pill">Build Workflow</span>
@@ -82,7 +82,7 @@ async function handleLogin() {
                 <span></span>
                 <span></span>
               </div>
-              <span class="login-console-caption">WWA CONTROL PLANE</span>
+              <span class="login-console-caption">ATLAS HUB CONTROL PLANE</span>
               <span class="login-console-status">Live</span>
             </div>
 
@@ -102,7 +102,7 @@ async function handleLogin() {
             </div>
 
             <div class="login-console-flow">
-              <div class="console-block-label">Active Workspaces</div>
+              <div class="console-block-label">Active Agents</div>
               <div class="login-flow-track">
                 <span class="login-flow-node is-active">Build</span>
                 <span class="login-flow-line"></span>
@@ -134,9 +134,9 @@ async function handleLogin() {
 
       <div class="login-card">
         <div class="login-header">
-          <div class="login-kicker">Workspace Access</div>
+          <div class="login-kicker">Atlas Hub Access</div>
           <h2 class="login-title">Sign in to continue</h2>
-          <p class="login-subtitle">Use your Team Book credentials to enter the WWA workspace.</p>
+          <p class="login-subtitle">Use your Team Book credentials to enter Atlas Engineering Delivery Hub.</p>
         </div>
 
         <form class="login-form" @submit.prevent="handleLogin">

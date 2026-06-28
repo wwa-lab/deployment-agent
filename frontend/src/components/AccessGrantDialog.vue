@@ -309,7 +309,7 @@ function submit() {
             :disabled="employeeIdDisabled"
           />
           <p class="field-hint">
-            This dialog creates a WWA access grant by Staff ID. Team Book search is optional in create mode.
+            This dialog creates an Atlas Hub access grant by Staff ID. Team Book search is optional in create mode.
           </p>
           <div v-if="selectedCandidate" class="directory-selected">
             Selected employee: <strong>{{ selectedCandidate.displayName }}</strong>

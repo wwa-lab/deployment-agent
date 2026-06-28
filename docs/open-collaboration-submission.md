@@ -4,7 +4,7 @@
 
 Atlas Engineering Delivery Hub is a Framework category entry for team delivery governance. It organizes engineering work through Seven Mountains SDLC and gives each stage a repeatable I-E-O-V operating model: Input, Execute, Output, Validate.
 
-The current repository demonstrates the framework through the WWA Agent Workspace Hub implementation baseline: Spring Boot backend, Vue 3 frontend, shared workspace shell, agent/function workspaces, scoped access governance, configuration management, audit logs, SDD traceability, and human-in-the-loop workflow controls.
+The current repository demonstrates the framework through the Atlas Engineering Delivery Hub implementation baseline: Spring Boot backend, Vue 3 frontend, shared workspace shell, agent/function workspaces, scoped access governance, configuration management, audit logs, SDD traceability, and human-in-the-loop workflow controls. Legacy technical identifiers such as `/wwa/*` are retained for compatibility, but the visible product brand is Atlas Engineering Delivery Hub.
 
 ## Category
 
@@ -17,9 +17,9 @@ This project qualifies as a Framework because it is not only a single tool or de
 | Project | Category | Relationship |
 |---|---|---|
 | Atlas Engineering Delivery Hub | Framework | The parent team framework and primary repository positioning. |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | One function inside the Hub, packaged as a separate entry for M6 Deployment and IBM iSeries one-click release UTL design direction. |
+| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent inside the Hub, packaged as a separate entry for M6 Deployment and IBM iSeries one-click release UTL design direction. |
 
-Deployment is intentionally presented as a function of the Hub. It is not the whole Hub.
+Deployment Agent is intentionally presented as an agent/function of the Hub. It is not the whole Hub.
 
 ## Problem Solved
 

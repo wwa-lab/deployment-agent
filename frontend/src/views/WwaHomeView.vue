@@ -17,10 +17,10 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
         <div class="home-hero-main">
           <div class="home-header">
             <div class="home-header-text">
-              <div class="home-platform-label">WWA Platform</div>
-              <h1 class="home-title">WWA Control Center</h1>
+              <div class="home-platform-label">Atlas Engineering Delivery Hub</div>
+              <h1 class="home-title">Atlas Hub Control Center</h1>
               <p class="home-subtitle">
-                Operate agent workspaces and shared platform controls from one command surface.
+                Operate delivery agents, shared controls, and traceable team workflows from one hub.
               </p>
             </div>
             <div class="home-user-block">
@@ -32,15 +32,15 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 
           <section class="wwa-intro-card home-intro-card" aria-labelledby="wwa-home-intro-title">
             <div class="wwa-intro-kicker">Overview</div>
-              <h2 id="wwa-home-intro-title" class="wwa-intro-title">Shared workflow automation workspace</h2>
+              <h2 id="wwa-home-intro-title" class="wwa-intro-title">Shared team delivery workspace</h2>
               <p class="wwa-intro-text">
-              Build, testing, and deployment agents with shared platform controls.
+              Build, testing, and Deployment Agent workspaces with shared Atlas Hub controls.
               Select a workspace below to get started.
               </p>
             </section>
         </div>
 
-        <aside class="home-console" aria-label="WWA control summary">
+        <aside class="home-console" aria-label="Atlas Hub control summary">
           <div class="home-console-topbar">
             <span class="home-console-kicker">Control Plane</span>
             <span class="home-console-status">Online</span>
@@ -65,7 +65,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
           </div>
 
           <div class="home-console-track">
-            <div class="home-console-track-label">Active Workspaces</div>
+            <div class="home-console-track-label">Active Agents</div>
             <div class="home-console-track-row">
               <span class="home-console-node is-active">Build</span>
               <span class="home-console-line"></span>

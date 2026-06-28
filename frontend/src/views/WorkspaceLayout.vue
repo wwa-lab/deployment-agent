@@ -26,10 +26,10 @@ type PrimaryNavItem = {
 }
 
 const primaryNavItems: PrimaryNavItem[] = [
-  { key: 'wwa', label: 'WWA', icon: '◫', expandable: true },
+  { key: 'wwa', label: 'Atlas Hub', icon: '◫', expandable: true },
 ]
 
-const activeSectionTitle = computed(() => (route.meta.sectionTitle as string) ?? 'WWA')
+const activeSectionTitle = computed(() => (route.meta.sectionTitle as string) ?? 'Atlas Hub')
 const isWwaWorkspace = computed(() => route.path.startsWith('/wwa'))
 const isWwaHomeRoute = computed(() => route.name === 'wwa-home')
 
@@ -162,12 +162,12 @@ watch(
       <div class="sidebar-logo">
         <span class="logo-icon">▣</span>
         <div class="logo-copy">
-          <span class="logo-text">WWA Platform</span>
-          <span class="logo-subtitle">Agent Workspace Hub</span>
+          <span class="logo-text">Atlas Hub</span>
+          <span class="logo-subtitle">Engineering Delivery Hub</span>
         </div>
       </div>
       <div class="sidebar-scroll" :ref="setSidebarScrollRef" @scroll="updateFlyoutPosition">
-        <div class="sidebar-section-label">Workspace</div>
+        <div class="sidebar-section-label">Delivery Hub</div>
 
         <nav class="sidebar-nav">
           <div
@@ -204,18 +204,18 @@ watch(
         :style="{ top: `${flyoutTop}px` }"
       >
         <div class="secondary-nav">
-          <!-- WWA Home -->
+          <!-- Atlas Hub Home -->
           <router-link
             to="/wwa/home"
             class="nav-link secondary-link flyout-home"
             @click="closeWwaFlyout"
           >
             <span class="nav-icon" aria-hidden="true">🏠</span>
-            <span class="nav-label">WWA Home</span>
+            <span class="nav-label">Atlas Hub Home</span>
           </router-link>
 
           <!-- Agent Workspaces -->
-          <div class="flyout-section-label">Workspaces</div>
+          <div class="flyout-section-label">Agent Workspaces</div>
           <router-link
             v-for="agent in agentRegistry.filter((a) => a.enabled)"
             :key="agent.key"
@@ -259,7 +259,7 @@ watch(
     <div class="main-area">
       <header class="topbar">
         <div class="topbar-branding">
-          <div class="topbar-kicker">WWA</div>
+          <div class="topbar-kicker">Atlas Hub</div>
           <div class="topbar-title">
             <span v-if="shouldShowWorkspaceBreadcrumb" class="breadcrumb-workspace">{{ activeWorkspaceLabel }}</span>
             <span v-if="shouldShowWorkspaceBreadcrumb" class="breadcrumb-sep" aria-hidden="true"> › </span>
@@ -272,7 +272,7 @@ watch(
             class="workspace-topbar-link wwa-home-topbar-link"
             :aria-current="isWwaHomeRoute ? 'page' : undefined"
           >
-            ← WWA Home
+            ← Atlas Hub Home
           </router-link>
           <a :href="FINBLOCK_URL" class="finblock-topbar-link" title="Return to FinBlock">← FinBlock</a>
           <span

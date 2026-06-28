@@ -252,7 +252,7 @@ function formatTimestamp(value: string) {
   <div class="agent-contribution-dashboard">
     <div class="view-header">
       <div>
-        <p class="view-eyebrow">WWA Shared Capability</p>
+        <p class="view-eyebrow">Atlas Hub Shared Capability</p>
         <h1 class="view-title">Agent Contribute Dashboard</h1>
         <p class="view-subtitle">
           Qilianshan SDLC coverage, ownership, and contribution accountability.
