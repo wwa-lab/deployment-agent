@@ -20,6 +20,7 @@ The framework narrative must sit above individual agent workspaces. It should pr
 5. Provide bilingual entry documentation for English and Chinese readers.
 6. Make contribution, adoption, submission, pitch, sample, and visual assets discoverable.
 7. Preserve existing implementation documentation rather than deleting detailed operational knowledge.
+8. Distinguish the two competition projects: the Hub as the parent Framework entry, and Deployment as an independent Tool / Function entry inside the Hub.
 
 ## 3. Scope
 
@@ -64,6 +65,7 @@ The framework narrative must sit above individual agent workspaces. It should pr
 - **AEDH-REQ-06:** The package shall include a synthetic adoption sample that does not expose customer or sensitive data.
 - **AEDH-REQ-07:** The package shall include visual assets that communicate the framework lifecycle and where Discovery capabilities such as Atlas Phoenix Lens fit.
 - **AEDH-REQ-08:** The package shall preserve detailed existing implementation documentation in a docs reference file.
+- **AEDH-REQ-09:** The package shall state that Deployment is one function inside the Hub and may be submitted separately as the M6 Deployment Tool / Function entry, including the IBM iSeries one-click release UTL design direction.
 
 ## 6. Non-Functional Requirements
 
@@ -83,10 +85,10 @@ The framework narrative must sit above individual agent workspaces. It should pr
 5. `docs/assets/` contains Mermaid source and rendered SVG diagrams.
 6. `docs/samples/` contains a synthetic adoption sample.
 7. Existing operational README detail is preserved in a docs reference file.
-8. Validation commands run and results are recorded in the final response.
-9. The related changes are committed with a conventional commit message.
+8. Deployment has separate function-level submission links so reviewers can evaluate it without confusing it for the entire Hub.
+9. Validation commands run and results are recorded in the final response.
+10. The related changes are committed with a conventional commit message.
 
 ## 8. Open Questions
 
 Open questions are tracked in [atlas-engineering-delivery-hub-tasks.md](../06-tasks/atlas-engineering-delivery-hub-tasks.md).
-

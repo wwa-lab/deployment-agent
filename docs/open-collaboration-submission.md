@@ -1,132 +1,146 @@
-# Open Collaboration Submission: Atlas Engineering Delivery Hub - Deployment
+# Open Collaboration Submission: Atlas Engineering Delivery Hub
 
 ## Summary
 
-Atlas Engineering Delivery Hub - Deployment is a Tool category entry for the M6 Deployment stage of the Atlas Engineering Delivery Hub / Seven Mountains SDLC narrative. It helps teams convert validated build and testing outputs into controlled, traceable release operations across SIT, UAT, and PROD.
+Atlas Engineering Delivery Hub is a Framework category entry for team delivery governance. It organizes engineering work through Seven Mountains SDLC and gives each stage a repeatable I-E-O-V operating model: Input, Execute, Output, Validate.
 
-The current repository implements a Spring Boot + Vue release workspace with Excel onboarding, release-flow tracking, task-level manual/AUTO execution, human review decisions, access governance, audit logs, and configuration-driven Jenkins/Ansible execution adapters.
+The current repository demonstrates the framework through the WWA Agent Workspace Hub implementation baseline: Spring Boot backend, Vue 3 frontend, shared workspace shell, agent/function workspaces, scoped access governance, configuration management, audit logs, SDD traceability, and human-in-the-loop workflow controls.
 
 ## Category
 
-**Tool**
+**Framework**
 
-This project qualifies as a Tool because it provides a concrete release operations workspace and API surface for one lifecycle stage: M6 Deployment. The larger Atlas Engineering Delivery Hub is the umbrella story; this repository is the deployment-stage tool inside that story.
+This project qualifies as a Framework because it is not only a single tool or deployment script. It defines a reusable way for teams to structure delivery stages, evidence, workflow execution, validation, and contribution across multiple SDLC functions.
+
+## Two Competition Projects
+
+| Project | Category | Relationship |
+|---|---|---|
+| Atlas Engineering Delivery Hub | Framework | The parent team framework and primary repository positioning. |
+| Atlas Engineering Delivery Hub - Deployment | Tool / Function | One function inside the Hub, packaged as a separate entry for M6 Deployment and IBM iSeries one-click release UTL design direction. |
+
+Deployment is intentionally presented as a function of the Hub. It is not the whole Hub.
 
 ## Problem Solved
 
-Release teams often receive build and testing evidence, but the last-mile release operation still becomes fragmented:
+Delivery work often becomes fragmented across planning notes, spreadsheets, build jobs, test reports, release runbooks, approvals, and production feedback. Teams lose clarity about:
 
-- deployment tasks are tracked in spreadsheets, chats, and external job consoles;
-- manual steps and AUTO jobs are hard to review side by side;
-- approvals are not consistently tied to the exact task result that was reviewed;
-- rollback or rerun decisions lose context;
-- environment-specific credentials and endpoints are sometimes copied into unsafe places;
-- audit trails are assembled after the fact.
+- which input evidence is required before work starts;
+- who owns each stage and decision;
+- what was executed by humans, agents, or external tools;
+- which output records are durable;
+- how validation and approval happened;
+- how later teams can trace the decision chain.
 
-Atlas Engineering Delivery Hub - Deployment gives teams a controlled place to package, run, review, and trace release work without pretending the process is fully autonomous.
+Atlas Engineering Delivery Hub gives teams a shared framework for those handoffs.
 
-## What The Tool Does Today
+## Framework Model
 
-- Imports deployment rundowns from a fixed Excel template.
-- Requires upload-time stage selection for `SIT`, `UAT`, or `PROD`.
-- Creates or updates Release Flow, Request, and Task records.
-- Tracks repeated attempts and linked stage rollouts through workflow identifiers.
-- Supports manual task execution and result recording.
-- Supports AUTO task submission to Jenkins or Ansible/AWX through adapters.
-- Preserves task execution history, external job links, and result summaries.
-- Requires human review decisions before downstream progression.
-- Provides rundown controls such as start, fail, archive, restore, and purge.
-- Enforces deny-by-default access through local Access Grants.
-- Records audit logs for workflow, access, and configuration activity.
-
-## What Is Not Claimed
-
-- It is not a fully autonomous deployment decision system.
-- It is not the entire Atlas Engineering Delivery Hub framework.
-- It does not include real production credentials, kubeconfigs, customer data, or internal screenshots.
-- It does not currently provide one-click infrastructure rollback.
-- Maintenance-stage incident routing and post-release automation are planned/TBD.
-
-## Reusable Value Across Teams
-
-The reusable pattern is not a single hardcoded deployment script. It is a release operations shell:
-
-- **Input contract:** stage, release identifier, scope, task list, owners, expected outputs, and external execution metadata.
-- **Execution contract:** manual or AUTO task execution with explicit owner/admin controls.
-- **Output contract:** task results, external links, decisions, status, audit rows, and release-flow state.
-- **Validation contract:** human review, status recomputation, access checks, and traceability.
-
-Teams can reuse the workspace model even when their actual Jenkins jobs, Ansible templates, task names, or release evidence differ.
-
-## Fit With The Open Collaboration Theme
-
-The tool is built for co-building:
-
-- Deployment adapters can be improved independently.
-- Sample release templates can be added without exposing internal data.
-- Docs and diagrams explain how teams can adopt the M6 stage contract.
-- SDD artifacts make scope, decisions, and validation explicit for humans and AI agents.
-- Safety rules protect secrets, approvals, audit history, and rollback posture.
-
-## Relationship To Atlas Engineering Delivery Hub
-
-Atlas Engineering Delivery Hub is the umbrella framework. Seven Mountains SDLC is the lifecycle model:
+Seven Mountains SDLC:
 
 ```text
 M1 Planning -> M2 Estimation -> M3 Discovery -> M4 Build -> M5 Testing -> M6 Deployment -> M7 Maintenance
 ```
 
-This repository is **M6 Deployment**.
+Every stage follows Seven Gates / I-E-O-V:
 
-Atlas Phoenix Lens / Legacy Spec Factory is useful context as an M3 Discovery capability. Build Agent and Testing capability provide upstream M4/M5 context. This project focuses on the M6 deployment tool and its controlled release workflow.
+| Element | Meaning |
+|---|---|
+| Input | Required artifacts, scope, owners, constraints, and preconditions. |
+| Execute | Controlled work by people, agents, automations, or external tools. |
+| Output | Durable artifacts, decisions, run records, and traceable results. |
+| Validate | Review checks, evidence gates, approvals, and audit records. |
+
+## What The Repository Provides Today
+
+- A working shared workspace shell for delivery functions.
+- Agent/function workspace patterns for Build, Testing, and Deployment style workflows.
+- Release Flow -> Request -> Task traceability.
+- Human review gates for task decisions.
+- Scoped access governance through local Access Grants.
+- Audit logs with user, action, scope, agent, and correlation context.
+- Configuration management for reusable execution targets.
+- Template and Excel-based onboarding patterns.
+- SDD documents that connect requirements, user stories, specs, architecture, design, and tasks.
+- Framework docs, diagrams, contribution guidance, and synthetic samples for open collaboration.
+
+## Deployment As An Independent Function
+
+The Deployment function is the most concrete function currently packaged from this repository. It covers controlled SIT / UAT / PROD release operations with manual and AUTO task execution, Jenkins/Ansible adapters, review decisions, execution history, and auditability.
+
+As a second competition project, Deployment can stand alone because it contains a complete function-level story and design direction for IBM iSeries one-click release UTL workflows. The Hub provides the team framework; Deployment demonstrates how one function becomes a reusable operating tool.
+
+See [Deployment submission](open-collaboration-submission-deployment.md) for the function-level package.
+
+## Reusable Value Across Teams
+
+Teams can reuse:
+
+- the lifecycle and gate vocabulary;
+- the SDD document chain;
+- the workflow shell and task progression pattern;
+- the evidence and audit model;
+- the contribution and validation rules;
+- the function packaging pattern used by Deployment.
+
+The framework is intentionally adaptable: different teams may plug in different Discovery, Build, Testing, Deployment, or Maintenance functions without rewriting the top-level operating model.
+
+## Fit With The Open Collaboration Theme
+
+The Hub is built for co-building:
+
+- Each function can evolve independently while staying aligned to the same stage/gate model.
+- Docs and SDD artifacts make scope clear for humans and AI agents.
+- Synthetic samples allow safe sharing without exposing customer or production data.
+- Contribution rules protect secrets, credentials, approvals, and audit posture.
+- The Deployment function gives contributors a concrete reference implementation.
 
 ## Delivered Materials
 
 - [English README](../README.md)
 - [Chinese README](../README.zh-CN.md)
-- [Deployment documentation index](atlas-engineering-delivery-hub-deployment-index.md)
-- [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md)
+- [Framework documentation index](atlas-engineering-delivery-hub-index.md)
+- [Framework pitch](atlas-engineering-delivery-hub-pitch.md)
 - [Contribution guide](../CONTRIBUTING.md)
-- [M6 lifecycle positioning diagram](assets/atlas-deployment-lifecycle-positioning.svg)
-- [Deployment workflow diagram](assets/atlas-deployment-tool-workflow.svg)
-- [Upstream/downstream relationship diagram](assets/atlas-deployment-upstream-downstream.svg)
-- [Sanitized mini output sample](samples/atlas-deployment-tool-mini-output/README.md)
-- [M6 SDD traceability](00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
+- [Framework lifecycle diagram](assets/atlas-framework-lifecycle.svg)
+- [Seven Mountains SDLC diagram](assets/seven-mountains-sdlc.svg)
+- [Seven Gates I-E-O-V diagram](assets/seven-gates-ieov.svg)
+- [Synthetic framework adoption sample](samples/atlas-framework-adoption-sample.md)
+- [Framework SDD traceability](00-context/atlas-engineering-delivery-hub-traceability.md)
+- [Deployment function package](atlas-engineering-delivery-hub-deployment-index.md)
 
 ## Demo Story
 
-1. Start from a validated candidate package and testing evidence.
-2. Upload a sanitized deployment task workbook for `SIT`.
-3. Show the created release flow and first runnable task.
-4. Run a manual task or submit an AUTO task.
-5. Record or inspect the result.
-6. Approve, reject, rerun, or skip through the human review gate.
-7. Reuse the workflow identifier for `UAT` and `PROD`.
-8. Show audit and execution history as the traceable release record.
-9. Explain how failed or rollback-needed work remains visible through state and history.
+1. Start from the Seven Mountains SDLC map.
+2. Explain I-E-O-V gates as the common team operating contract.
+3. Show the framework docs and SDD traceability chain.
+4. Open the working WWA Agent Workspace Hub implementation.
+5. Use Deployment as the concrete function example.
+6. Upload or inspect a release rundown, task flow, decision gate, and audit trail.
+7. Explain how another function can reuse the same framework structure.
 
 ## Contribution Opportunities
 
-- Add sanitized release template examples.
-- Improve Jenkins and Ansible adapter tests.
-- Add clearer upstream evidence handoff examples from Build and Testing.
-- Expand docs for rollback handoff and post-release learning.
+- Add new function-level packaging for Discovery, Build, Testing, or Maintenance.
+- Improve framework adoption samples.
+- Add sanitized stage gate templates and evidence examples.
 - Strengthen Markdown, Mermaid, and SDD validation scripts.
-- Improve frontend clarity for release operators and reviewers.
+- Expand the IBM iSeries one-click release UTL design under the Deployment function.
+- Improve frontend clarity for operators, reviewers, and contributors.
 
 ## Safety Boundaries
 
-- Human approval remains required for release progression.
 - Secrets and credentials must stay out of docs, samples, screenshots, and committed workbooks.
 - Real environment names and customer data must not be committed.
-- Adapter contributions must use configuration and secret-management paths.
-- Rollback claims must match implemented behavior.
+- Approval and rollback claims must match implemented behavior.
+- New user-facing or non-trivial changes must update the relevant SDD artifacts.
 
 ## Links
 
 - [README](../README.md)
 - [Chinese README](../README.zh-CN.md)
+- [Framework docs index](atlas-engineering-delivery-hub-index.md)
+- [Framework pitch](atlas-engineering-delivery-hub-pitch.md)
 - [Deployment docs index](atlas-engineering-delivery-hub-deployment-index.md)
-- [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md)
 - [Contribution guide](../CONTRIBUTING.md)
 - [Current implementation baseline](wwa-agent-workspace-hub-current-baseline.md)

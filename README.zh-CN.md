@@ -1,123 +1,106 @@
-# Atlas Engineering Delivery Hub - Deployment
+# Atlas Engineering Delivery Hub
 
-**参赛类别：** Tool
-**生命周期阶段：** M6 Deployment
+**参赛类别：** Framework
+**主叙事：** Team delivery framework
+**独立 function：** [Atlas Engineering Delivery Hub - Deployment](docs/atlas-engineering-delivery-hub-deployment-index.md)
 **English README:** [README.md](README.md)
 
-Atlas Engineering Delivery Hub - Deployment 是 Atlas Engineering Delivery Hub / Seven Mountains SDLC 中 **M6 Deployment** 阶段的 Tool。它帮助团队把已经通过构建和测试验证的交付输出，转换成受控、可追踪、可重复的发布运行流程。
+Atlas Engineering Delivery Hub 是一个面向团队交付的框架，用来把软件交付过程变得可见、可治理、可追踪、可复用。它围绕 Seven Mountains SDLC，并用统一的 I-E-O-V gate 模型描述每个阶段：Input、Execute、Output、Validate。
 
-本仓库承载的是当前 WWA Agent Workspace Hub 中的发布编排实现基线。它属于 Atlas Engineering Delivery Hub 叙事中的一个阶段能力，不代表整个 Atlas Engineering Delivery Hub 框架本身。
+这个仓库承载的是当前 WWA Agent Workspace Hub 的实现基线，用真实软件展示这个 framework。Deployment 是 Hub 里的一个已实现 function，不是整个 Hub。针对这次公司开源/开放协作大赛，本仓库支持两个相关但层级不同的项目：
 
-![Atlas Engineering Delivery Hub mobile vertical artwork](docs/assets/atlas-engineering-delivery-hub-mobile-vertical.png)
+| 项目 | 类别 | 展示重点 | 入口 |
+|---|---|---|---|
+| Atlas Engineering Delivery Hub | Framework | 一套可复用的团队 SDLC 工作框架，覆盖阶段模型、共享工作台、人工治理、证据、审计和贡献方式。 | 本 README、[Framework 文档索引](docs/atlas-engineering-delivery-hub-index.md)、[Framework 提交材料](docs/open-collaboration-submission.md) |
+| Atlas Engineering Delivery Hub - Deployment | Tool / Function | M6 Deployment function：受控的 SIT / UAT / PROD 发布运行能力，以及 IBM iSeries one-click release UTL 的设计方向。 | [Deployment 文档索引](docs/atlas-engineering-delivery-hub-deployment-index.md)、[Deployment 提交材料](docs/open-collaboration-submission-deployment.md) |
 
-![M6 Deployment lifecycle positioning](docs/assets/atlas-deployment-lifecycle-positioning.svg)
+![Atlas Engineering Delivery Hub framework lifecycle](docs/assets/atlas-framework-lifecycle.svg)
 
-## 生命周期定位
+## Framework 定位
 
-Seven Mountains SDLC：
+Hub 的定位是一套 team framework，而不是单个自动化脚本，也不是一个 deployment 页面。它给团队一套共同语言：每个交付阶段需要什么输入、如何受控执行、产出什么证据、怎样验证结果，以及如何把决策保留下来供复盘和审计。
+
+当前实现通过 Spring Boot 后端、Vue 3 前端、共享平台壳、Agent 工作区、访问治理、审计日志、配置管理、Excel 导入和人工评审门来展示这个框架。有些生命周期 function 已经实现较深，有些是框架方向；当某个 function 的工作价值足够完整时，它可以作为独立项目参赛或共建。
+
+## Seven Mountains SDLC
 
 ```text
 M1 Planning -> M2 Estimation -> M3 Discovery -> M4 Build -> M5 Testing -> M6 Deployment -> M7 Maintenance
 ```
 
-本仓库聚焦 **M6 Deployment**。它接收上游 M4 Build 与 M5 Testing 形成的构建产物、测试证据和发布上下文，并把这些输入组织成 SIT / UAT / PROD 发布流程、人工评审、审计记录、权限边界和可回溯的任务历史。
-
-| 阶段 | 在 Atlas 叙事中的角色 | 与本仓库的关系 |
+| 阶段 | 在团队框架中的目的 | 当前仓库信号 |
 |---|---|---|
-| M3 Discovery | 将业务意图转化为需求和设计证据；Atlas Phoenix Lens / Legacy Spec Factory 是上游示例能力。 | 上游能力，本仓库不实现。 |
-| M4 Build | 产出构建任务、构建产物和交付证据。 | 上游证据来源；当前平台基线中也包含 Build Agent 工作区。 |
-| M5 Testing | 产出验证证据、缺陷反馈和验收结论。 | 进入发布前的直接上游门。 |
-| M6 Deployment | 对发布任务进行编排、执行、评审、追踪和审计。 | 本参赛项目的主定位。 |
-| M7 Maintenance | 将生产反馈、事件和改进重新带回生命周期。 | 下游反馈目标；维护自动化仍为计划/TBD。 |
+| M1 Planning | 对齐目标、范围、参与者和审批准备度。 | Agent Contribute Dashboard 与 framework 文档。 |
+| M2 Estimation | 记录工作量、排期、风险和资源预期。 | Agent Contribute Dashboard 与 framework 文档。 |
+| M3 Discovery | 把业务意图转为需求、规格和设计证据。 | 目标阶段；Atlas Phoenix Lens / Legacy Spec Factory 可作为上游示例能力接入。 |
+| M4 Build | 将已批准设计转化为代码、任务、验证记录和构建产物。 | Build Agent 工作区与共享任务流基线。 |
+| M5 Testing | 在发布前形成验证证据。 | Testing Agent 工作区方向与共享任务流基线。 |
+| M6 Deployment | 协调发布执行、审批、回滚姿态和审计。 | 本仓库已实现的 Deployment function。 |
+| M7 Maintenance | 将事件、生产反馈和改进重新带回交付生命周期。 | 框架目标阶段和路线图方向。 |
 
-## 当前交付范围
+## Seven Gates：I-E-O-V
 
-当前已经具备：
+每个生命周期阶段都遵循同一种操作结构：
 
-- 基于 Spring Boot 与 Vue 3 的受控发布工作区。
-- `/wwa/deployment-agent` 下的 Deployment Agent 页面。
-- `/api/deployment-agent/*` 下的发布相关 API。
-- 基于固定 `AMH_HCC_task` 工作表的 Excel 发布请求导入。
+| Gate 元素 | 含义 |
+|---|---|
+| Input | 阶段开始前需要的交付物、Owner、范围、约束和前置条件。 |
+| Execute | 由人、Agent、自动化或外部工具完成的受控工作。 |
+| Output | 可留存的产物、决策、运行记录和可追踪结果。 |
+| Validate | 评审检查、测试证据、审批、审计记录和验收结论。 |
+
+这样团队可以在 Planning、Build、Testing、Deployment、Maintenance 等阶段复用同一种治理语言，同时允许每个 function 拥有自己的 workflow 和工具。
+
+![Seven Gates I-E-O-V](docs/assets/seven-gates-ieov.svg)
+
+## Framework 能力
+
+当前已实现或已文档化的能力包括：
+
+- 支持多个交付 function 的共享工作台。
+- 面向 Build、Testing、Deployment 类工作流的 Agent/function 工作区。
+- Human-in-the-Loop 任务推进和评审决策。
+- Release Flow -> Request -> Task 追踪模型。
+- 基于本地 Access Grant 的范围化访问治理。
+- 带 user、action、scope、agent、correlation context 的审计日志。
+- 面向执行目标和团队配置的 Configuration Management。
+- 用模板和 Excel 导入建立可重复工作流。
+- SDD 文档链，让需求、故事、规格、架构、设计和任务对人和 AI 协作者都清晰。
+
+## Deployment Function
+
+Deployment 是这个仓库中目前最具体的 function。它位于 M6，用来把已经通过 Build/Testing 验证的输出，转成受控的 SIT / UAT / PROD 发布工作。
+
+Deployment function 包括：
+
+- 基于 Excel 的 deployment request 导入。
 - 面向 `SIT`、`UAT`、`PROD` 的阶段化 Release Flow 跟踪。
-- Request 与 Task 生命周期管理，包括手动运行、自动提交、结果记录、人工决策、重跑、跳过、失败标记、归档、恢复和清除。
-- 进入下一步前的 Human-in-the-Loop 决策门。
-- 任务执行历史，包括重跑尝试、外部任务链接和日志链接。
-- 面向 Jenkins 与 Ansible/AWX 的 AUTO 提交适配器，端点和凭证由配置驱动。
-- 可选的外部执行轮询能力；当前配置默认关闭。
-- 基于 Access Grant 的本地访问治理。
-- 带 Release Flow、Request、Task、Application、SNOW Group、Agent 和 Correlation ID 上下文的审计日志。
-- 共享平台服务：认证、访问管理、配置管理、审计、模板下载和复用型工作流 UI。
+- 手动任务执行和 AUTO 提交路径。
+- Jenkins 与 Ansible/AWX 执行适配器。
+- 人工评审决策：approve、reject、rerun、skip。
+- 执行历史、外部 job/log 链接和审计记录。
+- 访问治理和发布安全控制。
 
-当前不声称已经完成的能力：
+作为第二个参赛项目，这个 function 可以独立呈现为 **Atlas Engineering Delivery Hub - Deployment**。它的差异化重点是 IBM iSeries one-click release UTL 的方向：Hub 提供受控发布框架，Deployment function 则沉淀任务模型、证据、人工评审门和适配器设计，让 iSeries 发布活动能够被包装成可重复的一键式运行流程。
 
-- 不提供全自动发布审批；当前基线坚持人工决策。
-- 真正的企业 Team Book 生产集成仍是未来工作；本地和测试流程使用抽象 provider 与 stub 用户。
-- 模板创建和模板存储仍有部分前端本地草稿形态；从模板创建 rundown 已经有后端能力。
-- AUTO 执行回调式完成回写不是当前主模型。
-- Maintenance 阶段的事件路由、生产反馈闭环和长期运维自动化仍为计划/TBD。
-- 本开放协作包不包含内部截图、客户数据、kubeconfig、真实凭证或真实生产环境名称。
+![Deployment tool workflow](docs/assets/atlas-deployment-tool-workflow.svg)
 
-## 核心能力
+## 当前范围和边界
 
-| 能力 | 说明 | 仓库中的证据 |
-|---|---|---|
-| 发布导入 | 接收 Excel、显式 Stage、发布标识和可选运行时范围。 | Upload Controller、Import Service、模板下载、解析测试。 |
-| Release Flow 跟踪 | 将发布工作组织为 Release Flow -> Request -> Task，并覆盖 SIT / UAT / PROD。 | Release Flow 领域服务、Controller、前端 summary/detail 页面。 |
-| 人工评审门 | 执行后不会自动静默推进，需要 Approve / Reject / Rerun / Skip。 | Decision Engine、Task State Machine、Progression Service、决策弹窗。 |
-| 手动执行 | Owner 或 DevOps Admin 可以启动手动任务并记录结果。 | Task Service、Record Result Service、Execution History。 |
-| AUTO 执行 | 将 AUTO 任务提交到已配置的 Jenkins 或 Ansible/AWX。 | Auto Execution Service、Execution Target Resolver、执行适配器。 |
-| 发布安全控制 | 支持归档/恢复/清除、失败标记、重跑尝试、状态重算和审计。 | Release Flow Service、Audit Logger、Request/Task 状态测试。 |
-| 范围化治理 | 通过 Access Grant、角色、权限和 `Application + SNOW Group` 范围控制访问。 | Access Grant、Auth Service、安全过滤器、Access Management UI。 |
-| 可追踪性 | 保存审计、执行历史、导入元数据、SDD 文档和样例包。 | 文档、迁移、测试、审计表和执行历史表。 |
+这个 package 声称具备：
 
-## 输入与输出
+- 共享交付工作流的可运行实现基线。
+- 可以承载多个 SDLC function 的 framework 叙事。
+- 带完整 SDD 追踪链和样例输出的 Deployment function。
+- Framework 和 Deployment function 的中英文评审入口。
 
-主要输入：
+这个 package 不声称具备：
 
-- 来自 M4 Build 和 M5 Testing 的发布意图、构建产物和验证证据。
-- 基于下载模板准备的 Excel 上传文件。
-- 上传时显式选择的阶段：`SIT`、`UAT` 或 `PROD`。
-- 可选 Workflow Identifier / Release ID，用于关联阶段尝试。
-- 可选 `Application`、`SNOW Group` 和 Agent 上下文。
-- Task 的执行类型：`MANUAL` 或 `AUTO`。
-- Task Owner 或 DevOps Admin 提交的人工决策与结果说明。
-- 任务输入中保存的 Jenkins / Ansible 目标元数据。
-
-主要输出：
-
-- 带阶段状态和当前阶段的 Release Flow 汇总。
-- 带 rundown owner、运行范围和归档状态的阶段 Request。
-- 有序 Task 列表，包括状态、输入参数、期望输出、结果摘要和执行历史。
-- AUTO 提交后的外部 job URL 与 log URL。
-- 上传、编辑、执行、决策、访问变更和生命周期操作的审计记录。
-- 面向未来通知分发的 outbox 事件记录。
-- 面向评审和贡献者的 SDD 与开放协作材料。
-
-## 发布工作流
-
-![Deployment tool internal workflow](docs/assets/atlas-deployment-tool-workflow.svg)
-
-1. 发布操作者上传任务工作簿，或从模板创建 rundown。
-2. 用户必须显式选择 `SIT`、`UAT` 或 `PROD`；Stage 不从表格中盲目信任。
-3. 后端校验并导入 Release Flow、Request 和 Task。
-4. 第一个符合条件的任务进入可运行状态。
-5. Task Owner 或 DevOps Admin 启动手动任务，或提交 AUTO 任务。
-6. 手动任务由用户记录结果；AUTO 任务保存外部执行元数据，并可在开启监控后轮询。
-7. 人工评审决定 Approve、Reject、Rerun 或 Skip。
-8. Progression 逻辑推进下一任务，或推进/完成 Release Flow。
-9. 审计和执行历史保留谁、何时、在什么发布上下文中做了什么。
-10. 失败、拒绝、归档或需要回滚的工作通过状态和历史保留，不会被静默覆盖。
-
-## 上下游关系
-
-![M4/M5 to M6 to M7 relationship](docs/assets/atlas-deployment-upstream-downstream.svg)
-
-Deployment Tool 位于构建和测试门之后：
-
-- **Input：** 构建产物引用、任务清单、测试证据、发布范围、Owner 和审批上下文。
-- **Execute：** 在 SIT / UAT / PROD 中执行阶段化 release rundown，支持手动与 AUTO 任务。
-- **Output：** 发布记录、任务结果、外部执行链接、审批、审计历史和失败/回滚状态。
-- **Validate：** 人工评审、可追踪决策、状态重算、审计检查，以及进入 M7 Maintenance 的生产反馈。
+- 完全自动化的交付审批。
+- Seven Mountains 每个阶段的完整生产落地。
+- 开放包里的真实企业 Team Book 生产集成。
+- 一键基础设施回滚。
+- 真实凭证、客户数据、kubeconfig、内部截图或真实生产环境名称。
 
 ## 快速开始
 
@@ -143,66 +126,41 @@ http://localhost:5173/wwa/deployment-agent
 
 本地/测试 stub 用户见 [当前实现基线](docs/wwa-agent-workspace-hub-current-baseline.md)。在 local 模式下，stub provider 接受任意非空密码。
 
-## 示例发布故事
+## 文档地图
 
-一个脱敏演示路径：
+Framework 入口：
 
-1. M4 Build 产出候选包和构建证据。
-2. M5 Testing 记录验证证据和验收说明。
-3. 发布操作者打开 Deployment Agent，并上传 `SIT` 阶段的脱敏任务工作簿。
-4. 工具创建或更新 Release Flow，并释放第一个发布任务。
-5. Task Owner 执行手动步骤，或把 AUTO 任务提交到已配置的 Jenkins/Ansible 目标。
-6. Reviewer 检查结果与期望输出后逐项批准。
-7. 后续 `UAT` 与 `PROD` 上传复用同一个 workflow identifier，让阶段尝试保持关联。
-8. 如果任务失败，团队记录失败、重跑或拒绝，并保留审计和执行历史。
-9. PROD 批准后，发布记录成为进入 Maintenance 阶段的运维证据。
+- [Framework 文档索引](docs/atlas-engineering-delivery-hub-index.md)
+- [Framework 开放协作提交材料](docs/open-collaboration-submission.md)
+- [中文 Framework 提交材料](docs/open-collaboration-submission.zh-CN.md)
+- [Framework Pitch](docs/atlas-engineering-delivery-hub-pitch.md)
+- [Framework adoption sample](docs/samples/atlas-framework-adoption-sample.md)
+- [Framework SDD 追踪链](docs/00-context/atlas-engineering-delivery-hub-traceability.md)
 
-脱敏样例包见 [docs/samples/atlas-deployment-tool-mini-output](docs/samples/atlas-deployment-tool-mini-output/README.md)。
+Deployment function 入口：
 
-## 目录概览
-
-| 路径 | 作用 |
-|---|---|
-| `src/main/java/com/wwa/agenthub/agents/deployment/` | Deployment Agent 阶段定义与 REST Controller。 |
-| `src/main/java/com/wwa/agenthub/domain/` | Release Flow、Task、Decision、Execution、Audit、Auth、Configuration、Import 等共享领域服务。 |
-| `src/main/java/com/wwa/agenthub/platform/` | 所有 Agent 共享的平台契约和安全边界。 |
-| `src/main/resources/db/migration/` | Oracle 数据库迁移历史。 |
-| `frontend/src/agents/deployment/` | Deployment 工作区入口、API、summary 与 detail 页面。 |
-| `frontend/src/platform/` | 前端共享的 release-flow workspace factory 和平台组件。 |
-| `docs/` | SDD、架构/设计、参赛材料、图表和样例。 |
-| `scripts/check-markdown-links.mjs` | Markdown 相对链接检查脚本。 |
-
-## 关键文档
-
-- [Deployment Tool 文档索引](docs/atlas-engineering-delivery-hub-deployment-index.md)
-- [英文开放协作提交材料](docs/open-collaboration-submission.md)
-- [中文开放协作提交材料](docs/open-collaboration-submission.zh-CN.md)
+- [Deployment 文档索引](docs/atlas-engineering-delivery-hub-deployment-index.md)
+- [Deployment 开放协作提交材料](docs/open-collaboration-submission-deployment.md)
+- [中文 Deployment 提交材料](docs/open-collaboration-submission-deployment.zh-CN.md)
 - [Deployment Pitch](docs/atlas-engineering-delivery-hub-deployment-pitch.md)
+- [Deployment 样例包](docs/samples/atlas-deployment-tool-mini-output/README.md)
+- [Deployment SDD 追踪链](docs/00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
+
+运行时与贡献参考：
+
 - [贡献指南](CONTRIBUTING.md)
 - [当前实现基线](docs/wwa-agent-workspace-hub-current-baseline.md)
-- [Deployment Agent 需求基线](docs/01-requirements/requirement.md)
-- [Deployment Agent 规格基线](docs/03-spec/spec.md)
 - [平台与 Deployment 架构](docs/04-architecture/architecture.md)
 - [详细设计基线](docs/05-design/design.md)
-- [M6 包装追踪链](docs/00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
-
-## 审批、追踪、回滚与人工评审
-
-- **审批：** 当前任务推进必须经过人工决策。MVP 决策门明确是手动模式。
-- **追踪：** Release Flow、Request、Task、执行历史、审计日志、Correlation ID 和 SDD 文档构成追踪链。
-- **回滚/恢复姿态：** 工具不声称提供一键基础设施回滚。它提供失败标记、重跑、拒绝、归档/恢复、清除和历史保留，帮助团队执行已有的回滚或修复流程。
-- **验证：** 上传校验、状态机、角色校验、边界保护和测试共同保护工作流。发布决策仍然需要人工评审。
-- **凭证安全：** 凭证应进入配置/密钥管理，不应进入文档、样例、截图或提交的工作簿。
+- [SDD Profile](docs/00-context/sdd-profile.md)
 
 ## 路线图
 
-- 明确 Build 与 Testing 阶段向 Deployment 传递证据的契约。
-- 完成后端持久化的模板管理能力。
-- 在环境验证后扩展 AUTO 执行监控和回调回写。
-- 基于现有 outbox seam 增加通知分发。
-- 增加 Maintenance 阶段的事件、回滚和发布后复盘模板。
-- 仅在明确评审通过后加入脱敏截图。
-- 持续增强 SDD 和文档验证自动化。
+- 为 Discovery、Build、Testing、Deployment、Maintenance 明确 function-level 项目包装方式。
+- 在不暴露真实环境细节的前提下，扩展 IBM iSeries one-click release UTL 设计。
+- 明确 Build、Testing 与 Deployment 之间的上游证据交接契约。
+- 强化 stage gate、task manifest、evidence capture 和 review decision 的可复用模板。
+- 持续增强 SDD、Markdown、Mermaid 和文档验证自动化。
 
 ## 验证
 

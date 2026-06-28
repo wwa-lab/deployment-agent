@@ -1,20 +1,22 @@
 # Atlas Engineering Delivery Hub - Deployment Documentation Index
 
-**Category:** Tool
+**Category:** Tool / Function
 **Stage:** M6 Deployment
 **Status:** Open-collaboration package
+**Parent framework:** [Atlas Engineering Delivery Hub](atlas-engineering-delivery-hub-index.md)
 **Last updated:** 2026-06-27
 
-This index collects the M6 Deployment Tool packaging materials for reviewers and contributors.
+This index collects the M6 Deployment function packaging materials for reviewers and contributors. Deployment is one function inside Atlas Engineering Delivery Hub and is also packaged as a separate competition project because it carries the controlled release workflow and IBM iSeries one-click release UTL design direction.
 
 ## Entry Points
 
 - [English README](../README.md)
 - [Chinese README](../README.zh-CN.md)
 - [Contribution guide](../CONTRIBUTING.md)
-- [Open collaboration submission](open-collaboration-submission.md)
-- [Chinese open collaboration submission](open-collaboration-submission.zh-CN.md)
+- [Deployment open collaboration submission](open-collaboration-submission-deployment.md)
+- [Chinese Deployment open collaboration submission](open-collaboration-submission-deployment.zh-CN.md)
 - [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md)
+- [Parent framework submission](open-collaboration-submission.md)
 
 ## Visuals
 

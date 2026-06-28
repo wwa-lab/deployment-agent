@@ -108,6 +108,17 @@ The package must add Mermaid source and rendered SVG diagrams under `docs/assets
 - Seven Gates / I-E-O-V flow.
 - Sub-capability fit, including Atlas Phoenix Lens as one Discovery example.
 
+### 3.8 Two Competition Entry Split
+
+The package must explain that this repository supports two related entries:
+
+| Entry | Category | Scope |
+|---|---|---|
+| Atlas Engineering Delivery Hub | Framework | Parent team framework, Seven Mountains SDLC, shared gates, governance, evidence, contribution model. |
+| Atlas Engineering Delivery Hub - Deployment | Tool / Function | One function inside the Hub, focused on M6 Deployment and the IBM iSeries one-click release UTL design direction. |
+
+The root README and framework submission must lead with the Hub. Deployment-specific docs must remain available through a separate index and function-level submission so reviewers can evaluate it independently.
+
 ## 4. Non-Functional Requirements
 
 - **No runtime impact:** No Java, Vue, API, database, or build behavior changes.
@@ -129,8 +140,8 @@ Not applicable. This packaging slice introduces documentation, diagrams, and sam
 | Confusing Atlas Phoenix Lens with the parent framework | Mention it only as a Discovery-stage sub-capability example. |
 | Losing detailed operational README content | Preserve the previous README body in a docs reference file. |
 | Broken relative links | Run a Markdown relative-link existence check. |
+| Confusing the Hub framework with the Deployment function | Keep separate framework and Deployment indexes, submissions, and pitch docs. |
 
 ## 7. Traceability
 
 Detailed requirement-to-task mapping is maintained in [atlas-engineering-delivery-hub-traceability.md](../00-context/atlas-engineering-delivery-hub-traceability.md).
-

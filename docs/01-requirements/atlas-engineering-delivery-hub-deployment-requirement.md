@@ -7,9 +7,9 @@
 
 ## Background
 
-The repository already implements a WWA Agent Workspace Hub baseline with a Deployment Agent workspace. For the internal open collaboration competition, the repository must now be presented accurately as **Atlas Engineering Delivery Hub - Deployment**, the M6 Deployment-stage Tool in the Atlas Engineering Delivery Hub / Seven Mountains SDLC narrative.
+The repository already implements a WWA Agent Workspace Hub baseline with a Deployment Agent workspace. For the internal open collaboration competition, the Deployment function must be presented accurately as **Atlas Engineering Delivery Hub - Deployment**, the M6 Deployment-stage Tool / Function inside the Atlas Engineering Delivery Hub / Seven Mountains SDLC framework.
 
-The packaging must not overstate the repo as the whole framework. It must explain how the tool consumes M4 Build and M5 Testing evidence and produces controlled release operations for M7 Maintenance handoff.
+The packaging must not overstate Deployment as the whole framework. It must explain how the function consumes M4 Build and M5 Testing evidence and produces controlled release operations for M7 Maintenance handoff. It must also preserve the IBM iSeries one-click release UTL design direction without exposing sensitive implementation details.
 
 ## Goals
 
@@ -17,6 +17,8 @@ The packaging must not overstate the repo as the whole framework. It must explai
 - Make M6 Deployment visually and textually obvious.
 - Explain current capabilities, limits, inputs, outputs, and workflow based on the implemented codebase.
 - Provide competition submission materials and a reviewer-ready pitch.
+- Provide separate function-level submission materials so the parent Hub can remain the Framework entry.
+- Mention the IBM iSeries one-click release UTL direction as a deployment design focus.
 - Add repo-safe diagrams and sanitized sample outputs.
 - Preserve existing technical references and SDD traceability.
 - Validate documentation and commit the finished package.
@@ -25,7 +27,7 @@ The packaging must not overstate the repo as the whole framework. It must explai
 
 | ID | Requirement |
 |---|---|
-| M6-REQ-01 | The root README shall position the repository as the M6 Deployment Tool, not the whole Atlas Engineering Delivery Hub framework. |
+| M6-REQ-01 | Deployment-specific docs shall position Deployment as the M6 Tool / Function inside the Atlas Engineering Delivery Hub framework, not as the whole Hub. |
 | M6-REQ-02 | Public docs shall distinguish implemented capabilities from planned, placeholder, or TBD capabilities. |
 | M6-REQ-03 | The package shall include natural English and Chinese README/submission materials. |
 | M6-REQ-04 | The package shall include reviewer-facing competition docs: deployment index, submission, Chinese submission, and pitch. |
@@ -33,6 +35,7 @@ The packaging must not overstate the repo as the whole framework. It must explai
 | M6-REQ-06 | The package shall include a sanitized sample or template package with representative inputs and outputs. |
 | M6-REQ-07 | The package shall preserve existing detailed technical docs by linking them instead of deleting useful content. |
 | M6-REQ-08 | The package shall pass documentation validation, avoid adding secrets or customer data, and be committed with the requested commit message. |
+| M6-REQ-09 | The package shall mention the IBM iSeries one-click release UTL design direction as a sanitized future/deepening focus for the Deployment function. |
 
 ## In Scope
 
@@ -50,9 +53,10 @@ The packaging must not overstate the repo as the whole framework. It must explai
 
 ## Acceptance Criteria
 
-- `README.md` and `README.zh-CN.md` open with Tool/M6 Deployment positioning.
-- `docs/open-collaboration-submission.md` and Chinese counterpart list category as Tool.
+- `README.md` and `README.zh-CN.md` open with the parent Framework positioning and link to Deployment as a function entry.
+- `docs/open-collaboration-submission-deployment.md` and Chinese counterpart list category as Tool / Function.
 - `docs/atlas-engineering-delivery-hub-deployment-index.md` links all reviewer materials.
+- Deployment materials mention the IBM iSeries one-click release UTL direction without real internal details.
 - Diagrams and sample package exist under `docs/assets/` and `docs/samples/`.
 - New samples contain only synthetic values.
 - Existing deeper docs remain available through links.

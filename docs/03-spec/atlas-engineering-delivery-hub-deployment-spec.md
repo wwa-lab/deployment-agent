@@ -7,7 +7,7 @@
 
 ## Scope
 
-This spec governs the documentation and sample package that presents the existing Deployment Agent as **Atlas Engineering Delivery Hub - Deployment**, the M6 Deployment Tool.
+This spec governs the documentation and sample package that presents the existing Deployment Agent as **Atlas Engineering Delivery Hub - Deployment**, the M6 Deployment Tool / Function inside the parent Atlas Engineering Delivery Hub framework.
 
 ## Actors
 
@@ -20,7 +20,7 @@ This spec governs the documentation and sample package that presents the existin
 
 | ID | Requirement |
 |---|---|
-| FR-01 | Public entry points shall identify the repo as a Tool-category M6 Deployment capability. |
+| FR-01 | Deployment-specific entry points shall identify Deployment as a Tool / Function-category M6 Deployment capability inside the parent Hub. |
 | FR-02 | Docs shall list implemented scope, planned/TBD scope, inputs, outputs, runtime assumptions, and maturity. |
 | FR-03 | English and Chinese materials shall present the same positioning naturally. |
 | FR-04 | Submission materials shall explain the release problem, reusable value, delivered assets, contribution opportunities, and demo story. |
@@ -28,6 +28,7 @@ This spec governs the documentation and sample package that presents the existin
 | FR-06 | Samples shall be safe, synthetic, and representative of release inputs/outputs. |
 | FR-07 | Existing detailed technical references shall remain linked. |
 | FR-08 | Validation and commit hygiene shall be completed before handoff. |
+| FR-09 | Deployment materials shall mention the IBM iSeries one-click release UTL design direction without exposing real internal or production details. |
 
 ## Non-Functional Requirements
 
@@ -43,8 +44,8 @@ This spec governs the documentation and sample package that presents the existin
 
 1. Inspect the current repository implementation and docs.
 2. Backfill SDD package documents for the M6 Deployment Tool slice.
-3. Update root README and Chinese README.
-4. Update submission, pitch, contribution guide, and index docs.
+3. Update root README and Chinese README so they lead with the parent Hub and link Deployment as a function.
+4. Update Deployment submission, pitch, contribution guide, and index docs.
 5. Add lifecycle/workflow/upstream diagrams.
 6. Add sanitized mini output sample package.
 7. Run diff, link, diagram, test, and secret-safety checks.
@@ -56,13 +57,13 @@ This spec governs the documentation and sample package that presents the existin
 - Do not push.
 - Do not add lockfile or credential changes.
 - Do not present Atlas Phoenix Lens as the main project.
-- Do not present this repository as the whole Atlas Engineering Delivery Hub framework.
+- Do not present Deployment as the whole Atlas Engineering Delivery Hub framework.
 
 ## Risks And Mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Reviewer confuses this repo with the whole framework | README, submission, and index explicitly say M6 Deployment Tool. |
-| Existing framework docs create mixed messaging | Older framework index/pitch are retained as context and point to the Deployment Tool entry. |
+| Reviewer confuses Deployment with the whole framework | Framework README leads with the Hub, while Deployment docs explicitly say Tool / Function. |
+| Framework and Deployment docs create mixed messaging | Keep separate framework and Deployment indexes, submissions, and pitches. |
 | Samples accidentally expose real details | Use synthetic names and `example.invalid` URLs only. |
 | Diagrams fail to render | Keep Mermaid source in the repo and render SVGs when tooling is available. |

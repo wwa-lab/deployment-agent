@@ -28,10 +28,10 @@ This traceability index connects the open-collaboration packaging work for Atlas
 | AEDH-REQ-05 Contribution guidance | AEDH-US-05 | 3.5 | 3.5 | AEDH-TASK-004 |
 | AEDH-REQ-06 Adoption sample | AEDH-US-06 | 3.6 | 3.6 | AEDH-TASK-006 |
 | AEDH-REQ-07 Link and validation hygiene | AEDH-US-07 | 4 | 4 | AEDH-TASK-007, AEDH-TASK-008 |
+| AEDH-REQ-09 Two competition entry split | AEDH-US-08 | 3.8 | 7.1 | AEDH-TASK-009 |
 
 ## Non-Goals
 
 - No customer data, credentials, screenshots, or production-only links are introduced.
 - No code paths, APIs, schemas, or runtime feature flags are changed.
 - Atlas Phoenix Lens remains a Discovery-stage sub-capability example, not the top-level project identity.
-
