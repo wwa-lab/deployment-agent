@@ -41,7 +41,16 @@ README and architecture docs should explain:
 - Deployment Agent is one agent inside the Hub.
 - `WWA` and `deployment-agent` technical identifiers remain temporarily for compatibility.
 
-## 4. Validation Design
+## 4. Responsive Layout Design
+
+The WWA-Atlas Hub home page should use a responsive content shell:
+
+- Replace the fixed `960px` home container with a full-width shell capped for normal desktop use and uncapped on very wide displays.
+- Keep the hero as a two-column layout on wide screens, then collapse to one column below desktop width.
+- Render active workspaces and shared controls as `auto-fit` grids so cards fill available horizontal space.
+- Preserve the existing mobile stack below the current mobile breakpoint.
+
+## 5. Validation Design
 
 Run:
 

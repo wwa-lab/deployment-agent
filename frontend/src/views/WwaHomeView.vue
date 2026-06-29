@@ -134,9 +134,10 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 
 <style scoped>
 .wwa-home {
-  max-width: 960px;
+  width: 100%;
+  max-width: 1480px;
   margin: 0 auto;
-  padding: 8px 0 40px;
+  padding: 8px clamp(0px, 1vw, 16px) 40px;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -216,7 +217,7 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(280px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
   gap: 24px;
   align-items: stretch;
 }
@@ -495,8 +496,8 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 }
 
 .agent-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
   gap: 12px;
 }
 
@@ -574,8 +575,8 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 }
 
 .platform-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 12px;
 }
 
@@ -594,9 +595,27 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
   text-decoration: none;
   transition: border-color 0.15s, background 0.15s, transform 0.2s;
   min-width: 200px;
+  width: 100%;
   backdrop-filter: blur(16px);
   box-shadow: 0 10px 24px rgba(31, 42, 68, 0.06);
   overflow: hidden;
+}
+
+@media (min-width: 1600px) {
+  .wwa-home {
+    max-width: none;
+  }
+}
+
+@media (max-width: 1200px) {
+  .home-hero-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .home-console-panels {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .platform-card::before {
@@ -646,6 +665,10 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 }
 
 @media (max-width: 768px) {
+  .wwa-home {
+    padding-inline: 0;
+  }
+
   .home-hero {
     padding: 20px;
     border-radius: 20px;
@@ -662,6 +685,11 @@ const enabledAgents = agentRegistry.filter((a) => a.enabled)
 
   .home-user-block {
     align-items: flex-start;
+  }
+
+  .home-console-panels {
+    display: flex;
+    flex-direction: column;
   }
 
   .platform-card {

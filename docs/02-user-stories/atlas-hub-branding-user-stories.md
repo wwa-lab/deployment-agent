@@ -63,3 +63,15 @@ Acceptance criteria:
 1. Frontend build passes.
 2. Markdown links pass.
 3. Whitespace diff check passes.
+
+## Story AHB-US-06: Home Page Uses Wide Screens Well
+
+**As a** competition reviewer,
+**I want** the WWA-Atlas Hub home page to use the available workspace width,
+**so that** the Hub feels like a team delivery control center instead of a narrow fixed panel on desktop displays.
+
+Acceptance criteria:
+
+1. The home page content shell expands beyond the previous fixed `960px` width on wide screens.
+2. Active workspace cards and shared-control cards reflow into responsive grids.
+3. Narrow desktop and mobile layouts remain stacked and readable.
