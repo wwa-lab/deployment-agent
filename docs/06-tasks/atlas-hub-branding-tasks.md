@@ -14,6 +14,7 @@
 | AHB-TASK-004 | Preserve route/API/package technical identifiers. | Complete |
 | AHB-TASK-005 | Update README, architecture naming note, changelog, and package metadata. | Complete |
 | AHB-TASK-006 | Run frontend build and documentation validation. | Complete |
+| AHB-TASK-007 | Make the WWA-Atlas Hub home layout responsive on wide desktop screens. | Complete |
 
 ## Verification Plan
 
@@ -29,3 +30,4 @@
 | `node scripts/check-markdown-links.mjs` | Pass - 201 Markdown files checked |
 | `cd frontend && npm run build` | Pass |
 | Login page screenshot | Pass - captured at `docs/assets/screenshots/atlas-hub-login-after.png` |
+| Wide home page responsiveness | Pass - captured at `docs/assets/screenshots/wwa-atlas-home-responsive-after.png` |

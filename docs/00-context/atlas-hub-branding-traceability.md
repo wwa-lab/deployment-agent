@@ -4,11 +4,11 @@
 **Status:** Active
 **Slice key:** `atlas-hub-branding`
 
-This traceability index covers the brand and UI naming change that presents the repository as **Atlas Engineering Delivery Hub** while preserving **Deployment Agent** as the M6 Deployment agent inside the Hub.
+This traceability index covers the brand and UI naming change that presents the repository as **WWA-Atlas Engineering Delivery Hub** while preserving **Deployment Agent** as the M6 Deployment agent inside the Hub.
 
 ## Scope
 
-This slice changes visible naming, documentation, and package metadata only. It does not change API routes, Vue router paths, Java package names, database tables, migration history, or backend route prefixes.
+This slice changes visible naming, documentation, package metadata, and the WWA-Atlas Hub home page's responsive presentation. It does not change API routes, Vue router paths, Java package names, database tables, migration history, or backend route prefixes.
 
 ## Artifact Chain
 
@@ -28,8 +28,9 @@ This slice changes visible naming, documentation, and package metadata only. It 
 | AHB-REQ-01 Product brand | AHB-US-01 | 3.1 | 2 | AHB-TASK-001, AHB-TASK-003 |
 | AHB-REQ-02 Preserve Deployment Agent | AHB-US-02 | 3.2 | 3 | AHB-TASK-003 |
 | AHB-REQ-03 Keep technical compatibility | AHB-US-03 | 3.3 | 4 | AHB-TASK-004 |
-| AHB-REQ-04 Update docs and metadata | AHB-US-04 | 3.4 | 5 | AHB-TASK-002, AHB-TASK-005 |
-| AHB-REQ-05 Validate change | AHB-US-05 | 4 | 6 | AHB-TASK-006 |
+| AHB-REQ-04 Update docs and metadata | AHB-US-04 | 3.4 | 3 | AHB-TASK-002, AHB-TASK-005 |
+| AHB-REQ-05 Validate change | AHB-US-05 | 4 | 5 | AHB-TASK-006 |
+| AHB-REQ-06 Wide-screen responsive home | AHB-US-06 | 3.5 | 4 | AHB-TASK-007 |
 
 ## Non-Goals
 

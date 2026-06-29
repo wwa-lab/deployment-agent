@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-29
 **Status:** Proposed / Documents-first
-**Source stories:** AHB-US-01 through AHB-US-05
+**Source stories:** AHB-US-01 through AHB-US-06
 
 ## 1. Overview
 
@@ -61,6 +61,17 @@ The package should update:
 - Changelog.
 - `frontend/index.html` title.
 - Maven display `name` and `description`, without changing `artifactId`.
+
+### 3.5 Responsive Home Layout
+
+The WWA-Atlas Hub home page should not be constrained to the previous narrow fixed-width shell on wide desktop screens.
+
+Required behavior:
+
+- The top-level home content area expands with the workspace viewport.
+- The hero keeps a primary content column and a control-summary column on wide screens.
+- Workspace cards and shared-control cards use responsive grids so additional width creates useful columns instead of empty margins.
+- The layout collapses back to a single readable column on narrower screens.
 
 ## 4. Validation
 

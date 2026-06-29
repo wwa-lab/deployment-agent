@@ -32,6 +32,7 @@ The desired naming is:
 | AHB-REQ-03 | Current route/API/package identifiers shall remain stable in this slice, including `/wwa/deployment-agent`, `/api/deployment-agent`, Maven `artifactId`, Java package names, and database names. |
 | AHB-REQ-04 | README, architecture notes, changelog, and package metadata shall describe WWA-Atlas as the visible product brand while preserving Atlas Engineering Delivery Hub as the framework name. |
 | AHB-REQ-05 | Frontend build and documentation checks shall pass after the branding update. |
+| AHB-REQ-06 | The WWA-Atlas Hub home page shall use available workspace width on wide desktop screens while preserving a readable stacked layout on narrower screens. |
 
 ## 4. Out Of Scope
 
@@ -50,3 +51,4 @@ The desired naming is:
 4. Deployment Agent still appears as a workspace/agent label.
 5. Docs explain the compatibility boundary between visible brand and technical identifiers.
 6. `cd frontend && npm run build`, `git diff --check`, and `node scripts/check-markdown-links.mjs` pass.
+7. The WWA-Atlas Hub home page no longer stays constrained to a narrow fixed-width column on wide desktop screens.
