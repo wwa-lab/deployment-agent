@@ -14,6 +14,8 @@ Atlas Engineering Delivery Hub 是一个面向团队交付的框架，用来把�
 | Atlas Engineering Delivery Hub | Framework | 一套可复用的团队 SDLC 工作框架，覆盖阶段模型、共享工作台、人工治理、证据、审计和贡献方式。 | 本 README、[Framework 文档索引](docs/atlas-engineering-delivery-hub-index.md)、[Framework 提交材料](docs/open-collaboration-submission.md) |
 | Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent 作为 M6 Deployment 能力：受控的 SIT / UAT / PROD 发布运行能力，以及 IBM iSeries one-click release UTL 的设计方向。 | [Deployment 文档索引](docs/atlas-engineering-delivery-hub-deployment-index.md)、[Deployment 提交材料](docs/open-collaboration-submission-deployment.md) |
 
+![Atlas Engineering Delivery Hub mobile vertical overview](docs/assets/atlas-engineering-delivery-hub-mobile-vertical.png)
+
 ![Atlas Engineering Delivery Hub framework lifecycle](docs/assets/atlas-framework-lifecycle.svg)
 
 ## Framework 定位

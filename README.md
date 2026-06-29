@@ -14,6 +14,8 @@ This repository is the current Atlas Engineering Delivery Hub implementation bas
 | Atlas Engineering Delivery Hub | Framework | A reusable team operating model for SDLC stages, shared workflow surfaces, human-in-the-loop governance, evidence, auditability, and contribution patterns. | This README, [framework docs index](docs/atlas-engineering-delivery-hub-index.md), [framework submission](docs/open-collaboration-submission.md) |
 | Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent as the M6 Deployment capability: controlled SIT / UAT / PROD release operations, including the design direction for IBM iSeries one-click release UTL workflows. | [Deployment docs index](docs/atlas-engineering-delivery-hub-deployment-index.md), [Deployment submission](docs/open-collaboration-submission-deployment.md) |
 
+![Atlas Engineering Delivery Hub mobile vertical overview](docs/assets/atlas-engineering-delivery-hub-mobile-vertical.png)
+
 ![Atlas Engineering Delivery Hub framework lifecycle](docs/assets/atlas-framework-lifecycle.svg)
 
 ## Framework Positioning

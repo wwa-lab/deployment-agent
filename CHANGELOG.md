@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restored the Atlas Engineering Delivery Hub mobile vertical overview image in both English and Chinese READMEs.
 - Improved the WWA-Atlas Hub home page responsiveness so wide desktop screens use the available workspace width, with responsive grids for active workspaces and shared controls instead of a narrow fixed-width column.
 - Updated visible branding and UI shell copy to present the repository as WWA-Atlas Engineering Delivery Hub / WWA-Atlas Hub while preserving Deployment Agent as the M6 Deployment agent and retaining existing `/wwa/*`, `/wwa/deployment-agent`, `/api/deployment-agent`, Maven artifact, and Java package compatibility identifiers.
 - Repositioned the open-collaboration package as two related competition entries: Atlas Engineering Delivery Hub as the parent Framework / team delivery framework, and Atlas Engineering Delivery Hub - Deployment as the independent M6 Tool / Function entry, including sanitized IBM iSeries one-click release UTL design direction, separate Deployment submission docs, and updated Hub/Deployment SDD traceability.
