@@ -20,3 +20,5 @@ This directory stores durable Architecture Decision Records (ADRs) for decisions
 | [ADR-0004](ADR-0004-add-agentic-sdlc-orchestrator-and-discipline-profile.md) | Accepted | Add orchestrator, discipline profile, and doctor for predictable AI engineering workflow |
 | [ADR-0005](ADR-0005-add-registry-schema-and-ci-gates.md) | Accepted | Add registry, execution manifest schema, and CI gates for enforceable workflow checks |
 | [ADR-0006](ADR-0006-route-github-copilot-through-agentic-sdlc.md) | Accepted | Route GitHub Copilot through the shared Agentic SDLC workflow |
+| [ADR-0007](ADR-0007-use-internal-skill-hub-registry.md) | Accepted | Use an internal metadata registry for Skill Hub |
+| [ADR-0008](ADR-0008-use-file-path-backed-skill-version-snapshots.md) | Accepted | Use project file-backed Skill Hub version history |
