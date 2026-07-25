@@ -1,12 +1,13 @@
-# Service Directory — API Implementation Guide
+# Resource Center — API Implementation Guide
 
 | Field | Value |
 |---|---|
 | **Slice** | `service-directory` |
-| **Status** | Regenerated via `architecture-to-design` — awaiting user acceptance |
+| **Status** | Regenerated via `architecture-to-design`; **Amended 2026-07-25** — product renamed to **Resource Center**; optional link `iconKey` (SD-FR-71) |
 | **Date** | 2026-07-25 |
-| **Version** | 1.0 (contract not yet implemented) |
-| **Base path** | `/api/platform/service-directory` |
+| **Version** | 1.2 (target contract: Resource Center paths; code still on `service-directory` until W10) |
+| **Base path** | `/api/platform/resource-center` (formerly `/api/platform/service-directory`) |
+| **Product name** | Resource Center |
 | **Backend stack** | Java 21 · Spring Boot 3.4 · Spring MVC · Spring Data JPA · Lombok |
 | **Auth model** | Session-based (`UserContext` from the session), with `X-User-Id` / `X-User-Role` header fallback in the `local` and `test` profiles |
 | **Source design** | `docs/05-design/service-directory-design.md` |
@@ -103,7 +104,7 @@ All errors use the existing envelope `ErrorResponseDto`
 | 500 | — | Unexpected failure, including a corrupt stored payload |
 
 This capability never returns **422** — that status is reserved for the spreadsheet import flow
-(`GlobalExceptionHandler.java:49-57`), which the Service Directory does not use.
+(`GlobalExceptionHandler.java:49-57`), which the Resource Center does not use.
 
 Error messages must name the offending field or entity and must never leak internal paths or stack
 traces.
@@ -116,34 +117,34 @@ traces.
 
 | Operation | Method | Endpoint | Auth |
 |---|---|---|---|
-| Read the catalog | GET | `/api/platform/service-directory` | Authenticated (incl. `GUEST`) |
+| Read the catalog | GET | `/api/platform/resource-center` | Authenticated (incl. `GUEST`) |
 
 ### Directory scope administration
 
 | Operation | Method | Endpoint | Auth |
 |---|---|---|---|
-| Create scope | POST | `/api/platform/service-directory/scopes` | `DEVOPS_ADMIN` |
-| Update scope | PUT | `/api/platform/service-directory/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Delete scope (cascades) | DELETE | `/api/platform/service-directory/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Create scope | POST | `/api/platform/resource-center/scopes` | `DEVOPS_ADMIN` |
+| Update scope | PUT | `/api/platform/resource-center/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Delete scope (cascades) | DELETE | `/api/platform/resource-center/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
 
 ### Directory group administration
 
 | Operation | Method | Endpoint | Auth |
 |---|---|---|---|
-| Create group | POST | `/api/platform/service-directory/scopes/{scopeKey}/groups` | `DEVOPS_ADMIN` |
-| Update group | PUT | `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Delete group (cascades) | DELETE | `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Create group | POST | `/api/platform/resource-center/scopes/{scopeKey}/groups` | `DEVOPS_ADMIN` |
+| Update group | PUT | `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Delete group (cascades) | DELETE | `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
 
 ### Directory link administration
 
 | Operation | Method | Endpoint | Auth |
 |---|---|---|---|
-| Create link | POST | `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}/links` | `DEVOPS_ADMIN` |
-| Update link (may move it) | PUT | `/api/platform/service-directory/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Delete link | DELETE | `/api/platform/service-directory/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Create link | POST | `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}/links` | `DEVOPS_ADMIN` |
+| Update link (may move it) | PUT | `/api/platform/resource-center/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Delete link | DELETE | `/api/platform/resource-center/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
 
 **Every** endpoint in every table above responds with the same body shape: the full
-`ServiceDirectoryCatalogDto`.
+`ResourceCenterCatalogDto`.
 
 ### The `expectedVersion` parameter
 
@@ -197,6 +198,7 @@ implement correctly than two.
               "url": "https://confluence.example.invalid/wwa/deployment-guideline",
               "kind": "docs",
               "kindLabel": "Guideline",
+              "iconKey": "confluence",
               "enabled": true,
               "sortOrder": 10
             },
@@ -207,6 +209,7 @@ implement correctly than two.
               "url": "/wwa/deployment-agent",
               "kind": "workspace",
               "kindLabel": "Workspace",
+              "iconKey": "wwa",
               "enabled": true,
               "sortOrder": 30
             }
@@ -224,13 +227,14 @@ Notes:
 
 - `version` is the concurrency token. Clients must retain it and echo it as `expectedVersion` on every update and delete (never on a create). It changes on every successful mutation, and the mutation response carries the new value, so a client that always stores the latest response never needs a second read.
 - `updatedBy` is `null` for a freshly seeded catalog (the seed has no human author).
-- Presentation values (icon colour, two-letter badge, open-in-new-tab) are **not** in the payload; the client derives them from `kind` and `title`.
+- Fallback presentation values (icon colour, two-letter badge, open-in-new-tab) are **not** in the payload; the client derives them from `kind` and `title` when `iconKey` is absent or unknown.
+- Optional `iconKey` **is** in the payload when set. It is a whitelist key into local frontend assets, never an image URL (SD-FR-71).
 
 ---
 
 ## Endpoint Reference
 
-### GET `/api/platform/service-directory`
+### GET `/api/platform/resource-center`
 
 **Purpose:** Return the whole catalog for rendering. Seeds the store on first access when it is empty.
 
@@ -269,7 +273,7 @@ action. No audit entry is written for any read.
 
 ---
 
-### POST `/api/platform/service-directory/scopes`
+### POST `/api/platform/resource-center/scopes`
 
 **Purpose:** Create a directory scope.
 
@@ -310,11 +314,11 @@ and shows an add affordance in manage mode.
 There is no 409 here: creates carry no `expectedVersion` and cannot be stale (SD-FR-67).
 
 **Side effects:** catalog row updated, `version` incremented, `updatedBy` / `updatedAt` set; one audit
-entry with action `service_directory_update` and context `{ target_type: SERVICE_DIRECTORY, entity: scope, entity_key: security, entity_title: Security, operation: create }`.
+entry with action `resource_center_update` and context `{ target_type: SERVICE_DIRECTORY, entity: scope, entity_key: security, entity_title: Security, operation: create }`.
 
 ---
 
-### PUT `/api/platform/service-directory/scopes/{scopeKey}`
+### PUT `/api/platform/resource-center/scopes/{scopeKey}`
 
 **Purpose:** Update a directory scope's presentation, ordering, or availability.
 
@@ -346,7 +350,7 @@ warns); deleting or re-keying one is not.
 
 ---
 
-### DELETE `/api/platform/service-directory/scopes/{scopeKey}`
+### DELETE `/api/platform/resource-center/scopes/{scopeKey}`
 
 **Purpose:** Delete a scope together with all of its groups and links.
 
@@ -371,13 +375,13 @@ rejection message states that system scopes may be disabled or retitled but not 
 | 409 | `expectedVersion` no longer matches the stored version |
 
 **Side effects:** the scope and every descendant are removed in one transaction; `version` incremented;
-**one** audit entry with action `service_directory_delete` and context
+**one** audit entry with action `resource_center_delete` and context
 `{ …, entity: scope, operation: delete, removed_groups: 2, removed_links: 9 }` — a single entry with
 counts rather than one entry per descendant.
 
 ---
 
-### POST `/api/platform/service-directory/scopes/{scopeKey}/groups`
+### POST `/api/platform/resource-center/scopes/{scopeKey}/groups`
 
 **Purpose:** Create a group inside a scope.
 
@@ -423,7 +427,7 @@ No 409: creates carry no `expectedVersion` (SD-FR-67).
 
 ---
 
-### PUT `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}`
+### PUT `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}`
 
 **Purpose:** Update a group.
 
@@ -448,7 +452,7 @@ matches the stored version.
 
 ---
 
-### DELETE `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}`
+### DELETE `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}`
 
 **Purpose:** Delete a group together with its links.
 
@@ -468,11 +472,11 @@ matches the stored version.
 There is no system-group protection: only scopes carry the `system` flag.
 
 **Side effects:** group and its links removed in one transaction; one audit entry with action
-`service_directory_delete`, `entity: group`, and `removed_links`.
+`resource_center_delete`, `entity: group`, and `removed_links`.
 
 ---
 
-### POST `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}/links`
+### POST `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}/links`
 
 **Purpose:** Create a link inside a group.
 
@@ -487,6 +491,7 @@ There is no system-group protection: only scopes carry the `system` flag.
 | `url` | string | Yes | ≤ 1024 characters; validated per `kind` — see the URL rules below |
 | `kind` | enum | Yes | `docs`, `tool`, `workspace`, `repo` |
 | `kindLabel` | string | No | ≤ 24 characters; short pill caption. Defaults to the kind's display name |
+| `iconKey` | enum | No | One of `confluence`, `github`, `arcad`, `peoplesoft`, `learning`, `infosec`, `vendor`, `wwa`. Omit, `null`, or blank for the letter-badge fallback. Unknown values → 400 on `iconKey` |
 | `enabled` | boolean | No | Defaults to `true` |
 | `sortOrder` | integer | No | 0–9999; defaults to the end of the sibling list (highest sibling + 10, clamped to 9999) |
 
@@ -499,7 +504,8 @@ list keys on that id, so it must never be client-chosen or reassigned.
   "description": "Repo for newcomers to start contributing",
   "url": "https://github.example.com/wwa/deployment-agent",
   "kind": "repo",
-  "kindLabel": "GitHub"
+  "kindLabel": "GitHub",
+  "iconKey": "github"
 }
 ```
 
@@ -520,7 +526,7 @@ list keys on that id, so it must never be client-chosen or reassigned.
 
 | Status | When |
 |---|---|
-| 400 | Missing title, unknown `kind`, any URL rule violation, length or range violation |
+| 400 | Missing title, unknown `kind`, unknown `iconKey`, any URL rule violation, length or range violation |
 | 401 / 403 | No session / not `DEVOPS_ADMIN` |
 | 404 | `scopeKey` or `groupKey` does not exist |
 
@@ -530,7 +536,7 @@ No 409: creates carry no `expectedVersion` (SD-FR-67).
 
 ---
 
-### PUT `/api/platform/service-directory/links/{linkId}`
+### PUT `/api/platform/resource-center/links/{linkId}`
 
 **Purpose:** Update a link and, optionally, move it to a different group.
 
@@ -554,6 +560,7 @@ Supplying exactly one of the two target fields is a validation error, not a part
   "url": "https://github.example.com/wwa/deployment-agent",
   "kind": "repo",
   "kindLabel": "GitHub",
+  "iconKey": "github",
   "enabled": true,
   "targetScopeKey": "sdlc",
   "targetGroupKey": "build"
@@ -581,7 +588,7 @@ indistinguishable in the audit trail from a title correction.
 
 ---
 
-### DELETE `/api/platform/service-directory/links/{linkId}`
+### DELETE `/api/platform/resource-center/links/{linkId}`
 
 **Purpose:** Delete a single link.
 
@@ -598,7 +605,7 @@ indistinguishable in the audit trail from a title correction.
 | 404 | `linkId` not found |
 | 409 | `expectedVersion` no longer matches the stored version |
 
-**Side effects:** link removed; one audit entry with action `service_directory_delete` and
+**Side effects:** link removed; one audit entry with action `resource_center_delete` and
 `entity: link`.
 
 **Client-side consequence, not a server one:** the deleted id may still sit in some users' browser
@@ -755,3 +762,4 @@ the verified convention `@SpringBootTest` + `@AutoConfigureMockMvc` + `@ActivePr
 | 14 | A link move writes `from_scope_key`, `from_group_key`, `to_scope_key`, and `to_group_key` in the audit context; an in-place link edit writes none of the four |
 | 15 | Creating a second scope with `layout = stage-strip` → 400; creating a second `buckets` scope → 200 |
 | 16 | After exercising every mutation, no rows were added to `DA_CONFIGURATION_COMPONENT`, `DA_CONFIGURATION_ITEM`, or `DA_SCOPE_DIRECTORY` |
+| 17 | **`iconKey` whitelist (SD-FR-71).** Create/update link with `iconKey = github` → 200 and echoed in GET; omit `iconKey` → 200 with null/absent; blank `iconKey` → stored as absent; `iconKey = jenkins` (not in MVP set) → 400 naming `iconKey`; `iconKey = https://evil.example/x.png` → 400 (must not be accepted as a URL) |

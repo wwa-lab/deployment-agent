@@ -41,6 +41,17 @@ export type ConfigKey =
   | 'execution_callback_endpoint'
   | 'agent_contribution_dashboard_statuses'
 export type ConfigIntegrationId = 'jenkins' | 'ansible' | 'callback'
+export type DirectoryLinkKind = 'docs' | 'tool' | 'workspace' | 'repo'
+export type DirectoryScopeLayout = 'stage-strip' | 'buckets'
+export type DirectoryGroupType = 'stage' | 'bucket'
+export type SdlcStageKey =
+  | 'planning'
+  | 'estimation'
+  | 'discovery'
+  | 'build'
+  | 'testing'
+  | 'deployment'
+  | 'maintenance'
 
 export interface AccessScope {
   application: string
@@ -240,6 +251,62 @@ export interface ScopeDirectoryEntry {
   scopeSource: 'Application Default' | 'SNOW Group Default' | 'Agent Override'
   updatedBy?: string
   updatedAt?: string
+}
+
+export type DirectoryLinkIconKey =
+  | 'confluence'
+  | 'jira'
+  | 'github'
+  | 'jenkins'
+  | 'ansible'
+  | 'arcad'
+  | 'peoplesoft'
+  | 'learning'
+  | 'infosec'
+  | 'vendor'
+  | 'wwa'
+
+export interface DirectoryLink {
+  id: string
+  title: string
+  description: string
+  url: string
+  kind: DirectoryLinkKind
+  kindLabel: string
+  iconKey?: DirectoryLinkIconKey | null
+  enabled: boolean
+  sortOrder: number
+}
+
+export interface DirectoryGroup {
+  key: string
+  title: string
+  description: string
+  type: DirectoryGroupType
+  stageKey?: SdlcStageKey
+  stageOrder?: number
+  agentName: string
+  enabled: boolean
+  sortOrder: number
+  links: DirectoryLink[]
+}
+
+export interface DirectoryScope {
+  key: string
+  title: string
+  description: string
+  layout: DirectoryScopeLayout
+  system: boolean
+  enabled: boolean
+  sortOrder: number
+  groups: DirectoryGroup[]
+}
+
+export interface ResourceCenterCatalog {
+  version: number
+  updatedBy?: string | null
+  updatedAt?: string
+  scopes: DirectoryScope[]
 }
 
 // AuditLogEntry

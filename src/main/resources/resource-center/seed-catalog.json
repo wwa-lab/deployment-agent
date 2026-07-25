@@ -1,0 +1,517 @@
+[
+  {
+    "key": "sdlc",
+    "title": "SDLC",
+    "description": "Seven Qilianshan delivery stages.",
+    "layout": "stage-strip",
+    "system": true,
+    "enabled": true,
+    "sortOrder": 10,
+    "groups": [
+      {
+        "key": "planning",
+        "title": "Planning",
+        "description": "Defines project intent, approval readiness, scope, and delivery direction.",
+        "type": "stage",
+        "stageKey": "planning",
+        "stageOrder": 1,
+        "agentName": "Planning Agent",
+        "enabled": true,
+        "sortOrder": 10,
+        "links": [
+          {
+            "id": "a1000001-0001-4000-8000-000000000001",
+            "title": "Planning Guideline",
+            "description": "Confluence \u00b7 stage guideline",
+            "url": "https://confluence.example.invalid/wwa/planning-guideline",
+            "kind": "docs",
+            "kindLabel": "Guideline",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000001-0002-4000-8000-000000000002",
+            "title": "Planning Feedback",
+            "description": "Confluence \u00b7 write stage feedback",
+            "url": "https://confluence.example.invalid/wwa/planning-feedback",
+            "kind": "docs",
+            "kindLabel": "Feedback",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000001-0003-4000-8000-000000000003",
+            "title": "Planning Agent",
+            "description": "Open the WWA home workspace",
+            "url": "/wwa/home",
+            "kind": "workspace",
+            "kindLabel": "Workspace",
+            "enabled": true,
+            "sortOrder": 30,
+            "iconKey": "wwa"
+          }
+        ]
+      },
+      {
+        "key": "estimation",
+        "title": "Estimation",
+        "description": "Turns schedule, cost, resource, and risk assumptions into a delivery baseline.",
+        "type": "stage",
+        "stageKey": "estimation",
+        "stageOrder": 2,
+        "agentName": "Estimation Agent",
+        "enabled": true,
+        "sortOrder": 20,
+        "links": [
+          {
+            "id": "a1000002-0001-4000-8000-000000000001",
+            "title": "Estimation Guideline",
+            "description": "Confluence \u00b7 stage guideline",
+            "url": "https://confluence.example.invalid/wwa/estimation-guideline",
+            "kind": "docs",
+            "kindLabel": "Guideline",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000002-0002-4000-8000-000000000002",
+            "title": "Estimation Feedback",
+            "description": "Confluence \u00b7 write stage feedback",
+            "url": "https://confluence.example.invalid/wwa/estimation-feedback",
+            "kind": "docs",
+            "kindLabel": "Feedback",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "confluence"
+          }
+        ]
+      },
+      {
+        "key": "discovery",
+        "title": "Discovery",
+        "description": "Clarifies solution options, constraints, and design direction before build.",
+        "type": "stage",
+        "stageKey": "discovery",
+        "stageOrder": 3,
+        "agentName": "Discovery Agent",
+        "enabled": true,
+        "sortOrder": 30,
+        "links": [
+          {
+            "id": "a1000003-0001-4000-8000-000000000001",
+            "title": "Discovery Guideline",
+            "description": "Confluence \u00b7 stage guideline",
+            "url": "https://confluence.example.invalid/wwa/discovery-guideline",
+            "kind": "docs",
+            "kindLabel": "Guideline",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000003-0002-4000-8000-000000000002",
+            "title": "Discovery Feedback",
+            "description": "Confluence \u00b7 write stage feedback",
+            "url": "https://confluence.example.invalid/wwa/discovery-feedback",
+            "kind": "docs",
+            "kindLabel": "Feedback",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "confluence"
+          }
+        ]
+      },
+      {
+        "key": "build",
+        "title": "Build",
+        "description": "DEV-stage build, packaging, and pre-deployment automation.",
+        "type": "stage",
+        "stageKey": "build",
+        "stageOrder": 4,
+        "agentName": "Build Agent",
+        "enabled": true,
+        "sortOrder": 40,
+        "links": [
+          {
+            "id": "a1000004-0001-4000-8000-000000000001",
+            "title": "Build Guideline",
+            "description": "Confluence \u00b7 stage guideline",
+            "url": "https://confluence.example.invalid/wwa/build-guideline",
+            "kind": "docs",
+            "kindLabel": "Guideline",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000004-0002-4000-8000-000000000002",
+            "title": "Build Feedback",
+            "description": "Confluence \u00b7 write stage feedback",
+            "url": "https://confluence.example.invalid/wwa/build-feedback",
+            "kind": "docs",
+            "kindLabel": "Feedback",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000004-0003-4000-8000-000000000003",
+            "title": "Build Agent",
+            "description": "Open the WWA Build workspace",
+            "url": "/wwa/build-agent",
+            "kind": "workspace",
+            "kindLabel": "Workspace",
+            "enabled": true,
+            "sortOrder": 30,
+            "iconKey": "wwa"
+          }
+        ]
+      },
+      {
+        "key": "testing",
+        "title": "Testing",
+        "description": "Functional, performance, and compatibility validation with defect feedback.",
+        "type": "stage",
+        "stageKey": "testing",
+        "stageOrder": 5,
+        "agentName": "Testing Agent",
+        "enabled": true,
+        "sortOrder": 50,
+        "links": [
+          {
+            "id": "a1000005-0001-4000-8000-000000000001",
+            "title": "Testing Guideline",
+            "description": "Confluence \u00b7 stage guideline",
+            "url": "https://confluence.example.invalid/wwa/testing-guideline",
+            "kind": "docs",
+            "kindLabel": "Guideline",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000005-0002-4000-8000-000000000002",
+            "title": "Testing Feedback",
+            "description": "Confluence \u00b7 write stage feedback",
+            "url": "https://confluence.example.invalid/wwa/testing-feedback",
+            "kind": "docs",
+            "kindLabel": "Feedback",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000005-0003-4000-8000-000000000003",
+            "title": "Testing Agent",
+            "description": "Open the WWA Testing workspace",
+            "url": "/wwa/testing-agent",
+            "kind": "workspace",
+            "kindLabel": "Workspace",
+            "enabled": true,
+            "sortOrder": 30,
+            "iconKey": "wwa"
+          }
+        ]
+      },
+      {
+        "key": "deployment",
+        "title": "Deployment",
+        "description": "Human-in-the-loop deployment across SIT, UAT, and PROD.",
+        "type": "stage",
+        "stageKey": "deployment",
+        "stageOrder": 6,
+        "agentName": "Deployment Agent",
+        "enabled": true,
+        "sortOrder": 60,
+        "links": [
+          {
+            "id": "a1000006-0001-4000-8000-000000000001",
+            "title": "Deployment Guideline",
+            "description": "Confluence \u00b7 stage guideline",
+            "url": "https://confluence.example.invalid/wwa/deployment-guideline",
+            "kind": "docs",
+            "kindLabel": "Guideline",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000006-0002-4000-8000-000000000002",
+            "title": "Deployment Feedback",
+            "description": "Confluence \u00b7 write stage feedback",
+            "url": "https://confluence.example.invalid/wwa/deployment-feedback",
+            "kind": "docs",
+            "kindLabel": "Feedback",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000006-0003-4000-8000-000000000003",
+            "title": "Deployment Agent",
+            "description": "Open the WWA Deployment workspace",
+            "url": "/wwa/deployment-agent",
+            "kind": "workspace",
+            "kindLabel": "Workspace",
+            "enabled": true,
+            "sortOrder": 30,
+            "iconKey": "wwa"
+          }
+        ]
+      },
+      {
+        "key": "maintenance",
+        "title": "Maintenance",
+        "description": "Monitoring, incident response, and feedback routed back into the SDLC.",
+        "type": "stage",
+        "stageKey": "maintenance",
+        "stageOrder": 7,
+        "agentName": "Maintenance Agent",
+        "enabled": true,
+        "sortOrder": 70,
+        "links": [
+          {
+            "id": "a1000007-0001-4000-8000-000000000001",
+            "title": "Maintenance Guideline",
+            "description": "Confluence \u00b7 stage guideline",
+            "url": "https://confluence.example.invalid/wwa/maintenance-guideline",
+            "kind": "docs",
+            "kindLabel": "Guideline",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "a1000007-0002-4000-8000-000000000002",
+            "title": "Maintenance Feedback",
+            "description": "Confluence \u00b7 write stage feedback",
+            "url": "https://confluence.example.invalid/wwa/maintenance-feedback",
+            "kind": "docs",
+            "kindLabel": "Feedback",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "confluence"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "common",
+    "title": "Common",
+    "description": "Shared WWA and engineering resources used by every delivery team.",
+    "layout": "buckets",
+    "system": true,
+    "enabled": true,
+    "sortOrder": 20,
+    "groups": [
+      {
+        "key": "platform",
+        "title": "Common \u00b7 Platform",
+        "description": "Shared WWA / FinBlock resources used by every delivery team.",
+        "type": "bucket",
+        "stageKey": null,
+        "stageOrder": null,
+        "agentName": "",
+        "enabled": true,
+        "sortOrder": 10,
+        "links": [
+          {
+            "id": "b2000001-0001-4000-8000-000000000001",
+            "title": "WWA Home",
+            "description": "Agent hub and navigation entry point",
+            "url": "/wwa/home",
+            "kind": "workspace",
+            "kindLabel": "Workspace",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "wwa"
+          },
+          {
+            "id": "b2000001-0002-4000-8000-000000000002",
+            "title": "Template Management",
+            "description": "Upload templates and rundown definitions",
+            "url": "/wwa/template-management",
+            "kind": "workspace",
+            "kindLabel": "Workspace",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "wwa"
+          },
+          {
+            "id": "b2000001-0003-4000-8000-000000000003",
+            "title": "WWA Atlas Hub Docs",
+            "description": "Confluence \u00b7 product and onboarding",
+            "url": "https://confluence.example.invalid/wwa/atlas-hub-docs",
+            "kind": "docs",
+            "kindLabel": "Hub",
+            "enabled": true,
+            "sortOrder": 30,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "b2000001-0004-4000-8000-000000000004",
+            "title": "Change Management Guide",
+            "description": "CAB process and freeze calendar",
+            "url": "https://confluence.example.invalid/wwa/change-management",
+            "kind": "docs",
+            "kindLabel": "Process",
+            "enabled": true,
+            "sortOrder": 40,
+            "iconKey": "confluence"
+          }
+        ]
+      },
+      {
+        "key": "engineering-tools",
+        "title": "Common \u00b7 Engineering tools",
+        "description": "Shared engineering systems. Per-tool GitHub source links live under each SDLC agent.",
+        "type": "bucket",
+        "stageKey": null,
+        "stageOrder": null,
+        "agentName": "",
+        "enabled": true,
+        "sortOrder": 20,
+        "links": [
+          {
+            "id": "b2000002-0001-4000-8000-000000000001",
+            "title": "ARCAD",
+            "description": "IBM i DevOps / change management toolchain",
+            "url": "https://arcad.example.invalid/",
+            "kind": "tool",
+            "kindLabel": "ARCAD",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "arcad"
+          },
+          {
+            "id": "b2000002-0002-4000-8000-000000000002",
+            "title": "GitHub Enterprise",
+            "description": "Org home — browse team repos, PRs, and WWA projects",
+            "url": "https://github.example.invalid/",
+            "kind": "tool",
+            "kindLabel": "GitHub",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "github"
+          },
+          {
+            "id": "b2000002-0003-4000-8000-000000000003",
+            "title": "Jenkins",
+            "description": "CI / CD job console",
+            "url": "https://jenkins.example.invalid/",
+            "kind": "tool",
+            "kindLabel": "Jenkins",
+            "enabled": true,
+            "sortOrder": 30,
+            "iconKey": "jenkins"
+          },
+          {
+            "id": "b2000002-0004-4000-8000-000000000004",
+            "title": "Ansible",
+            "description": "Automation controller / AWX",
+            "url": "https://ansible.example.invalid/",
+            "kind": "tool",
+            "kindLabel": "Ansible",
+            "enabled": true,
+            "sortOrder": 40,
+            "iconKey": "ansible"
+          },
+          {
+            "id": "b2000002-0005-4000-8000-000000000005",
+            "title": "Confluence",
+            "description": "Team docs and knowledge base",
+            "url": "https://confluence.example.invalid/",
+            "kind": "docs",
+            "kindLabel": "Confluence",
+            "enabled": true,
+            "sortOrder": 50,
+            "iconKey": "confluence"
+          },
+          {
+            "id": "b2000002-0006-4000-8000-000000000006",
+            "title": "Jira",
+            "description": "Work items and delivery tracking",
+            "url": "https://jira.example.invalid/",
+            "kind": "tool",
+            "kindLabel": "Jira",
+            "enabled": true,
+            "sortOrder": 60,
+            "iconKey": "jira"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "external",
+    "title": "External",
+    "description": "Corporate systems outside WWA \u2014 open in a new tab.",
+    "layout": "buckets",
+    "system": true,
+    "enabled": true,
+    "sortOrder": 30,
+    "groups": [
+      {
+        "key": "enterprise",
+        "title": "External \u00b7 Enterprise",
+        "description": "Corporate systems outside WWA \u2014 open in a new tab.",
+        "type": "bucket",
+        "stageKey": null,
+        "stageOrder": null,
+        "agentName": "",
+        "enabled": true,
+        "sortOrder": 10,
+        "links": [
+          {
+            "id": "c3000001-0001-4000-8000-000000000001",
+            "title": "People Soft / HR Portal",
+            "description": "Leave, timesheets, org chart",
+            "url": "https://hr.example.invalid/",
+            "kind": "tool",
+            "kindLabel": "HR",
+            "enabled": true,
+            "sortOrder": 10,
+            "iconKey": "peoplesoft"
+          },
+          {
+            "id": "c3000001-0002-4000-8000-000000000002",
+            "title": "Learning Hub",
+            "description": "Training and compliance courses",
+            "url": "https://learning.example.invalid/",
+            "kind": "tool",
+            "kindLabel": "Learning",
+            "enabled": true,
+            "sortOrder": 20,
+            "iconKey": "learning"
+          },
+          {
+            "id": "c3000001-0003-4000-8000-000000000003",
+            "title": "InfoSec Policy Library",
+            "description": "Security standards and exceptions",
+            "url": "https://confluence.example.invalid/infosec/policies",
+            "kind": "docs",
+            "kindLabel": "Policy",
+            "enabled": true,
+            "sortOrder": 30,
+            "iconKey": "infosec"
+          },
+          {
+            "id": "c3000001-0004-4000-8000-000000000004",
+            "title": "Vendor Status Page",
+            "description": "Third-party outage notices",
+            "url": "https://vendor.example.invalid/status",
+            "kind": "tool",
+            "kindLabel": "Vendor",
+            "enabled": true,
+            "sortOrder": 40,
+            "iconKey": "vendor"
+          }
+        ]
+      }
+    ]
+  }
+]

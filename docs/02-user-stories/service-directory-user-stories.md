@@ -1,9 +1,10 @@
-# Service Directory User Stories
+# Resource Center User Stories
 
 **Slice:** `service-directory`
 **Date:** 2026-07-25
-**Status:** Regenerated via `req-to-user-story` — awaiting user acceptance
-**Source requirements:** `docs/01-requirements/service-directory-requirement.md` (SD-REQ-01 … SD-REQ-14)
+**Status:** Regenerated via `req-to-user-story`; **Amended 2026-07-25** — product renamed to **Resource Center**; per-link `iconKey` whitelist (SD-REQ-15)
+**Product name:** Resource Center (slice id `service-directory`)
+**Source requirements:** `docs/01-requirements/service-directory-requirement.md` (SD-REQ-01 … SD-REQ-15)
 **Granularity:** Capability Story Mode — eight capability-domain stories covering navigation, browsing, SDLC wayfinding, shared tooling, personal shortcuts, administration, audit, and boundary enforcement.
 
 > ID note: this regeneration uses `SD-US-nn`. The earlier draft used `SD-0n`; the mapping is
@@ -14,29 +15,29 @@
 
 # User Story SD-US-01
 
-**Title:** Reach Service Directory from Hub navigation
+**Title:** Reach Resource Center from Hub navigation
 
 **Story:**
 As an authenticated WWA user,
-I want to open Service Directory from the Platform flyout and from the Home page,
+I want to open Resource Center from the Platform flyout and from the Home page,
 so that I can reach shared tools and docs without leaving the Hub shell or hunting for a bookmark.
 
 ## Acceptance Criteria
 
 1. **Given** I am authenticated and viewing any `/wwa/*` page
    **When** I open the Platform section of the navigation flyout
-   **Then** I see a **Service Directory** entry alongside the other Platform capabilities, with no permission lock icon.
+   **Then** I see a **Resource Center** entry alongside the other Platform capabilities, with no permission lock icon.
 
 2. **Given** I am on the Home page
    **When** I look at the **Shared Controls** section
-   **Then** I see a Service Directory card that links to the same destination.
+   **Then** I see a Resource Center card that links to the same destination.
 
 3. **Given** I activate either entry
    **When** the page loads
-   **Then** the browser URL is `/wwa/service-directory`, the page renders inside the existing Hub shell (sidebar, flyout, topbar intact), and the topbar section title reads "Service Directory".
+   **Then** the browser URL is `/wwa/resource-center`, the page renders inside the existing Hub shell (sidebar, flyout, topbar intact), and the topbar section title reads "Resource Center".
 
 4. **Given** I am not authenticated
-   **When** I request `/wwa/service-directory` directly
+   **When** I request `/wwa/resource-center` directly
    **Then** the existing router guard sends me to `/login` first, and returns me to the Hub after login.
 
 ## Notes / Assumptions
@@ -53,7 +54,7 @@ so that I can reach shared tools and docs without leaving the Hub shell or hunti
 ## Out of Scope
 
 - Reordering or restyling the existing Platform navigation entries.
-- Adding a sidebar primary nav item (Service Directory is a Platform capability, not a workspace).
+- Adding a sidebar primary nav item (Resource Center is a Platform capability, not a workspace).
 
 ## Open Questions
 
@@ -96,11 +97,20 @@ so that I can find the right destination in a few seconds instead of scanning ev
    **When** I press `/` while focus is not in a text field and no dialog is open
    **Then** focus moves to the search input.
 
+7. **Given** a link has a whitelisted `iconKey` (for example `github` or `arcad`)
+   **When** I view its card
+   **Then** the card icon area shows the matching local icon instead of the two-letter badge.
+
+8. **Given** a link has no `iconKey`, or an unknown key that failed validation was never stored
+   **When** I view its card
+   **Then** the card keeps the existing kind-coloured letter badge (title initials, or `GH` for `repo`).
+
 ## Notes / Assumptions
 
 - Scope and kind filters are single-select (exclusive), matching the prototype (`wwa-service-directory.html:1461-1466`, `1502`).
 - **Correction from the earlier draft:** the draft claimed search matches the link URL. The accepted prototype does not search URLs (`wwa-service-directory.html:1443-1450`, `1590`), and searching raw URLs produces noisy matches. This story keeps URLs out of the search haystack; the requirement and spec were corrected to match.
 - Filtering is entirely client-side over the single catalog payload — no server round trip per keystroke.
+- **Amended 2026-07-25:** per-link icons use optional `iconKey` + frontend whitelist mapping (SD-REQ-15); no remote image URLs.
 
 ## Dependencies
 
@@ -111,6 +121,7 @@ so that I can find the right destination in a few seconds instead of scanning ev
 - Saved or shareable filter state in the URL query string.
 - Multi-select scope or kind filters.
 - Server-side search or pagination.
+- Custom icon upload or arbitrary icon image URLs.
 
 ## Open Questions
 
@@ -269,7 +280,7 @@ so that my day-to-day destinations are one click away without filtering or searc
 
 ## Notes / Assumptions
 
-- Recently used is stored in browser `localStorage` under a versioned key. This is the **first** `localStorage` usage in this frontend — a grep of `frontend/` found none — so this story establishes the key-naming convention `wwa.serviceDirectory.recent.v1`.
+- Recently used is stored in browser `localStorage` under a versioned key. This is the **first** `localStorage` usage in this frontend — a grep of `frontend/` found none — so this story establishes the key-naming convention `wwa.resourceCenter.recent.v1`.
 - Recently used is a UI convenience, not an audited event (SD-NFR-04).
 - The prototype seeds three fake recent ids on first load; production must not (see requirement §8).
 
@@ -301,7 +312,7 @@ so that the directory stays accurate without waiting for a code release.
 ## Acceptance Criteria
 
 1. **Given** I hold the `DEVOPS_ADMIN` role
-   **When** I open Service Directory
+   **When** I open Resource Center
    **Then** I see a manage toggle; enabling it reveals Add scope / Add group / Add link actions plus per-link Edit and Delete controls.
 
 2. **Given** manage mode is on
@@ -340,11 +351,20 @@ so that the directory stays accurate without waiting for a code release.
     **When** I *add* a new scope, group, or link
     **Then** it is accepted, because adding cannot overwrite anyone else's work — the conflict error is reserved for edits and deletions that could.
 
+11. **Given** I create or edit a link
+    **When** I open the link form
+    **Then** I can optionally pick an `iconKey` from a fixed whitelist dropdown (or leave it empty for the letter badge).
+
+12. **Given** I submit a link with an `iconKey` that is not on the whitelist
+    **When** validation runs
+    **Then** the save is rejected with a field-level message on `iconKey` and nothing is persisted.
+
 ## Notes / Assumptions
 
 - The role check is imperative and server-side (`user.hasRole("DEVOPS_ADMIN")` → `ForbiddenAppException`), matching the existing pattern in `ConfigurationController.java:39-48`. `@PreAuthorize` is not used anywhere in this codebase.
 - The prototype's topbar role `<select>` is a demo device only; production reads roles from the real session (requirement §8).
 - Conflict detection needs the client to send back the catalog version it last read on every edit and deletion. Storage-level optimistic locking alone would not satisfy AC 9: it only catches writes that overlap in flight, whereas the case in AC 9 is two saves minutes apart, which storage-level locking accepts silently. The existing `GlobalExceptionHandler` maps both to HTTP 409. See spec SD-FR-44, SD-FR-67, and SD-FR-68.
+- **Amended 2026-07-25:** link icons are optional whitelist keys only (SD-REQ-15); no upload or remote icon URL field.
 
 ## Dependencies
 
@@ -357,6 +377,7 @@ so that the directory stays accurate without waiting for a code release.
 - Bulk import or CSV upload of links.
 - Reordering by drag and drop (order is edited as a numeric field in MVP).
 - Role delegation — no new role or permission is introduced by this slice.
+- Custom icon upload or arbitrary icon image URLs.
 
 ## Open Questions
 
@@ -408,7 +429,7 @@ so that I can see who added, changed, or removed a destination and when.
 
 ## Out of Scope
 
-- A dedicated Service Directory change-history UI (the shared Audit Log page is the surface).
+- A dedicated Resource Center change-history UI (the shared Audit Log page is the surface).
 - Field-level before/after diffs for every attribute.
 - Audit retention or export changes.
 
@@ -424,7 +445,7 @@ so that I can see who added, changed, or removed a destination and when.
 
 **Story:**
 As a product owner,
-I want Service Directory content stored in its own place with its own admin surface,
+I want Resource Center content stored in its own place with its own admin surface,
 so that navigation content never mixes with Jenkins / Ansible runtime configuration and cannot be corrupted by config edits.
 
 ## Acceptance Criteria
@@ -435,21 +456,21 @@ so that navigation content never mixes with Jenkins / Ansible runtime configurat
 
 2. **Given** the Configuration Management page
    **When** an admin opens its Component, Scope Directory, and Configuration tabs
-   **Then** Service Directory entities do not appear there and its behavior is unchanged by this slice.
+   **Then** Resource Center entities do not appear there and its behavior is unchanged by this slice.
 
 3. **Given** an admin needs to change a directory link
    **When** they perform the change
-   **Then** they use the Service Directory page and its API, not the Config Admin editors.
+   **Then** they use the Resource Center page and its API, not the Config Admin editors.
 
 4. **Given** the API surface
    **When** the slice is reviewed
-   **Then** Service Directory endpoints are Platform-shared (`/api/platform/...`) and carry no agent parameter, because the catalog is cross-agent.
+   **Then** Resource Center endpoints are Platform-shared (`/api/platform/...`) and carry no agent parameter, because the catalog is cross-agent.
 
 ## Notes / Assumptions
 
 - The boundary is a durable architectural decision, so it is captured in proposed `ADR-0010` rather than only in this story.
-- The existing `ConfigKey` enum backs `ConfigurationItem` rows; adding a Service Directory key there would violate this story and must be avoided. Note that the Agent Contribute Dashboard *does* store its stage-status overrides as a `ConfigurationItem` — that precedent must not be copied for the catalog.
-- "Scope" is an overloaded word in this repository: `ScopeDirectoryEntry` / `AccessScope` mean application + SNOW-group access scoping, while a Service Directory **scope** is a catalog category. The names must not be conflated in code or docs.
+- The existing `ConfigKey` enum backs `ConfigurationItem` rows; adding a Resource Center key there would violate this story and must be avoided. Note that the Agent Contribute Dashboard *does* store its stage-status overrides as a `ConfigurationItem` — that precedent must not be copied for the catalog.
+- "Scope" is an overloaded word in this repository: `ScopeDirectoryEntry` / `AccessScope` mean application + SNOW-group access scoping, while a Resource Center **scope** is a catalog category. The names must not be conflated in code or docs.
 
 ## Dependencies
 

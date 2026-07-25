@@ -1,17 +1,20 @@
-# Data Model: Service Directory
+# Data Model: Resource Center
 
 > **Slice:** `service-directory`
-> **Status:** Regenerated via `architecture-to-design` — awaiting user acceptance
+> **Status:** Regenerated via `architecture-to-design`; **Amended 2026-07-25** — product renamed to **Resource Center**; optional link `iconKey` whitelist (SD-FR-71)
+> **Product name:** Resource Center · **Slice id:** `service-directory`
+>
+> **Physical table name:** `DA_SERVICE_DIRECTORY_CATALOG` remains the Oracle/H2 table id (already migrated as V20). Product rename does **not** require renaming the table.
 > **Last updated:** 2026-07-25
 > **Source spec:** `docs/03-spec/service-directory-spec.md`
 > **Companions:** `service-directory-architecture.md`, `service-directory-data-flow.md`
-> **Decision record:** `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Proposed)
+> **Decision record:** `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Accepted)
 
 ---
 
 ## 1. Overview
 
-Service Directory persists exactly one thing: the directory catalog — the administrator-maintained tree
+Resource Center persists exactly one thing: the directory catalog — the administrator-maintained tree
 of directory scopes, groups, and links that the Hub renders as a destination catalog. It is stored as a
 **single versioned JSON document in a single row** of a new dedicated table, because the catalog is
 always read whole, rendered whole, and versioned whole.
@@ -82,7 +85,8 @@ domain module is the only owner of catalog persistence, that migration stays con
               │  DirectoryLink            │   embedded, not a table
               │  id · title · description │
               │  url · kind · kindLabel · │
-              │  enabled · order          │
+              │  iconKey · enabled ·      │
+              │  order                    │
               └───────────────────────────┘
 
 Relationships to existing tables:
@@ -163,6 +167,7 @@ Table naming follows the repository's existing `DA_`-prefixed convention (for ex
 | `url` | String(1024) | Yes | Destination. Validated per kind: for `workspace`, an in-Hub path matching `^/wwa/[A-Za-z0-9._~\-/]*$` — no query string, fragment, or percent-encoding; for `docs`, `tool`, `repo`, an `http`/`https` scheme. Script-like schemes, protocol-relative URLs, and blanks are rejected (SD-FR-47, SD-FR-48) |
 | `kind` | Enum | Yes | `docs`, `tool`, `workspace`, `repo` (SD-FR-46) |
 | `kindLabel` | String(24) | No | Short pill caption — for example "Guideline", "CI", "GitHub". Defaults to the kind's display name when omitted |
+| `iconKey` | Enum / String | No | Optional whitelist key selecting a local card icon (SD-FR-71). MVP values: `confluence`, `github`, `arcad`, `peoplesoft`, `learning`, `infosec`, `vendor`, `wwa`. Blank or omitted means no key; unknown values are rejected on write. This is a key into the frontend asset map, **not** an image URL |
 | `enabled` | Boolean | Yes | Readers receive enabled links only |
 | `sortOrder` | Integer 0–9999 | Yes | Ascending within the group; ties break by `title`, then by `id` (SD-FR-10). Links have no `key`, so the scope/group tie-break rule does not apply here; `id` is the final discriminator that makes the order stable across reloads when two links share a title |
 
@@ -171,7 +176,8 @@ Table naming follows the repository's existing `DA_`-prefixed convention (for ex
 | Not stored | Reason |
 |---|---|
 | `openInNewTab` | Derived from `kind` (SD-FR-26). Storing it allows a `workspace` link flagged for a new tab — a state with no correct behavior |
-| `tone`, `mark` (icon colour and two-letter badge) | Pure presentation, derived deterministically in the frontend from kind and title, exactly as the prototype derives them on create |
+| `tone`, `mark` (icon colour and two-letter badge) | Pure presentation fallback when `iconKey` is absent; still derived deterministically in the frontend from kind and title |
+| `iconUrl` / uploaded icon bytes | MVP icons are local assets keyed by `iconKey` only (SD-FR-71). Arbitrary URLs would create broken cards, CSP risk, and an unowned asset store |
 | `tags`, `audience`, `environments`, `source` | Speculative in the earlier draft; no requirement consumes them, and unused fields still need validation, UI, and migration |
 | `agentOwner` (team name) | Team ownership belongs to the Agent Contribute Dashboard, not the link catalog |
 | `updatedAt` / `updatedBy` per link | Per-entity attribution is already captured in the audit trail (SD-FR-55); duplicating it in the document creates a second, un-reviewed history that can drift |
@@ -235,7 +241,7 @@ The version is not a business state and is never shown as one; it exists solely 
 This slice adds **no** configuration keys, components, or scope-directory entries. That is a
 requirement, not an omission (SD-FR-63).
 
-| Existing store | Owner | Why Service Directory must not use it |
+| Existing store | Owner | Why Resource Center must not use it |
 |---|---|---|
 | `DA_CONFIGURATION_ITEM` (keyed by the `ConfigKey` enum) | Configuration Management | Holds runtime key-value settings. Adding a catalog key would place navigation content behind the config admin editors and mix two change-control audiences. Note the Agent Contribute Dashboard *does* store its stage-status overrides here — that precedent must not be copied for the catalog |
 | `DA_CONFIGURATION_COMPONENT` | Configuration Management | Holds integration endpoints and credentials for Jenkins / Ansible / callback components. The catalog has no credential concept and must not sit next to secrets |
@@ -255,7 +261,7 @@ This slice writes to the existing audit store; it defines no new audit table.
 
 | Audit field | Value for this slice |
 |---|---|
-| Action type | A dedicated Service Directory action: an update action for create and update, a delete action for deletion (SD-FR-54) |
+| Action type | A dedicated Resource Center action: an update action for create and update, a delete action for deletion (SD-FR-54) |
 | Actor kind | `HUMAN` — the audit write path already sets this for every entry (verified at `domain/audit/AuditLoggerService.java:125`) |
 | Operator identity and role | Taken from the server-side user context, never from the request body |
 | Context payload | The identifying detail: entity type, entity id or key, entity title, operation, and — for cascade deletes — counts of removed groups and links (SD-FR-55, SD-FR-56) |
@@ -309,6 +315,7 @@ Seed content rules:
 3. **Unknown URLs use the reserved `.invalid` suffix** (RFC 2606), which renders as "URL pending" and is not activatable (SD-FR-27, SD-FR-62). This applies to ARCAD and GitHub Enterprise until SD-T02 supplies real URLs, and to stage guideline / feedback links whose Confluence targets are not yet confirmed.
 4. **No fabricated Recently used entries.** The prototype seeds three; production starts empty (SD-FR-32).
 5. **No real internal hostnames are guessed.** A placeholder is preferable to a wrong or sensitive host.
+6. **Seed links may set `iconKey` for known destinations** (for example `arcad`, `github`, `confluence`, `wwa`) when a matching local asset exists. Links without a clear brand keep `iconKey` omitted and use the letter badge.
 
 ---
 
@@ -316,7 +323,7 @@ Seed content rules:
 
 | Key | Shape | Cap | Notes |
 |---|---|---|---|
-| `wwa.serviceDirectory.recent.v1` | Ordered list of `{ linkId, openedAt }`, most recent first | 8 entries | Resolved against the loaded catalog on every page load; unresolvable ids are dropped (SD-FR-34). Bump the `v` suffix on an incompatible shape change |
+| `wwa.resourceCenter.recent.v1` | Ordered list of `{ linkId, openedAt }`, most recent first | 8 entries | Resolved against the loaded catalog on every page load; unresolvable ids are dropped (SD-FR-34). Bump the `v` suffix on an incompatible shape change |
 
 Two grounded notes:
 

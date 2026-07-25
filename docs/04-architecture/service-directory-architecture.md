@@ -1,11 +1,12 @@
-# System Architecture: Service Directory
+# System Architecture: Resource Center
 
 > **Slice:** `service-directory`
-> **Status:** Regenerated via `spec-to-architecture` — awaiting user acceptance
+> **Status:** Regenerated via `spec-to-architecture`; **Amended 2026-07-25** — product renamed to **Resource Center** (formerly Service Directory); optional link `iconKey` stays inside the catalog document (SD-FR-71)
+> **Product name:** Resource Center · **Slice id:** `service-directory`
 > **Last updated:** 2026-07-25
 > **Source spec:** `docs/03-spec/service-directory-spec.md`
 > **Companion documents:** `service-directory-data-flow.md`, `service-directory-data-model.md`
-> **Decision record:** `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Proposed)
+> **Decision record:** `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Accepted)
 
 Abstraction note: this document stays at component and boundary level. Concrete classes, endpoints,
 payloads, and file locations belong to `docs/05-design/service-directory-design.md` and the API guide.
@@ -14,7 +15,7 @@ payloads, and file locations belong to `docs/05-design/service-directory-design.
 
 ## Overview
 
-- **Architecture Summary**: Service Directory adds one Platform-shared capability to the existing WWA Agent Hub modular monolith. A new catalog module owns a single versioned configuration document describing directory scopes, groups, and links; a Platform REST resource serves the whole document to the Hub frontend on page load and applies administrator mutations to it; the existing audit component records each mutation. All discovery behavior — filtering, stage focus, search — is client-side over that one payload, and the personal Recently used list never leaves the browser.
+- **Architecture Summary**: Resource Center adds one Platform-shared capability to the existing WWA Agent Hub modular monolith. A new catalog module owns a single versioned configuration document describing directory scopes, groups, and links; a Platform REST resource serves the whole document to the Hub frontend on page load and applies administrator mutations to it; the existing audit component records each mutation. All discovery behavior — filtering, stage focus, search — is client-side over that one payload, and the personal Recently used list never leaves the browser.
 - **Design Objective**: Configuration-driven navigation content that an administrator can change without a code release, with a data-ownership boundary that keeps navigation content out of runtime integration configuration.
 - **Architectural Style**: Layered modular monolith, consistent with the rest of the Hub — Vue presentation layer, Spring MVC Platform API layer, domain service layer, JPA persistence layer. Read-mostly reference data served as a single aggregate document. No new runtime process, queue, scheduler, or external integration.
 
@@ -22,8 +23,8 @@ payloads, and file locations belong to `docs/05-design/service-directory-design.
 
 ## Source Specification
 
-- **Feature / System Name**: Service Directory (WWA Agent Hub Platform capability)
-- **Scope Summary**: A config-driven catalog page at `/wwa/service-directory` offering scope / kind / SDLC-stage / text discovery over administrator-maintained destinations, plus `DEVOPS_ADMIN` CRUD with audit. Excludes link health checks, external discovery or sync, server-side personal history, and any storage inside Configuration Management.
+- **Feature / System Name**: Resource Center (WWA Agent Hub Platform capability)
+- **Scope Summary**: A config-driven catalog page at `/wwa/resource-center` offering scope / kind / SDLC-stage / text discovery over administrator-maintained destinations, plus `DEVOPS_ADMIN` CRUD with audit. Excludes link health checks, external discovery or sync, server-side personal history, and any storage inside Configuration Management.
 
 ---
 
@@ -84,7 +85,7 @@ payloads, and file locations belong to `docs/05-design/service-directory-design.
 ### System Boundary
 
 Inside the boundary: the catalog document and its persistence, catalog read and mutation services,
-validation, seeding, the Platform REST resource, and the Service Directory page with its client-side
+validation, seeding, the Platform REST resource, and the Resource Center page with its client-side
 discovery logic and browser-local Recently used list.
 
 Outside the boundary: authentication and session management, guest write enforcement, the audit store
@@ -108,7 +109,7 @@ its own content, every agent workspace, and every system a link points to.
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  Hub Web App (Vue SPA, existing shell)                                   │
 │  ┌────────────────────────────────┐  ┌─────────────────────────────────┐  │
-│  │ Service Directory Page         │  │ Browser-local store            │  │
+│  │ Resource Center Page         │  │ Browser-local store            │  │
 │  │ catalog render · filters ·     │  │ Recently used (max 8) —        │  │
 │  │ stage rail · search · manage   │  │ never sent to the server       │  │
 │  └────────────────────────────────┘  └─────────────────────────────────┘  │
@@ -121,10 +122,10 @@ its own content, every agent workspace, and every system a link points to.
 │  Auth chain: session → header fallback (local/test) → guest write block   │
 │  ├──────────────────────────────────────────────────────────────────────┤ │
 │  │  Platform shared web layer                                          │ │
-│  │  Service Directory resource — read (all sessions) ·                  │ │
+│  │  Resource Center resource — read (all sessions) ·                  │ │
 │  │  mutate (DEVOPS_ADMIN, imperative role check)                        │ │
 │  ├──────────────────────────────────────────────────────────────────────┤ │
-│  │  Service Directory domain module                                     │ │
+│  │  Resource Center domain module                                     │ │
 │  │  ┌────────────────┐ ┌────────────────┐ ┌────────────────────────┐    │ │
 │  │  │ Catalog read + │ │ Validation +   │ │ Seed provisioning      │    │ │
 │  │  │ visibility     │ │ mutation       │ │ (empty store only)     │    │ │
@@ -139,7 +140,7 @@ its own content, every agent workspace, and every system a link points to.
 ┌────────────────────────────┐      ┌────────────────────────────────────┐
 │  Relational DB             │      │  Existing Audit capability         │
 │  Oracle (prod) · H2 (local)│      │  writes one HUMAN-actor entry per   │
-│  Service Directory catalog │      │  successful catalog mutation        │
+│  Resource Center catalog │      │  successful catalog mutation        │
 │  table (new, isolated)     │      │                                    │
 │                            │      │  Configuration Management stores    │
 │                            │      │  remain untouched by this slice     │
@@ -150,9 +151,9 @@ its own content, every agent workspace, and every system a link points to.
 
 The capability spans four layers plus one client-only store:
 
-- **Presentation Layer** — the Service Directory page renders the catalog and owns all discovery behavior (scope filter, kind filter, stage focus, search, empty states, manage mode). It is the only place where filtering happens, because the server always returns the whole visible catalog.
+- **Presentation Layer** — the Resource Center page renders the catalog and owns all discovery behavior (scope filter, kind filter, stage focus, search, empty states, manage mode). It is the only place where filtering happens, because the server always returns the whole visible catalog.
 - **Application / API Layer** — a Platform-shared REST resource, sitting behind the existing authentication chain. It resolves the caller's role, decides read visibility, delegates mutations, and translates domain failures into the platform's standard error envelope. It holds no persistence logic.
-- **Domain Layer** — a new Service Directory module with three responsibilities: read with visibility filtering, validated hierarchical mutation, and one-time seed provisioning. Structural rules (uniqueness, cascade removal, system-scope protection, URL shape) live here so the API layer and any future caller inherit them.
+- **Domain Layer** — a new Resource Center module with three responsibilities: read with visibility filtering, validated hierarchical mutation, and one-time seed provisioning. Structural rules (uniqueness, cascade removal, system-scope protection, URL shape) live here so the API layer and any future caller inherit them.
 - **Persistence Layer** — one table holding one catalog row: the serialised document plus an optimistic version and update-attribution columns. Reads load one row; writes read-modify-write that row inside a transaction.
 - **Client-only store** — Recently used lives in browser storage, is resolved against the freshly loaded catalog, and is deliberately unreachable from the server (privacy and scope constraint SD-NFR-09).
 
@@ -162,7 +163,7 @@ The capability spans four layers plus one client-only store:
 
 ### Frontend Components
 
-- **Service Directory page**: orchestrates load, error, and empty states; owns filter state (active scope, active kind, active stage focus, search text) and manage-mode state.
+- **Resource Center page**: orchestrates load, error, and empty states; owns filter state (active scope, active kind, active stage focus, search text) and manage-mode state.
 - **Filter region**: scope chips, kind chips, SDLC stage rail, and search input. Enforces the interaction rules — single-select chips, stage focus hiding non-SDLC scopes, stage toggle-off, focus reset when leaving the SDLC scope.
 - **Catalog region**: renders visible scopes → groups → links, applies the fixed kind sub-heading order, and shows per-kind add affordances when manage mode is active.
 - **Link activation helper**: single decision point for open behavior — in-app routing for workspace links, protected new tab for other kinds, suppression for pending URLs — and the only place that records a Recently used entry.
@@ -174,7 +175,7 @@ The capability spans four layers plus one client-only store:
 
 ### Backend Services
 
-- **Service Directory Platform resource**: the only inbound surface. Read is available to any authenticated session; mutation paths perform the imperative `DEVOPS_ADMIN` check and reject otherwise. Returns the updated catalog from every mutation.
+- **Resource Center Platform resource**: the only inbound surface. Read is available to any authenticated session; mutation paths perform the imperative `DEVOPS_ADMIN` check and reject otherwise. Returns the updated catalog from every mutation.
 - **Catalog read service**: loads the single catalog row, triggers seeding when the store is empty, and projects the document for the caller — enabled-only for readers, complete for administrators who ask for it.
 - **Catalog mutation service**: applies one create, update, or delete to the document inside a transaction. Owns uniqueness checks, hierarchical removal, system-scope protection, and version-conflict propagation.
 - **Catalog validation component**: pure structural and URL-shape validation, independent of persistence, so the same rules apply to seeding and to administrator input.
@@ -192,8 +193,8 @@ The capability spans four layers plus one client-only store:
 
 ### Monitoring / Audit Modules
 
-- **Audit emission**: after a successful mutation, the mutation service calls the existing audit component once with a dedicated Service Directory action, human actor kind, and a context map identifying entity type, identifier, key or title, operation, and — for cascade deletes — the removed-descendant counts.
-- **Audit review**: the existing Audit Log capability is the review surface. No Service Directory-specific history UI is introduced.
+- **Audit emission**: after a successful mutation, the mutation service calls the existing audit component once with a dedicated Resource Center action, human actor kind, and a context map identifying entity type, identifier, key or title, operation, and — for cascade deletes — the removed-descendant counts.
+- **Audit review**: the existing Audit Log capability is the review surface. No Resource Center-specific history UI is introduced.
 - **Correlation**: requests inherit the platform's existing request-correlation mechanism; this slice adds no bespoke metrics or alerting.
 
 ### Integration Adapters
@@ -235,7 +236,7 @@ concurrency: a mutation computed against version *n* only commits while the stor
 
 ### Persistence Responsibilities
 
-- The Service Directory domain module is the **only** owner of catalog persistence. No other module reads or writes the catalog table, and this module writes nothing else.
+- The Resource Center domain module is the **only** owner of catalog persistence. No other module reads or writes the catalog table, and this module writes nothing else.
 - The catalog is stored as one document in one row, because it is always read whole, rendered whole, and versioned whole. Rationale, alternatives, and consequences are recorded in `ADR-0010`.
 - Audit records are owned by the existing audit capability; this module only emits.
 - Recently used is owned by the browser and is intentionally not persisted server-side.
@@ -254,11 +255,11 @@ no availability coupling between the Hub and any linked system.
 
 ### Internal Capability Boundaries
 
-- **Authentication chain → Service Directory resource**: the chain establishes the session-derived user context and blocks guest writes before the resource is reached; the resource consumes the resulting context and never re-authenticates.
-- **Service Directory resource → Service Directory domain module**: the resource passes the caller's identity and role decision plus a validated request; the module owns all structural rules.
-- **Service Directory domain module → audit capability**: one-way, in-process, after-commit-intent emission in the audit capability's own transaction. Failure is contained on the audit side (SD-FR-58).
-- **Service Directory domain module → Configuration Management**: deliberately **no** relationship. This is the boundary the slice exists to protect (`ADR-0010`).
-- **Service Directory ↔ Agent Contribute Dashboard**: no runtime coupling in MVP. Overlapping SDLC guideline and feedback content is aligned by content ownership, not by code (SD-FR-66). A shared content source is a separate future slice.
+- **Authentication chain → Resource Center resource**: the chain establishes the session-derived user context and blocks guest writes before the resource is reached; the resource consumes the resulting context and never re-authenticates.
+- **Resource Center resource → Resource Center domain module**: the resource passes the caller's identity and role decision plus a validated request; the module owns all structural rules.
+- **Resource Center domain module → audit capability**: one-way, in-process, after-commit-intent emission in the audit capability's own transaction. Failure is contained on the audit side (SD-FR-58).
+- **Resource Center domain module → Configuration Management**: deliberately **no** relationship. This is the boundary the slice exists to protect (`ADR-0010`).
+- **Resource Center ↔ Agent Contribute Dashboard**: no runtime coupling in MVP. Overlapping SDLC guideline and feedback content is aligned by content ownership, not by code (SD-FR-66). A shared content source is a separate future slice.
 - **Agent isolation mechanisms**: not applicable. This is a Platform capability with no agent parameter, so no agent-forcing or agent boundary guarding participates.
 
 ### Event / Polling / Callback Patterns
@@ -273,7 +274,7 @@ property of reference data, stated in the spec's lifecycle (§Functional Scope, 
 
 ### Request Flow
 
-1. The browser requests the Service Directory route; the frontend router guard ensures an authenticated session exists.
+1. The browser requests the Resource Center route; the frontend router guard ensures an authenticated session exists.
 2. The page issues one catalog read.
 3. The authentication chain resolves the session into a server-side user context and passes the request through.
 4. The Platform resource inspects the caller's role to decide whether disabled entries may be included, then delegates to the read service.
@@ -328,8 +329,8 @@ entry.
 
 | Interface | Consumer | Purpose |
 |---|---|---|
-| Platform catalog read resource | Service Directory page | Fetch the whole catalog for rendering; visibility depends on the caller's role |
-| Platform catalog administration resource | Service Directory manage mode | Create, update, and delete directory scopes, groups, and links; returns the updated catalog |
+| Platform catalog read resource | Resource Center page | Fetch the whole catalog for rendering; visibility depends on the caller's role |
+| Platform catalog administration resource | Resource Center manage mode | Create, update, and delete directory scopes, groups, and links; returns the updated catalog |
 
 Both live under the shared `/api/platform` prefix and accept no agent parameter. Concrete paths,
 payloads, and status codes are specified in
@@ -337,9 +338,9 @@ payloads, and status codes are specified in
 
 ### Internal Module Boundaries
 
-- The Platform resource depends on the Service Directory domain module; the module has no dependency on the web layer.
+- The Platform resource depends on the Resource Center domain module; the module has no dependency on the web layer.
 - The domain module depends on the audit capability's write interface only.
-- No other Hub module depends on the Service Directory module, and the Service Directory module depends on no other domain module. This isolation is what makes the boundary in `ADR-0010` enforceable by inspection.
+- No other Hub module depends on the Resource Center module, and the Resource Center module depends on no other domain module. This isolation is what makes the boundary in `ADR-0010` enforceable by inspection.
 
 ### Outbound Integrations
 
@@ -389,7 +390,7 @@ store.
 
 ### Auditability
 
-- One entry per successful mutation, human actor kind, dedicated Service Directory action vocabulary distinct from Configuration Management actions.
+- One entry per successful mutation, human actor kind, dedicated Resource Center action vocabulary distinct from Configuration Management actions.
 - Identifying detail is carried in the audit context map, which is the part of the audit record the review surface actually exposes.
 - Cascade deletes record one entry with descendant counts rather than a burst of per-descendant entries, keeping the audit trail readable.
 - Reads, filtering, and Recently used are never audited, so the audit trail stays a record of change rather than of browsing.
@@ -416,7 +417,7 @@ store.
 | 1 | Single-document storage versus normalised tables | Chosen deliberately: the catalog is always read and rendered whole, which makes one document simpler, cheaper to migrate, and trivially consistent for hierarchical deletes. The cost is document-level concurrency (see risk 2) and the loss of per-row SQL querying. Recorded in `ADR-0010`. |
 | 2 | Document-level optimistic locking can reject edits to unrelated links | Accepted for MVP under the low-write-concurrency assumption. An explicit conflict is strictly safer than a silent lost update. Normalising later is a contained change because the module owns all catalog persistence. |
 | 3 | Client-side filtering assumes a bounded catalog | Valid within the stated MVP ceiling. Crossing it would force server-side filtering and pagination, which would also change the "one read serves the page" property. The ceiling is stated in the spec so growth is detected rather than discovered. |
-| 4 | Extending the shared audit action vocabulary | Additive and migration-free because the action is persisted as a string. The alternative — reusing configuration actions — was rejected because it would make Configuration Management and Service Directory changes indistinguishable to auditors. |
+| 4 | Extending the shared audit action vocabulary | Additive and migration-free because the action is persisted as a string. The alternative — reusing configuration actions — was rejected because it would make Configuration Management and Resource Center changes indistinguishable to auditors. |
 | 5 | Identifying detail lives in the audit context map, not in the audit entity's generic target columns | Deliberate: those columns exist but are written by nothing and exposed by nothing, so using them would produce audit records that auditors cannot see. Populating them properly is a separate audit-capability improvement, not this slice's scope. |
 | 6 | Overlapping content with the Agent Contribute Dashboard | Two surfaces can drift while alignment is manual. Accepted for MVP with an explicit owner responsibility; a shared source is a candidate follow-up slice (SD-OQ-03). |
 | 7 | Term collision on the word "scope" | The codebase already uses "scope" for access scoping. Mitigated by consistently qualifying the new concept as a *directory scope* and by keeping the two models in separate modules with no shared types. |

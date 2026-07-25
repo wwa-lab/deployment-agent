@@ -1,8 +1,10 @@
-# Service Directory Traceability
+# Resource Center Traceability
 
 **Slice:** `service-directory`
 **Date:** 2026-07-25
-**Status:** Regenerated via the `wwa-sdd-generate-all` skill chain, then reviewed and repaired — SDD complete, **awaiting user acceptance**, not implemented
+**Status:** **Implemented** — W10 (Resource Center rename) and W9 (`iconKey`) complete in code; manual UAT pending (SD-T62)
+**Product name:** Resource Center  
+**Slice id / artifact filenames:** `service-directory` (unchanged)  
 **Language:** English-only (ADR-0009)
 
 This document is the single index for the slice: which documents exist, how every requirement traces
@@ -16,13 +18,13 @@ forward to code-level tasks, and what is still open.
 |---|---|
 | Slice | `service-directory` |
 | Goal | One Platform page that answers "where do I go?" for SDLC tooling, shared platforms, and external systems, driven by admin-maintained configuration rather than code |
-| Scope (in) | Route `/wwa/service-directory`; `directory scopes → groups → links` catalog; scope / kind / stage / text filters; browser-local Recently used; `DEVOPS_ADMIN` manage with audit; dedicated persistence + Platform REST API; seed catalog |
-| Scope (out) | Storage inside Configuration Management entities; link health probes; auto-discovery; server-side Recently used; iframe embedding; per-user favourites; the prototype's mock role switch |
+| Scope (in) | Route `/wwa/resource-center`; `directory scopes → groups → links` catalog; scope / kind / stage / text filters; browser-local Recently used; `DEVOPS_ADMIN` manage with audit; dedicated persistence + Platform REST API; seed catalog |
+| Scope (out) | Storage inside Configuration Management entities; link health probes; auto-discovery; server-side Recently used; iframe embedding; per-user favourites; the prototype's mock role switch; arbitrary icon URL upload or remote image hosting |
 | Prototype (accepted UX baseline) | `docs/prototypes/wwa-service-directory.html` |
 | Behavior source of truth | `docs/03-spec/service-directory-spec.md` |
 | Execution source of truth | `docs/06-tasks/service-directory-tasks.md` |
-| Decision record | `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Proposed) |
-| Verification | `mvn test`, `cd frontend && npm run build`, documented manual walkthrough (tasks doc) |
+| Decision record | `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (**Accepted**) |
+| Verification | `mvn test` (445/445), `cd frontend && npm run build` green; manual walkthrough pending |
 
 ---
 
@@ -30,17 +32,42 @@ forward to code-level tasks, and what is still open.
 
 | Stage | Path | Status |
 |---|---|---|
-| Requirements | `docs/01-requirements/service-directory-requirement.md` | Regenerated |
-| User stories | `docs/02-user-stories/service-directory-user-stories.md` | Regenerated |
-| Spec | `docs/03-spec/service-directory-spec.md` | Regenerated |
-| Architecture | `docs/04-architecture/service-directory-architecture.md` | Regenerated |
-| Data flow | `docs/04-architecture/service-directory-data-flow.md` | Regenerated (was previously deferred) |
-| Data model | `docs/04-architecture/service-directory-data-model.md` | Regenerated |
-| Design | `docs/05-design/service-directory-design.md` | Regenerated |
-| API guide | `docs/05-design/contracts/service-directory-API_IMPLEMENTATION_GUIDE.md` | Regenerated (was previously deferred) |
-| Tasks | `docs/06-tasks/service-directory-tasks.md` | Regenerated |
-| Traceability | this document | Regenerated |
-| Decision record | `docs/00-context/decisions/ADR-0010-…` | Proposed |
+| Requirements | `docs/01-requirements/service-directory-requirement.md` | Regenerated; **Amended** SD-REQ-15 |
+| User stories | `docs/02-user-stories/service-directory-user-stories.md` | Regenerated; **Amended** SD-US-02 / SD-US-06 ACs |
+| Spec | `docs/03-spec/service-directory-spec.md` | Regenerated; **Amended** SD-FR-71 |
+| Architecture | `docs/04-architecture/service-directory-architecture.md` | Regenerated (store boundary unchanged by icons) |
+| Data flow | `docs/04-architecture/service-directory-data-flow.md` | Regenerated; **Amended** `iconKey` mapping |
+| Data model | `docs/04-architecture/service-directory-data-model.md` | Regenerated; **Amended** link `iconKey` |
+| Design | `docs/05-design/service-directory-design.md` | Regenerated; **Amended** enum, validator, UI |
+| API guide | `docs/05-design/contracts/service-directory-API_IMPLEMENTATION_GUIDE.md` | Regenerated; **Amended** v1.1 + checklist row 17 |
+| Tasks | `docs/06-tasks/service-directory-tasks.md` | Regenerated; **Amended** W9 icons + **W10** rename |
+| Traceability | this document | Implemented + amendment index |
+| Decision record | `docs/00-context/decisions/ADR-0010-…` | **Accepted** (store boundary unchanged; product now called Resource Center) |
+
+---
+
+## Implementation Status (2026-07-25)
+
+| Task | Status | Evidence |
+|---|---|---|
+| SD-T00 | Closed | Option A — `DA_SERVICE_DIRECTORY_CATALOG` single JSON row |
+| SD-T01 | Closed | Guest GET 200 in `ResourceCenterControllerTest` |
+| SD-T02 | Open | Seed uses `*.example.invalid` for ARCAD/GitHub Enterprise |
+| SD-T03 | Closed | `ADR-0010` Accepted |
+| SD-T10 … SD-T14 | Done | Entity, enums, converter, repo, V20, Oracle DDL |
+| SD-T20 … SD-T22 | Done | Validator, service, seed loader + JSON |
+| SD-T30, SD-T31 | Done | Controller + audit constants |
+| SD-T40 | Done | 16 checklist scenarios in `ResourceCenterControllerTest` |
+| SD-T50 … SD-T54 | Done | Frontend API, store, view, dialogs, composable |
+| SD-T60 | Partial | Manual alignment only; dashboard links remain frontend JSON |
+| SD-T61 | Done | CHANGELOG Unreleased entry |
+| SD-T62 | Partial | Automated gates pass; manual walkthrough not run this session |
+| SD-T63 | Done | This document + `AGENT_HANDOFF.md` |
+| SD-T70 | Skipped | Per user — governance package paths unchanged |
+| SD-T80 … SD-T83 | **Done** | `DirectoryLinkIconKey`, validator, seed keys, frontend assets/picker, checklist row 17 |
+| SD-T90 … SD-T92 | **Done** | Route/API `resource-center`, `ResourceCenter*` symbols, audit rename, redirect, grep gate clean |
+
+**Content ownership (SD-T60):** Resource Center SDLC guideline/feedback URLs live in `seed-catalog.json` (server); Agent Contribute Dashboard `resourceLinks` live in `frontend/src/config/agentContributionDashboard.json` (client). Both use `confluence.example*` placeholders for unconfirmed Confluence targets — reconcile manually when URLs are known.
 
 ---
 
@@ -100,6 +127,7 @@ in the completion report and in `docs/00-context/lessons-learned.md`.
 | SD-REQ-12 — System scopes protected from deletion, keys fixed | SD-US-06 | SD-FR-43 | M3, M4 | SD-T20, SD-T21, SD-T40, SD-T54 |
 | SD-REQ-13 — Guest read allowed, mutations blocked `[DEFAULT]` | SD-US-01 | SD-FR-65 | M6 | SD-T01, SD-T40 |
 | SD-REQ-14 — Manual alignment with Agent Contribute Dashboard | SD-US-08 | SD-FR-66 | Integration design | SD-T60 |
+| SD-REQ-15 — Optional per-link whitelist `iconKey`, local icons only | SD-US-02, SD-US-06 | SD-FR-71 | M1, M4, F1, F5, F6 | SD-T80 … SD-T83 |
 
 Non-functional requirements are defined as `SD-NFR-01` … `SD-NFR-10` in
 `docs/01-requirements/service-directory-requirement.md` §5 and restated with per-item verification in
@@ -112,10 +140,10 @@ verification run).
 
 ## Full FR Coverage
 
-The table above traces by requirement. This one traces the other direction — every one of the spec's 66
-functional requirements to the design unit that realises it and the task that delivers it — so no FR can
-be silently dropped during implementation. Design unit ids (`M*` backend, `F*` frontend) are the section
-ids in `docs/05-design/service-directory-design.md`.
+The table above traces by requirement. This one traces the other direction — every one of the spec's
+functional requirements (SD-FR-01 … SD-FR-71) to the design unit that realises it and the task that
+delivers it — so no FR can be silently dropped during implementation. Design unit ids (`M*` backend,
+`F*` frontend) are the section ids in `docs/05-design/service-directory-design.md`.
 
 | Spec FR | Topic | Design unit | Task |
 |---|---|---|---|
@@ -139,6 +167,7 @@ ids in `docs/05-design/service-directory-design.md`.
 | SD-FR-66 | Manual content alignment with the Agent Contribute Dashboard | Integration design | SD-T60 |
 | SD-FR-67 … 69 | Creates exempt from the version precondition, storage-level locking as the second layer, 409 carries no field detail and is never merged | M3, M6, F3 | SD-T21, SD-T30, SD-T40, SD-T50 |
 | SD-FR-70 | At most one `stage-strip` scope | M4 | SD-T20, SD-T40 |
+| SD-FR-71 | Optional `iconKey` whitelist; local icon render; letter-badge fallback; no icon URLs | M1, M4, F1, F5, F6 | SD-T80 … SD-T83 |
 
 ---
 
@@ -147,11 +176,13 @@ ids in `docs/05-design/service-directory-design.md`.
 | Task group | Verification |
 |---|---|
 | SD-T10 … SD-T14 (persistence, migration, schema) | `mvn test`; `docs/sql/ORACLE_CURRENT_SCHEMA.sql` contains the new table |
-| SD-T20 … SD-T22 (validator, service, seed) | `mvn test -Dtest=ServiceDirectoryControllerTest` |
+| SD-T20 … SD-T22 (validator, service, seed) | `mvn test -Dtest=ResourceCenterControllerTest` |
 | SD-T30, SD-T31 (API, audit) | `mvn test`; Audit Log shows one entry per mutation |
 | SD-T40 (contract tests) | 14-row checklist in the API guide, all asserted |
 | SD-T50 … SD-T54 (frontend) | `cd frontend && npm run build`; manual walkthrough, before/after screenshots |
 | SD-T60 … SD-T63 (hardening) | CHANGELOG entry; this document; `AGENT_HANDOFF.md` updated last |
+| SD-T80 … SD-T83 (iconKey amendment) | Checklist row 17 in controller test; `npm run build`; cards show icons or letter fallback |
+| SD-T90 … SD-T92 (Resource Center rename) | Route/API use `resource-center`; tests green; no stale user-facing `service-directory` paths |
 
 ---
 
@@ -163,7 +194,7 @@ The earlier draft asserted these incorrectly; the regenerated set fixes them.
 |---|---|---|
 | 1 | Java base package is `com.wwa.deploymentagent` | It is `com.wwa.agenthub`. `CLAUDE.md` (9 occurrences) and `AGENTS.md` (7) still state the old name; `PROJECT_RULES.md` does not — SD-T70, needs user approval to edit |
 | 2 | Free-text search also matches link URLs | Search matches display text only (spec §7.3) |
-| 3 | Audit can reuse `config_update` / `config_delete` | Rejected; the slice adds `service_directory_update` / `service_directory_delete` |
+| 3 | Audit can reuse `config_update` / `config_delete` | Rejected; the slice adds `resource_center_update` / `resource_center_delete` |
 | 4 | `openInNewTab` is a stored field | Derived client-side from link kind |
 | 5 | Guest visibility is "policy TBD" | Stated as a committed default (read allowed) with an explicit open question, so acceptance can ratify or reverse it |
 | 6 | `AuditLogEntry.target_type` / `target_id` are usable for entity identity | Nothing writes them and the DTO does not expose them; identity goes in the audit context payload instead |
@@ -176,7 +207,7 @@ The earlier draft asserted these incorrectly; the regenerated set fixes them.
 
 - English-only SDD and project rules (ADR-0009); no `.zh-CN.md` companions.
 - Full `wwa-sdd-generate-all` skill chain was re-run for this regeneration — unlike the original draft.
-- `ADR-0010` records the catalog store boundary and is `Proposed` pending acceptance (spec SD-OQ-04).
+- `ADR-0010` records the catalog store boundary and is **Accepted** (2026-07-25).
 - HITL safety rails in `CLAUDE.md` are untouched: catalog mutations are ordinary admin writes, always
   performed by an interactive human with `actor_kind = HUMAN`, never auto-approved.
 - Lessons from this regeneration are recorded in `docs/00-context/lessons-learned.md`.
@@ -187,20 +218,18 @@ The earlier draft asserted these incorrectly; the regenerated set fixes them.
 
 | # | Question | Blocking | Owner |
 |---|---|---|---|
-| SD-OQ-01 | Guest read allowed, or redirect? Default: allowed. | Blocks implementation start (cheap now, visible change later) | Product / Security |
-| SD-OQ-02 | Production ARCAD / GitHub Enterprise URLs. | Blocks release readiness, not development | Ops / Platform |
-| SD-OQ-03 | Shared source for SDLC guideline links with the Agent Contribute Dashboard? Default: manual alignment. | No | Product |
-| SD-OQ-04 | Must `ADR-0010` be accepted before implementation? Default: yes. | Blocks implementation start | Architecture |
-| SD-OQ-05 | Approve SD-T70 (fix base-package drift in `CLAUDE.md` and `AGENTS.md`)? | No | User |
+| SD-OQ-01 | Guest read allowed, or redirect? Default: allowed. | **Closed** — implemented |
+| SD-OQ-02 | Production ARCAD / GitHub Enterprise URLs. | **Open** — release readiness |
+| SD-OQ-03 | Shared source for SDLC guideline links with the Agent Contribute Dashboard? Default: manual alignment. | No — manual only |
+| SD-OQ-04 | Must `ADR-0010` be accepted before implementation? Default: yes. | **Closed** |
+| SD-OQ-05 | Approve SD-T70 (fix base-package drift in `CLAUDE.md` and `AGENTS.md`)? | **Skipped** per user |
 
 `SD-OQ-01` … `SD-OQ-04` originate in the requirement and are carried through the spec. `SD-OQ-05` is
 raised by the tasks document: it is out-of-slice governance housekeeping surfaced by the grounding pass,
-not a Service Directory scope question.
+not a Resource Center scope question.
 
 ---
 
 ## Resume Point
 
-- **Now:** user reviews and accepts the regenerated SDD set.
-- **Then:** ratify SD-T00 … SD-T03 / SD-OQ-01 … SD-OQ-04, flip `ADR-0010` to `Accepted`, and start W1 (persistence) from `docs/06-tasks/service-directory-tasks.md`.
-- **Active handoff:** `docs/00-context/AGENT_HANDOFF.md`
+- **Now:** run manual UAT walkthrough (SD-T62); collect production URLs (SD-T02); commit when user asks.

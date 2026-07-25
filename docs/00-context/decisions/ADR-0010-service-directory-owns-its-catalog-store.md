@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed
+Accepted
+
+**Product rename note (2026-07-25):** The Hub page is now called **Resource Center** (formerly Service Directory). This ADR's **store-boundary decision is unchanged**. Slice artifact filenames and the physical table `DA_SERVICE_DIRECTORY_CATALOG` may retain the historical `service-directory` / `SERVICE_DIRECTORY` identifiers; user-facing name, route, and API path follow the Resource Center SDD amendment.
 
 ## Date
 
@@ -10,7 +12,7 @@ Proposed
 
 ## Context
 
-The `service-directory` slice adds a Platform-shared Hub page that renders an administrator-maintained
+The `service-directory` slice (product name: **Resource Center**) adds a Platform-shared Hub page that renders an administrator-maintained
 catalog of destinations — documentation, tools, in-Hub workspaces, and source repositories — organised as
 `directory scope → group → link`. The catalog must be editable by `DEVOPS_ADMIN` without a code release,
 so it has to live in the database rather than in application code.

@@ -1,8 +1,8 @@
 -- WWA Agent Workspace Hub — Oracle current schema
 -- Generated for greenfield UAT / internal environment setup.
 -- Use this script for a fresh Oracle schema.
--- Do not run V2-V19 incremental scripts on top of this file for a brand-new database,
--- because this script already includes the current end-state columns from V2 through V19.
+-- Do not run V2-V20 incremental scripts on top of this file for a brand-new database,
+-- because this script already includes the current end-state columns from V2 through V20.
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 1. DA_RELEASE_FLOW — root aggregate
@@ -324,3 +324,17 @@ CREATE INDEX IDX_OUTBOX_AGG
 
 CREATE INDEX IDX_OUTBOX_CORR
     ON DA_OUTBOX_EVENT (correlation_id);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 11. DA_SERVICE_DIRECTORY_CATALOG — Service Directory catalog document
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE DA_SERVICE_DIRECTORY_CATALOG (
+    id          VARCHAR2(36)   NOT NULL,
+    payload     CLOB           NOT NULL,
+    version     NUMBER(19,0)   DEFAULT 0 NOT NULL,
+    updated_by  VARCHAR2(64),
+    updated_at  TIMESTAMP(6)   NOT NULL,
+    created_at  TIMESTAMP(6)   NOT NULL,
+    CONSTRAINT PK_DA_SERVICE_DIRECTORY_CATALOG PRIMARY KEY (id)
+);

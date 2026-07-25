@@ -1,7 +1,8 @@
-# Detailed Design: Service Directory
+# Detailed Design: Resource Center
 
 > **Slice:** `service-directory`
-> **Status:** Regenerated via `architecture-to-design` — awaiting user acceptance
+> **Status:** Regenerated via `architecture-to-design`; **Amended 2026-07-25** — product renamed to **Resource Center** (formerly Service Directory); optional link `iconKey` (SD-FR-71 / SD-REQ-15)
+> **Product name:** Resource Center · **Slice id:** `service-directory`
 > **Last updated:** 2026-07-25
 > **Source spec (authoritative):** `docs/03-spec/service-directory-spec.md`
 > **Source architecture:** `docs/04-architecture/service-directory-architecture.md`
@@ -12,8 +13,8 @@
 
 ## Overview
 
-Service Directory adds one Platform-shared capability to the existing Hub: a page at
-`/wwa/service-directory` that renders an administrator-maintained catalog of destinations
+Resource Center adds one Platform-shared capability to the existing Hub: a page at
+`/wwa/resource-center` that renders an administrator-maintained catalog of destinations
 (`directory scope → group → link`), plus the Platform API, domain module, and single-table persistence
 behind it. Reads serve the whole catalog in one request; all filtering happens client-side;
 `DEVOPS_ADMIN` mutations are validated, versioned, and audited.
@@ -76,9 +77,9 @@ the grounding pass and carries a `file:line` anchor. Unverifiable claims are tag
 
 ## Module Design
 
-### M1 — Persistence: `ServiceDirectoryCatalogEntity`
+### M1 — Persistence: `ResourceCenterCatalogEntity`
 
-**Location:** `src/main/java/com/wwa/agenthub/domain/servicedirectory/ServiceDirectoryCatalogEntity.java` (new)
+**Location:** `src/main/java/com/wwa/agenthub/domain/resourcecenter/ResourceCenterCatalogEntity.java` (new)
 
 | Aspect | Design |
 |---|---|
@@ -98,12 +99,12 @@ follows the same shape:
 - **New:** `src/main/java/com/wwa/agenthub/util/DirectoryScopeListJsonAttributeConverter.java`, `@Converter`, implementing `AttributeConverter<List<DirectoryScope>, String>`, applied as `@Convert(converter = DirectoryScopeListJsonAttributeConverter.class)` with `@Column(name = "payload", columnDefinition = "CLOB")` — the exact pattern documented at `util/JsonAttributeConverter.java:18-26`.
 - On a deserialisation failure the converter throws rather than returning an empty list: a corrupt payload must surface as a 500, never as a silently empty catalog that an administrator might then "fix" by re-seeding over real content.
 
-**Nested value types** (new records in `domain/servicedirectory/model/`, serialised inside the payload;
+**Nested value types** (new records in `domain/resourcecenter/model/`, serialised inside the payload;
 field lists are specified in the data model §4):
 
 - `DirectoryScope(key, title, description, layout, system, enabled, sortOrder, groups)`
 - `DirectoryGroup(key, title, description, type, stageKey, stageOrder, agentName, enabled, sortOrder, links)`
-- `DirectoryLink(id, title, description, url, kind, kindLabel, enabled, sortOrder)`
+- `DirectoryLink(id, title, description, url, kind, kindLabel, iconKey, enabled, sortOrder)`
 
 These are domain value types, not JPA entities — there are no child tables.
 
@@ -113,52 +114,53 @@ that enum constant names equal their persisted string values):
 | Enum | Constants |
 |---|---|
 | `DirectoryLinkKind` | `docs`, `tool`, `workspace`, `repo` |
+| `DirectoryLinkIconKey` | `confluence`, `github`, `arcad`, `peoplesoft`, `learning`, `infosec`, `vendor`, `wwa` — optional on links; serialised as lower-case strings matching the constant names (SD-FR-71) |
 | `DirectoryScopeLayout` | `stage_strip`, `buckets` — serialised as `stage-strip` / `buckets` in JSON and the API |
 | `DirectoryGroupType` | `stage`, `bucket` |
 | `SdlcStageKey` | `planning`, `estimation`, `discovery`, `build`, `testing`, `deployment`, `maintenance` |
 
 **Cross-cutting sync obligation.** `DEVELOPMENT_STANDARDS.md:44` requires the matching TypeScript union
-to change with any `contracts/enums/` change. All four enums above are consumed by the frontend, so
-`frontend/src/types/index.ts` gains the corresponding unions in the same change (see F1 in UI design).
-The two new `AuditActionType` constants are the exception — verified that
+to change with any `contracts/enums/` change. The catalog enums above (including `DirectoryLinkIconKey`)
+are consumed by the frontend, so `frontend/src/types/index.ts` gains the corresponding unions in the
+same change (see F1 in UI design). The two `AuditActionType` constants are the exception — verified that
 `frontend/src/types/index.ts:250` types `actionType` as plain `string`, so no union exists to update.
 
-### M2 — Repository: `ServiceDirectoryCatalogRepository`
+### M2 — Repository: `ResourceCenterCatalogRepository`
 
-**Location:** `src/main/java/com/wwa/agenthub/domain/servicedirectory/ServiceDirectoryCatalogRepository.java` (new)
+**Location:** `src/main/java/com/wwa/agenthub/domain/resourcecenter/ResourceCenterCatalogRepository.java` (new)
 
-`extends JpaRepository<ServiceDirectoryCatalogEntity, String>` with one added method:
+`extends JpaRepository<ResourceCenterCatalogEntity, String>` with one added method:
 
-- `Optional<ServiceDirectoryCatalogEntity> findFirstByOrderByIdAsc()` — the singleton accessor. A deterministic ordering is used so that if a duplicate row ever appeared, every read would still pick the same one instead of alternating.
+- `Optional<ResourceCenterCatalogEntity> findFirstByOrderByIdAsc()` — the singleton accessor. A deterministic ordering is used so that if a duplicate row ever appeared, every read would still pick the same one instead of alternating.
 
 No other query methods. The singleton invariant is enforced by M3, not by the repository.
 
-### M3 — Domain service: `ServiceDirectoryService`
+### M3 — Domain service: `ResourceCenterService`
 
-**Location:** `src/main/java/com/wwa/agenthub/domain/servicedirectory/ServiceDirectoryService.java` (new)
+**Location:** `src/main/java/com/wwa/agenthub/domain/resourcecenter/ResourceCenterService.java` (new)
 
 Sole owner of catalog persistence and of every structural rule. The controller holds no business logic.
 
 | Method | Responsibility |
 |---|---|
-| `ServiceDirectoryCatalogDto read(boolean includeDisabled)` | `@Transactional`. Load-or-seed, then project. Non-admin callers always pass `false` |
-| `ServiceDirectoryCatalogDto read(boolean includeDisabled)` | *(above)* |
-| `ServiceDirectoryCatalogDto createScope(DirectoryScopeUpsertRequest, UserContext)` | Validate, append, save, audit. **No version parameter** (SD-FR-67) |
-| `ServiceDirectoryCatalogDto updateScope(String scopeKey, long expectedVersion, DirectoryScopeUpsertRequest, UserContext)` | Assert version, validate, replace in place, save, audit |
-| `ServiceDirectoryCatalogDto deleteScope(String scopeKey, long expectedVersion, UserContext)` | Assert version; reject when `system`; cascade-remove groups and links; save; audit with descendant counts |
-| `ServiceDirectoryCatalogDto createGroup(String scopeKey, DirectoryGroupUpsertRequest, UserContext)` | Validate (including scope existence and key uniqueness within scope), append, save, audit |
-| `ServiceDirectoryCatalogDto updateGroup(String scopeKey, String groupKey, long expectedVersion, …)` | Assert version, then as above, in place |
-| `ServiceDirectoryCatalogDto deleteGroup(String scopeKey, String groupKey, long expectedVersion, UserContext)` | Assert version; cascade-remove links; save; audit with link count |
-| `ServiceDirectoryCatalogDto createLink(String scopeKey, String groupKey, DirectoryLinkUpsertRequest, UserContext)` | Validate, assign a UUID id, append, save, audit |
-| `ServiceDirectoryCatalogDto updateLink(String linkId, long expectedVersion, DirectoryLinkUpsertRequest, UserContext)` | Assert version; locate by id across the document; support moving between groups via the request's target scope and group keys; save; audit including the move |
-| `ServiceDirectoryCatalogDto deleteLink(String linkId, long expectedVersion, UserContext)` | Assert version; remove by id; save; audit |
+| `ResourceCenterCatalogDto read(boolean includeDisabled)` | `@Transactional`. Load-or-seed, then project. Non-admin callers always pass `false` |
+| `ResourceCenterCatalogDto read(boolean includeDisabled)` | *(above)* |
+| `ResourceCenterCatalogDto createScope(DirectoryScopeUpsertRequest, UserContext)` | Validate, append, save, audit. **No version parameter** (SD-FR-67) |
+| `ResourceCenterCatalogDto updateScope(String scopeKey, long expectedVersion, DirectoryScopeUpsertRequest, UserContext)` | Assert version, validate, replace in place, save, audit |
+| `ResourceCenterCatalogDto deleteScope(String scopeKey, long expectedVersion, UserContext)` | Assert version; reject when `system`; cascade-remove groups and links; save; audit with descendant counts |
+| `ResourceCenterCatalogDto createGroup(String scopeKey, DirectoryGroupUpsertRequest, UserContext)` | Validate (including scope existence and key uniqueness within scope), append, save, audit |
+| `ResourceCenterCatalogDto updateGroup(String scopeKey, String groupKey, long expectedVersion, …)` | Assert version, then as above, in place |
+| `ResourceCenterCatalogDto deleteGroup(String scopeKey, String groupKey, long expectedVersion, UserContext)` | Assert version; cascade-remove links; save; audit with link count |
+| `ResourceCenterCatalogDto createLink(String scopeKey, String groupKey, DirectoryLinkUpsertRequest, UserContext)` | Validate, assign a UUID id, append, save, audit |
+| `ResourceCenterCatalogDto updateLink(String linkId, long expectedVersion, DirectoryLinkUpsertRequest, UserContext)` | Assert version; locate by id across the document; support moving between groups via the request's target scope and group keys; save; audit including the move |
+| `ResourceCenterCatalogDto deleteLink(String linkId, long expectedVersion, UserContext)` | Assert version; remove by id; save; audit |
 
 **Committed decisions inside M3**
 
 - **Addressing.** Scopes and groups are addressed by `key` (stable, human-meaningful, already unique at their level). Links are addressed by `id`, because a link has no key and because the browser's Recently used list stores exactly this id. Mixed addressing is deliberate, not an oversight.
 - **Link lookup is a full document walk.** With ≤ 600 links, a linear search is simpler and cheaper than maintaining an index. No caching layer is introduced.
 - **Mutations are read-modify-write in one transaction.** Load the singleton, mutate the in-memory tree, `save`.
-- **Stale-page detection needs an explicit precondition, and this is the one design decision most likely to be implemented wrongly.** Every update and delete takes `expectedVersion`. The first thing the method does, before validation, is compare it to the loaded row's `version`; on mismatch it throws the existing `OptimisticLockConflictException("Service Directory catalog")` (`errors/OptimisticLockConflictException.java:4-9`), which is an `AppException` carrying 409 and code `OPTIMISTIC_LOCK_CONFLICT`, mapped by `GlobalExceptionHandler.java:24-28`.
+- **Stale-page detection needs an explicit precondition, and this is the one design decision most likely to be implemented wrongly.** Every update and delete takes `expectedVersion`. The first thing the method does, before validation, is compare it to the loaded row's `version`; on mismatch it throws the existing `OptimisticLockConflictException("Resource Center catalog")` (`errors/OptimisticLockConflictException.java:4-9`), which is an `AppException` carrying 409 and code `OPTIMISTIC_LOCK_CONFLICT`, mapped by `GlobalExceptionHandler.java:24-28`.
 
   Why this cannot be skipped: JPA's `@Version` alone only detects two transactions overlapping *in flight*. Every mutation here loads the row at the start of its own transaction, so the sequence "admin A loads the page → admin B saves → admin A saves ten minutes later" produces no version conflict at all — A's request reads B's version and overwrites B's work silently. That is precisely the lost update SD-FR-44 forbids. The `@Version` column stays and still guards the same-instant race (SD-FR-68), reaching 409 through the *other* handler at `GlobalExceptionHandler.java:31-36`. Two layers, two windows, one status code.
 - **Creates deliberately take no version** (SD-FR-67). A create appends to whatever the current document is and cannot overwrite anything, so a precondition there would reject harmless work. Implementers should resist "consistency" pressure to add one.
@@ -166,9 +168,9 @@ Sole owner of catalog persistence and of every structural rule. The controller h
 - **Audit is emitted after the mutation is applied and before the method returns**, by calling the existing logger. Ordering is safe because the logger already writes in its own transaction (`domain/audit/AuditLoggerService.java:110-117`), so an audit failure cannot roll back the catalog change (SD-FR-58).
 - **Seeding** is delegated to M5 and only ever invoked from `read` when the repository returns empty.
 
-### M4 — Validation: `ServiceDirectoryValidator`
+### M4 — Validation: `ResourceCenterValidator`
 
-**Location:** `src/main/java/com/wwa/agenthub/domain/servicedirectory/ServiceDirectoryValidator.java` (new)
+**Location:** `src/main/java/com/wwa/agenthub/domain/resourcecenter/ResourceCenterValidator.java` (new)
 
 Pure functions, no repository dependency — so seeding and administrator input pass through identical
 rules (spec §Validation Flow). Throws `ValidationAppException` (`errors/ValidationAppException.java`,
@@ -183,6 +185,7 @@ new exception class is introduced.
 | Title required, ≤ 120; description ≤ 240 | Trim then length-check | SD-FR-50 |
 | `sortOrder` range | 0 … 9999 inclusive | SD-FR-50 |
 | `kind` membership | `DirectoryLinkKind` | SD-FR-46 |
+| `iconKey` membership | Optional; blank → null; otherwise must be a `DirectoryLinkIconKey` constant. Reject unknown strings with field `iconKey` — never treat the value as a URL | SD-FR-71 |
 | `stageKey` / `stageOrder` presence | Required together when `type = stage`; rejected when `type = bucket` | SD-FR-51 |
 | Stage identity | When `type = stage`, require `key.equals(stageKey)` — a stage has one identifier, so the rail cannot disagree with the document | SD-FR-51 |
 | One stage strip | Reject a create or update that would leave two scopes with `layout = stage-strip` | SD-FR-70 |
@@ -208,16 +211,16 @@ not fire):
 That last row is the deliberate non-firing case: validation and pending-URL rendering are separate
 concerns, decided in different layers.
 
-### M5 — Seeding: `ServiceDirectorySeedLoader`
+### M5 — Seeding: `ResourceCenterSeedLoader`
 
-**Location:** `src/main/java/com/wwa/agenthub/domain/servicedirectory/ServiceDirectorySeedLoader.java` (new)
-**Resource:** `src/main/resources/service-directory/seed-catalog.json` (new)
+**Location:** `src/main/java/com/wwa/agenthub/domain/resourcecenter/ResourceCenterSeedLoader.java` (new)
+**Resource:** `src/main/resources/resource-center/seed-catalog.json` (new)
 
 | Aspect | Design |
 |---|---|
-| Trigger | Called by `ServiceDirectoryService.read` only when the repository returns empty — lazy, not an `ApplicationRunner`, so an empty database in any profile self-heals on first page view without startup coupling |
+| Trigger | Called by `ResourceCenterService.read` only when the repository returns empty — lazy, not an `ApplicationRunner`, so an empty database in any profile self-heals on first page view without startup coupling |
 | Idempotency | Guarded by the empty-store check inside the same transaction as the insert, so two concurrent first requests cannot both insert. If the unique-ish race still produced two rows, `findFirstByOrderByIdAsc` keeps reads deterministic (SD-FR-61) |
-| Validation | Runs the seed through `ServiceDirectoryValidator`; an invalid seed fails loudly at first read rather than persisting bad content |
+| Validation | Runs the seed through `ResourceCenterValidator`; an invalid seed fails loudly at first read rather than persisting bad content |
 | Never overwrites | Only inserts into an empty store — including a catalog an administrator deliberately emptied |
 | Attribution | `updatedBy` left null; the seed has no human author |
 | Content | Data model §8: seven SDLC stage groups, Common (Platform + Engineering tools), External. No example `security` scope, no fabricated recents, unknown URLs use the reserved `.invalid` suffix |
@@ -227,19 +230,19 @@ the seed passes through the same validator as administrator input. This mirrors 
 holding structured static content as a packaged resource, as the Agent Contribute Dashboard does with
 `frontend/src/config/agentContributionDashboard.json`, while keeping the catalog itself server-owned.
 
-### M6 — Web layer: `ServiceDirectoryController`
+### M6 — Web layer: `ResourceCenterController`
 
-**Location:** `src/main/java/com/wwa/agenthub/platform/web/shared/ServiceDirectoryController.java` (new)
+**Location:** `src/main/java/com/wwa/agenthub/platform/web/shared/ResourceCenterController.java` (new)
 
 Sits beside the existing platform controllers in that package (`AccessGrantController`,
 `AuditLogController`, `AuthController`, `ConfigurationController`, `TemplateDownloadController`,
 `AgentContributionDashboardController`). Follows their exact style: `@RestController`,
-`@RequiredArgsConstructor`, `@RequestMapping("/api/platform/service-directory")`,
+`@RequiredArgsConstructor`, `@RequestMapping("/api/platform/resource-center")`,
 `@AuthenticationPrincipal UserContext user`, DTO records returned inside `ResponseEntity.ok(...)`.
 
 | Concern | Design |
 |---|---|
-| Base path | `/api/platform/service-directory` |
+| Base path | `/api/platform/resource-center` |
 | Read authorization | Any authenticated session, including `GUEST`. `includeDisabled=true` is honoured only for `DEVOPS_ADMIN`; for anyone else the parameter is ignored rather than rejected, so a stale bookmark cannot 403 a read |
 | Write authorization | `private void validateAdmin(UserContext user, String action)` throwing `ForbiddenAppException(action)` — the same private-helper shape as `DeploymentReleaseFlowController.java:277-281` and the inline check at `ConfigurationController.java:39-48` |
 | Agent parameter | None. Platform capability; `AgentBoundaryGuard` is not involved |
@@ -256,8 +259,8 @@ Two constants are appended to `src/main/java/com/wwa/agenthub/contracts/enums/Au
 
 | Constant | Used for |
 |---|---|
-| `service_directory_update` | Scope, group, and link create and update |
-| `service_directory_delete` | Scope, group, and link delete (including cascades) |
+| `resource_center_update` | Scope, group, and link create and update |
+| `resource_center_delete` | Scope, group, and link delete (including cascades) |
 
 No migration is needed — the column is `@Enumerated(EnumType.STRING)` (`AuditLogEntry.java:81-83`).
 
@@ -298,6 +301,9 @@ Added unions and interfaces, kept in exact lockstep with M1's enums per `DEVELOP
 
 ```ts
 export type DirectoryLinkKind = 'docs' | 'tool' | 'workspace' | 'repo'
+export type DirectoryLinkIconKey =
+  | 'confluence' | 'github' | 'arcad' | 'peoplesoft'
+  | 'learning' | 'infosec' | 'vendor' | 'wwa'
 export type DirectoryScopeLayout = 'stage-strip' | 'buckets'
 export type DirectoryGroupType = 'stage' | 'bucket'
 export type SdlcStageKey =
@@ -305,10 +311,10 @@ export type SdlcStageKey =
   | 'build' | 'testing' | 'deployment' | 'maintenance'
 ```
 
-plus `DirectoryLink`, `DirectoryGroup`, `DirectoryScope`, and `ServiceDirectoryCatalog` interfaces
-mirroring the data model's field lists.
+plus `DirectoryLink`, `DirectoryGroup`, `DirectoryScope`, and `ResourceCenterCatalog` interfaces
+mirroring the data model's field lists (`DirectoryLink.iconKey?: DirectoryLinkIconKey | null`).
 
-### F2 — API module: `frontend/src/api/serviceDirectory.ts` (new)
+### F2 — API module: `frontend/src/api/resourceCenter.ts` (new)
 
 Uses the shared `platformClient` (`frontend/src/api/platformClient.ts:11-17`), matching the function
 style of `frontend/src/api/config.ts:106-118` and `frontend/src/api/accessGrants.ts:18-21`. One exported
@@ -319,7 +325,7 @@ The client's existing 401 interceptor (`platformClient.ts:21-42`) already redire
 error normalisation already merges `message` and `details` — so this module adds no bespoke error
 handling.
 
-### F3 — Store: `frontend/src/stores/serviceDirectory.ts` (new)
+### F3 — Store: `frontend/src/stores/resourceCenter.ts` (new)
 
 Pinia store following the shape of `frontend/src/stores/config.ts:15-29`:
 
@@ -337,12 +343,12 @@ Behaviour decisions:
 
 ### F4 — Recently used composable
 
-**Location:** `frontend/src/platform/composables/useRecentDirectoryLinks.ts` (new — that directory
+**Location:** `frontend/src/platform/composables/useRecentResourceCenterLinks.ts` (new — that directory
 exists and already holds `createAgentWorkspace.ts`)
 
 | Aspect | Design |
 |---|---|
-| Storage key | `wwa.serviceDirectory.recent.v1` — this is the **first** browser-storage usage in the frontend (verified: no `localStorage` or `sessionStorage` occurrences exist), so it sets the convention `wwa.<feature>.<purpose>.<version>` |
+| Storage key | `wwa.resourceCenter.recent.v1` — this is the **first** browser-storage usage in the frontend (verified: no `localStorage` or `sessionStorage` occurrences exist), so it sets the convention `wwa.<feature>.<purpose>.<version>` |
 | Stored shape | `Array<{ linkId: string; openedAt: string }>`, most recent first |
 | Cap | 8, matching the prototype's `MAX_RECENT` (`wwa-service-directory.html:1170`) |
 | `record(linkId)` | Unshift, de-duplicate by id, truncate to 8, persist |
@@ -351,7 +357,7 @@ exists and already holds `createAgentWorkspace.ts`)
 | Failure handling | Every read and write is wrapped; a `SecurityError`, quota error, or malformed JSON degrades to an empty list and never throws into rendering (spec §Error paths) |
 | Not seeded | Unlike the prototype (`:1409-1411`), production never fabricates entries |
 
-### F5 — View: `frontend/src/views/ServiceDirectoryView.vue` (new)
+### F5 — View: `frontend/src/views/ResourceCenterView.vue` (new)
 
 Placed in `views/` with the other platform pages (`ConfigAdminView.vue`, `AuditLogView.vue`,
 `AccessManagementView.vue`, `TemplateManagementView.vue`) — verified as the established location.
@@ -372,7 +378,7 @@ six-component split was unnecessary indirection for one page):
 Derived state is computed, not stored: `visibleScopes`, `visibleGroups`, `filteredLinks`, and the
 per-kind partition. The filter algorithm is specified in the UI section below.
 
-### F6 — Dialog: `frontend/src/components/ServiceDirectoryEntityDialog.vue` (new)
+### F6 — Dialog: `frontend/src/components/ResourceCenterEntityDialog.vue` (new)
 
 One dialog handling all three entity types, mirroring the prototype's single-modal approach
 (`wwa-service-directory.html:1630-1691`) and the prop/emit contract of
@@ -395,7 +401,11 @@ const props = defineProps<{
 Emits `close` and `save`. Field visibility is driven by `entityType`. Client validation mirrors M4
 exactly and is never the enforcement point.
 
-### F7 — Delete confirmation: `frontend/src/components/ServiceDirectoryDeleteDialog.vue` (new)
+**Link form amendment (SD-FR-71):** when `entityType === 'link'`, show an optional **Icon** select whose
+options are the `DirectoryLinkIconKey` whitelist plus an empty "Default (letter badge)" choice. Do not
+offer a free-text or URL field for icons.
+
+### F7 — Delete confirmation: `frontend/src/components/ResourceCenterDeleteDialog.vue` (new)
 
 Follows `DeleteTemplateDialog.vue` rather than the prototype's `window.confirm`
 (`wwa-service-directory.html:1696`), and states the descendant impact — "This removes 2 groups and 9
@@ -417,18 +427,28 @@ Single decision point for open behavior, derived from kind rather than a stored 
 → host does not end `.invalid`, normal link ✓ (must not fire) · `/wwa/build-agent` → no host, normal
 workspace navigation ✓.
 
-**Derived presentation** (replacing the prototype's stored `tone` and `mark`, data flow §6.1): icon
-colour is a fixed map from `kind`, and the badge text is the first two characters of the title
-upper-cased, except `repo`, which always shows `GH` — exactly the derivation the prototype performs at
-`wwa-service-directory.html:1773-1777`. Trace: `repo` "Build Agent · source" → `GH` ✓ · `tool` "ARCAD"
-→ `AR` ✓ · `docs` "X" (single character) → `X` ✓.
+**Derived presentation** (data flow §6.1, amended for SD-FR-71):
+
+1. If `link.iconKey` is set **and** present in the frontend icon asset map, render that local icon in
+   the card icon slot (SVG or static asset under `frontend/src/assets/resource-center/icons/`, keyed
+   by `DirectoryLinkIconKey`).
+2. Otherwise fall back to the letter badge: icon colour is a fixed map from `kind`, and the badge text
+   is the first two characters of the title upper-cased, except `repo`, which always shows `GH` —
+   exactly the derivation the prototype performs at `wwa-service-directory.html:1773-1777`.
+
+Trace: `iconKey = github` → GitHub asset ✓ · `iconKey` omitted on `tool` "ARCAD" → `AR` ✓ ·
+`iconKey = unknown` (should never be stored; if an older client sees a future key) → letter badge ✓ ·
+`repo` "Build Agent · source" with no icon → `GH` ✓ · `docs` "X" → `X` ✓.
+
+Keep a small pure helper (for example `resolveDirectoryLinkIcon(link)`) co-located with the view or in
+`frontend/src/platform/` so the admin preview and the catalog cards share one mapping.
 
 ### F9 — Route and navigation registration
 
 | File | Change |
 |---|---|
-| `frontend/src/router/index.ts` | New child route of `/wwa`, inserted after the `access-management` child (currently ending at `:148`): path `service-directory`, name `wwa-service-directory`, lazy component `../views/ServiceDirectoryView.vue`, meta `{ section: 'service-directory', sectionTitle: 'Service Directory' }`. The existing `beforeEach` guard at `:154-174` then covers authentication with no change |
-| `frontend/src/config/agentRegistry.ts` | One `platformCapabilities` entry (`:75-108`): `{ key: 'service-directory', label: 'Service Directory', to: '/wwa/service-directory', icon: '🧭' }` — deliberately **no** `accessPermission`, so the entry stays unlocked for every role including `GUEST` (SD-FR-02). This single entry serves both the flyout and Home Shared Controls |
+| `frontend/src/router/index.ts` | New child route of `/wwa`, inserted after the `access-management` child (currently ending at `:148`): path `resource-center`, name `wwa-resource-center`, lazy component `../views/ResourceCenterView.vue`, meta `{ section: 'resource-center', sectionTitle: 'Resource Center' }`. The existing `beforeEach` guard at `:154-174` then covers authentication with no change |
+| `frontend/src/config/agentRegistry.ts` | One `platformCapabilities` entry (`:75-108`): `{ key: 'resource-center', label: 'Resource Center', to: '/wwa/resource-center', icon: '🧭' }` — deliberately **no** `accessPermission`, so the entry stays unlocked for every role including `GUEST` (SD-FR-02). This single entry serves both the flyout and Home Shared Controls |
 
 ---
 
@@ -438,16 +458,16 @@ Full contract: `docs/05-design/contracts/service-directory-API_IMPLEMENTATION_GU
 
 | Operation | Method | Path | Auth |
 |---|---|---|---|
-| Read catalog | GET | `/api/platform/service-directory` | Any authenticated session (incl. `GUEST`) |
-| Create scope | POST | `/api/platform/service-directory/scopes` | `DEVOPS_ADMIN` |
-| Update scope | PUT | `/api/platform/service-directory/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Delete scope | DELETE | `/api/platform/service-directory/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Create group | POST | `/api/platform/service-directory/scopes/{scopeKey}/groups` | `DEVOPS_ADMIN` |
-| Update group | PUT | `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Delete group | DELETE | `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Create link | POST | `/api/platform/service-directory/scopes/{scopeKey}/groups/{groupKey}/links` | `DEVOPS_ADMIN` |
-| Update link | PUT | `/api/platform/service-directory/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
-| Delete link | DELETE | `/api/platform/service-directory/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Read catalog | GET | `/api/platform/resource-center` | Any authenticated session (incl. `GUEST`) |
+| Create scope | POST | `/api/platform/resource-center/scopes` | `DEVOPS_ADMIN` |
+| Update scope | PUT | `/api/platform/resource-center/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Delete scope | DELETE | `/api/platform/resource-center/scopes/{scopeKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Create group | POST | `/api/platform/resource-center/scopes/{scopeKey}/groups` | `DEVOPS_ADMIN` |
+| Update group | PUT | `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Delete group | DELETE | `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Create link | POST | `/api/platform/resource-center/scopes/{scopeKey}/groups/{groupKey}/links` | `DEVOPS_ADMIN` |
+| Update link | PUT | `/api/platform/resource-center/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
+| Delete link | DELETE | `/api/platform/resource-center/links/{linkId}?expectedVersion=` | `DEVOPS_ADMIN` |
 
 **Committed interface decisions**
 
@@ -489,7 +509,7 @@ introduced (SD-NFR-10). Dialogs use the global `.modal-overlay` / `.modal` class
 | Element | Text |
 |---|---|
 | Eyebrow | WWA-Atlas Hub Shared Capability |
-| Title | Service Directory |
+| Title | Resource Center |
 | Subtitle | Jump to SDLC tools, shared platforms, and external systems. |
 | Manage toggle (admin) | Manage catalog / Managing… |
 | Non-admin banner | Read-only view. Only **DEVOPS_ADMIN** can change the directory. |

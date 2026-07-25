@@ -1,7 +1,8 @@
-# Data Flow: Service Directory
+# Data Flow: Resource Center
 
 > **Slice:** `service-directory`
-> **Status:** Regenerated via `spec-to-architecture` (companion artifact) — awaiting user acceptance
+> **Status:** Regenerated via `spec-to-architecture`; **Amended 2026-07-25** — product renamed to **Resource Center**; optional link `iconKey` whitelist (SD-FR-71)
+> **Product name:** Resource Center · **Slice id:** `service-directory`
 > **Last updated:** 2026-07-25
 > **Source spec:** `docs/03-spec/service-directory-spec.md`
 > **Companions:** `service-directory-architecture.md`, `service-directory-data-model.md`
@@ -16,7 +17,7 @@ text, matching the architecture document's style.
 
 | Object | Lives in | Lifetime | Crosses the network? |
 |---|---|---|---|
-| **Stored catalog document** | One row in the Service Directory catalog table | Durable; one per environment | No — server-side only |
+| **Stored catalog document** | One row in the Resource Center catalog table | Durable; one per environment | No — server-side only |
 | **Seed catalog** | Application package | Immutable, ships with the build | No |
 | **Catalog read projection** | Response body of the read endpoint | Per request | Server → browser |
 | **Mutation request** | Request body of a mutation endpoint | Per request | Browser → server |
@@ -234,9 +235,11 @@ every rename and every field that is deliberately **not** persisted.
 | `links[].title` | link `title` | Kept |
 | `links[].desc` | link `description` | Renamed |
 | `links[].url` | link `url` | Kept; validated by shape and scheme on write |
-| `links[].tone`, `links[].mark` | — | **Dropped from storage.** Derived deterministically in the frontend from kind and title, exactly as the prototype itself derives them when creating a link |
+| `links[].tone`, `links[].mark` | — | **Dropped from storage as authoritative presentation.** Still used as the **fallback** badge when `iconKey` is absent; derived from kind and title |
+| (amended 2026-07-25) | link `iconKey` | **Added.** Optional whitelist key for a local card icon (SD-FR-71). Not an image URL |
 | `links[].enabled`, `sortOrder` | same | Kept |
 | (draft SDD proposal) `openInNewTab` | — | **Not stored.** Open behavior is derived from kind, so the two can never disagree |
+| (draft SDD proposal) `iconUrl` / uploaded icon | — | **Not stored in MVP.** Icons are local assets selected by `iconKey` only |
 | (draft SDD proposal) `tags`, `audience`, `environments`, `source` | — | **Not stored in MVP.** No requirement consumes them; speculative fields would need validation and UI they do not have |
 
 ### 6.2 Mutation request → stored document
@@ -246,6 +249,7 @@ every rename and every field that is deliberately **not** persisted.
 | Scope or group `key` | Trim, lower-case, pattern check, uniqueness check within its level |
 | Any `title` / `description` | Trim; length-checked; stored as given otherwise |
 | Link `url` | Trim; scheme and shape validated per kind; stored verbatim (no normalisation that could change the target) |
+| Link `iconKey` | Trim; blank → `null`; non-blank must be a member of the platform whitelist enum; never interpreted as a URL |
 | `sortOrder` | Range-checked integer; defaults to the end of the sibling list when omitted on create |
 | Link `id` | Server-assigned on create; immutable afterwards |
 | Catalog `version` | Never stored from the request. On an update or delete it arrives as `expectedVersion` and is used only as a precondition, then discarded; the stored version is always the server's own counter |

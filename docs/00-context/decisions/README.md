@@ -23,4 +23,4 @@ This directory stores durable Architecture Decision Records (ADRs) for decisions
 | [ADR-0007](ADR-0007-adopt-atlas-style-project-rules-and-bilingual-sdd.md) | Partially superseded | Atlas-style rules + skill chain; bilingual mandate withdrawn by ADR-0009 |
 | [ADR-0008](ADR-0008-active-agent-handoff-markdown.md) | Accepted | Maintain active `AGENT_HANDOFF` for IDE/agent switches |
 | [ADR-0009](ADR-0009-english-only-project-and-sdd-docs.md) | Accepted | English-only project rules and SDD documents |
-| [ADR-0010](ADR-0010-service-directory-owns-its-catalog-store.md) | Proposed | Service Directory owns its own catalog store, separate from Configuration Management |
+| [ADR-0010](ADR-0010-service-directory-owns-its-catalog-store.md) | Accepted | Resource Center (formerly Service Directory) owns its own catalog store, separate from Configuration Management |

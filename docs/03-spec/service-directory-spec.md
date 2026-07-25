@@ -1,9 +1,10 @@
-# Feature Specification: Service Directory
+# Feature Specification: Resource Center
 
 > **Slice:** `service-directory`
 > **Source stories:** SD-US-01 … SD-US-08 (`docs/02-user-stories/service-directory-user-stories.md`)
-> **Source requirements:** SD-REQ-01 … SD-REQ-14 (`docs/01-requirements/service-directory-requirement.md`)
-> **Spec status:** Regenerated via `user-story-to-spec` — awaiting user acceptance
+> **Source requirements:** SD-REQ-01 … SD-REQ-15 (`docs/01-requirements/service-directory-requirement.md`)
+> **Spec status:** Regenerated via `user-story-to-spec`; **Amended 2026-07-25** — product renamed to **Resource Center** (formerly Service Directory); optional per-link `iconKey` whitelist (SD-FR-71)
+> **Product name:** Resource Center · **Slice id:** `service-directory` (artifact filenames unchanged)
 > **Last updated:** 2026-07-25
 > **UX baseline:** `docs/prototypes/wwa-service-directory.html`
 
@@ -21,7 +22,7 @@ This document is the **behavior source of truth** for the slice. Code, tests, an
 ## Overview
 
 **Feature summary:**
-Service Directory is a Platform-shared Hub page that renders an administrator-maintained catalog of
+Resource Center is a Platform-shared Hub page that renders an administrator-maintained catalog of
 destinations — documentation, tools, in-Hub workspaces, and source repositories — organised as
 `scopes → groups → links`, with filtering, a personal Recently used strip, and audited `DEVOPS_ADMIN`
 maintenance.
@@ -31,7 +32,7 @@ Cut the time delivery teams and new joiners spend locating tools, guidelines, an
 and remove the code-deploy dependency for adding a new destination category.
 
 **In-scope outcome:**
-At delivery, any authenticated user can open `/wwa/service-directory` from the flyout or Home, filter
+At delivery, any authenticated user can open `/wwa/resource-center` from the flyout or Home, filter
 a seeded catalog covering the seven SDLC stages plus Common and External destinations, open links with
 correct in-app or new-tab behavior, and see their own Recently used list. A `DEVOPS_ADMIN` can perform
 full CRUD on the catalog, every mutation is audited with `actor_kind = HUMAN`, and no catalog data is
@@ -43,7 +44,7 @@ stored in Configuration Management.
 
 | Story | Title / Summary | Key Capability |
 |---|---|---|
-| SD-US-01 | Reach Service Directory from Hub navigation | Route, flyout entry, Home Shared Controls entry, auth guard |
+| SD-US-01 | Reach Resource Center from Hub navigation | Route, flyout entry, Home Shared Controls entry, auth guard |
 | SD-US-02 | Browse and filter the destination catalog | Scope / kind filters, search, empty state, `/` shortcut |
 | SD-US-03 | Navigate SDLC stages and open each agent's source | Stage strip, stage focus, kind sub-headings, open behavior |
 | SD-US-04 | Find shared platform and engineering systems | Seed content, Common / External scopes, pending-URL handling |
@@ -75,7 +76,7 @@ stored in Configuration Management.
 **Core capability domains:**
 
 - **Navigation placement** — route, flyout entry, Home Shared Controls entry, shell integration.
-- **Catalog read** — load the persisted catalog, hide disabled entries, order deterministically, render scope → group → link.
+- **Catalog read** — load the persisted catalog, hide disabled entries, order deterministically, render scope → group → link (including optional per-link whitelist icons).
 - **Discovery** — scope filter, kind filter, SDLC stage focus, free-text search, empty states.
 - **Link activation** — in-app navigation for `workspace`, protected new tab for other kinds, pending-URL suppression.
 - **Personal shortcuts** — Recently used capture, capping, clearing, and self-healing against deleted links.
@@ -94,7 +95,7 @@ stored in Configuration Management.
 
 **Workflow boundaries:**
 
-- Entry point: navigating to `/wwa/service-directory` (from flyout, Home, or a direct URL).
+- Entry point: navigating to `/wwa/resource-center` (from flyout, Home, or a direct URL).
 - Exit point: the user opens a destination, or leaves the page. The feature has no terminal business state — the catalog is long-lived reference data.
 - Out-of-band transitions: an administrator mutation invalidates other users' loaded copies (resolved by reload); a stale administrator write is rejected as a conflict; a link deleted while present in someone's Recently used list is dropped on their next load.
 
@@ -108,9 +109,9 @@ stored in Configuration Management.
 
 ### FR Group 1 — Navigation And Placement
 
-- **SD-FR-01**: The application exposes route `/wwa/service-directory`, rendered inside the existing Hub workspace shell, with the section title "Service Directory". *(Source: SD-US-01)*
-- **SD-FR-02**: The Platform flyout lists a Service Directory entry, unlocked for all roles (no access permission gate). *(Source: SD-US-01)*
-- **SD-FR-03**: The Home page Shared Controls section lists a Service Directory card pointing at the same route. *(Source: SD-US-01)*
+- **SD-FR-01**: The application exposes route `/wwa/resource-center`, rendered inside the existing Hub workspace shell, with the section title "Resource Center". *(Source: SD-US-01)*
+- **SD-FR-02**: The Platform flyout lists a Resource Center entry, unlocked for all roles (no access permission gate). *(Source: SD-US-01)*
+- **SD-FR-03**: The Home page Shared Controls section lists a Resource Center card pointing at the same route. *(Source: SD-US-01)*
 - **SD-FR-04**: Unauthenticated access to the route follows the existing router guard: session restore is attempted, then redirect to login. *(Source: SD-US-01)*
 - **SD-FR-05**: Flyout and Home entries are driven by the single existing Platform capability registry, so one registration serves both surfaces. `[INFERRED]`
 
@@ -198,7 +199,7 @@ stored in Configuration Management.
 - **SD-FR-60**: When the catalog store is empty, a seed catalog is installed once, covering the seven SDLC stage groups, Common (Platform and Engineering tools including ARCAD and GitHub Enterprise), and External. *(Source: SD-US-04, SD-REQ-06)*
 - **SD-FR-61**: Seeding must be idempotent — it runs only against an empty store and never overwrites administrator edits, including a deliberately emptied catalog. *(Source: SD-US-04)* `[INFERRED]`
 - **SD-FR-62**: Seed links whose production URL is unknown use the reserved `.invalid` suffix so they render as pending rather than as dead links. *(Source: SD-US-04, SD-OQ-02)* `[DEFAULT]`
-- **SD-FR-63**: The catalog is stored in its own dedicated persistence; no Service Directory data is written to `DA_CONFIGURATION_COMPONENT`, `DA_CONFIGURATION_ITEM`, or `DA_SCOPE_DIRECTORY`, and no configuration key is added for it. *(Source: SD-US-08, SD-REQ-10)*
+- **SD-FR-63**: The catalog is stored in its own dedicated persistence; no Resource Center data is written to `DA_CONFIGURATION_COMPONENT`, `DA_CONFIGURATION_ITEM`, or `DA_SCOPE_DIRECTORY`, and no configuration key is added for it. *(Source: SD-US-08, SD-REQ-10)*
 - **SD-FR-64**: All endpoints are Platform-shared under `/api/platform/` and accept no agent parameter; no agent boundary forcing applies. *(Source: SD-US-08)*
 - **SD-FR-65**: Guest sessions may read the catalog. All non-read requests from a guest session remain blocked by the existing guest read-only enforcement, and this slice adds no exemption. *(Source: SD-US-01, SD-US-06)* `[DEFAULT — SD-OQ-01]`
 - **SD-FR-66**: SDLC guideline and feedback link content is aligned with the Agent Contribute Dashboard manually for MVP; no automated dual-write is introduced. *(Source: SD-US-08, SD-REQ-14)*
@@ -213,6 +214,16 @@ existing ids stay stable.
 - **SD-FR-68**: Independently of SD-FR-44, the store enforces its own optimistic locking, so two mutations overlapping in flight still cannot interleave — the loser receives the same 409 with the same error code. The two mechanisms cover different windows and neither replaces the other: SD-FR-44 covers "stale page", storage-level locking covers "same instant". *(Source: SD-NFR-06)* `[INFERRED]`
 - **SD-FR-69**: A 409 is not a validation error and carries no field-level detail. The client's only correct response is to reload the catalog and ask the administrator to reapply the edit; merging is never attempted, because a merge could resurrect an entry another administrator deleted. *(Source: SD-US-06)* `[DEFAULT]`
 - **SD-FR-70**: At most one scope may declare `layout = stage-strip`; a second one is rejected on create and on update. Stage focus selects "the stage-strip scope" (SD-FR-18), and with two such scopes that phrase has no single referent. *(Source: SD-US-03)* `[DEFAULT]`
+
+### FR Group 11 — Per-Link Icons (amended 2026-07-25)
+
+- **SD-FR-71**: Each link may carry an optional `iconKey` that selects a local catalog icon from a fixed platform whitelist. *(Source: SD-US-02, SD-US-06, SD-REQ-15)* `[DEFAULT]`
+  - Allowed MVP keys (exact set; extend only by coordinated backend enum + frontend union + asset map): `confluence`, `github`, `arcad`, `peoplesoft`, `learning`, `infosec`, `vendor`, `wwa`.
+  - `null`, omitted, or blank means "no icon key" and is valid.
+  - A non-blank value that is not in the whitelist is rejected server-side with a field-level validation error on `iconKey`.
+  - The catalog must **not** accept icon image URLs, data URIs, or uploaded binary assets in MVP.
+  - Presentation: when `iconKey` is present and known to the client map, render that local icon in the card icon slot; otherwise fall back to the existing kind-derived letter badge (title initials, or `GH` for `repo`) and kind colour. A client that does not yet know a newly added whitelist key must also fall back rather than break the page.
+  - `iconKey` is not part of free-text search (SD-FR-16 unchanged).
 
 ---
 
@@ -247,7 +258,7 @@ would itself be sensitive; unknown URLs stay as `.invalid` placeholders (SD-FR-6
 
 ```mermaid
 flowchart TD
-    A[User opens /wwa/service-directory] --> B{Authenticated session?}
+    A[User opens /wwa/resource-center] --> B{Authenticated session?}
     B -- No --> C[Router guard redirects to /login]
     C --> A
     B -- Yes --> D[Load catalog: one read request]
@@ -303,7 +314,7 @@ flowchart TD
 
 ### Main Flow
 
-1. **Trigger.** The user navigates to `/wwa/service-directory` from the Platform flyout, the Home Shared Controls grid, or a direct URL. An unauthenticated visitor is sent to login first and returns afterwards.
+1. **Trigger.** The user navigates to `/wwa/resource-center` from the Platform flyout, the Home Shared Controls grid, or a direct URL. An unauthenticated visitor is sent to login first and returns afterwards.
 2. **Read.** The page issues one catalog read. A non-admin receives enabled entries only; an administrator may request disabled entries too.
 3. **Provision (first run only).** If the store is empty, the seed catalog is installed once and then served. A catalog that an administrator has deliberately emptied is not re-seeded.
 4. **Render.** Scopes render in `sortOrder`, then groups, then links under fixed kind sub-headings. The SDLC scope renders with a stage rail; other scopes render as bucket sections. The Recently used strip renders above the filters when it has resolvable entries.
@@ -342,7 +353,7 @@ flowchart TD
 | Catalog | The single versioned container for all directory content | version, updatedBy, updatedAt, scopes |
 | Scope | Top-level category and filter chip (for example SDLC, Common, External) | key, title, description, layout, system, enabled, sortOrder |
 | Group | A section within a scope — an SDLC stage or a plain bucket | key, title, description, type, stageOrder, agentName, stageKey, enabled, sortOrder |
-| Link | A single destination card | id, title, description, url, kind, kindLabel, enabled, sortOrder |
+| Link | A single destination card | id, title, description, url, kind, kindLabel, iconKey (optional whitelist), enabled, sortOrder |
 
 Detailed field-level definitions live in `docs/04-architecture/service-directory-data-model.md`.
 
@@ -360,7 +371,7 @@ The catalog is reference data, not a workflow entity. The only lifecycle state i
 - Valid transitions: `enabled → disabled` and `disabled → enabled`, both by administrator update. Deletion removes the entity (and its descendants) outright; there is no soft-delete state.
 - Readers only ever see `enabled` entities (SD-FR-08); administrators may view both (SD-FR-09).
 
-**Validation rules:** see FR Group 7 (SD-FR-46 … SD-FR-52).
+**Validation rules:** see FR Group 7 (SD-FR-46 … SD-FR-52) and SD-FR-71 (`iconKey` whitelist).
 
 **Rule traces** (each new rule checked against at least three cases, including one where it must not fire):
 
@@ -377,6 +388,7 @@ The catalog is reference data, not a workflow entity. The only lifecycle state i
 | Search field scope (SD-FR-16) | searching a word present only in a link title → matches that link ✓ · searching a path segment that appears only inside URLs → matches nothing, because URLs are not searched ✓ · searching "github" → **does** match every `repo` link, because the kind label "GitHub / source" is searched even though the URL is not (rule must not be mistaken for "the word github matches nothing") ✓ |
 | Recently used cap (SD-FR-29, SD-FR-30) | 9 distinct opens → oldest dropped, 8 kept ✓ · re-open of entry 5 → moves to front, count unchanged ✓ · open of a link later deleted → dropped on next load, count shrinks ✓ |
 | System-scope protection (SD-FR-43) | delete `sdlc` → rejected ✓ · delete an admin-created `security` scope → allowed ✓ · disable `sdlc` → allowed, page renders remaining scopes ✓ |
+| Icon key whitelist (SD-FR-71) | `iconKey = github` → accepted ✓ · omit `iconKey` → accepted, letter badge ✓ · `iconKey = ""` → treated as absent ✓ · `iconKey = jenkins` (not in MVP set) → rejected ✓ · `iconKey = https://evil.example/x.png` → rejected as unknown key ✓ (must not be treated as an image URL) |
 | Link tie-break (SD-FR-10) | two links, `sortOrder` 10 and 20 → 10 first ✓ · both `sortOrder` 10, titles "Argo" / "Bamboo" → "Argo" first ✓ · both `sortOrder` 10 and both titled "Runbook" → lower `id` first, so order is stable across reloads ✓ |
 
 ---
@@ -389,7 +401,7 @@ The catalog is reference data, not a workflow entity. The only lifecycle state i
 
 **APIs / interfaces:**
 
-- **Catalog read API** (inbound, consumed by the Service Directory page): returns the whole catalog.
+- **Catalog read API** (inbound, consumed by the Resource Center page): returns the whole catalog.
 - **Catalog mutation API** (inbound, `DEVOPS_ADMIN` only): create / update / delete for scope, group, and link, each returning the updated catalog.
 - **Audit write** (internal, outbound from the catalog service to the existing audit component).
 - Concrete paths, payloads, and status codes: `docs/05-design/contracts/service-directory-API_IMPLEMENTATION_GUIDE.md`.
@@ -451,7 +463,7 @@ The following are explicitly excluded:
 - **Server-side Recently used or cross-device sync** — personal data with privacy implications; not needed for the MVP outcome.
 - **Per-user favourites, pinning, or popularity ranking** — future enhancement, no current requirement.
 - **Embedding third-party UIs in iframes** — security and licensing risk; links open externally.
-- **A dedicated Service Directory audit UI** — the shared Audit Log page is the review surface.
+- **A dedicated Resource Center audit UI** — the shared Audit Log page is the review surface.
 - **Draft / approval workflow for catalog edits** — `DEVOPS_ADMIN` writes take effect immediately.
 - **Bulk import / export of links** — manual entry only in MVP.
 - **Drag-and-drop reordering** — order is a numeric field in MVP.
@@ -465,7 +477,7 @@ The following are explicitly excluded:
 
 | # | Question | Raised from | Owner |
 |---|---|---|---|
-| **SD-OQ-01** | May guest sessions read the Service Directory, or should they be redirected away? Spec default: read allowed (SD-FR-65). | SD-US-01, SD-REQ-13 | Product / Security |
+| **SD-OQ-01** | May guest sessions read the Resource Center, or should they be redirected away? Spec default: read allowed (SD-FR-65). | SD-US-01, SD-REQ-13 | Product / Security |
 | **SD-OQ-02** | What are the production ARCAD and GitHub Enterprise URLs? Spec default: pending `.invalid` placeholders until supplied (SD-FR-62). | SD-US-04 | Ops / Platform |
 | **SD-OQ-03** | Should SDLC guideline / feedback links become a single shared source with the Agent Contribute Dashboard? Spec default: manual alignment for MVP (SD-FR-66). | SD-US-08 | Product |
 | **SD-OQ-04** | Must the store-boundary ADR be accepted before implementation starts? Spec default: yes — `ADR-0010` accompanies this set as Proposed. | SD-US-08 | Architecture |
@@ -476,12 +488,12 @@ The following are explicitly excluded:
 
 | Story | Requirements | Functional requirements | Observable acceptance check |
 |---|---|---|---|
-| SD-US-01 | SD-REQ-01 | SD-FR-01 … SD-FR-05 | Flyout entry and Home card both open `/wwa/service-directory` inside the shell; unauthenticated access redirects to login |
-| SD-US-02 | SD-REQ-02, SD-REQ-05 | SD-FR-06 … SD-FR-10, SD-FR-14 … SD-FR-16, SD-FR-21 … SD-FR-23 | Scope, kind, and search filters narrow results as specified; URLs are not searched; empty state offers Clear filters; `/` focuses search |
+| SD-US-01 | SD-REQ-01 | SD-FR-01 … SD-FR-05 | Flyout entry and Home card both open `/wwa/resource-center` inside the shell; unauthenticated access redirects to login |
+| SD-US-02 | SD-REQ-02, SD-REQ-05, SD-REQ-15 | SD-FR-06 … SD-FR-10, SD-FR-14 … SD-FR-16, SD-FR-21 … SD-FR-23, SD-FR-71 | Scope, kind, and search filters narrow results as specified; URLs are not searched; empty state offers Clear filters; `/` focuses search; whitelisted `iconKey` shows local icon, absent key keeps letter badge |
 | SD-US-03 | SD-REQ-03, SD-REQ-04 | SD-FR-11 … SD-FR-13, SD-FR-17 … SD-FR-20, SD-FR-24 … SD-FR-26 | Seven ordered stages in the rail; stage focus hides other scopes and toggles off; `workspace` navigates in-app, other kinds open a protected new tab |
 | SD-US-04 | SD-REQ-06 | SD-FR-27, SD-FR-60 … SD-FR-62 | Seeded Common groups include ARCAD and GitHub Enterprise; pending `.invalid` links render as "URL pending" and do not navigate |
 | SD-US-05 | SD-REQ-09 | SD-FR-28 … SD-FR-35 | Opening links fills Recently used, capped at 8, no duplicates, clearable, self-healing, empty by default, never audited |
-| SD-US-06 | SD-REQ-07, SD-REQ-08, SD-REQ-11, SD-REQ-12 | SD-FR-36 … SD-FR-52, SD-FR-67 … SD-FR-70 | Admin CRUD works; non-admin sees nothing and gets 403; duplicate keys, key edits, bad URLs, and system-scope deletes are rejected; cascade delete is confirmed and complete; a stale update or delete returns 409 while a stale create still succeeds |
+| SD-US-06 | SD-REQ-07, SD-REQ-08, SD-REQ-11, SD-REQ-12, SD-REQ-15 | SD-FR-36 … SD-FR-52, SD-FR-67 … SD-FR-71 | Admin CRUD works; non-admin sees nothing and gets 403; duplicate keys, key edits, bad URLs, unknown `iconKey`, and system-scope deletes are rejected; cascade delete is confirmed and complete; a stale update or delete returns 409 while a stale create still succeeds; link form offers whitelist `iconKey` picker |
 | SD-US-07 | SD-REQ-08 | SD-FR-53 … SD-FR-59 | One audit entry per successful mutation with `actor_kind = HUMAN` and an identifiable entity; failures and reads produce none; audit failure does not break the mutation |
 | SD-US-08 | SD-REQ-10, SD-REQ-14 | SD-FR-63, SD-FR-64, SD-FR-66 | Catalog lives in its own table; no Configuration Management rows or config keys added; endpoints are Platform-shared with no agent parameter |
 | Guest posture | SD-REQ-13 | SD-FR-65 | A guest session can read the catalog; every guest mutation attempt is blocked |
@@ -521,5 +533,5 @@ The following are explicitly excluded:
 | API guide | `docs/05-design/contracts/service-directory-API_IMPLEMENTATION_GUIDE.md` |
 | Tasks | `docs/06-tasks/service-directory-tasks.md` |
 | Traceability | `docs/00-context/service-directory-traceability.md` |
-| Store boundary ADR | `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Proposed) |
+| Store boundary ADR | `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Accepted) |
 | Prototype | `docs/prototypes/wwa-service-directory.html` |

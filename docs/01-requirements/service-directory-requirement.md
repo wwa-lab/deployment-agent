@@ -1,8 +1,10 @@
-# Service Directory Requirement
+# Resource Center Requirement
 
 **Slice:** `service-directory`
 **Date:** 2026-07-25
-**Status:** Regenerated via `wwa-sdd-generate-all` skill chain — awaiting user acceptance
+**Status:** Regenerated via `wwa-sdd-generate-all`; **Amended 2026-07-25** — product renamed to **Resource Center** (formerly Service Directory); optional per-link `iconKey` whitelist (SD-REQ-15)
+**Product name:** Resource Center  
+**Slice id / artifact filenames:** `service-directory` (unchanged for continuity)
 **Owner:** WWA-Atlas Hub (Platform)
 **Language:** English-only (ADR-0009)
 **Prototype (accepted UX baseline):** `docs/prototypes/wwa-service-directory.html`
@@ -18,9 +20,9 @@
 | Field | Value |
 |---|---|
 | Goal | Give every Hub user one Platform page that answers "where do I go?" for SDLC tooling, shared platforms, and external systems — driven by admin-maintained configuration instead of code |
-| Slice | `service-directory` |
-| Scope (in) | New Platform page `/wwa/service-directory`; config-driven `scopes → groups → links` catalog; scope / kind / SDLC-stage / text filters; client-local Recently used; `DEVOPS_ADMIN` manage with audited mutations; new dedicated persistence + Platform REST API; seed catalog |
-| Scope (out) | Any storage inside Configuration Management entities; link health probes; auto-discovery from GitHub/Confluence; server-side Recently used; iframe embedding; per-user favourites; the prototype's mock role switch |
+| Slice | `service-directory` (artifact id; product name is **Resource Center**, formerly Service Directory) |
+| Scope (in) | New Platform page `/wwa/resource-center`; config-driven `scopes → groups → links` catalog; scope / kind / SDLC-stage / text filters; client-local Recently used; `DEVOPS_ADMIN` manage with audited mutations; new dedicated persistence + Platform REST API; seed catalog |
+| Scope (out) | Any storage inside Configuration Management entities; link health probes; auto-discovery from GitHub/Confluence; server-side Recently used; iframe embedding; per-user favourites; the prototype's mock role switch; arbitrary icon URL upload or remote image hosting |
 | Sources of truth | This requirement, `docs/03-spec/service-directory-spec.md` (behavior), `docs/06-tasks/service-directory-tasks.md` (execution), the prototype (UX), proposed `ADR-0010` (store boundary) |
 | Acceptance | See §7 Success Criteria; per-story acceptance in `docs/02-user-stories/service-directory-user-stories.md`; consolidated matrix in the spec |
 | Verification | `mvn test` (backend + new controller test), `cd frontend && npm run build`, documented manual walkthrough against the prototype |
@@ -46,7 +48,7 @@ Consequences observed:
 - Shared engineering systems (ARCAD, GitHub Enterprise) have no canonical entry point in the Hub.
 - Adding a new link category requires a frontend code change and a release.
 
-Service Directory closes that gap with an admin-maintainable, audited catalog.
+Resource Center closes that gap with an admin-maintainable, audited catalog.
 
 ---
 
@@ -80,7 +82,7 @@ Roles are the existing `UserRole` union (`frontend/src/types/index.ts:16`) backe
 
 | ID | Requirement |
 |---|---|
-| **SD-REQ-01** | Expose Service Directory at route `/wwa/service-directory` inside the existing Hub shell, reachable from both the Platform flyout and the Home "Shared Controls" section. |
+| **SD-REQ-01** | Expose Resource Center at route `/wwa/resource-center` inside the existing Hub shell, reachable from both the Platform flyout and the Home "Shared Controls" section. |
 | **SD-REQ-02** | Render the catalog from persisted configuration — `scopes`, `groups`, `links` — with no hard-coded scope, group, or link enumeration in application code. |
 | **SD-REQ-03** | Support four link kinds: `docs`, `tool`, `workspace`, `repo`. `workspace` links navigate inside the Hub; the other kinds open in a new browser tab. |
 | **SD-REQ-04** | Support many links per group, and model each of the seven SDLC stages as one group under the `sdlc` scope carrying its stage order and owning agent name. |
@@ -94,6 +96,7 @@ Roles are the existing `UserRole` union (`frontend/src/types/index.ts:16`) backe
 | **SD-REQ-12** | Preserve the three seeded system scopes (`sdlc`, `common`, `external`) against deletion, while still allowing them to be retitled, reordered, and disabled. Their keys stay fixed, since behavior and audit history reference them. |
 | **SD-REQ-13** | Allow `GUEST` sessions to read the catalog while all mutations remain blocked. `[DEFAULT — revisit if wrong; see SD-OQ-01]` |
 | **SD-REQ-14** | Keep SDLC guideline / feedback link content aligned with the Agent Contribute Dashboard by manual alignment for MVP; do not introduce a dual-write path without a defined sync rule. |
+| **SD-REQ-15** | Allow each link an optional `iconKey` chosen from a fixed platform whitelist so catalog cards can show a distinct local icon per tool or destination. Omitting the key, or supplying an unknown key, must fall back to the existing kind-derived letter badge. Do not accept icon image URLs or uploaded assets in MVP. |
 
 ---
 
@@ -116,13 +119,14 @@ Roles are the existing `UserRole` union (`frontend/src/types/index.ts:16`) backe
 
 ## 7. Success Criteria
 
-1. Any authenticated user opens Service Directory from the flyout or Home and sees SDLC, Common, and External destinations.
+1. Any authenticated user opens Resource Center from the flyout or Home and sees SDLC, Common, and External destinations.
 2. A `DEVOPS_ADMIN` adds a new scope, group, and link and other users see them after reload — with no code deploy.
 3. Publishing a WWA agent tool includes attaching a `repo` link under the owning SDLC stage, and a new joiner can find it.
 4. Every admin mutation appears in the existing Audit Log page and identifies the affected catalog entity.
 5. A non-admin sees no manage affordances, and direct API mutation attempts return HTTP 403.
-6. Inspecting Configuration Management shows no Service Directory catalog data.
+6. Inspecting Configuration Management shows no Resource Center catalog data.
 7. The delivered page matches the accepted prototype's structure and interaction model, minus the prototype-only artifacts listed in §8.
+8. Links with a whitelisted `iconKey` render that local icon on the card; links without one keep the letter badge.
 
 ---
 
@@ -163,7 +167,7 @@ The prototype is a UX baseline, not an implementation reference. These parts mus
 
 | ID | Question | Default taken | Owner |
 |---|---|---|---|
-| **SD-OQ-01** | May a `GUEST` session read the Service Directory, or should guests be redirected away from the page? | Default: guests may read (`SD-REQ-13`). Guests already read other Platform pages and all writes are blocked by `GuestReadOnlyFilter`. | Product / Security |
+| **SD-OQ-01** | May a `GUEST` session read the Resource Center, or should guests be redirected away from the page? | Default: guests may read (`SD-REQ-13`). Guests already read other Platform pages and all writes are blocked by `GuestReadOnlyFilter`. | Product / Security |
 | **SD-OQ-02** | Production URLs for ARCAD and GitHub Enterprise. | Seed ships reserved `.invalid` placeholders rendered as non-navigable "URL pending"; replaced under SD-T02 before release. | Ops / Platform |
 | **SD-OQ-03** | Should SDLC guideline / feedback links become a shared source with the Agent Contribute Dashboard? | Default: manual alignment for MVP (`SD-REQ-14`); a shared source is a later slice. | Product |
 | **SD-OQ-04** | Does the store boundary decision need a formal ADR before implementation? | Default: yes — `ADR-0010` is proposed with this set and needs acceptance. | Architecture |
@@ -183,5 +187,5 @@ The prototype is a UX baseline, not an implementation reference. These parts mus
 | API guide | `docs/05-design/contracts/service-directory-API_IMPLEMENTATION_GUIDE.md` |
 | Tasks | `docs/06-tasks/service-directory-tasks.md` |
 | Traceability | `docs/00-context/service-directory-traceability.md` |
-| Store boundary decision | `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Proposed) |
+| Store boundary decision | `docs/00-context/decisions/ADR-0010-service-directory-owns-its-catalog-store.md` (Accepted) |
 | Prototype | `docs/prototypes/wwa-service-directory.html` |
