@@ -5,13 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Working Rules
 
 - When asked to review a document, only produce a review or quality report unless the user explicitly asks to rewrite or fix the document.
-- Write staged SDLC artifacts to the current repository paths:
-  - `docs/02-user-stories/user-stories.md`
-  - `docs/03-spec/spec.md`
-  - `docs/04-architecture/architecture.md`
-  - `docs/05-design/design.md`
-  - `docs/06-tasks/tasks.md`
-- Default repository documents, code, and comments to English unless the user explicitly asks for another language.
+- At the start of a new session, read `docs/00-context/AGENT_HANDOFF.md` before product/SDD/implementation work. Before ending a session with meaningful progress, update that handoff last (ADR-0008).
+- Read `PROJECT_RULES.md` and `DEVELOPMENT_STANDARDS.md` before non-trivial SDD or implementation work.
+- Write staged SDLC artifacts to slice paths under `docs/01-requirements` … `docs/06-tasks` (see `docs/SDD-BOOTSTRAP.md`). Shared docs such as `docs/03-spec/spec.md` remain valid for cross-cutting scope.
+- For full SDD generation, use `.claude/skills/wwa-sdd-generate-all/` and the mandatory skill chain; report skill-chain evidence.
+- Project rules and SDD documents are English-only (ADR-0009). Do not create `.zh-CN.md` companions unless the user explicitly asks.
+- Default code, comments, and runtime UI copy to English unless a product slice explicitly requires otherwise.
 - For durable project memory, use the `context-engineering-adr` skill when a task changes architecture, cross-project conventions, AI-agent working context, platform boundaries, integrations, security posture, or data ownership.
 
 # Project Contract
@@ -39,7 +38,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Treat `.agents/skills/` as the canonical project-local source for reusable SDD and Agentic SDLC workflows.
 - Use `sdd-profile-manager` before applying SDD to a new project shape.
-- Use `sdd-slice-bootstrap` when starting or auditing a feature slice.
+- Use `wwa-sdd-generate-all` for full slice SDD generation; use `sdd-slice-bootstrap` when auditing an existing skeleton.
 - Use `execution-manifest` before handing work to a coding agent, remote agent, or automation.
 - Use `freshness-gate` before approving, implementing, or releasing from potentially stale docs/code/tests.
 - Use `cross-ide-skill-router` when keeping Codex, Claude Code, OpenCode, Gemini, or another tool aligned on the same workflow source.

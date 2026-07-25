@@ -20,3 +20,7 @@ This directory stores durable Architecture Decision Records (ADRs) for decisions
 | [ADR-0004](ADR-0004-add-agentic-sdlc-orchestrator-and-discipline-profile.md) | Accepted | Add orchestrator, discipline profile, and doctor for predictable AI engineering workflow |
 | [ADR-0005](ADR-0005-add-registry-schema-and-ci-gates.md) | Accepted | Add registry, execution manifest schema, and CI gates for enforceable workflow checks |
 | [ADR-0006](ADR-0006-route-github-copilot-through-agentic-sdlc.md) | Accepted | Route GitHub Copilot through the shared Agentic SDLC workflow |
+| [ADR-0007](ADR-0007-adopt-atlas-style-project-rules-and-bilingual-sdd.md) | Partially superseded | Atlas-style rules + skill chain; bilingual mandate withdrawn by ADR-0009 |
+| [ADR-0008](ADR-0008-active-agent-handoff-markdown.md) | Accepted | Maintain active `AGENT_HANDOFF` for IDE/agent switches |
+| [ADR-0009](ADR-0009-english-only-project-and-sdd-docs.md) | Accepted | English-only project rules and SDD documents |
+| [ADR-0010](ADR-0010-service-directory-owns-its-catalog-store.md) | Proposed | Service Directory owns its own catalog store, separate from Configuration Management |

@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WWA Prototype — Service Directory (SDLC · v5)</title>
+  <style>
+    :root {
+      --color-text-primary: #172235;
+      --color-text-secondary: #475569;
+      --color-text-muted: #7f90af;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --font: "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: var(--font);
+      color: var(--color-text-primary);
+      -webkit-font-smoothing: antialiased;
+      background: #0f172a;
+    }
+
+    .proto-banner {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 16px;
+      background: #0b1220;
+      color: #dbe7ff;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .proto-banner strong { color: #8ef0d2; }
+    .proto-banner button {
+      appearance: none;
+      border: 1px solid rgba(147, 197, 253, 0.45);
+      background: rgba(37, 99, 235, 0.2);
+      color: #dbeafe;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .workspace {
+      position: relative;
+      display: flex;
+      height: calc(100vh - 33px);
+      overflow: hidden;
+      background: rgba(245, 248, 255, 0.48);
+      isolation: isolate;
+    }
+    .workspace::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(rgba(116, 143, 188, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(116, 143, 188, 0.08) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.1));
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .sidebar {
+      position: relative;
+      width: 220px;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, #172235 0%, #1d2b45 38%, #21385a 100%);
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+      z-index: 20;
+      border-right: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .sidebar-logo {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 16px;
+      border-bottom: 1px solid #334155;
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .logo-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #4f7cff 0%, #2f66f3 100%);
+      color: white;
+      font-size: 14px;
+    }
+    .logo-copy { display: flex; flex-direction: column; gap: 2px; }
+    .logo-text { color: #f8fafc; }
+    .logo-subtitle { font-size: 12px; font-weight: 500; color: #94a3b8; }
+    .sidebar-section-label {
+      position: relative;
+      z-index: 1;
+      padding: 12px 16px 0;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+    .sidebar-nav { position: relative; z-index: 1; padding: 12px 8px; }
+    .primary-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(51, 65, 85, 0.94);
+      color: #f8fafc;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+    }
+    .primary-chevron { margin-left: auto; font-size: 12px; color: #94a3b8; }
+
+    .secondary-flyout {
+      position: absolute;
+      top: 88px;
+      left: calc(100% + 14px);
+      min-width: 268px;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      padding: 14px 12px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(37, 67, 128, 0.96) 0%, rgba(30, 53, 101, 0.96) 100%);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+      backdrop-filter: blur(16px);
+      z-index: 30;
+    }
+    .secondary-flyout.hidden { display: none; }
+    .flyout-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7b97c7;
+      padding: 10px 12px 4px;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      color: #dbe7ff;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+    }
+    .nav-link:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+    .nav-link.active { background: #2563eb; color: white; }
+    .flyout-home { margin-bottom: 4px; }
+    .finblock-link { color: #93c5fd; font-style: italic; }
+    .nav-icon { font-size: 15px; width: 1.25em; text-align: center; }
+    .new-tag {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 700;
+      color: #8ef0d2;
+      background: rgba(142, 240, 210, 0.12);
+      border: 1px solid rgba(142, 240, 210, 0.35);
+      border-radius: 999px;
+      padding: 1px 7px;
+    }
+
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      isolation: isolate;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.42) 0%,
+        rgba(245, 248, 255, 0.9) 38%,
+        rgba(240, 248, 246, 0.78) 100%
+      );
+    }
+    .main-area::before,
+    .main-area::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(72px);
+      opacity: 0.8;
+      z-index: 0;
+    }
+    .main-area::before {
+      top: -140px; right: -120px; width: 320px; height: 320px;
+      background: rgba(220, 235, 255, 0.85);
+    }
+    .main-area::after {
+      bottom: -180px; left: 8%; width: 280px; height: 280px;
+      background: rgba(232, 247, 242, 0.68);
+    }
+
+    .topbar {
+      min-height: 60px;
+      background: rgba(255, 255, 255, 0.72);
+      border-bottom: 1px solid rgba(227, 234, 247, 0.94);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 8px 24px rgba(31, 42, 68, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .topbar::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(61, 107, 218, 0), rgba(61, 107, 218, 0.86), rgba(61, 107, 218, 0));
+    }
+    .topbar-kicker {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+    }
+    .topbar-title { font-size: 16px; font-weight: 600; }
+    .breadcrumb-workspace { font-weight: 400; color: var(--color-text-muted); }
+    .breadcrumb-sep { color: #94a3b8; }
+    .topbar-user { display: flex; align-items: center; gap: 10px; }
+    .topbar-link {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      text-decoration: none;
+      border: 1px solid #bfdbfe;
+      padding: 4px 10px;
+      border-radius: 6px;
+      color: #2563eb;
+      background: #eff6ff;
+    }
+    .finblock-top {
+      color: var(--color-text-muted);
+      border: 1px solid #e2e8f0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+    .user-name { font-size: 13px; color: var(--color-text-secondary); font-weight: 500; }
+    .badge-role {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .btn-logout {
+      appearance: none;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font: inherit;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+    }
+
+    .main-content {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      overflow: auto;
+      padding: 20px 28px 40px;
+    }
+
+    .page { max-width: 1280px; margin: 0 auto; }
+
+    .page-hero {
+      position: relative;
+      padding: 22px 24px;
+      border-radius: 20px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.86) 0%, rgba(245,249,255,0.96) 58%, rgba(241,249,246,0.92) 100%);
+      border: 1px solid rgba(208, 221, 245, 0.94);
+      box-shadow: 0 16px 36px rgba(31, 42, 68, 0.08);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+    .page-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(rgba(128, 154, 209, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(128, 154, 209, 0.1) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,0.35), transparent 70%);
+      pointer-events: none;
+    }
+    .page-hero-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .page-kicker {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      margin-bottom: 6px;
+    }
+    .page-hero h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .page-hero p {
+      margin: 8px 0 0;
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      max-width: 58ch;
+    }
+
+    .search {
+      width: min(300px, 100%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(191, 210, 240, 0.95);
+      box-shadow: 0 8px 18px rgba(31, 42, 68, 0.05);
+    }
+    .search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      font: inherit;
+      font-size: 14px;
+    }
+    .search input::placeholder { color: #94a3b8; }
+    .search kbd {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #94a3b8;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 2px 6px;
+      background: #f8fafc;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      margin-right: 2px;
+    }
+    .chip {
+      appearance: none;
+      border: 1px solid rgba(214, 226, 245, 0.95);
+      background: rgba(255,255,255,0.72);
+      color: var(--color-text-secondary);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+    .chip:hover { border-color: #93c5fd; color: #1d4ed8; }
+    .chip.active {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+      font-weight: 650;
+    }
+
+    /* SDLC stage strip */
+    .sdlc-strip {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+    .sdlc-step {
+      appearance: none;
+      border: 1px solid rgba(214, 226, 245, 0.95);
+      background: rgba(255,255,255,0.72);
+      border-radius: 14px;
+      padding: 12px 10px;
+      text-align: left;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+    .sdlc-step:hover {
+      border-color: #93c5fd;
+      transform: translateY(-1px);
+    }
+    .sdlc-step.active {
+      border-color: #2563eb;
+      background: #eff6ff;
+      box-shadow: 0 10px 22px rgba(37, 99, 235, 0.1);
+    }
+    .sdlc-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: #172235;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .sdlc-step.active .sdlc-num { background: #2563eb; }
+    .sdlc-name {
+      display: block;
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+    .sdlc-agent {
+      display: block;
+      font-size: 11px;
+      color: var(--color-text-muted);
+      line-height: 1.3;
+    }
+
+    .stage-block {
+      margin-bottom: 22px;
+      scroll-margin-top: 12px;
+      padding: 18px 20px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(247,250,255,0.72) 100%);
+      border: 1px solid rgba(220, 230, 246, 0.96);
+      box-shadow: 0 12px 28px rgba(31, 42, 68, 0.06);
+      backdrop-filter: blur(16px);
+    }
+    .stage-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(227, 234, 247, 0.95);
+    }
+    .stage-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .stage-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: #172235;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .stage-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .stage-meta {
+      margin: 0;
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      line-height: 1.45;
+      max-width: 70ch;
+    }
+    .stage-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge-agent {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
+    .badge-common {
+      background: #f0fdf4;
+      color: #15803d;
+      border-color: #bbf7d0;
+    }
+    .badge-external {
+      background: #fff7ed;
+      color: #c2410c;
+      border-color: #fed7aa;
+    }
+    .badge-custom {
+      background: #f5f3ff;
+      color: #6d28d9;
+      border-color: #ddd6fe;
+    }
+    .stage-num.custom { background: #6d28d9; }
+    .field[hidden] { display: none !important; }
+    .badge-count {
+      background: #f8fafc;
+      color: var(--color-text-muted);
+      border-color: #e2e8f0;
+      font-family: var(--font-mono);
+    }
+    .stage-num.common { background: #15803d; }
+    .stage-num.external { background: #c2410c; }
+    .sdlc-strip.dimmed { opacity: 0.45; pointer-events: none; }
+
+    .link-kind {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+    }
+    .link-kind + .grid { margin-bottom: 14px; }
+    .link-kind:last-of-type + .grid { margin-bottom: 0; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .card {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      min-height: 78px;
+      border-radius: 14px;
+      text-decoration: none;
+      color: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(247,250,255,0.84) 100%);
+      border: 1px solid rgba(220, 230, 246, 0.96);
+      box-shadow: 0 8px 20px rgba(31, 42, 68, 0.05);
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(61,107,218,0), rgba(61,107,218,0.92), rgba(61,107,218,0));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .card:hover {
+      border-color: #2563eb;
+      box-shadow: 0 14px 26px rgba(37, 99, 235, 0.1);
+      transform: translateY(-2px);
+    }
+    .card:hover::before { opacity: 1; }
+
+    .icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #fff;
+      background: var(--tone, #2563eb);
+    }
+    .body { min-width: 0; flex: 1; }
+    .kind-pill {
+      display: inline-block;
+      margin-bottom: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--tone, #2563eb);
+    }
+    .name {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 650;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .desc {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .arrow { color: #94a3b8; font-size: 18px; flex-shrink: 0; }
+
+    .empty {
+      display: none;
+      padding: 40px;
+      text-align: center;
+      color: var(--color-text-muted);
+      border: 1px dashed rgba(191, 210, 240, 0.95);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.5);
+    }
+
+    .note {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--color-text-muted);
+      line-height: 1.55;
+    }
+
+    /* Recently used */
+    .recent-card {
+      margin-bottom: 18px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(247,250,255,0.72) 100%);
+      border: 1px solid rgba(220, 230, 246, 0.96);
+      box-shadow: 0 10px 24px rgba(31, 42, 68, 0.05);
+      backdrop-filter: blur(14px);
+    }
+    .recent-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .recent-head h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+    }
+    .text-btn {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: #2563eb;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+    }
+    .text-btn:hover { text-decoration: underline; }
+    .recent-empty {
+      margin: 0;
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+    .recent-row {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .recent-chip {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px 8px 8px;
+      border-radius: 999px;
+      text-decoration: none;
+      color: inherit;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(214, 226, 245, 0.95);
+      font-size: 13px;
+      font-weight: 600;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .recent-chip:hover {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+    .recent-chip .dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    /* Admin manage */
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+    }
+    .manage-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+    }
+    .manage-bar.visible { display: flex; }
+    .manage-bar p {
+      margin: 0;
+      font-size: 13px;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+    .btn {
+      appearance: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary {
+      background: #fff;
+      color: #1d4ed8;
+      border-color: #93c5fd;
+    }
+    .btn-danger {
+      background: #fff;
+      color: #b91c1c;
+      border-color: #fecaca;
+    }
+    .btn-sm { padding: 5px 8px; font-size: 12px; }
+    .role-select {
+      appearance: none;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .card-wrap { position: relative; }
+    .card-actions {
+      display: none;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      gap: 4px;
+      z-index: 2;
+    }
+    .manage-on .card-actions { display: flex; }
+    .manage-on .card { padding-right: 72px; }
+    .add-slot {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-height: 78px;
+      border-radius: 14px;
+      border: 1px dashed #93c5fd;
+      background: rgba(239, 246, 255, 0.65);
+      color: #1d4ed8;
+      font-size: 13px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .manage-on .add-slot { display: flex; }
+    .add-slot:hover { background: #eff6ff; }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 80;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: min(480px, 100%);
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+      padding: 20px;
+    }
+    .modal h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+    }
+    .modal .sub {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+    }
+    .field input, .field select, .field textarea {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      font-size: 14px;
+    }
+    .field textarea { min-height: 64px; resize: vertical; }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 90;
+      display: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #172235;
+      color: #e2e8f0;
+      font-size: 13px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
+    }
+    .toast.show { display: block; }
+
+    @media (max-width: 1200px) {
+      .sdlc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1100px) {
+      .secondary-flyout { display: none; }
+    }
+    @media (max-width: 720px) {
+      .sidebar { display: none; }
+      .sdlc-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid { grid-template-columns: 1fr; }
+      .page-hero-inner,
+      .stage-head { flex-direction: column; align-items: stretch; }
+      .stage-badges { justify-content: flex-start; }
+      .search { width: 100%; }
+      .main-content { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="proto-banner">
+    <div>
+      <strong>PROTOTYPE v5 · SDLC + Admin + Recent</strong>
+      — Recently used (local) · DEVOPS_ADMIN manage mode (mock persist)
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button type="button" id="toggleFlyout">Toggle flyout</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">W</span>
+        <div class="logo-copy">
+          <span class="logo-text">WWA-Atlas Hub</span>
+          <span class="logo-subtitle">Engineering Delivery Hub</span>
+        </div>
+      </div>
+      <div class="sidebar-section-label">Delivery Hub</div>
+      <div class="sidebar-nav">
+        <button class="primary-link" type="button" id="hubBtn">
+          <span>⌂</span>
+          <span>WWA-Atlas Hub</span>
+          <span class="primary-chevron">›</span>
+        </button>
+      </div>
+
+      <div class="secondary-flyout hidden" id="flyout">
+        <a class="nav-link flyout-home" href="#"><span class="nav-icon">🏠</span><span>WWA-Atlas Hub Home</span></a>
+        <div class="flyout-section-label">Agent Workspaces</div>
+        <a class="nav-link" href="#"><span class="nav-icon">🧭</span><span>Planning Agent</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">🚀</span><span>Deployment Agent</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">🧪</span><span>Testing Agent</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">🛠️</span><span>Build Agent</span></a>
+        <div class="flyout-section-label">Platform</div>
+        <a class="nav-link" href="#"><span class="nav-icon">▦</span><span>Dashboard</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">🤖</span><span>Agent Operations</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">🧩</span><span>Template Management</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">⚙️</span><span>Configuration Management</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">📊</span><span>Audit Log</span></a>
+        <a class="nav-link" href="#"><span class="nav-icon">🛂</span><span>Access Management</span></a>
+        <a class="nav-link active" href="#" aria-current="page">
+          <span class="nav-icon">↗</span><span>Service Directory</span><span class="new-tag">NEW</span>
+        </a>
+        <div class="flyout-section-label">Navigation</div>
+        <a class="nav-link finblock-link" href="#"><span class="nav-icon">↩</span><span>Return to FinBlock</span></a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div>
+          <div class="topbar-kicker">WWA-Atlas Hub</div>
+          <div class="topbar-title">
+            <span class="breadcrumb-workspace">Platform</span>
+            <span class="breadcrumb-sep">›</span>
+            Service Directory
+          </div>
+        </div>
+        <div class="topbar-user">
+          <a class="topbar-link" href="#">← WWA-Atlas Hub Home</a>
+          <a class="finblock-top" href="#">← FinBlock</a>
+          <span class="user-name">Alice Park</span>
+          <select class="role-select" id="roleSelect" title="Prototype: switch role">
+            <option value="DEVELOPER">DEVELOPER</option>
+            <option value="DEVOPS_ADMIN">DEVOPS_ADMIN</option>
+          </select>
+          <button class="btn-logout" type="button">Logout</button>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <div class="page" id="pageRoot">
+          <section class="page-hero">
+            <div class="page-hero-inner">
+              <div>
+                <div class="page-kicker">Qilianshan SDLC · common &amp; external</div>
+                <h1>Service Directory</h1>
+                <p>
+                  Scopes are config-driven. Common includes ARCAD &amp; GitHub.
+                  When a tool ships, attach its GitHub repo so newcomers can start coding quickly.
+                </p>
+              </div>
+              <div class="hero-actions">
+                <label class="search">
+                  <span aria-hidden="true">⌕</span>
+                  <input id="q" type="search" placeholder="Search stage, agent, or link…" autocomplete="off" />
+                  <kbd>/</kbd>
+                </label>
+                <button type="button" class="btn btn-secondary" id="manageBtn" title="Switch topbar role to DEVOPS_ADMIN">Manage links</button>
+              </div>
+            </div>
+          </section>
+
+          <div class="manage-bar" id="manageBar">
+            <p>Manage mode · add custom scopes for new scenarios · mock-saved locally (prototype).</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn btn-primary btn-sm" id="addScopeBtn">+ Add scope</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="addGroupBtn">+ Add group</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="addLinkBtn">+ Add link</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="exitManageBtn">Done</button>
+            </div>
+          </div>
+
+          <section class="recent-card" id="recentCard" aria-labelledby="recent-title">
+            <div class="recent-head">
+              <h2 id="recent-title">Recently used</h2>
+              <button type="button" class="text-btn" id="clearRecentBtn">Clear</button>
+            </div>
+            <div id="recentBody"></div>
+          </section>
+
+          <div class="filter-row">
+            <div class="filter-group" id="scopeChips">
+              <span class="filter-label">Scope</span>
+            </div>
+            <div class="filter-group" id="kindChips">
+              <span class="filter-label">Type</span>
+            </div>
+          </div>
+
+          <div class="sdlc-strip" id="sdlcStrip" aria-label="SDLC stages"></div>
+
+          <div id="sections"></div>
+          <div class="empty" id="empty">No matches.</div>
+          <p class="note">
+            v5 · Config-driven scopes · Recently used (local) · Manage scopes/groups/links as DEVOPS_ADMIN
+          </p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <h3 id="modalTitle">Add link</h3>
+      <p class="sub" id="modalSub">DEVOPS_ADMIN · config is data, not hard-coded enums</p>
+      <form class="form-grid" id="entityForm">
+        <input type="hidden" id="fMode" />
+        <input type="hidden" id="fEditId" />
+
+        <div class="field" data-for="scope,group">
+          <label for="fScopeKey">Scope key</label>
+          <input id="fScopeKey" placeholder="e.g. security / vendor / training" maxlength="40" />
+        </div>
+        <div class="field" data-for="scope">
+          <label for="fScopeLabel">Scope label</label>
+          <input id="fScopeLabel" placeholder="Security" maxlength="40" />
+        </div>
+        <div class="field" data-for="scope">
+          <label for="fScopeLayout">Layout</label>
+          <select id="fScopeLayout">
+            <option value="buckets">Buckets (card groups)</option>
+            <option value="stage-strip">Stage strip (SDLC-style)</option>
+          </select>
+        </div>
+
+        <div class="field" data-for="group,link">
+          <label for="fScopeRef">Scope</label>
+          <select id="fScopeRef"></select>
+        </div>
+        <div class="field" data-for="group">
+          <label for="fGroupName">Group name</label>
+          <input id="fGroupName" placeholder="e.g. Security · Controls" maxlength="80" />
+        </div>
+        <div class="field" data-for="group">
+          <label for="fGroupDesc">Group description</label>
+          <input id="fGroupDesc" maxlength="200" />
+        </div>
+
+        <div class="field" data-for="link">
+          <label for="fGroup">Group</label>
+          <select id="fGroup"></select>
+        </div>
+        <div class="field" data-for="link">
+          <label for="fTitle">Title</label>
+          <input id="fTitle" maxlength="80" />
+        </div>
+        <div class="field" data-for="link">
+          <label for="fDesc">Description</label>
+          <input id="fDesc" maxlength="160" />
+        </div>
+        <div class="field" data-for="link">
+          <label for="fHref">URL or WWA path</label>
+          <input id="fHref" placeholder="https://… or /wwa/…" />
+        </div>
+        <div class="field" data-for="link">
+          <label for="fKind">Kind</label>
+          <select id="fKind">
+            <option value="docs">docs</option>
+            <option value="tool">tool</option>
+            <option value="workspace">workspace</option>
+            <option value="repo">repo (GitHub)</option>
+          </select>
+        </div>
+        <div class="field" data-for="link">
+          <label for="fLabel">Label</label>
+          <input id="fLabel" placeholder="Guideline / GitHub / ARCAD…" />
+        </div>
+      </form>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="modalCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="modalSave">Save</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /**
+     * Config-driven directory:
+     *   scopes[]  → filter chips (sdlc / common / external / custom…)
+     *   groups[]  → stage or bucket under a scope
+     *   links[]   → items inside a group
+     * New scenarios = add a scope (+ groups/links) via admin, no code change.
+     */
+    const RECENT_KEY = 'wwa.serviceDirectory.recent.v2';
+    const DATA_KEY = 'wwa.serviceDirectory.data.v4';
+    const MAX_RECENT = 8;
+
+    const defaultConfig = {
+      scopes: [
+        { key: 'sdlc', label: 'SDLC', layout: 'stage-strip', sortOrder: 10, system: true, enabled: true },
+        { key: 'common', label: 'Common', layout: 'buckets', sortOrder: 20, system: true, enabled: true },
+        { key: 'external', label: 'External', layout: 'buckets', sortOrder: 30, system: true, enabled: true },
+        // Example custom scope — proves config can grow beyond the three defaults
+        { key: 'security', label: 'Security', layout: 'buckets', sortOrder: 40, system: false, enabled: true },
+      ],
+      groups: [
+        // —— SDLC stages ——
+        stage('planning', 1, 'Planning', 'Planning Agent', 'Portfolio Planning Team',
+          'Defines project intent, approval readiness, scope, and delivery direction.', [
+            L('planning-guideline', 'docs', 'Guideline', 'Planning Guideline', 'Confluence · stage guideline', '#2563eb', 'GL', '#'),
+            L('planning-feedback', 'docs', 'Feedback', 'Planning Feedback', 'Confluence · write stage feedback', '#0f766e', 'FB', '#'),
+            L('planning-jira', 'tool', 'Board', 'Jira Planning Board', 'Epic and milestone tracking', '#2684ff', 'JR', '#'),
+            L('planning-workspace', 'workspace', 'Workspace', 'Planning Agent', 'Open WWA Planning workspace', '#4f46e5', 'PA', '/wwa/home'),
+            L('planning-github', 'repo', 'GitHub', 'Planning Agent · source', 'Repo for newcomers to start contributing', '#24292f', 'GH', 'https://github.com/example/wwa-planning-agent'),
+          ]),
+        stage('estimation', 2, 'Estimation', 'Estimation Agent', 'Delivery Planning Team',
+          'Turns schedule, cost, resource, and risk assumptions into a delivery baseline.', [
+            L('estimation-guideline', 'docs', 'Guideline', 'Estimation Guideline', 'Confluence · stage guideline', '#2563eb', 'GL', '#'),
+            L('estimation-feedback', 'docs', 'Feedback', 'Estimation Feedback', 'Confluence · write stage feedback', '#0f766e', 'FB', '#'),
+            L('estimation-template', 'docs', 'Template', 'Estimate Workbook', 'Shared estimation template', '#b45309', 'TP', '#'),
+          ]),
+        stage('discovery', 3, 'Discovery', 'Discovery Agent', 'Solution Discovery Team',
+          'Clarifies solution options, constraints, and design direction before build.', [
+            L('discovery-guideline', 'docs', 'Guideline', 'Discovery Guideline', 'Confluence · stage guideline', '#2563eb', 'GL', '#'),
+            L('discovery-feedback', 'docs', 'Feedback', 'Discovery Feedback', 'Confluence · write stage feedback', '#0f766e', 'FB', '#'),
+            L('discovery-arch', 'tool', 'Design', 'Architecture Space', 'Confluence · solution options', '#0891b2', 'AR', '#'),
+          ]),
+        stage('build', 4, 'Build', 'Build Agent', 'Build Engineering Team',
+          'DEV-stage build, packaging, and pre-deployment automation.', [
+            L('build-guideline', 'docs', 'Guideline', 'Build Guideline', 'Confluence · stage guideline', '#2563eb', 'GL', '#'),
+            L('build-feedback', 'docs', 'Feedback', 'Build Feedback', 'Confluence · write stage feedback', '#0f766e', 'FB', '#'),
+            L('build-workspace', 'workspace', 'Workspace', 'Build Agent', 'Open WWA Build workspace', '#16a34a', 'BA', '/wwa/build-agent'),
+            L('build-jenkins', 'tool', 'CI', 'Jenkins Build Jobs', 'Pipeline console for DEV builds', '#d97706', 'JK', '#'),
+            L('build-artifactory', 'tool', 'Registry', 'Artifactory', 'Artifacts and images', '#15803d', 'AF', '#'),
+            L('build-github', 'repo', 'GitHub', 'Build Agent · source', 'Repo for newcomers to start contributing', '#24292f', 'GH', 'https://github.com/example/wwa-build-agent'),
+          ]),
+        stage('testing', 5, 'Testing', 'Testing Agent', 'QA Automation Team',
+          'Functional, performance, and compatibility validation with defect feedback.', [
+            L('testing-guideline', 'docs', 'Guideline', 'Testing Guideline', 'Confluence · stage guideline', '#2563eb', 'GL', '#'),
+            L('testing-feedback', 'docs', 'Feedback', 'Testing Feedback', 'Confluence · write stage feedback', '#0f766e', 'FB', '#'),
+            L('testing-workspace', 'workspace', 'Workspace', 'Testing Agent', 'Open WWA Testing workspace', '#7c3aed', 'TA', '/wwa/testing-agent'),
+            L('testing-jira', 'tool', 'Defects', 'Jira Defect Board', 'Defect triage and feedback loop', '#2684ff', 'JR', '#'),
+            L('testing-github', 'repo', 'GitHub', 'Testing Agent · source', 'Repo for newcomers to start contributing', '#24292f', 'GH', 'https://github.com/example/wwa-testing-agent'),
+          ]),
+        stage('deployment', 6, 'Deployment', 'Deployment Agent', 'Release Operations Team',
+          'Human-in-the-loop deployment across SIT, UAT, and PROD.', [
+            L('deployment-guideline', 'docs', 'Guideline', 'Deployment Guideline', 'Confluence · stage guideline', '#2563eb', 'GL', '#'),
+            L('deployment-feedback', 'docs', 'Feedback', 'Deployment Feedback', 'Confluence · write stage feedback', '#0f766e', 'FB', '#'),
+            L('deployment-runbook', 'docs', 'Runbook', 'Deployment Runbooks', 'Stage checklists & rollback', '#b45309', 'RB', '#'),
+            L('deployment-workspace', 'workspace', 'Workspace', 'Deployment Agent', 'Open WWA Deployment workspace', '#dc2626', 'DA', '/wwa/deployment-agent'),
+            L('deployment-jenkins', 'tool', 'CI', 'Jenkins Deploy Jobs', 'Release pipeline console', '#d97706', 'JK', '#'),
+            L('deployment-ansible', 'tool', 'Automate', 'Ansible Tower', 'Playbooks and inventory', '#b91c1c', 'AN', '#'),
+            L('deployment-github', 'repo', 'GitHub', 'Deployment Agent · source', 'Repo for newcomers to start contributing', '#24292f', 'GH', 'https://github.com/example/wwa-deployment-agent'),
+          ]),
+        stage('maintenance', 7, 'Maintenance', 'Maintenance Agent', 'Operations Team',
+          'Monitoring, incident response, and feedback routed back into the SDLC.', [
+            L('maintenance-guideline', 'docs', 'Guideline', 'Maintenance Guideline', 'Confluence · stage guideline', '#2563eb', 'GL', '#'),
+            L('maintenance-feedback', 'docs', 'Feedback', 'Maintenance Feedback', 'Confluence · write stage feedback', '#0f766e', 'FB', '#'),
+            L('maintenance-grafana', 'tool', 'Observe', 'Grafana', 'Release health and SLO boards', '#ea580c', 'GR', '#'),
+            L('maintenance-kibana', 'tool', 'Logs', 'Kibana', 'Log search for incident triage', '#0891b2', 'KB', '#'),
+            L('maintenance-snow', 'tool', 'ITSM', 'ServiceNow', 'Incidents and changes', '#0d9488', 'SN', '#'),
+          ]),
+        // —— Common ——
+        bucket('common', 'common-platform', 'Common · Platform',
+          'Shared WWA / FinBlock resources used by every delivery team.', 'Common', 'badge-common', 'common', [
+            L('common-wwa-docs', 'docs', 'Hub', 'WWA Atlas Hub Docs', 'Confluence · product & onboarding', '#2563eb', 'WA', '#'),
+            L('common-change', 'docs', 'Process', 'Change Management Guide', 'CAB process and freeze calendar', '#0f766e', 'CG', '#'),
+            L('common-standard', 'docs', 'Standard', 'Multi-Agent Integration Standard', 'How new agents join the hub', '#1d4ed8', 'ST', '#'),
+            L('common-finblock', 'tool', 'Portal', 'FinBlock Portal', 'Parent platform entry point', '#1d4ed8', 'FB', '#'),
+            L('common-teams', 'tool', 'Chat', 'Teams · Release Channel', 'Cross-stage coordination', '#4f46e5', 'TM', '#'),
+            L('common-teambook', 'tool', 'People', 'Team Book', 'Staff directory lookup', '#64748b', 'TB', '#'),
+          ]),
+        bucket('common', 'common-engineering', 'Common · Engineering tools',
+          'Shared engineering systems. Per-tool GitHub source links live under each SDLC agent (for newcomers).', 'Common', 'badge-common', 'common', [
+            L('common-arcad', 'tool', 'ARCAD', 'ARCAD', 'IBM i DevOps / change management toolchain', '#c2410c', 'AR', '#'),
+            L('common-github', 'tool', 'GitHub', 'GitHub Enterprise', 'Org home — browse team repos, PRs, and WWA projects', '#24292f', 'GH', 'https://github.com/'),
+          ]),
+        // —— External ——
+        bucket('external', 'external-enterprise', 'External · Enterprise',
+          'Corporate systems outside WWA — open in a new tab.', 'External', 'badge-external', 'external', [
+            L('ext-hr', 'tool', 'HR', 'People Soft / HR Portal', 'Leave, timesheets, org chart', '#c2410c', 'HR', '#'),
+            L('ext-learning', 'tool', 'Learning', 'Learning Hub', 'Training and compliance courses', '#ea580c', 'LH', '#'),
+            L('ext-infosec', 'docs', 'Policy', 'InfoSec Policy Library', 'Security standards and exceptions', '#b45309', 'IS', '#'),
+            L('ext-vendor', 'tool', 'Vendor', 'Vendor Status Page', 'Third-party outage notices', '#9a3412', 'VS', '#'),
+          ]),
+        // —— Custom scope example ——
+        bucket('security', 'security-controls', 'Security · Controls',
+          'Example custom scope. Add more scopes anytime via Manage → Add scope.', 'Custom', 'badge-custom', 'custom', [
+            L('sec-vault', 'tool', 'Secrets', 'Vault / Secrets Portal', 'Credential and secret checkout', '#6d28d9', 'VA', '#'),
+            L('sec-scan', 'tool', 'Scan', 'Code Scanning Dashboard', 'SAST / dependency findings', '#7c3aed', 'SC', '#'),
+            L('sec-policy', 'docs', 'Policy', 'Secure Coding Standard', 'Confluence · engineering security baseline', '#5b21b6', 'PL', '#'),
+          ]),
+      ],
+    };
+
+    function L(id, kind, label, title, desc, tone, mark, url) {
+      return { id, kind, label, title, desc, tone, mark, url, enabled: true, sortOrder: 0 };
+    }
+    function stage(key, order, name, agent, agentOwner, description, links) {
+      return {
+        key, scopeKey: 'sdlc', type: 'stage', name, description, enabled: true, sortOrder: order,
+        agent, agentOwner, order, links,
+      };
+    }
+    function bucket(scopeKey, key, name, description, badge, badgeClass, numClass, links) {
+      return {
+        key, scopeKey, type: 'bucket', name, description, enabled: true, sortOrder: 0,
+        badge, badgeClass, numClass, links,
+      };
+    }
+
+    function loadConfig() {
+      try {
+        const raw = localStorage.getItem(DATA_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.scopes?.length && parsed?.groups?.length) return parsed;
+        }
+      } catch (_) {}
+      return structuredClone(defaultConfig);
+    }
+
+    function saveConfig() {
+      localStorage.setItem(DATA_KEY, JSON.stringify(config));
+    }
+
+    let config = loadConfig();
+
+    const kinds = [
+      { id: 'all', label: 'All links' },
+      { id: 'docs', label: 'Docs / Confluence' },
+      { id: 'tool', label: 'Tools' },
+      { id: 'workspace', label: 'WWA workspaces' },
+      { id: 'repo', label: 'GitHub / source' },
+    ];
+
+    let activeScope = 'all';
+    let activeStage = 'all';
+    let activeKind = 'all';
+    let query = '';
+    let role = 'DEVELOPER';
+    let manageOn = false;
+
+    const stripEl = document.getElementById('sdlcStrip');
+    const scopeChipsEl = document.getElementById('scopeChips');
+    const kindChipsEl = document.getElementById('kindChips');
+    const sectionsEl = document.getElementById('sections');
+    const emptyEl = document.getElementById('empty');
+    const qInput = document.getElementById('q');
+    const flyout = document.getElementById('flyout');
+    const pageRoot = document.getElementById('pageRoot');
+    const manageBtn = document.getElementById('manageBtn');
+    const manageBar = document.getElementById('manageBar');
+    const recentBody = document.getElementById('recentBody');
+    const modal = document.getElementById('modal');
+    const toastEl = document.getElementById('toast');
+
+    document.getElementById('toggleFlyout').addEventListener('click', () => flyout.classList.toggle('hidden'));
+    document.getElementById('hubBtn').addEventListener('click', () => flyout.classList.toggle('hidden'));
+
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => toastEl.classList.remove('show'), 2200);
+    }
+
+    function isAdmin() { return role === 'DEVOPS_ADMIN'; }
+
+    function enabledScopes() {
+      return [...config.scopes]
+        .filter((s) => s.enabled !== false)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    }
+
+    function groupsInScope(scopeKey) {
+      return config.groups
+        .filter((g) => g.enabled !== false && g.scopeKey === scopeKey)
+        .sort((a, b) => (a.sortOrder ?? a.order ?? 0) - (b.sortOrder ?? b.order ?? 0));
+    }
+
+    function syncRoleUi() {
+      manageBtn.hidden = false;
+      manageBtn.disabled = false;
+      if (!isAdmin()) {
+        manageOn = false;
+        manageBtn.textContent = 'Manage links (admin only)';
+        manageBtn.style.opacity = '0.65';
+      } else {
+        manageBtn.textContent = manageOn ? 'Managing…' : 'Manage config';
+        manageBtn.style.opacity = '1';
+      }
+      manageBar.classList.toggle('visible', manageOn && isAdmin());
+      pageRoot.classList.toggle('manage-on', manageOn && isAdmin());
+    }
+
+    document.getElementById('roleSelect').addEventListener('change', (e) => {
+      role = e.target.value;
+      syncRoleUi();
+      render();
+      toast(role === 'DEVOPS_ADMIN' ? 'Switched to DEVOPS_ADMIN — open Manage config' : 'Switched to DEVELOPER');
+    });
+
+    manageBtn.addEventListener('click', () => {
+      if (!isAdmin()) {
+        toast('Switch role to DEVOPS_ADMIN in the topbar first');
+        document.getElementById('roleSelect').focus();
+        return;
+      }
+      manageOn = !manageOn;
+      syncRoleUi();
+    });
+    document.getElementById('exitManageBtn').addEventListener('click', () => {
+      manageOn = false;
+      syncRoleUi();
+    });
+
+    function findLink(id) {
+      for (const g of config.groups) {
+        const link = g.links.find((l) => l.id === id);
+        if (link) return { group: g, link };
+      }
+      return null;
+    }
+
+    function flattenLinks() {
+      return config.groups.flatMap((g) => g.links.filter((l) => l.enabled !== false).map((l) => ({ ...l, groupKey: g.key, groupName: g.name })));
+    }
+
+    function getRecentIds() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      } catch (_) {}
+      const seed = ['common-finblock', 'deployment-workspace', 'sec-vault'];
+      localStorage.setItem(RECENT_KEY, JSON.stringify(seed));
+      return seed;
+    }
+    function setRecentIds(ids) {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(ids.slice(0, MAX_RECENT)));
+    }
+    function recordRecent(id) {
+      setRecentIds([id, ...getRecentIds().filter((x) => x !== id)]);
+      renderRecent();
+    }
+
+    function renderRecent() {
+      const byId = new Map(flattenLinks().map((l) => [l.id, l]));
+      const items = getRecentIds().map((id) => byId.get(id)).filter(Boolean);
+      if (!items.length) {
+        recentBody.innerHTML = `<p class="recent-empty">No recent links yet. Open any card to start a personal list.</p>`;
+        return;
+      }
+      recentBody.innerHTML = `<div class="recent-row">${items.map((l) => `
+        <a class="recent-chip" href="${l.url}" data-recent-id="${l.id}" ${l.kind === 'workspace' ? '' : 'target="_blank" rel="noopener"'}>
+          <span class="dot" style="background:${l.tone}">${l.mark}</span>
+          <span>${l.title}</span>
+        </a>`).join('')}</div>`;
+      recentBody.querySelectorAll('[data-recent-id]').forEach((a) => {
+        a.addEventListener('click', () => recordRecent(a.getAttribute('data-recent-id')));
+      });
+    }
+    document.getElementById('clearRecentBtn').addEventListener('click', () => {
+      setRecentIds([]);
+      renderRecent();
+      toast('Recent list cleared');
+    });
+
+    function filterLinks(links, extraHay = []) {
+      return links.filter((l) => {
+        if (l.enabled === false) return false;
+        if (activeKind !== 'all' && l.kind !== activeKind) return false;
+        if (!query.trim()) return true;
+        const q = query.trim().toLowerCase();
+        return [...extraHay, l.title, l.desc, l.label, l.kind].join(' ').toLowerCase().includes(q);
+      });
+    }
+
+    function renderScopeChips() {
+      scopeChipsEl.querySelectorAll('.chip').forEach((n) => n.remove());
+      const chips = [{ key: 'all', label: 'All' }, ...enabledScopes()];
+      chips.forEach((s) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `chip ${activeScope === s.key ? 'active' : ''}`;
+        btn.textContent = s.label;
+        btn.addEventListener('click', () => {
+          activeScope = s.key;
+          if (s.key !== 'sdlc' && s.key !== 'all') activeStage = 'all';
+          render();
+        });
+        scopeChipsEl.appendChild(btn);
+      });
+    }
+
+    function renderStrip() {
+      const sdlcScope = config.scopes.find((s) => s.key === 'sdlc');
+      const showStrip = sdlcScope && (activeScope === 'all' || activeScope === 'sdlc') && sdlcScope.layout === 'stage-strip';
+      const stages = groupsInScope('sdlc').filter((g) => g.type === 'stage');
+      stripEl.style.display = showStrip || manageOn ? '' : 'none';
+      stripEl.classList.toggle('dimmed', activeScope !== 'all' && activeScope !== 'sdlc');
+      stripEl.innerHTML = stages.map((s) => `
+        <button type="button" class="sdlc-step ${activeStage === s.key ? 'active' : ''}" data-stage="${s.key}">
+          <span class="sdlc-num">${s.order ?? s.sortOrder}</span>
+          <span class="sdlc-name">${s.name}</span>
+          <span class="sdlc-agent">${s.agent || ''}</span>
+        </button>`).join('');
+      stripEl.querySelectorAll('[data-stage]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-stage');
+          activeStage = activeStage === key ? 'all' : key;
+          activeScope = 'sdlc';
+          render();
+          if (activeStage !== 'all') {
+            document.getElementById(`group-${activeStage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+    }
+
+    function renderKindChips() {
+      kindChipsEl.querySelectorAll('.chip').forEach((n) => n.remove());
+      kinds.forEach((k) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `chip ${activeKind === k.id ? 'active' : ''}`;
+        btn.textContent = k.label;
+        btn.addEventListener('click', () => { activeKind = k.id; render(); });
+        kindChipsEl.appendChild(btn);
+      });
+    }
+
+    function cardHtml(l) {
+      const target = l.kind === 'workspace' ? '' : 'target="_blank" rel="noopener"';
+      return `
+        <div class="card-wrap">
+          <div class="card-actions">
+            <button type="button" class="btn btn-secondary btn-sm" data-edit="${l.id}">Edit</button>
+            <button type="button" class="btn btn-danger btn-sm" data-del="${l.id}">Del</button>
+          </div>
+          <a class="card" href="${l.url}" ${target} data-link-id="${l.id}">
+            <div class="icon" style="background:${l.tone}">${l.mark}</div>
+            <div class="body">
+              <span class="kind-pill" style="color:${l.tone}">${l.label}</span>
+              <p class="name">${l.title}</p>
+              <p class="desc">${l.desc}</p>
+            </div>
+            <span class="arrow" aria-hidden="true">›</span>
+          </a>
+        </div>`;
+    }
+
+    function groupLinks(links, groupKey) {
+      const docs = links.filter((l) => l.kind === 'docs');
+      const tools = links.filter((l) => l.kind === 'tool');
+      const workspaces = links.filter((l) => l.kind === 'workspace');
+      const repos = links.filter((l) => l.kind === 'repo');
+      let html = '';
+      const block = (title, items, kind) => {
+        if (!items.length && !(manageOn)) return;
+        if (!items.length && manageOn) {
+          html += `<p class="link-kind">${title}</p><div class="grid"><button type="button" class="add-slot" data-add-group="${groupKey}" data-add-kind="${kind}">+ Add ${kind}</button></div>`;
+          return;
+        }
+        html += `<p class="link-kind">${title}</p><div class="grid">${items.map(cardHtml).join('')}<button type="button" class="add-slot" data-add-group="${groupKey}" data-add-kind="${kind}">+ Add ${kind}</button></div>`;
+      };
+      block('Docs / Confluence', docs, 'docs');
+      block('Tools', tools, 'tool');
+      block('WWA workspaces', workspaces, 'workspace');
+      block('GitHub / source (for newcomers)', repos, 'repo');
+      if (!docs.length && !tools.length && !workspaces.length && !repos.length && manageOn) {
+        html += `<div class="grid"><button type="button" class="add-slot" data-add-group="${groupKey}" data-add-kind="repo">+ Add GitHub link</button></div>`;
+      }
+      return html;
+    }
+
+    function groupBlockHtml(g) {
+      const isStage = g.type === 'stage';
+      const badge = isStage
+        ? `<span class="badge badge-agent">${g.agent || 'Agent'}</span>`
+        : `<span class="badge ${g.badgeClass || 'badge-custom'}">${g.badge || 'Custom'}</span>`;
+      const num = isStage
+        ? `<span class="stage-num">${g.order ?? g.sortOrder}</span>`
+        : `<span class="stage-num ${g.numClass || 'custom'}">${g.numClass === 'external' ? '↗' : g.numClass === 'common' ? '★' : '+'}</span>`;
+      return `
+        <section class="stage-block" id="group-${g.key}">
+          <div class="stage-head">
+            <div>
+              <div class="stage-title-row">${num}<h2 class="stage-title">${g.name}</h2></div>
+              <p class="stage-meta">${g.description || ''}</p>
+            </div>
+            <div class="stage-badges">
+              ${badge}
+              <span class="badge badge-count">${g.links.length} links</span>
+              <span class="badge badge-count">${g.scopeKey}</span>
+            </div>
+          </div>
+          ${groupLinks(g.links, g.key)}
+        </section>`;
+    }
+
+    function visibleGroups() {
+      const focusStage = activeStage !== 'all';
+      let scopes = enabledScopes();
+      if (activeScope !== 'all') scopes = scopes.filter((s) => s.key === activeScope);
+
+      const out = [];
+      for (const scope of scopes) {
+        let groups = groupsInScope(scope.key);
+        if (scope.key === 'sdlc' && focusStage) {
+          groups = groups.filter((g) => g.key === activeStage);
+        } else if (focusStage && scope.key !== 'sdlc') {
+          continue; // stage focus hides non-sdlc
+        }
+        for (const g of groups) {
+          const links = filterLinks(g.links, [g.name, g.description, g.agent, g.scopeKey, scope.label]);
+          if (links.length || manageOn) out.push({ ...g, links });
+        }
+      }
+      return out;
+    }
+
+    function bindCardEvents() {
+      sectionsEl.querySelectorAll('[data-link-id]').forEach((a) => {
+        a.addEventListener('click', () => recordRecent(a.getAttribute('data-link-id')));
+      });
+      sectionsEl.querySelectorAll('[data-edit]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          openModal('link-edit', btn.getAttribute('data-edit'));
+        });
+      });
+      sectionsEl.querySelectorAll('[data-del]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          deleteLink(btn.getAttribute('data-del'));
+        });
+      });
+      sectionsEl.querySelectorAll('[data-add-group]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          openModal('link-create', null, {
+            groupKey: btn.getAttribute('data-add-group'),
+            kind: btn.getAttribute('data-add-kind'),
+          });
+        });
+      });
+    }
+
+    function renderSections() {
+      const visible = visibleGroups();
+      emptyEl.style.display = visible.length ? 'none' : 'block';
+      sectionsEl.innerHTML = visible.map(groupBlockHtml).join('');
+      bindCardEvents();
+    }
+
+    function setModalFields(mode) {
+      document.querySelectorAll('#entityForm .field').forEach((field) => {
+        const forModes = (field.getAttribute('data-for') || '').split(',').map((s) => s.trim());
+        const show =
+          (mode.startsWith('scope') && forModes.includes('scope')) ||
+          (mode.startsWith('group') && forModes.includes('group')) ||
+          (mode.startsWith('link') && forModes.includes('link'));
+        field.hidden = !show;
+      });
+    }
+
+    function fillScopeSelect(selected) {
+      const sel = document.getElementById('fScopeRef');
+      sel.innerHTML = enabledScopes().map((s) =>
+        `<option value="${s.key}" ${s.key === selected ? 'selected' : ''}>${s.label} (${s.key})</option>`
+      ).join('');
+    }
+
+    function fillGroupSelect(selected) {
+      const sel = document.getElementById('fGroup');
+      sel.innerHTML = config.groups.map((g) =>
+        `<option value="${g.key}" ${g.key === selected ? 'selected' : ''}>${g.scopeKey} · ${g.name}</option>`
+      ).join('');
+    }
+
+    function openModal(mode, editId, opts = {}) {
+      if (!isAdmin()) return;
+      document.getElementById('fMode').value = mode;
+      document.getElementById('fEditId').value = editId || '';
+      setModalFields(mode);
+
+      if (mode === 'scope-create') {
+        document.getElementById('modalTitle').textContent = 'Add scope';
+        document.getElementById('fScopeKey').value = '';
+        document.getElementById('fScopeLabel').value = '';
+        document.getElementById('fScopeLayout').value = 'buckets';
+      } else if (mode === 'group-create') {
+        document.getElementById('modalTitle').textContent = 'Add group';
+        fillScopeSelect(opts.scopeKey || activeScope === 'all' ? 'common' : activeScope);
+        document.getElementById('fGroupName').value = '';
+        document.getElementById('fGroupDesc').value = '';
+      } else if (mode === 'link-edit') {
+        document.getElementById('modalTitle').textContent = 'Edit link';
+        const found = findLink(editId);
+        if (!found) return;
+        fillGroupSelect(found.group.key);
+        document.getElementById('fTitle').value = found.link.title;
+        document.getElementById('fDesc').value = found.link.desc || '';
+        document.getElementById('fHref').value = found.link.url;
+        document.getElementById('fKind').value = found.link.kind;
+        document.getElementById('fLabel').value = found.link.label || '';
+      } else {
+        document.getElementById('modalTitle').textContent = 'Add link';
+        fillGroupSelect(opts.groupKey || config.groups[0]?.key);
+        document.getElementById('fTitle').value = '';
+        document.getElementById('fDesc').value = '';
+        document.getElementById('fHref').value = '';
+        document.getElementById('fKind').value = opts.kind || 'docs';
+        document.getElementById('fLabel').value = '';
+      }
+      modal.classList.add('open');
+    }
+
+    function closeModal() { modal.classList.remove('open'); }
+
+    function deleteLink(id) {
+      if (!isAdmin() || !confirm('Delete this link?')) return;
+      for (const g of config.groups) {
+        const i = g.links.findIndex((l) => l.id === id);
+        if (i >= 0) {
+          g.links.splice(i, 1);
+          saveConfig();
+          setRecentIds(getRecentIds().filter((x) => x !== id));
+          render();
+          toast('Link deleted');
+          return;
+        }
+      }
+    }
+
+    document.getElementById('addScopeBtn').addEventListener('click', () => openModal('scope-create'));
+    document.getElementById('addGroupBtn').addEventListener('click', () => openModal('group-create'));
+    document.getElementById('addLinkBtn').addEventListener('click', () => openModal('link-create'));
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('modalSave').addEventListener('click', () => {
+      if (!isAdmin()) return;
+      const mode = document.getElementById('fMode').value;
+
+      if (mode === 'scope-create') {
+        const key = document.getElementById('fScopeKey').value.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+        const label = document.getElementById('fScopeLabel').value.trim();
+        const layout = document.getElementById('fScopeLayout').value;
+        if (!key || !label) { toast('Scope key and label required'); return; }
+        if (config.scopes.some((s) => s.key === key)) { toast('Scope key already exists'); return; }
+        config.scopes.push({
+          key, label, layout, sortOrder: (config.scopes.at(-1)?.sortOrder || 0) + 10,
+          system: false, enabled: true,
+        });
+        // seed empty group so scope isn't blank
+        config.groups.push(bucket(key, `${key}-default`, `${label} · General`,
+          `Custom scope "${label}" — add groups and links as needed.`, 'Custom', 'badge-custom', 'custom', []));
+        saveConfig();
+        activeScope = key;
+        toast(`Scope "${label}" added`);
+        closeModal();
+        render();
+        return;
+      }
+
+      if (mode === 'group-create') {
+        const scopeKey = document.getElementById('fScopeRef').value;
+        const name = document.getElementById('fGroupName').value.trim();
+        const description = document.getElementById('fGroupDesc').value.trim();
+        if (!name) { toast('Group name required'); return; }
+        const key = `${scopeKey}-${Date.now()}`;
+        const scope = config.scopes.find((s) => s.key === scopeKey);
+        if (scope?.layout === 'stage-strip') {
+          const order = groupsInScope(scopeKey).length + 1;
+          config.groups.push({
+            key, scopeKey, type: 'stage', name, description, enabled: true,
+            sortOrder: order, order, agent: name, agentOwner: '', links: [],
+          });
+        } else {
+          config.groups.push(bucket(scopeKey, key, name, description, 'Custom', 'badge-custom', 'custom', []));
+        }
+        saveConfig();
+        activeScope = scopeKey;
+        toast('Group added');
+        closeModal();
+        render();
+        return;
+      }
+
+      const editId = document.getElementById('fEditId').value;
+      const groupKey = document.getElementById('fGroup').value;
+      const title = document.getElementById('fTitle').value.trim();
+      const desc = document.getElementById('fDesc').value.trim();
+      const url = document.getElementById('fHref').value.trim();
+      const kind = document.getElementById('fKind').value;
+      const label = document.getElementById('fLabel').value.trim() || kind;
+      if (!title || !url) { toast('Title and URL are required'); return; }
+      const tone = kind === 'docs' ? '#2563eb'
+        : kind === 'workspace' ? '#4f46e5'
+        : kind === 'repo' ? '#24292f'
+        : '#0f766e';
+      const mark = kind === 'repo' ? 'GH' : title.slice(0, 2).toUpperCase();
+
+      if (editId) {
+        const found = findLink(editId);
+        if (!found) return;
+        if (found.group.key !== groupKey) {
+          found.group.links = found.group.links.filter((l) => l.id !== editId);
+          const dest = config.groups.find((g) => g.key === groupKey);
+          dest.links.push({ ...found.link, title, desc, url, kind, label, tone, mark });
+        } else {
+          Object.assign(found.link, { title, desc, url, kind, label, tone, mark });
+        }
+        saveConfig();
+        toast('Link updated');
+      } else {
+        const dest = config.groups.find((g) => g.key === groupKey);
+        dest.links.push({ id: `custom-${Date.now()}`, title, desc, url, kind, label, tone, mark, enabled: true, sortOrder: 0 });
+        saveConfig();
+        toast('Link added');
+      }
+      closeModal();
+      render();
+    });
+
+    function render() {
+      renderScopeChips();
+      renderStrip();
+      renderKindChips();
+      renderSections();
+      renderRecent();
+      syncRoleUi();
+    }
+
+    qInput.addEventListener('input', (e) => { query = e.target.value; renderSections(); });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== qInput && !modal.classList.contains('open')) {
+        e.preventDefault();
+        qInput.focus();
+      }
+      if (e.key === 'Escape') closeModal();
+    });
+
+    render();
+  </script>
+</body>
+</html>
