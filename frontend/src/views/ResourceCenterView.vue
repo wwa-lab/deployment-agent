@@ -893,6 +893,10 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 12px;
+  --rc-accent: #2563eb;
+  --rc-accent-strong: #1d4ed8;
+  --rc-accent-soft: rgba(37, 99, 235, 0.12);
+  --rc-accent-hover: rgba(37, 99, 235, 0.06);
 }
 
 .toolbar {
@@ -940,8 +944,8 @@ watch(
 
 .search-input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  border-color: var(--rc-accent);
+  box-shadow: 0 0 0 3px var(--rc-accent-soft);
 }
 
 .search-kbd {
@@ -1127,14 +1131,14 @@ watch(
 }
 
 .nav-item:hover {
-  background: rgba(37, 99, 235, 0.06);
+  background: var(--rc-accent-hover);
 }
 
 .nav-item.active {
-  background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
+  background: var(--rc-accent-soft);
+  color: var(--rc-accent-strong);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 #2563eb;
+  box-shadow: inset 3px 0 0 var(--rc-accent);
 }
 
 .nav-item.disabled {
@@ -1196,8 +1200,8 @@ watch(
 }
 
 .kind-chip.active {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--rc-accent);
+  border-color: var(--rc-accent);
   color: #fff;
 }
 
@@ -1207,6 +1211,12 @@ watch(
 
 .group-block {
   scroll-margin-top: 84px;
+}
+
+.group-block + .group-block {
+  margin-top: 6px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .group-block.disabled {
@@ -1283,6 +1293,7 @@ watch(
 
 .link-card {
   position: relative;
+  --accent: transparent;
   width: 100%;
   display: grid;
   grid-template-columns: 32px 1fr auto;
@@ -1292,7 +1303,7 @@ watch(
   border-radius: 10px;
   border: 0.5px solid var(--color-border-subtle);
   background: #fff;
-  box-shadow: 0 1px 2px rgba(31, 42, 68, 0.04);
+  box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px rgba(31, 42, 68, 0.04);
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -1300,17 +1311,30 @@ watch(
 
 .link-card:hover:not(:disabled) {
   border-color: #93c5fd;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
+  box-shadow: inset 3px 0 0 var(--accent), 0 4px 14px rgba(37, 99, 235, 0.08);
 }
 
 .link-card.kind-workspace {
+  --accent: #7c3aed;
   background: linear-gradient(135deg, #fbf8ff 0%, #f6f1ff 100%);
   border-color: rgba(124, 58, 237, 0.22);
 }
 
 .link-card.kind-workspace:hover:not(:disabled) {
   border-color: #a78bfa;
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.12);
+  box-shadow: inset 3px 0 0 var(--accent), 0 4px 14px rgba(124, 58, 237, 0.12);
+}
+
+.link-card.kind-docs {
+  --accent: #2563eb;
+}
+
+.link-card.kind-tool {
+  --accent: #0f766e;
+}
+
+.link-card.kind-repo {
+  --accent: #24292f;
 }
 
 .link-card:hover:not(:disabled) .arrow {
@@ -1391,7 +1415,7 @@ watch(
 
 .name {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
   color: var(--color-text-primary);
@@ -1427,9 +1451,9 @@ watch(
 .arrow {
   align-self: center;
   font-size: 18px;
-  color: var(--color-text-muted);
-  opacity: 0;
-  transition: opacity 0.15s;
+  color: var(--accent, var(--color-text-muted));
+  opacity: 0.4;
+  transition: opacity 0.15s, color 0.15s;
 }
 
 .scope-manage {
