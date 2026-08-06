@@ -1,0 +1,9 @@
+CREATE TABLE DA_SERVICE_DIRECTORY_CATALOG (
+    id          VARCHAR2(36)   NOT NULL,
+    payload     CLOB           NOT NULL,
+    version     NUMBER(19,0)   DEFAULT 0 NOT NULL,
+    updated_by  VARCHAR2(64),
+    updated_at  TIMESTAMP(6)   NOT NULL,
+    created_at  TIMESTAMP(6)   NOT NULL,
+    CONSTRAINT PK_DA_SERVICE_DIRECTORY_CATALOG PRIMARY KEY (id)
+);

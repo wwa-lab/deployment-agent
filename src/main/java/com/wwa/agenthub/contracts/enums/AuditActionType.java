@@ -20,5 +20,7 @@ public enum AuditActionType {
     access_grant_create,
     access_grant_update,
     access_grant_suspend,
-    access_grant_reactivate
+    access_grant_reactivate,
+    resource_center_update,
+    resource_center_delete
 }

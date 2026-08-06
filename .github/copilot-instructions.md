@@ -6,12 +6,15 @@ OpenCode.
 
 ## Primary Contract
 
-- Read and follow `AGENTS.md` first. It is the primary repository contract.
+- Read `docs/00-context/AGENT_HANDOFF.md` first in a new session; update it before ending a session with progress.
+- Read and follow `AGENTS.md`, `PROJECT_RULES.md`, and `DEVELOPMENT_STANDARDS.md`.
 - Keep repository-local instructions stricter than global preferences.
 - For non-trivial or user-facing changes, follow `docs/00-context/sdd-profile.md`
   and keep the SDD artifact chain aligned under `docs/01-requirements`,
   `docs/02-user-stories`, `docs/03-spec`, `docs/04-architecture`,
   `docs/05-design`, and `docs/06-tasks`.
+- For full SDD generation, use `.agents/skills/wwa-sdd-generate-all/SKILL.md`
+  and `docs/SDD-BOOTSTRAP.md`. Project rules and SDD are English-only (ADR-0009).
 - Do not add user-facing features as code-only work.
 
 ## Skill Routing
@@ -23,7 +26,8 @@ Use these routes by default:
 
 - Lifecycle work: `.agents/skills/agentic-sdlc-orchestrator/SKILL.md`
 - Context and ADR changes: `.agents/skills/context-engineering-adr/SKILL.md`
-- SDD slice creation or audit: `.agents/skills/sdd-slice-bootstrap/SKILL.md`
+- Full SDD generation: `.agents/skills/wwa-sdd-generate-all/SKILL.md`
+- SDD slice skeleton audit: `.agents/skills/sdd-slice-bootstrap/SKILL.md`
 - Agent handoff setup: `.agents/skills/execution-manifest/SKILL.md`
 - Staleness checks: `.agents/skills/freshness-gate/SKILL.md`
 - Cross-tool routing changes: `.agents/skills/cross-ide-skill-router/SKILL.md`

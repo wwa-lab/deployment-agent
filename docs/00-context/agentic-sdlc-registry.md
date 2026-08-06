@@ -6,7 +6,7 @@ Accepted
 
 ## Last Synced
 
-2026-05-27
+2026-07-25
 
 ## Purpose
 
@@ -42,6 +42,7 @@ This registry tracks the reusable Agentic SDLC assets installed globally or brid
 | `review-docs-against-code` | 0.1.0 | `.agents/skills/review-docs-against-code/` | Review documentation against actual code |
 | `sdd-profile-manager` | 0.1.0 | `.agents/skills/sdd-profile-manager/` | Define or choose project SDD profiles |
 | `sdd-slice-bootstrap` | 0.1.0 | `.agents/skills/sdd-slice-bootstrap/` | Create or audit complete SDD slice document sets |
+| `wwa-sdd-generate-all` | 0.1.1 | `.agents/skills/wwa-sdd-generate-all/` | Orchestrate full English WWA SDD generation via the project skill chain |
 | `spec-to-architecture` | 0.1.0 | `.agents/skills/spec-to-architecture/` | Convert specifications into architecture |
 | `tasks-to-code` | 0.1.0 | `.agents/skills/tasks-to-code/` | Convert task breakdowns into code-oriented implementation guidance |
 | `tasks-to-implementation` | 0.1.0 | `.agents/skills/tasks-to-implementation/` | Implement from structured tasks |
@@ -51,6 +52,12 @@ This registry tracks the reusable Agentic SDLC assets installed globally or brid
 
 | Asset | Path | Purpose |
 |---|---|---|
+| Active agent handoff | `docs/00-context/AGENT_HANDOFF.md` | Cross-IDE/agent resume narrative; read first, update last |
+| Handoff archives | `docs/00-context/handoffs/` | Frozen phase handoffs + templates |
+| Project rules | `PROJECT_RULES.md` | Product/SDD/quality-gate operating rules (English-only) |
+| Development standards | `DEVELOPMENT_STANDARDS.md` | Engineering standards by layer |
+| SDD bootstrap | `docs/SDD-BOOTSTRAP.md` | SDD generation entry guide (English-only) |
+| SDD generation gate | `docs/00-context/checklists/sdd-generation-gate.md` | Skill-chain evidence checklist for SDD handoff |
 | SDD profile | `docs/00-context/sdd-profile.md` | Active project SDD chain and gates |
 | Discipline profile | `docs/00-context/agent-discipline-profile.md` | AI behavior vs programmatic gate policy |
 | Execution manifest schema | `docs/00-context/execution-manifest.schema.json` | Machine-checkable manifest contract |

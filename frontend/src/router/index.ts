@@ -146,6 +146,19 @@ const router = createRouter({
             sectionTitle: 'Access Management',
           },
         },
+        {
+          path: 'resource-center',
+          name: 'wwa-resource-center',
+          component: () => import('../views/ResourceCenterView.vue'),
+          meta: {
+            section: 'resource-center',
+            sectionTitle: 'Resource Center',
+          },
+        },
+        {
+          path: 'service-directory',
+          redirect: '/wwa/resource-center',
+        },
       ],
     },
   ],

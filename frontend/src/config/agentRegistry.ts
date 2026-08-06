@@ -105,4 +105,10 @@ export const platformCapabilities: PlatformCapabilityDescriptor[] = [
     icon: '🛂',
     accessPermission: 'access.manage',
   },
+  {
+    key: 'resource-center',
+    label: 'Resource Center',
+    to: '/wwa/resource-center',
+    icon: '🧭',
+  },
 ]
