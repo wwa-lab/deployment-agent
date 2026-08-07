@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -31,5 +32,13 @@ public class StagePipelineRegistry {
                     "No StagePipeline registered for agentId: " + agentId);
         }
         return pipeline;
+    }
+
+    public boolean contains(String agentId) {
+        return agentId != null && byAgent.containsKey(agentId);
+    }
+
+    public Set<String> registeredAgentIds() {
+        return byAgent.keySet();
     }
 }

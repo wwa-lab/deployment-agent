@@ -1,10 +1,12 @@
 package com.wwa.agenthub.domain.decision;
 
 import com.wwa.agenthub.contracts.UserContext;
+import com.wwa.agenthub.contracts.AccessScope;
 import com.wwa.agenthub.contracts.enums.TaskStatus;
 import com.wwa.agenthub.domain.releaseflow.ReleaseFlow;
 import com.wwa.agenthub.domain.releaseflow.Request;
 import com.wwa.agenthub.domain.task.Task;
+import com.wwa.agenthub.domain.task.TaskExecutionHistoryRepository;
 import com.wwa.agenthub.domain.task.TaskRepository;
 import com.wwa.agenthub.errors.ForbiddenAppException;
 import com.wwa.agenthub.errors.InvalidStateTransitionException;
@@ -17,6 +19,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -28,6 +33,7 @@ class DecisionEngineTest {
 
     @Autowired private DecisionEngine decisionEngine;
     @Autowired private TaskRepository taskRepository;
+    @Autowired private TaskExecutionHistoryRepository executionHistoryRepository;
     @Autowired private TestDataHelper helper;
 
     private ReleaseFlow releaseFlow;
@@ -40,9 +46,19 @@ class DecisionEngineTest {
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        ownerUser = new UserContext("emp-001", "DEVELOPER");
+        ownerUser = scopedUser("emp-001");
         adminUser = new UserContext("emp-003", "DEVOPS_ADMIN");
-        devUser = new UserContext("dev-user", "DEVELOPER");
+        devUser = scopedUser("dev-user");
+    }
+
+    private static UserContext scopedUser(String userId) {
+        return new UserContext(
+                userId,
+                "DEVELOPER",
+                List.of("DEVELOPER"),
+                Set.of(),
+                userId,
+                List.of(new AccessScope("*", "*")));
     }
 
     // ─── approve ─────────────────────────────────────────────────────────────
@@ -115,26 +131,30 @@ class DecisionEngineTest {
     // ─── rerun ───────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("rerun: Rejected → Ready_For_Execution and creates execution history")
-    void rerun_rejected_createsExecutionHistory() {
+    @DisplayName("rerun: Rejected → Ready_For_Execution without creating a ghost execution")
+    void rerun_rejected_doesNotCreateExecutionHistory() {
         Task task = helper.seedTask(request, TaskStatus.Rejected);
+        long historyBefore = executionHistoryRepository.count();
 
         decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null);
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Ready_For_Execution);
-        assertThat(updated.getLatestExecutionId()).isNotNull();
+        assertThat(updated.getLatestExecutionId()).isNull();
+        assertThat(executionHistoryRepository.count()).isEqualTo(historyBefore);
     }
 
     @Test
-    @DisplayName("rerun: Failed → Ready_For_Execution and creates execution history")
-    void rerun_failed_createsExecutionHistory() {
+    @DisplayName("rerun: Failed → Ready_For_Execution without creating a ghost execution")
+    void rerun_failed_doesNotCreateExecutionHistory() {
         Task task = helper.seedTask(request, TaskStatus.Failed);
+        long historyBefore = executionHistoryRepository.count();
 
         decisionEngine.applyDecision(task.getId(), DecisionType.rerun, ownerUser, null);
 
         Task updated = taskRepository.findById(task.getId()).orElseThrow();
         assertThat(updated.getTaskStatus()).isEqualTo(TaskStatus.Ready_For_Execution);
+        assertThat(executionHistoryRepository.count()).isEqualTo(historyBefore);
     }
 
     @Test

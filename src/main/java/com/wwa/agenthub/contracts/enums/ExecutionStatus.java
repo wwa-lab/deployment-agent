@@ -6,5 +6,6 @@ public enum ExecutionStatus {
     Running,
     Completed,
     Failed,
-    Timed_Out
+    Timed_Out,
+    Cancelled
 }

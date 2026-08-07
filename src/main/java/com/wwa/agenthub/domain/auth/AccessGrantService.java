@@ -120,7 +120,7 @@ public class AccessGrantService {
             throw new AccessSuspendedAppException();
         }
 
-        List<String> roles = normalizeRoles(grant.getAssignedRoles());
+        List<String> roles = normalizeAuthorizedGrantRoles(grant.getAssignedRoles());
         if (roles.isEmpty()) {
             throw new AccessNotGrantedAppException();
         }
@@ -138,6 +138,30 @@ public class AccessGrantService {
                 employee.displayName(),
                 List.copyOf(grant.getScopeGrants())
         );
+    }
+
+    /**
+     * Rebuilds a session identity from the current grant so role, permission,
+     * scope, and suspension changes take effect without waiting for logout.
+     */
+    @Transactional(readOnly = true)
+    public UserContext refreshAuthorizedContext(String employeeId) {
+        AccessGrant grant = accessGrantRepository.findById(employeeId)
+                .orElseThrow(AccessNotGrantedAppException::new);
+        if (grant.getGrantStatus() == AccessGrantStatus.SUSPENDED) {
+            throw new AccessSuspendedAppException();
+        }
+        List<String> roles = normalizeAuthorizedGrantRoles(grant.getAssignedRoles());
+        if (roles.isEmpty()) {
+            throw new AccessNotGrantedAppException();
+        }
+        return new UserContext(
+                grant.getEmployeeId(),
+                roles.getFirst(),
+                roles,
+                permissionResolver.resolvePermissions(roles),
+                grant.getDisplayNameSnapshot(),
+                List.copyOf(grant.getScopeGrants()));
     }
 
     @Transactional
@@ -290,14 +314,17 @@ public class AccessGrantService {
                                             Collection<String> assignedRoles,
                                             Collection<AccessScope> scopeGrants,
                                             String note) {
+        List<String> normalizedRoles = normalizeRolesForMutation(assignedRoles);
+        List<AccessScope> normalizedScopes = normalizeScopesForMutation(scopeGrants);
+        validateActiveRoles(AccessGrantStatus.ACTIVE, normalizedRoles, normalizedScopes);
         return accessGrantRepository.findById(employeeId)
                 .orElseGet(() -> {
                     AccessGrant grant = new AccessGrant();
                     grant.setEmployeeId(employeeId);
                     grant.setDisplayNameSnapshot(displayName == null || displayName.isBlank() ? employeeId : displayName);
                     grant.setGrantStatus(AccessGrantStatus.ACTIVE);
-                    grant.setAssignedRoles(normalizeRoles(assignedRoles));
-                    grant.setScopeGrants(normalizeScopes(scopeGrants));
+                    grant.setAssignedRoles(normalizedRoles);
+                    grant.setScopeGrants(normalizedScopes);
                     grant.setNote(note);
                     grant.setCreatedBy("system");
                     grant.setUpdatedBy("system");
@@ -317,6 +344,10 @@ public class AccessGrantService {
                                      Collection<AccessScope> scopeGrants) {
         if (grantStatus == AccessGrantStatus.ACTIVE && (roles == null || roles.isEmpty())) {
             throw new ValidationAppException("Active access grants must have at least one assigned role.");
+        }
+        if (roles != null && roles.contains(Role.GUEST.name())) {
+            throw new ValidationAppException(
+                    "GUEST is reserved for the synthetic guest session and cannot be assigned to an access grant.");
         }
         boolean adminGrant = roles != null && roles.contains(Role.DEVOPS_ADMIN.name());
         boolean hasScopes = scopeGrants != null && !scopeGrants.isEmpty();
@@ -382,9 +413,26 @@ public class AccessGrantService {
 
     private List<String> normalizeRolesForMutation(Collection<String> rawRoles) {
         try {
-            return normalizeRoles(rawRoles);
+            List<String> roles = normalizeRoles(rawRoles);
+            if (roles.contains(Role.GUEST.name())) {
+                throw new IllegalArgumentException(
+                        "GUEST is reserved for the synthetic guest session.");
+            }
+            return roles;
         } catch (IllegalArgumentException ex) {
             throw new ValidationAppException("Invalid role assignment: " + ex.getMessage());
+        }
+    }
+
+    private List<String> normalizeAuthorizedGrantRoles(Collection<String> rawRoles) {
+        try {
+            List<String> roles = normalizeRoles(rawRoles);
+            if (roles.contains(Role.GUEST.name())) {
+                throw new AccessNotGrantedAppException();
+            }
+            return roles;
+        } catch (IllegalArgumentException exception) {
+            throw new AccessNotGrantedAppException();
         }
     }
 

@@ -22,5 +22,15 @@ public enum AuditActionType {
     access_grant_suspend,
     access_grant_reactivate,
     resource_center_update,
-    resource_center_delete
+    resource_center_delete,
+    integration_execution_start,
+    integration_execution_progress,
+    integration_artifact_register,
+    integration_execution_submit,
+    integration_execution_fail,
+    integration_execution_cancel,
+    integration_review_submit,
+    integration_task_rerun,
+    integration_task_binding_update,
+    integration_input_artifact_approve
 }

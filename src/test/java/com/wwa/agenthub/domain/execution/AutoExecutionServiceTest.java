@@ -69,9 +69,9 @@ class AutoExecutionServiceTest {
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        ownerUser  = new UserContext("emp-001", "DEVELOPER");
+        ownerUser  = TestDataHelper.globallyScopedUser("emp-001", "DEVELOPER");
         adminUser  = new UserContext("emp-003", "DEVOPS_ADMIN");
-        nonOwnerUser = new UserContext("dev-user", "DEVELOPER");
+        nonOwnerUser = TestDataHelper.globallyScopedUser("dev-user", "DEVELOPER");
 
         reset(restTemplate);
     }

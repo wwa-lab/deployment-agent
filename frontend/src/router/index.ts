@@ -120,6 +120,15 @@ const router = createRouter({
           },
         },
         {
+          path: 'atlas-execution-center',
+          name: 'wwa-atlas-execution-center',
+          component: () => import('../views/AtlasExecutionCenterView.vue'),
+          meta: {
+            section: 'atlas-execution-center',
+            sectionTitle: 'Atlas Execution Center',
+          },
+        },
+        {
           path: 'configuration-management',
           name: 'wwa-configuration-management',
           component: () => import('../views/ConfigAdminView.vue'),

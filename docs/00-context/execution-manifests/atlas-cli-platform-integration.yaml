@@ -1,0 +1,198 @@
+# yaml-language-server: $schema=../execution-manifest.schema.json
+manifest_schema_version: "1.0"
+manifest_id: atlas-cli-platform-integration
+created_at: "2026-08-06T16:09:14Z"
+created_by: Codex
+status: completed
+completed_at: "2026-08-07"
+
+workspace:
+  project_name: deployment-agent
+  repo_path: /Users/leo/wwa-lab/deployment-agent
+  repo_url: https://github.com/wwa-lab/deployment-agent.git
+  branch: altas-cli
+  commit_sha: abf3850dee78b13c597f7da2791dd06d201c1a66
+
+task:
+  title: Implement Atlas CLI platform capabilities
+  objective: >-
+    Implement the Atlas Integration API and Web experience as Agent-neutral Platform Core
+    capabilities while preserving Atlas as the sole authority for Task and Execution state.
+  mode: code-change
+  sdd_profile: deployment-agent-standard-java
+
+inputs:
+  source_references:
+    - type: local-file
+      ref: /Users/leo/wwa-lab/GitHub/atlas-cli/docs/api-contract.md
+      version: bdc5854e15083335f83a89b1a6916dc23c745912
+      notes: Atlas CLI API contract; source repository commit fa95065ab193d919032fd6cb1349a6c1fabe30ad
+    - type: local-file
+      ref: /Users/leo/wwa-lab/GitHub/atlas-cli/docs/openapi/atlas-execution-api.yaml
+      version: 169a3663b03d4409c6bf93a600cce5d374a6a8a7
+      notes: OpenAPI 3.1 wire contract; source repository commit fa95065ab193d919032fd6cb1349a6c1fabe30ad
+    - type: local-file
+      ref: /Users/leo/wwa-lab/GitHub/atlas-cli/docs/architecture-decisions.md
+      version: 3adc8e24c0f52f4eb7d637936c2098e2f60e726e
+      notes: Atlas CLI architecture decisions; source repository commit fa95065ab193d919032fd6cb1349a6c1fabe30ad
+  documents:
+    - path: docs/00-context/changes/atlas-cli-platform-integration/proposal.md
+      required: true
+      version: accepted-2026-08-07
+    - path: docs/00-context/changes/atlas-cli-platform-integration/freshness.md
+      required: true
+      version: fresh-2026-08-07
+    - path: docs/01-requirements/atlas-cli-platform-integration-requirement.md
+      required: true
+      version: f16f2407c4d28814efe0452d23f7407d9d783153
+    - path: docs/02-user-stories/atlas-cli-platform-integration-user-stories.md
+      required: true
+      version: a6ea8b8b589d701dc306aabd2cabf4b8b95e2328
+    - path: docs/03-spec/atlas-cli-platform-integration-spec.md
+      required: true
+      version: 03583f4c21ef49d16d653bb04dacc95801e4fd38
+    - path: docs/04-architecture/atlas-cli-platform-integration-architecture.md
+      required: true
+      version: 4a4bced8891df89d26870a9dacc1b29a95f08873
+    - path: docs/04-architecture/atlas-cli-platform-integration-data-flow.md
+      required: true
+      version: e643fc060b7466e523ca3e527f267516dc8b97bf
+    - path: docs/04-architecture/atlas-cli-platform-integration-data-model.md
+      required: true
+      version: 7e7e1484ff3026dbf33112687f484ad4d081b70c
+    - path: docs/05-design/atlas-cli-platform-integration-design.md
+      required: true
+      version: b5cd9c8b8189238d9fffc1cb9ac938ce8028aef9
+    - path: docs/05-design/contracts/atlas-cli-platform-integration-API_IMPLEMENTATION_GUIDE.md
+      required: true
+      version: 06be93ea393a116c563fd03a3572112cf9173224
+    - path: docs/06-tasks/atlas-cli-platform-integration-tasks.md
+      required: true
+      version: b9d4447d0e5158bc9f7023b9baf0da7d09e8cc0d
+    - path: docs/00-context/atlas-cli-platform-integration-traceability.md
+      required: true
+      version: b8c2127cdeb148ba53971d75db0288cb7d2b2e3c
+    - path: docs/00-context/changes/atlas-cli-platform-integration/review.md
+      required: true
+      version: 733b8747d44002bfeea419132cc043cdf98faf3f
+    - path: docs/00-context/changes/atlas-cli-platform-integration/archive.md
+      required: true
+      version: 5010ad8f77f449e3a79dfac7faeeac49ae74cef9
+  adrs:
+    - path: docs/00-context/decisions/ADR-0011-atlas-integration-is-platform-control-plane.md
+      required: true
+      version: db8b2889c5237ce6a89fb7afe0986df51a683201
+    - path: /Users/leo/wwa-lab/GitHub/atlas-cli/docs/architecture-decisions.md
+      required: true
+      version: 3adc8e24c0f52f4eb7d637936c2098e2f60e726e
+
+constraints:
+  allowed_paths:
+    - docs/
+    - src/main/java/com/wwa/agenthub/
+    - src/main/resources/db/migration/
+    - src/test/java/com/wwa/agenthub/
+    - frontend/src/
+    - frontend/tests/
+    - CHANGELOG.md
+  forbidden_paths:
+    - .env
+    - frontend/package-lock.json
+    - pom.xml
+    - /Users/leo/wwa-lab/GitHub/atlas-cli/
+    - secrets/
+  external_actions_require_approval: true
+  architectural_boundaries:
+    - Platform Core owns Execution, Artifact, Telemetry, idempotency, correlation, audit, and review services.
+    - Agent Modules may supply fixed scope adapters but contain no duplicated lifecycle logic.
+    - Atlas is the sole source of Task and Execution business state.
+    - Client state changes must pass TaskStateMachine and active-Execution fencing.
+    - Atlas Server must not run local Skills, inference runtimes, repository scanners, or LangGraph.
+  security_boundaries:
+    - Never expose tokens, credentials, signed URLs, absolute local paths, prompts, environment variables, or complete source content.
+    - Reauthorize every write and idempotent replay; preserve cross-scope not-found behavior.
+    - Validate bounded uploads by size, digest, name, path label, media type, scope, and Execution ownership.
+
+outputs:
+  expected_artifacts:
+    - path: docs/01-requirements/atlas-cli-platform-integration-requirement.md
+      kind: markdown
+    - path: docs/02-user-stories/atlas-cli-platform-integration-user-stories.md
+      kind: markdown
+    - path: docs/03-spec/atlas-cli-platform-integration-spec.md
+      kind: markdown
+    - path: docs/04-architecture/atlas-cli-platform-integration-architecture.md
+      kind: markdown
+    - path: docs/04-architecture/atlas-cli-platform-integration-data-flow.md
+      kind: markdown
+    - path: docs/04-architecture/atlas-cli-platform-integration-data-model.md
+      kind: markdown
+    - path: docs/05-design/atlas-cli-platform-integration-design.md
+      kind: markdown
+    - path: docs/05-design/contracts/atlas-cli-platform-integration-API_IMPLEMENTATION_GUIDE.md
+      kind: markdown
+    - path: docs/06-tasks/atlas-cli-platform-integration-tasks.md
+      kind: markdown
+    - path: docs/00-context/atlas-cli-platform-integration-traceability.md
+      kind: markdown
+    - path: docs/00-context/changes/atlas-cli-platform-integration/review.md
+      kind: markdown
+    - path: docs/00-context/changes/atlas-cli-platform-integration/archive.md
+      kind: markdown
+    - path: src/main/resources/db/migration/V21__add_atlas_integration_platform.sql
+      kind: sql
+    - path: src/main/java/com/wwa/agenthub/platform/
+      kind: java-source
+    - path: src/test/java/com/wwa/agenthub/
+      kind: java-tests
+    - path: frontend/src/
+      kind: vue-typescript-source
+  completion_report:
+    include_changed_files: true
+    include_verification: true
+    include_risks: true
+
+verification:
+  commands:
+    - command: mvn test
+      required: true
+    - command: mvn test -Dtest='*ArchitectureTest,*ArchTest,AgentModuleBoundaryTest'
+      required: true
+    - command: cd frontend && npm test
+      required: true
+    - command: cd frontend && npm run build
+      required: true
+  quality_gates:
+    - full_sdd_traceability
+    - api_contract_integration_tests
+    - task_state_machine_enforcement
+    - idempotency_and_execution_fencing
+    - access_and_agent_boundary_enforcement
+    - artifact_least_disclosure
+    - capability_usage_aggregation_filters
+    - architecture_boundary_tests
+    - no_secrets_or_sensitive_source_rendering
+    - docs_code_alignment
+
+completion:
+  verdict: passed
+  completed_on: "2026-08-07"
+  verification:
+    backend: "547 tests, 0 failures, 0 errors, 1 environment-gated Oracle skip"
+    architecture: "15 tests passed"
+    frontend_tests: "11 tests passed"
+    frontend_build: "vue-tsc and Vite passed; 225 modules transformed"
+    browser_smoke: "desktop and 390x844 mobile passed; visible polling and least-disclosure sentinels verified"
+    reviews: "code, security, docs-against-code, and doc-quality passed with no unresolved high-priority finding"
+  residual_operations:
+    - Configure digest-only Integration client descriptors in production.
+    - Provide the required external fail-closed Artifact malware/DLP scanner in production.
+    - Run the environment-gated Oracle V20-to-V21 test on a disposable real Oracle database.
+
+stop_conditions:
+  - A pinned Atlas CLI source blob changes before implementation or verification completes.
+  - Required SDD input is missing or contradicts the accepted user scope.
+  - An accepted ADR conflicts with the requested Platform Core boundary.
+  - A requested operation would make a client authoritative for Task or Execution state.
+  - A requested operation would run a local Skill, model runtime, repository scanner, or LangGraph on Atlas Server.
+  - A command requires an external write, commit, push, or credential change without explicit approval.

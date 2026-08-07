@@ -116,36 +116,32 @@ public class AuditLoggerService {
                                 Map<String, Object> context,
                                 ScopeSnapshot scope) {
         try {
-            AuditLogEntry entry = new AuditLogEntry();
-            entry.setOperatorId(user.userId());
-            entry.setOperatorRole(user.role());
-            // MVP Foundation Seam: every audit write is attributed to a real human
-            // operator. The seam exists so that future policy / AI-assisted / system
-            // writes can override this value without retrofitting the table.
-            entry.setActorKind(ActorKind.HUMAN);
-            entry.setActorRef(null);
-            // Stitch this audit row into the originating HTTP request so
-            // operators can correlate with server logs and downstream calls.
-            // Null is acceptable for background jobs that run outside of an
-            // HTTP request context.
-            entry.setCorrelationId(CorrelationIdFilter.current());
-            entry.setActionType(actionType);
-            entry.setReleaseFlowId(releaseFlowId);
-            entry.setRequestId(requestId);
-            entry.setTaskId(taskId);
-            entry.setApplication(scope.application());
-            entry.setSnowGroup(scope.snowGroup());
-            entry.setAgent(scope.agent());
-            // Platform audit standard fields (WWA-009) — dynamic per-agent since BA-T14
-            entry.setAgentName(scope.agent());
-            entry.setSourceSystem("wwa-api");
-            entry.setContextPayload(enrichContext(context, scope));
-            auditLogRepository.save(entry);
+            persistAuditEntry(
+                    user, actionType, releaseFlowId, requestId, taskId, context, scope);
         } catch (Exception ex) {
             // Audit failure must not propagate to caller.
             log.warn("[AuditLoggerService] Failed to write audit entry for action={} user={}: {}",
                     actionType, user.userId(), ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Writes a security-relevant audit row in the caller's transaction.
+     * Integration lifecycle code uses this path so the state mutation, event,
+     * and audit row either commit together or roll back together.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void logAtomic(UserContext user,
+                          AuditActionType actionType,
+                          String releaseFlowId,
+                          String requestId,
+                          String taskId,
+                          Map<String, Object> context) {
+        ScopeSnapshot scope = resolveScope(context, requestId, taskId);
+        if (scope.agent() == null) {
+            scope = new ScopeSnapshot(scope.application(), scope.snowGroup(), PLATFORM_AGENT);
+        }
+        persistAuditEntry(user, actionType, releaseFlowId, requestId, taskId, context, scope);
     }
 
     /** Convenience overload – no release flow / request / task context. */
@@ -177,6 +173,32 @@ public class AuditLoggerService {
         }
 
         return resolved;
+    }
+
+    private void persistAuditEntry(UserContext user,
+                                   AuditActionType actionType,
+                                   String releaseFlowId,
+                                   String requestId,
+                                   String taskId,
+                                   Map<String, Object> context,
+                                   ScopeSnapshot scope) {
+        AuditLogEntry entry = new AuditLogEntry();
+        entry.setOperatorId(user.userId());
+        entry.setOperatorRole(user.role());
+        entry.setActorKind(ActorKind.HUMAN);
+        entry.setActorRef(null);
+        entry.setCorrelationId(CorrelationIdFilter.current());
+        entry.setActionType(actionType);
+        entry.setReleaseFlowId(releaseFlowId);
+        entry.setRequestId(requestId);
+        entry.setTaskId(taskId);
+        entry.setApplication(scope.application());
+        entry.setSnowGroup(scope.snowGroup());
+        entry.setAgent(scope.agent());
+        entry.setAgentName(scope.agent());
+        entry.setSourceSystem("wwa-api");
+        entry.setContextPayload(enrichContext(context, scope));
+        auditLogRepository.save(entry);
     }
 
     private Map<String, Object> enrichContext(Map<String, Object> context, ScopeSnapshot scope) {

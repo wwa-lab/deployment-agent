@@ -2,6 +2,7 @@ package com.wwa.agenthub.domain.task;
 
 import com.wwa.agenthub.contracts.enums.ExecutionStatus;
 import com.wwa.agenthub.errors.NotFoundAppException;
+import com.wwa.agenthub.errors.ConflictAppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,10 @@ public class TaskExecutionHistoryService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NotFoundAppException("Task", taskId));
         taskService.assertTaskRequestActive(task);
+        if (task.isIntegrationBound()) {
+            throw new ConflictAppException(
+                    "Integration-bound Tasks create attempts only through the Atlas Integration Execution API");
+        }
 
         int maxAttempt = executionHistoryRepository.findMaxAttemptNumberByTaskId(taskId);
         int nextAttempt = maxAttempt + 1;
@@ -64,13 +69,15 @@ public class TaskExecutionHistoryService {
     /** Retrieve all execution attempts for a task, ordered by attemptNumber ascending. */
     @Transactional(readOnly = true)
     public List<TaskExecutionHistory> findByTaskId(String taskId) {
-        return executionHistoryRepository.findByTaskIdOrderByAttemptNumberAsc(taskId);
+        return executionHistoryRepository
+                .findByTaskIdAndIntegrationManagedFalseOrderByAttemptNumberAsc(taskId);
     }
 
     /** Retrieve the latest execution attempt for a task. */
     @Transactional(readOnly = true)
     public Optional<TaskExecutionHistory> findLatest(String taskId) {
-        return executionHistoryRepository.findFirstByTaskIdOrderByAttemptNumberDesc(taskId);
+        return executionHistoryRepository
+                .findFirstByTaskIdAndIntegrationManagedFalseOrderByAttemptNumberDesc(taskId);
     }
 
     /**
@@ -84,6 +91,10 @@ public class TaskExecutionHistoryService {
                                                   String resultLogs) {
         TaskExecutionHistory execution = executionHistoryRepository.findById(executionId)
                 .orElseThrow(() -> new NotFoundAppException("TaskExecutionHistory", executionId));
+        if (execution.isIntegrationManaged() || execution.getTask().isIntegrationBound()) {
+            throw new ConflictAppException(
+                    "Integration-managed Executions can be finalized only through Atlas commands");
+        }
 
         execution.setExecutionStatus(executionStatus);
         if (resultSummary != null) execution.setResultSummary(resultSummary);

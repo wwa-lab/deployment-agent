@@ -1,6 +1,7 @@
 package com.wwa.agenthub.domain.task;
 
 import com.wwa.agenthub.contracts.UserContext;
+import com.wwa.agenthub.contracts.enums.PermissionKey;
 import com.wwa.agenthub.domain.auth.AuthService;
 import com.wwa.agenthub.errors.ForbiddenAppException;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.Objects;
 
 /**
  * Centralized task-level authorization rules.
@@ -34,13 +36,39 @@ public class TaskPermissionService {
         if (task == null || user == null) {
             return false;
         }
+        if (!hasTaskScope(task, user)) {
+            return false;
+        }
         if (user.hasRole("DEVOPS_ADMIN")) {
             return true;
         }
         return isOwner(task, user);
     }
 
+    public void assertOwnerAdminOrReviewPermission(Task task, UserContext user, String action) {
+        if (!hasTaskScope(task, user)
+                || (!isOwnerOrAdmin(task, user)
+                && (user == null
+                || (!user.hasPermission(PermissionKey.TASK_REVIEW.value())
+                && !user.hasPermission(PermissionKey.PLATFORM_EXECUTION_REVIEW.value()))))) {
+            throw new ForbiddenAppException(action);
+        }
+    }
+
+    public boolean hasTaskScope(Task task, UserContext user) {
+        return task != null
+                && task.getRequest() != null
+                && user != null
+                && user.hasScopedAccess(
+                        task.getRequest().getApplication(),
+                        task.getRequest().getSnowGroup());
+    }
+
     private boolean isOwner(Task task, UserContext user) {
+        if (task.getAssigneeUserId() != null
+                && Objects.equals(task.getAssigneeUserId(), user.userId())) {
+            return true;
+        }
         String normalizedOwner = normalize(task.getOwner());
         if (normalizedOwner == null) {
             return false;

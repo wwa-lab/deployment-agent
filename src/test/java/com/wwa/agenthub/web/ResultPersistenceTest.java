@@ -49,7 +49,7 @@ class ResultPersistenceTest {
     @Autowired private ReleaseFlowRepository releaseFlowRepository;
     @Autowired private TestDataHelper helper;
 
-    private final UserContext ownerUser = new UserContext("emp-001", "DEVELOPER");
+    private final UserContext ownerUser = TestDataHelper.globallyScopedUser("emp-001", "DEVELOPER");
 
     // ─── CLOB storage roundtrip ───────────────────────────────────────────────
 

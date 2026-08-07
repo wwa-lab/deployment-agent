@@ -44,6 +44,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 
     public static final String HEADER_NAME = "X-Correlation-Id";
     public static final String MDC_KEY = "correlationId";
+    private static final String BEARER_PREFIX = "Bearer ";
 
     /**
      * Accepts only safe characters in client-supplied IDs (letters, digits,
@@ -52,13 +53,19 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
      * or oversized strings into the MDC and downstream log pipelines.
      */
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+    private static final Pattern SECRET_LIKE_ID = Pattern.compile(
+            "(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|"
+                    + "github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,})");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String supplied = request.getHeader(HEADER_NAME);
-        String correlationId = isSafe(supplied) ? supplied : newCorrelationId();
+        String correlationId = isSafe(supplied)
+                && !containsPresentedBearer(supplied, request.getHeader("Authorization"))
+                ? supplied
+                : newCorrelationId();
 
         MDC.put(MDC_KEY, correlationId);
         response.setHeader(HEADER_NAME, correlationId);
@@ -71,7 +78,19 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     }
 
     private static boolean isSafe(String value) {
-        return value != null && SAFE_ID.matcher(value).matches();
+        return value != null
+                && SAFE_ID.matcher(value).matches()
+                && !SECRET_LIKE_ID.matcher(value).find();
+    }
+
+    private static boolean containsPresentedBearer(String correlationId, String authorization) {
+        if (authorization == null
+                || !authorization.regionMatches(
+                        true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
+            return false;
+        }
+        String credential = authorization.substring(BEARER_PREFIX.length()).trim();
+        return !credential.isEmpty() && correlationId.contains(credential);
     }
 
     private static String newCorrelationId() {

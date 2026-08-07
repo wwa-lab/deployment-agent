@@ -1,8 +1,10 @@
 package com.wwa.agenthub.domain.task;
 
 import com.wwa.agenthub.contracts.enums.ActorKind;
+import com.wwa.agenthub.contracts.enums.CapabilityType;
 import com.wwa.agenthub.contracts.enums.ExecutionStatus;
 import com.wwa.agenthub.contracts.enums.ExternalStatus;
+import com.wwa.agenthub.contracts.enums.IntegrationClientType;
 import com.wwa.agenthub.util.JsonAttributeConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -25,7 +27,11 @@ import java.util.UUID;
     name = "DA_TASK_EXECUTION_HISTORY",
     indexes = {
         @Index(name = "IDX_TEH_TASK_ATTEMPT", columnList = "task_id, attempt_number", unique = true),
-        @Index(name = "IDX_TEH_TASK", columnList = "task_id")
+        @Index(name = "IDX_TEH_TASK", columnList = "task_id"),
+        @Index(name = "IDX_TEH_INTEGRATION_TIME", columnList = "integration_managed, start_time"),
+        @Index(name = "IDX_TEH_CAPABILITY", columnList = "capability_type, capability_id, capability_version"),
+        @Index(name = "IDX_TEH_SCOPE", columnList = "config_application, config_snow_group, config_agent"),
+        @Index(name = "IDX_TEH_PROJECT_CLIENT", columnList = "project_id, client_type")
     }
 )
 @Getter
@@ -129,6 +135,82 @@ public class TaskExecutionHistory {
     @Column(name = "last_synced_at")
     private Instant lastSyncedAt;
 
+    // ─── Atlas Integration immutable execution facts ────────────────────────
+
+    @Column(name = "integration_managed", nullable = false)
+    private boolean integrationManaged;
+
+    @Column(name = "user_id", length = 255)
+    private String userId;
+
+    @Column(name = "user_display_name", length = 255)
+    private String userDisplayName;
+
+    @Column(name = "client_application_id", length = 255)
+    private String clientApplicationId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "client_type", length = 30)
+    private IntegrationClientType clientType;
+
+    @Column(name = "client_version", length = 128)
+    private String clientVersion;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "capability_type", length = 30)
+    private CapabilityType capabilityType;
+
+    @Column(name = "capability_id", length = 255)
+    private String capabilityId;
+
+    @Column(name = "capability_version", length = 128)
+    private String capabilityVersion;
+
+    @Column(name = "project_id", length = 255)
+    private String projectId;
+
+    @Column(name = "project_name", length = 255)
+    private String projectName;
+
+    @Column(name = "repository_id", length = 255)
+    private String repositoryId;
+
+    @Column(name = "repository_provider", length = 128)
+    private String repositoryProvider;
+
+    @Column(name = "repository_url", length = 2048)
+    private String repositoryUrl;
+
+    @Column(name = "repository_branch", length = 1024)
+    private String repositoryBranch;
+
+    @Column(name = "repository_commit", length = 255)
+    private String repositoryCommit;
+
+    @Column(name = "duration_ms")
+    private Long durationMs;
+
+    @Column(name = "artifact_count", nullable = false)
+    private int artifactCount;
+
+    @Column(name = "failure_code", length = 128)
+    private String failureCode;
+
+    @Column(name = "failure_message", length = 2000)
+    private String failureMessage;
+
+    @Column(name = "failure_retryable")
+    private Boolean failureRetryable;
+
+    @Column(name = "cancellation_reason", length = 2000)
+    private String cancellationReason;
+
+    @Column(name = "correlation_id", length = 64)
+    private String correlationId;
+
+    @Column(name = "last_event_at")
+    private Instant lastEventAt;
+
     // ─── MVP Foundation Seams (see architecture.md) ──────────────────────────
 
     /**
@@ -147,6 +229,10 @@ public class TaskExecutionHistory {
      */
     @Column(name = "actor_ref", length = 255)
     private String actorRef;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @PrePersist
     protected void onCreate() {

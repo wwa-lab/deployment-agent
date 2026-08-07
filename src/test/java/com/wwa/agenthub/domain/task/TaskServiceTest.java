@@ -43,9 +43,9 @@ class TaskServiceTest {
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequest(releaseFlow);
-        ownerUser = new UserContext("emp-001", "DEVELOPER");
+        ownerUser = TestDataHelper.globallyScopedUser("emp-001", "DEVELOPER");
         adminUser = new UserContext("emp-003", "DEVOPS_ADMIN");
-        nonOwnerUser = new UserContext("dev-user", "DEVELOPER");
+        nonOwnerUser = TestDataHelper.globallyScopedUser("dev-user", "DEVELOPER");
     }
 
     // ─── create ──────────────────────────────────────────────────────────────
@@ -131,6 +131,17 @@ class TaskServiceTest {
         Task updated = taskService.editInput(task.getId(), newInput, ownerUser);
 
         assertThat(updated.getInputParameters()).containsEntry("script", "new_deploy.sh");
+    }
+
+    @Test
+    @DisplayName("rejects an owner whose access grant has no matching scope")
+    void editInput_ownerWithoutScope_throwsForbidden() {
+        Task task = helper.seedTask(request, TaskStatus.Pending);
+        UserContext unscopedOwner = new UserContext("emp-001", "DEVELOPER");
+
+        assertThatThrownBy(() -> taskService.editInput(
+                task.getId(), Map.of("script", "new_deploy.sh"), unscopedOwner))
+                .isInstanceOf(ForbiddenAppException.class);
     }
 
     @Test

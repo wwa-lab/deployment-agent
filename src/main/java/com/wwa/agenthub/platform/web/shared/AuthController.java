@@ -7,6 +7,7 @@ import com.wwa.agenthub.contracts.enums.Role;
 import com.wwa.agenthub.domain.auth.AuthService;
 import com.wwa.agenthub.domain.auth.PermissionResolver;
 import com.wwa.agenthub.web.security.UserContextAuthentication;
+import com.wwa.agenthub.web.security.SessionIdentityAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private static final String USER_CONTEXT_ATTR = "USER_CONTEXT";
     private static final String GUEST_USER_ID = "guest";
     private static final String GUEST_DISPLAY_NAME = "Guest Viewer";
 
@@ -39,9 +39,15 @@ public class AuthController {
 
         UserContext userContext = authService.authenticate(body.employeeId(), body.password());
 
-        // Create/update session
-        HttpSession session = request.getSession(true);
-        session.setAttribute(USER_CONTEXT_ATTR, userContext);
+        // Rotate any pre-authentication identifier before upgrading authority.
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            session = request.getSession(true);
+        } else {
+            request.changeSessionId();
+        }
+        session.setAttribute(SessionIdentityAttributes.USER_CONTEXT, userContext);
+        session.removeAttribute(SessionIdentityAttributes.SYNTHETIC_GUEST);
 
         // Set security context for the current request
         UserContextAuthentication auth = new UserContextAuthentication(userContext);
@@ -64,7 +70,7 @@ public class AuthController {
             return ResponseEntity.status(401).build();
         }
 
-        UserContext userContext = (UserContext) session.getAttribute(USER_CONTEXT_ATTR);
+        UserContext userContext = (UserContext) session.getAttribute(SessionIdentityAttributes.USER_CONTEXT);
         if (userContext == null) {
             return ResponseEntity.status(401).build();
         }
@@ -100,7 +106,8 @@ public class AuthController {
         );
 
         HttpSession session = request.getSession(true);
-        session.setAttribute(USER_CONTEXT_ATTR, guest);
+        session.setAttribute(SessionIdentityAttributes.USER_CONTEXT, guest);
+        session.setAttribute(SessionIdentityAttributes.SYNTHETIC_GUEST, Boolean.TRUE);
 
         UserContextAuthentication auth = new UserContextAuthentication(guest);
         SecurityContextHolder.getContext().setAuthentication(auth);

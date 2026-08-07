@@ -96,6 +96,7 @@ public class BuildReleaseFlowController {
 
         Request request = releaseFlowService.startRequestDeployment(flowId, requestId, user);
         List<TaskDto> taskDtos = request.getTasks().stream()
+                .filter(task -> !task.isIntegrationBound())
                 .map(TaskDto::from)
                 .toList();
         return ResponseEntity.ok(RequestDto.from(request, taskDtos));
@@ -113,6 +114,7 @@ public class BuildReleaseFlowController {
 
         Request request = releaseFlowService.markRequestFailed(flowId, requestId, user);
         List<TaskDto> taskDtos = request.getTasks().stream()
+                .filter(task -> !task.isIntegrationBound())
                 .map(TaskDto::from)
                 .toList();
         return ResponseEntity.ok(RequestDto.from(request, taskDtos));
@@ -126,11 +128,14 @@ public class BuildReleaseFlowController {
             @AuthenticationPrincipal UserContext user) {
         validateRundownEditor(user);
         boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
-        validateRequestScope(user, findRequestForScopeValidation(flowId, requestId), "update_rundown");
+        Request requestForValidation = findRequestForScopeValidation(flowId, requestId);
+        validateRequestScope(user, requestForValidation, "update_rundown");
+        validateRundownDestination(user, requestForValidation, body, AgentId.BUILD_AGENT);
         validateOwnerEdit(user, body);
 
         Request request = releaseFlowService.updateRequestRundown(flowId, requestId, body);
         List<TaskDto> taskDtos = request.getTasks().stream()
+                .filter(task -> !task.isIntegrationBound())
                 .map(TaskDto::from)
                 .toList();
         return ResponseEntity.ok(RequestDto.from(request, taskDtos));
@@ -203,7 +208,10 @@ public class BuildReleaseFlowController {
         }
 
         List<RequestDto> requestDtos = visibleRequests.stream()
-                .map(req -> RequestDto.from(req, req.getTasks().stream().map(TaskDto::from).toList()))
+                .map(req -> RequestDto.from(req, req.getTasks().stream()
+                        .filter(task -> !task.isIntegrationBound())
+                        .map(TaskDto::from)
+                        .toList()))
                 .toList();
 
         return ResponseEntity.ok(new ReleaseFlowDetailDto(
@@ -285,6 +293,27 @@ public class BuildReleaseFlowController {
         }
         if (!user.hasScopedAccess(request.getApplication(), request.getSnowGroup())) {
             throw new ForbiddenAppException(action);
+        }
+    }
+
+    private void validateRundownDestination(
+            UserContext user,
+            Request current,
+            RequestRundownUpdateDto body,
+            String expectedAgent
+    ) {
+        if (body == null) {
+            throw new ValidationAppException("Rundown update is required.");
+        }
+        String targetAgent = body.agent() == null ? current.getAgent() : body.agent().trim();
+        String targetApplication = body.application() == null
+                ? current.getApplication() : body.application().trim();
+        String targetSnowGroup = body.snowGroup() == null
+                ? current.getSnowGroup() : body.snowGroup().trim();
+        if (!expectedAgent.equals(targetAgent)
+                || (user != null && !user.isGlobalDevOpsAdmin()
+                && !user.hasScopedAccess(targetApplication, targetSnowGroup))) {
+            throw new ForbiddenAppException("update_rundown_destination");
         }
     }
 

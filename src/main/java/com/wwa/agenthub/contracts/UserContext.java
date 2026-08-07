@@ -72,7 +72,7 @@ public record UserContext(
      * earlier by GuestReadOnlyFilter.
      */
     public boolean isGuestViewer() {
-        return hasRole("GUEST");
+        return roles.size() == 1 && hasRole("GUEST");
     }
 
     public boolean hasScopedAccess(String application, String snowGroup) {

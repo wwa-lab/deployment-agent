@@ -8,6 +8,14 @@ public enum PermissionKey {
     PLATFORM_ACCESS_MANAGE("platform.access.manage"),
     /** Grants visibility of the platform-level audit log view. */
     PLATFORM_AUDIT_VIEW("platform.audit.view"),
+    /** Grants supervised execution start across visible tasks. */
+    PLATFORM_EXECUTION_RUN("platform.execution.run"),
+    /** Grants supervised mutation of an execution owned by another registered client. */
+    PLATFORM_EXECUTION_DELEGATE("platform.execution.delegate"),
+    /** Grants exact-attempt human review across visible tasks. */
+    PLATFORM_EXECUTION_REVIEW("platform.execution.review"),
+    /** Grants access to scoped capability and Skill usage aggregation. */
+    PLATFORM_TELEMETRY_VIEW("platform.telemetry.view"),
 
     // --- Deployment Agent workspace permissions (agent-private) ---
     RELEASE_VIEW("release.view"),

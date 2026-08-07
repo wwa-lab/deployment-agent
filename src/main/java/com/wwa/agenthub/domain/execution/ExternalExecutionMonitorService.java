@@ -117,6 +117,11 @@ public class ExternalExecutionMonitorService {
         if (history.getExecutionStatus() != ExecutionStatus.Running) {
             return;
         }
+        if (history.isIntegrationManaged()) {
+            log.warn("Monitor: Integration-managed execution {} cannot be reconciled by an external adapter",
+                    executionId);
+            return;
+        }
 
         String systemType = history.getExternalSystemType();
         AutoExecutionAdapter adapter = adapters.stream()
@@ -180,6 +185,11 @@ public class ExternalExecutionMonitorService {
         task = taskRepository.findById(task.getId()).orElse(null);
         if (task == null) {
             log.error("Monitor: task not found for execution {}; cannot reconcile state", history.getId());
+            return;
+        }
+
+        if (task.isIntegrationBound() || task.getActiveExecutionId() != null) {
+            log.warn("Monitor: refusing legacy reconciliation for Integration-bound task {}", task.getId());
             return;
         }
 

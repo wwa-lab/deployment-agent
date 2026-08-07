@@ -74,6 +74,12 @@ export type PlatformCapabilityDescriptor = {
 
 export const platformCapabilities: PlatformCapabilityDescriptor[] = [
   {
+    key: 'atlas-execution-center',
+    label: 'Atlas Execution Center',
+    to: '/wwa/atlas-execution-center',
+    icon: '◉',
+  },
+  {
     key: 'agent-contribute-dashboard',
     label: 'Agent Contribute Dashboard',
     to: '/wwa/agent-contribute-dashboard',

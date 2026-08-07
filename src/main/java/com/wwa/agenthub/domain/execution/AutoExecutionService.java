@@ -65,10 +65,14 @@ public class AutoExecutionService {
 
     @Transactional
     public Task submitAutoExecution(String taskId, UserContext user) {
-        Task task = taskRepository.findById(taskId)
+        Task task = taskRepository.findByIdForExecutionUpdate(taskId)
                 .orElseThrow(() -> new NotFoundAppException("Task", taskId));
         taskService.assertTaskRequestActive(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:submitAutoExecution");
+        if (task.isIntegrationBound()) {
+            throw new ConflictAppException(
+                    "Integration-bound Tasks must be started through the Atlas Integration Execution API");
+        }
 
         if (task.getExecutionType() != ExecutionType.AUTO) {
             throw new ConflictAppException(

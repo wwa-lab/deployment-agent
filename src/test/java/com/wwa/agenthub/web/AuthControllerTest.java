@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -169,6 +170,47 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("employee login rotates an existing guest session ID")
+    void login_afterGuest_rotatesSessionId() throws Exception {
+        MvcResult guestResult = mockMvc.perform(post("/api/platform/auth/guest"))
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession guestSession = (MockHttpSession) guestResult.getRequest().getSession();
+        String guestSessionId = guestSession.getId();
+
+        MvcResult loginResult = mockMvc.perform(post("/api/platform/auth/login")
+                        .session(guestSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new LoginRequestDto("emp-002", "password"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(loginResult.getRequest().getSession(false)).isNotNull();
+        assertThat(loginResult.getRequest().getSession(false).getId())
+                .isNotEqualTo(guestSessionId);
+    }
+
+    @Test
+    @DisplayName("employee login rotates an existing anonymous session ID")
+    void login_withExistingAnonymousSession_rotatesSessionId() throws Exception {
+        MockHttpSession anonymousSession = new MockHttpSession();
+        String anonymousSessionId = anonymousSession.getId();
+
+        MvcResult loginResult = mockMvc.perform(post("/api/platform/auth/login")
+                        .session(anonymousSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new LoginRequestDto("emp-002", "password"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(loginResult.getRequest().getSession(false)).isNotNull();
+        assertThat(loginResult.getRequest().getSession(false).getId())
+                .isNotEqualTo(anonymousSessionId);
     }
 
     private static AccessGrant copyGrant(AccessGrant source) {

@@ -67,7 +67,7 @@ flowchart LR
 **Relevant constraints carried forward:**
 
 - No release-flow progression after execution without explicit human decision.
-- Same logical task keeps the same `task_id`; reruns create new execution-history attempts.
+- Same logical task keeps the same `task_id`; rerun only returns it to `Ready_For_Execution`, and the subsequent explicit start creates the next execution-history attempt.
 - Task input editing remains limited to pre-execution states.
 - Dependency fields remain informational and do not introduce DAG execution in this phase.
 
@@ -649,7 +649,7 @@ sequenceDiagram
 - Existing rerun behavior is preserved:
   - `Rejected -> Ready_For_Execution`
   - `Failed -> Ready_For_Execution`
-- Each rerun creates a new execution-history attempt.
+- Rerun itself creates no attempt; it preserves history and returns the task to `Ready_For_Execution`. The subsequent explicit MANUAL or AUTO start creates the next execution-history attempt.
 - Prior execution history remains visible in Task Activity.
 
 ---

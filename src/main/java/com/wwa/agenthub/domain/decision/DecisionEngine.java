@@ -8,8 +8,8 @@ import com.wwa.agenthub.domain.eventing.DomainEvent;
 import com.wwa.agenthub.domain.eventing.DomainEventPublisher;
 import com.wwa.agenthub.domain.task.Task;
 import com.wwa.agenthub.domain.task.TaskPermissionService;
-import com.wwa.agenthub.domain.task.TaskExecutionHistoryService;
 import com.wwa.agenthub.domain.task.TaskService;
+import com.wwa.agenthub.errors.ConflictAppException;
 import com.wwa.agenthub.errors.InvalidStateTransitionException;
 import com.wwa.agenthub.platform.web.common.CorrelationIdFilter;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ import java.util.Map;
  * <ul>
  *   <li>Approve: Awaiting_Review → Approved (owner/admin)</li>
  *   <li>Reject:  Awaiting_Review → Rejected (owner/admin)</li>
- *   <li>Rerun:   Rejected/Failed → Ready_For_Execution (owner/admin), creates new execution history</li>
+ *   <li>Rerun:   Rejected/Failed → Ready_For_Execution (owner/admin); start creates the next attempt</li>
  *   <li>Skip:    Pending/Ready_For_Execution/Awaiting_Review → Skipped (owner/admin)</li>
  * </ul>
  */
@@ -37,7 +37,6 @@ import java.util.Map;
 public class DecisionEngine {
 
     private final TaskService taskService;
-    private final TaskExecutionHistoryService executionHistoryService;
     private final AuditLoggerService auditLogger;
     private final TaskPermissionService taskPermissionService;
     private final DecisionGate decisionGate;
@@ -59,8 +58,38 @@ public class DecisionEngine {
      */
     @Transactional
     public void applyDecision(String taskId, DecisionType decision, UserContext user, String comment) {
+        applyDecisionInternal(taskId, decision, user, comment, false);
+    }
+
+    /** Shared-platform review entry point for Integration-bound Tasks. */
+    @Transactional
+    public void applyIntegrationDecision(
+            String taskId,
+            DecisionType decision,
+            UserContext user,
+            String comment
+    ) {
+        applyDecisionInternal(taskId, decision, user, comment, true);
+    }
+
+    private void applyDecisionInternal(
+            String taskId,
+            DecisionType decision,
+            UserContext user,
+            String comment,
+        boolean integrationReview
+    ) {
         Task task = taskService.getById(taskId);
-        taskPermissionService.assertOwnerOrAdmin(task, user, "decision:" + decision.name());
+        if (integrationReview) {
+            taskPermissionService.assertOwnerAdminOrReviewPermission(
+                    task, user, "decision:" + decision.name());
+        } else {
+            taskPermissionService.assertOwnerOrAdmin(task, user, "decision:" + decision.name());
+        }
+        if (task.isIntegrationBound() && !integrationReview) {
+            throw new ConflictAppException(
+                    "Integration-bound Task reviews must use the exact Execution review endpoint");
+        }
 
         // Idempotency (P1-1): if the task is already in the terminal state that this
         // decision would produce, treat the call as a successful no-op. This prevents
@@ -68,9 +97,9 @@ public class DecisionEngine {
         // permission check still runs first so that an unauthorized caller cannot
         // probe the current task state by calling the decision endpoint.
         //
-        // Rerun is intentionally excluded from this rule: it is a "try again" action
-        // that must create a fresh execution history row every time it is invoked,
-        // even when the task is already in Ready_For_Execution.
+        // Rerun is intentionally excluded from this rule: it is a command from a
+        // rejected/failed state back to readiness. It never fabricates an execution;
+        // the next successful start command owns attempt creation.
         if (isAlreadyInTargetState(task.getTaskStatus(), decision)) {
             return;
         }
@@ -93,14 +122,14 @@ public class DecisionEngine {
                     throw new InvalidStateTransitionException(
                             task.getTaskStatus().name(), TaskStatus.Approved.name(), "Task");
                 }
-                taskService.updateStatus(taskId, TaskStatus.Approved, user, comment);
+                updateStatus(taskId, TaskStatus.Approved, user, comment, integrationReview);
             }
             case reject -> {
                 if (task.getTaskStatus() != TaskStatus.Awaiting_Review) {
                     throw new InvalidStateTransitionException(
                             task.getTaskStatus().name(), TaskStatus.Rejected.name(), "Task");
                 }
-                taskService.updateStatus(taskId, TaskStatus.Rejected, user, comment);
+                updateStatus(taskId, TaskStatus.Rejected, user, comment, integrationReview);
             }
             case rerun -> {
                 if (task.getTaskStatus() != TaskStatus.Rejected
@@ -108,8 +137,7 @@ public class DecisionEngine {
                     throw new InvalidStateTransitionException(
                             task.getTaskStatus().name(), TaskStatus.Ready_For_Execution.name(), "Task");
                 }
-                taskService.updateStatus(taskId, TaskStatus.Ready_For_Execution, user, comment);
-                executionHistoryService.createExecution(taskId);
+                updateStatus(taskId, TaskStatus.Ready_For_Execution, user, comment, integrationReview);
             }
             case skip -> {
                 if (task.getTaskStatus() != TaskStatus.Pending
@@ -118,27 +146,30 @@ public class DecisionEngine {
                     throw new InvalidStateTransitionException(
                             task.getTaskStatus().name(), TaskStatus.Skipped.name(), "Task");
                 }
-                taskService.updateStatus(taskId, TaskStatus.Skipped, user, comment);
+                updateStatus(taskId, TaskStatus.Skipped, user, comment, integrationReview);
             }
         }
 
-        // Log the decision as an audit action
-        AuditActionType auditAction = switch (decision) {
-            case approve -> AuditActionType.approve;
-            case reject  -> AuditActionType.reject;
-            case rerun   -> AuditActionType.rerun;
-            case skip    -> AuditActionType.skip;
-        };
+        // Integration reviews record one atomic platform audit in the outer
+        // transaction. Legacy decisions retain their existing audit trail.
+        if (!integrationReview) {
+            AuditActionType auditAction = switch (decision) {
+                case approve -> AuditActionType.approve;
+                case reject  -> AuditActionType.reject;
+                case rerun   -> AuditActionType.rerun;
+                case skip    -> AuditActionType.skip;
+            };
 
-        Map<String, Object> auditContext = new LinkedHashMap<>();
-        auditContext.put("decisionType", decision.name());
-        auditContext.put("previousStatus", task.getTaskStatus().name());
-        auditContext.put("comment", comment != null ? comment : "");
-        auditContext.put("actorKind", gateOutcome.actorKind().name());
-        if (gateOutcome.actorRef() != null) {
-            auditContext.put("actorRef", gateOutcome.actorRef());
+            Map<String, Object> auditContext = new LinkedHashMap<>();
+            auditContext.put("decisionType", decision.name());
+            auditContext.put("previousStatus", previousStatus.name());
+            auditContext.put("comment", comment != null ? comment : "");
+            auditContext.put("actorKind", gateOutcome.actorKind().name());
+            if (gateOutcome.actorRef() != null) {
+                auditContext.put("actorRef", gateOutcome.actorRef());
+            }
+            auditLogger.log(user, auditAction, releaseFlowId, requestId, taskId, auditContext);
         }
-        auditLogger.log(user, auditAction, releaseFlowId, requestId, taskId, auditContext);
 
         // Publish a domain event onto the transactional outbox (P2-2 seam).
         // MVP: no consumer reads this; rows accumulate in PENDING state. The
@@ -164,12 +195,25 @@ public class DecisionEngine {
                 eventPayload));
     }
 
+    private void updateStatus(
+            String taskId,
+            TaskStatus newStatus,
+            UserContext user,
+            String comment,
+            boolean integrationReview
+    ) {
+        if (integrationReview) {
+            taskService.updateStatusForIntegrationReview(taskId, newStatus);
+        } else {
+            taskService.updateStatus(taskId, newStatus, user, comment);
+        }
+    }
+
     /**
      * Nominal target status for a non-idempotent decision application.
      * Used for domain event payloads so consumers can read the intended
      * target without replicating the state machine rules. Rerun ends in
-     * {@code Ready_For_Execution} even though it also creates a new
-     * execution history row.
+     * {@code Ready_For_Execution}; a later start creates the execution row.
      */
     private static TaskStatus targetStatusFor(DecisionType decision) {
         return switch (decision) {
@@ -190,7 +234,7 @@ public class DecisionEngine {
             case approve -> current == TaskStatus.Approved;
             case reject -> current == TaskStatus.Rejected;
             case skip -> current == TaskStatus.Skipped;
-            // Rerun always creates a new attempt — never idempotent.
+            // Rerun is valid only from Rejected/Failed — never an already-target no-op.
             case rerun -> false;
         };
     }

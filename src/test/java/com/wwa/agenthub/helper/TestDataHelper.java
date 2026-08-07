@@ -1,6 +1,8 @@
 package com.wwa.agenthub.helper;
 
 import com.wwa.agenthub.contracts.AgentId;
+import com.wwa.agenthub.contracts.AccessScope;
+import com.wwa.agenthub.contracts.UserContext;
 import com.wwa.agenthub.contracts.enums.*;
 import com.wwa.agenthub.domain.releaseflow.ReleaseFlow;
 import com.wwa.agenthub.domain.releaseflow.ReleaseFlowRepository;
@@ -12,12 +14,29 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Set;
+
 /**
  * Test helper – seeds minimal entities for integration tests.
  * Mirrors the TypeScript seedReleaseFlow / seedRequest / seedTask helpers.
  */
 @Component
 public class TestDataHelper {
+
+    /**
+     * Builds a test principal that can exercise legacy domain workflows without
+     * weakening the production rule that non-admin users require an explicit scope.
+     */
+    public static UserContext globallyScopedUser(String userId, String role) {
+        return new UserContext(
+                userId,
+                role,
+                List.of(role),
+                Set.of(),
+                userId,
+                List.of(new AccessScope(AccessScope.WILDCARD, AccessScope.WILDCARD)));
+    }
 
     @Autowired private ReleaseFlowRepository releaseFlowRepository;
     @Autowired private RequestRepository requestRepository;
@@ -26,11 +45,16 @@ public class TestDataHelper {
 
     @Transactional
     public ReleaseFlow seedReleaseFlow() {
+        return seedReleaseFlow("001");
+    }
+
+    @Transactional
+    public ReleaseFlow seedReleaseFlow(String fixtureId) {
         ReleaseFlow rf = new ReleaseFlow();
-        rf.setProjectId("PROJ-001");
+        rf.setProjectId("PROJ-" + fixtureId);
         rf.setProjectName("Test Project");
-        rf.setReleaseId("SIT-test-project-001");
-        rf.setNormalizedReleaseId("sit-test-project-001");
+        rf.setReleaseId("SIT-test-project-" + fixtureId);
+        rf.setNormalizedReleaseId("sit-test-project-" + fixtureId.toLowerCase(java.util.Locale.ROOT));
         rf.setCurrentStage("SIT");
         rf.setFlowStatus(FlowStatus.Pending);
         rf.setReviewStatus(ReviewStatus.Pending_Review);
@@ -64,7 +88,9 @@ public class TestDataHelper {
         req.setAgent(agent);
         Request saved = requestRepository.save(req);
         entityManager.flush();
-        entityManager.refresh(releaseFlow);
+        if (entityManager.contains(releaseFlow)) {
+            entityManager.refresh(releaseFlow);
+        }
         return saved;
     }
 
@@ -99,7 +125,41 @@ public class TestDataHelper {
         task.setOwner("alice");
         Task saved = taskRepository.save(task);
         entityManager.flush();
-        entityManager.refresh(request);
+        if (entityManager.contains(request)) {
+            entityManager.refresh(request);
+        }
         return saved;
+    }
+
+    @Transactional
+    public Task seedIntegrationTask(
+            Request request,
+            TaskStatus status,
+            CapabilityType capabilityType,
+            String assigneeUserId
+    ) {
+        request.setApplication("payments");
+        request.setSnowGroup("team-atlas");
+        requestRepository.save(request);
+
+        Task task = seedTask(request, status, true);
+        task.setExecutionType(capabilityType == CapabilityType.MANUAL
+                ? ExecutionType.MANUAL
+                : ExecutionType.AUTO);
+        task.setAssigneeUserId(assigneeUserId);
+        task.setOwner(assigneeUserId);
+        task.setCapabilityType(capabilityType);
+        task.setCapabilityId(capabilityType == CapabilityType.SKILL
+                ? "skill.atlas.delivery"
+                : "capability.atlas.delivery");
+        task.setCapabilityVersion("1.0.0");
+        if (capabilityType != CapabilityType.MANUAL) {
+            task.setRepositoryId("repo-atlas-001");
+            task.setRepositoryProvider("GITHUB");
+            task.setRepositoryUrl("https://github.example.invalid/wwa/atlas.git");
+            task.setRepositoryBranch("main");
+            task.setRepositoryCommit("abcdef1234567890abcdef1234567890abcdef12");
+        }
+        return taskRepository.save(task);
     }
 }

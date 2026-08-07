@@ -3,6 +3,10 @@ package com.wwa.agenthub.config;
 import com.wwa.agenthub.web.security.GuestReadOnlyFilter;
 import com.wwa.agenthub.web.security.HeaderAuthFilter;
 import com.wwa.agenthub.web.security.SessionAuthFilter;
+import com.wwa.agenthub.platform.web.security.IntegrationBearerAuthFilter;
+import com.wwa.agenthub.platform.web.security.IntegrationRequestRateLimitFilter;
+import com.wwa.agenthub.platform.web.security.ArtifactDownloadAdmissionFilter;
+import com.wwa.agenthub.platform.web.security.ArtifactUploadAdmissionFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -18,6 +22,10 @@ public class LocalSecurityConfig {
     @Bean
     public SecurityFilterChain localSecurityFilterChain(HttpSecurity http,
                                                         SessionAuthFilter sessionAuthFilter,
+                                                        IntegrationBearerAuthFilter integrationBearerAuthFilter,
+                                                        IntegrationRequestRateLimitFilter integrationRequestRateLimitFilter,
+                                                        ArtifactUploadAdmissionFilter artifactUploadAdmissionFilter,
+                                                        ArtifactDownloadAdmissionFilter artifactDownloadAdmissionFilter,
                                                         HeaderAuthFilter headerAuthFilter,
                                                         GuestReadOnlyFilter guestReadOnlyFilter) throws Exception {
         http
@@ -25,9 +33,13 @@ public class LocalSecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-                .addFilterBefore(sessionAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(integrationBearerAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(sessionAuthFilter, IntegrationBearerAuthFilter.class)
                 .addFilterAfter(headerAuthFilter, SessionAuthFilter.class)
-                .addFilterAfter(guestReadOnlyFilter, HeaderAuthFilter.class);
+                .addFilterAfter(guestReadOnlyFilter, HeaderAuthFilter.class)
+                .addFilterAfter(integrationRequestRateLimitFilter, GuestReadOnlyFilter.class)
+                .addFilterAfter(artifactUploadAdmissionFilter, IntegrationRequestRateLimitFilter.class)
+                .addFilterAfter(artifactDownloadAdmissionFilter, ArtifactUploadAdmissionFilter.class);
 
         return http.build();
     }

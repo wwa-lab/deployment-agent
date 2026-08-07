@@ -41,6 +41,10 @@ class TaskStateMachineTest {
         assertThat(TaskStateMachine.isValid(TaskStatus.Executing, TaskStatus.Failed)).isTrue();
     }
 
+    @Test void executingToReadyForExecution_allowedForCancellation() {
+        assertThat(TaskStateMachine.isValid(TaskStatus.Executing, TaskStatus.Ready_For_Execution)).isTrue();
+    }
+
     @Test void executingToApproved_disallowed() {
         assertThat(TaskStateMachine.isValid(TaskStatus.Executing, TaskStatus.Approved)).isFalse();
     }

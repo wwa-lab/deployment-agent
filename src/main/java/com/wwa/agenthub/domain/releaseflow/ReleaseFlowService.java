@@ -18,7 +18,9 @@ import com.wwa.agenthub.platform.domain.StagePipeline;
 import com.wwa.agenthub.platform.domain.StagePipelineRegistry;
 import com.wwa.agenthub.domain.audit.AuditLoggerService;
 import com.wwa.agenthub.domain.task.TaskRepository;
+import com.wwa.agenthub.domain.task.Task;
 import com.wwa.agenthub.errors.ForbiddenAppException;
+import com.wwa.agenthub.errors.ConflictAppException;
 import com.wwa.agenthub.errors.NotFoundAppException;
 import com.wwa.agenthub.errors.ValidationAppException;
 import jakarta.persistence.EntityManager;
@@ -41,6 +43,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -317,7 +320,10 @@ public class ReleaseFlowService {
 
         List<String> linkedReleaseIds = orderedDistinctReleaseIds(releaseFlows, requestsByReleaseFlowId, representativeFlow);
         List<RequestDto> requestDtos = visibleRequests.stream()
-                .map(req -> RequestDto.from(req, req.getTasks().stream().map(TaskDto::from).toList()))
+                .map(req -> RequestDto.from(req, req.getTasks().stream()
+                        .filter(task -> !task.isIntegrationBound())
+                        .map(TaskDto::from)
+                        .toList()))
                 .toList();
 
         return new ReleaseFlowDetailDto(
@@ -417,17 +423,40 @@ public class ReleaseFlowService {
     public Request updateRequestRundown(String releaseFlowId, String requestId, RequestRundownUpdateDto update) {
         Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        List<Task> lockedTasks = lockAndRefreshRequestTasks(requestId);
+        entityManager.refresh(request);
+
+        if (update == null) {
+            throw new ValidationAppException("Rundown update is required.");
+        }
 
         if (update.estimatedRemainingMinutes() != null && update.estimatedRemainingMinutes() < 0) {
             throw new ValidationAppException("Estimated remaining minutes must be zero or positive.");
         }
 
-        request.setSnowGroup(normalizeBlank(update.snowGroup()));
-        request.setApplication(normalizeBlank(update.application()));
-        request.setAgent(normalizeBlank(update.agent()));
-        request.setOwner(normalizeBlank(update.owner()));
-        request.setSite(normalizeBlank(update.site()));
-        request.setEstimatedRemainingMinutes(update.estimatedRemainingMinutes());
+        String targetSnowGroup = update.snowGroup() == null
+                ? request.getSnowGroup() : normalizeBlank(update.snowGroup());
+        String targetApplication = update.application() == null
+                ? request.getApplication() : normalizeBlank(update.application());
+        String targetAgent = update.agent() == null
+                ? request.getAgent() : normalizeBlank(update.agent());
+        boolean integrationBound = lockedTasks.stream().anyMatch(Task::isIntegrationBound);
+        if (integrationBound
+                && (!Objects.equals(targetSnowGroup, request.getSnowGroup())
+                || !Objects.equals(targetApplication, request.getApplication())
+                || !Objects.equals(targetAgent, request.getAgent()))) {
+            throw new ConflictAppException(
+                    "Application, team, and Agent cannot change after Atlas Integration binding");
+        }
+
+        request.setSnowGroup(targetSnowGroup);
+        request.setApplication(targetApplication);
+        request.setAgent(targetAgent);
+        request.setOwner(update.owner() == null ? request.getOwner() : normalizeBlank(update.owner()));
+        request.setSite(update.site() == null ? request.getSite() : normalizeBlank(update.site()));
+        request.setEstimatedRemainingMinutes(update.estimatedRemainingMinutes() == null
+                ? request.getEstimatedRemainingMinutes()
+                : update.estimatedRemainingMinutes());
         Request saved = requestRepository.save(request);
         saved.getTasks().size();
         return saved;
@@ -437,12 +466,15 @@ public class ReleaseFlowService {
     public Request startRequestDeployment(String releaseFlowId, String requestId, UserContext user) {
         Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        List<Task> lockedTasks = lockAndRefreshRequestTasks(requestId);
+        entityManager.refresh(request);
 
         if (request.getRequestStatus() != RequestStatus.Pending) {
             throw new ValidationAppException("Only pending requests can be started.");
         }
 
-        request.getTasks().stream()
+        lockedTasks.stream()
+                .sorted(REQUEST_TASK_ORDER)
                 .filter(task -> task.getTaskStatus() == TaskStatus.Pending)
                 .findFirst()
                 .ifPresentOrElse(task -> {
@@ -464,6 +496,15 @@ public class ReleaseFlowService {
     public Request markRequestFailed(String releaseFlowId, String requestId, UserContext user) {
         Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+
+        if (request.getTasks().stream().anyMatch(task -> task.isIntegrationBound()
+                && task.getTaskStatus() != TaskStatus.Approved
+                && task.getTaskStatus() != TaskStatus.Rejected
+                && task.getTaskStatus() != TaskStatus.Skipped
+                && task.getTaskStatus() != TaskStatus.Failed)) {
+            throw new ConflictAppException(
+                    "Integration-bound Tasks must reach a terminal state through Atlas Execution or Review commands");
+        }
 
         if (request.getRequestStatus() == RequestStatus.Completed
                 || request.getRequestStatus() == RequestStatus.Failed
@@ -500,6 +541,14 @@ public class ReleaseFlowService {
     public RequestArchiveResultDto archiveRequestRundown(String releaseFlowId, String requestId, UserContext user) {
         Request request = requestRepository.findActiveByIdAndReleaseFlowIdWithTasks(requestId, releaseFlowId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        List<Task> lockedTasks = lockAndRefreshRequestTasks(requestId);
+        entityManager.refresh(request);
+        boolean hasActiveIntegrationExecution = lockedTasks.stream()
+                .anyMatch(task -> task.isIntegrationBound() && task.getActiveExecutionId() != null);
+        if (hasActiveIntegrationExecution) {
+            throw new ConflictAppException(
+                    "A Request with an active Atlas Integration Execution cannot be archived");
+        }
         ReleaseFlow releaseFlow = getById(releaseFlowId);
 
         Instant archivedAt = clock.instant();
@@ -532,6 +581,25 @@ public class ReleaseFlowService {
                 true,
                 releaseFlowArchived,
                 activeRequests.size());
+    }
+
+    private static final Comparator<Task> REQUEST_TASK_ORDER = Comparator
+            .comparing(Task::getTaskGroupId, Comparator.nullsFirst(String::compareTo))
+            .thenComparing(Task::getStepSeq, Comparator.nullsFirst(Integer::compareTo))
+            .thenComparing(Task::getId);
+
+    private List<Task> lockAndRefreshRequestTasks(String requestId) {
+        List<String> taskIds = taskRepository
+                .findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(requestId)
+                .stream()
+                .map(Task::getId)
+                .sorted()
+                .toList();
+        return taskIds.stream()
+                .map(taskId -> taskRepository.findByIdForExecutionUpdate(taskId)
+                        .orElseThrow(() -> new NotFoundAppException("Task", taskId)))
+                .peek(entityManager::refresh)
+                .toList();
     }
 
     @Transactional
@@ -573,6 +641,10 @@ public class ReleaseFlowService {
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         if (request.getArchivedAt() == null) {
             throw new ValidationAppException("Only archived rundowns can be permanently deleted.");
+        }
+        if (request.getTasks().stream().anyMatch(Task::isIntegrationBound)) {
+            throw new ConflictAppException(
+                    "Atlas Integration audit and execution evidence is retention-protected and cannot be purged");
         }
 
         String stage = request.getStage();

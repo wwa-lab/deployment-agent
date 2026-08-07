@@ -55,7 +55,7 @@ class ManualTaskWorkflowTest {
     void setUp() {
         releaseFlow = helper.seedReleaseFlow();
         request = helper.seedRequestWithAgent(releaseFlow, AgentId.DEPLOYMENT_AGENT);
-        ownerUser = new UserContext("emp-001", "DEVELOPER");
+        ownerUser = TestDataHelper.globallyScopedUser("emp-001", "DEVELOPER");
     }
 
     // ─── Full lifecycle ───────────────────────────────────────────────────────

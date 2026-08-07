@@ -1,5 +1,6 @@
 package com.wwa.agenthub.platform.web.security;
 
+import com.wwa.agenthub.contracts.UserContext;
 import com.wwa.agenthub.domain.releaseflow.ReleaseFlowRepository;
 import com.wwa.agenthub.domain.releaseflow.Request;
 import com.wwa.agenthub.domain.releaseflow.RequestRepository;
@@ -46,6 +47,35 @@ public class AgentBoundaryGuard {
         Request request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundAppException("Request", requestId));
         if (!expectedAgent.equals(request.getAgent())) {
+            throw new NotFoundAppException("Request", requestId);
+        }
+    }
+
+    /**
+     * Protect legacy Task DTO endpoints from exposing Integration-controlled
+     * input/result fields or data outside the caller's Application/SNOW scope.
+     */
+    @Transactional(readOnly = true)
+    public void assertLegacyTaskReadable(String taskId, String expectedAgent, UserContext user) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundAppException("Task", taskId));
+        Request request = task.getRequest();
+        if (request == null
+                || !expectedAgent.equals(request.getAgent())
+                || task.isIntegrationBound()
+                || user == null
+                || !user.hasScopedAccess(request.getApplication(), request.getSnowGroup())) {
+            throw new NotFoundAppException("Task", taskId);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void assertLegacyRequestReadable(String requestId, String expectedAgent, UserContext user) {
+        Request request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundAppException("Request", requestId));
+        if (!expectedAgent.equals(request.getAgent())
+                || user == null
+                || !user.hasScopedAccess(request.getApplication(), request.getSnowGroup())) {
             throw new NotFoundAppException("Request", requestId);
         }
     }

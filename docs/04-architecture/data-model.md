@@ -281,8 +281,8 @@ Pending ──► Ready_For_Execution ──► Executing ──► Awaiting_Rev
 | Executing | Failed | Execution failure or submission failure |
 | Awaiting_Review | Approved | Reviewer approve decision |
 | Awaiting_Review | Rejected | Reviewer reject decision |
-| Rejected | Ready_For_Execution | Reviewer rerun decision (creates new execution history) |
-| Failed | Ready_For_Execution | Reviewer rerun decision (creates new execution history) |
+| Rejected | Ready_For_Execution | Reviewer rerun decision (preserves history; the next explicit start creates a new attempt) |
+| Failed | Ready_For_Execution | Reviewer rerun decision (preserves history; the next explicit start creates a new attempt) |
 
 ### Flow Status
 

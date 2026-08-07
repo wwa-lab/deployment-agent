@@ -14,7 +14,7 @@ import java.util.Set;
  * <pre>
  *   Pending             → Ready_For_Execution, Skipped
  *   Ready_For_Execution → Executing, Skipped
- *   Executing           → Awaiting_Review, Failed
+ *   Executing           → Awaiting_Review, Failed, Ready_For_Execution (cancel)
  *   Awaiting_Review     → Approved, Rejected, Skipped
  *   Rejected            → Ready_For_Execution  (rerun)
  *   Failed              → Ready_For_Execution  (rerun)
@@ -35,7 +35,10 @@ public final class TaskStateMachine {
         TRANSITIONS.put(TaskStatus.Ready_For_Execution,
                 EnumSet.of(TaskStatus.Executing, TaskStatus.Skipped));
         TRANSITIONS.put(TaskStatus.Executing,
-                EnumSet.of(TaskStatus.Awaiting_Review, TaskStatus.Failed));
+                EnumSet.of(
+                        TaskStatus.Awaiting_Review,
+                        TaskStatus.Failed,
+                        TaskStatus.Ready_For_Execution));
         TRANSITIONS.put(TaskStatus.Awaiting_Review,
                 EnumSet.of(TaskStatus.Approved, TaskStatus.Rejected, TaskStatus.Skipped));
         TRANSITIONS.put(TaskStatus.Approved, EnumSet.noneOf(TaskStatus.class));

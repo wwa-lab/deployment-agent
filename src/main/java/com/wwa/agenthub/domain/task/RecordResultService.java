@@ -55,6 +55,10 @@ public class RecordResultService {
                 .orElseThrow(() -> new NotFoundAppException("Task", taskId));
         taskService.assertTaskRequestActive(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:recordResult");
+        if (task.isIntegrationBound()) {
+            throw new ConflictAppException(
+                    "Integration-bound Tasks accept results only through their active Atlas Execution");
+        }
 
         if (task.getExecutionType() != ExecutionType.MANUAL) {
             throw new ConflictAppException(

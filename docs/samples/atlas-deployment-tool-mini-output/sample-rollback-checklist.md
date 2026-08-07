@@ -23,7 +23,7 @@
 
 - [ ] Follow the team's approved rollback runbook outside this sample.
 - [ ] Record the rollback or remediation result in the task result summary.
-- [ ] Use `Rerun` only when the task should create a new execution attempt.
+- [ ] Use `Rerun` only when the task should return to `Ready_For_Execution`; start the next execution attempt explicitly.
 - [ ] Use `Reject` when the release should stop pending rework.
 - [ ] Use `Archive` only for controlled cleanup of a rundown that should no longer appear in default views.
 

@@ -53,7 +53,10 @@ public class PermissionResolver {
                 Set.of(
                         PermissionKey.TASK_EDIT,
                         PermissionKey.TASK_RUN,
-                        PermissionKey.TASK_REVIEW
+                        PermissionKey.TASK_REVIEW,
+                        PermissionKey.PLATFORM_EXECUTION_RUN,
+                        PermissionKey.PLATFORM_EXECUTION_REVIEW,
+                        PermissionKey.PLATFORM_TELEMETRY_VIEW
                 )
         ));
 
@@ -67,19 +70,22 @@ public class PermissionResolver {
                         PermissionKey.PLATFORM_ACCESS_MANAGE,
                         PermissionKey.RELEASE_VIEW_ARCHIVED,
                         PermissionKey.RELEASE_RUNDOWN_RESTORE,
-                        PermissionKey.RELEASE_RUNDOWN_PURGE
+                        PermissionKey.RELEASE_RUNDOWN_PURGE,
+                        PermissionKey.PLATFORM_EXECUTION_DELEGATE
                 )
         ));
 
         permissions.put(Role.AUDIT, Set.of(
                 PermissionKey.PLATFORM_ENTER,
                 PermissionKey.AUDIT_VIEW,
-                PermissionKey.PLATFORM_AUDIT_VIEW
+                PermissionKey.PLATFORM_AUDIT_VIEW,
+                PermissionKey.PLATFORM_TELEMETRY_VIEW
         ));
         permissions.put(Role.MANAGEMENT, Set.of(
                 PermissionKey.PLATFORM_ENTER,
                 PermissionKey.AUDIT_VIEW,
-                PermissionKey.PLATFORM_AUDIT_VIEW
+                PermissionKey.PLATFORM_AUDIT_VIEW,
+                PermissionKey.PLATFORM_TELEMETRY_VIEW
         ));
         // Guest is a global anonymous viewer. Grant enough permissions for
         // nav/page rendering only; all write endpoints are blocked upstream

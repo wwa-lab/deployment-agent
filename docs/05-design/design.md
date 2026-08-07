@@ -70,7 +70,7 @@ flowchart LR
 **Key architectural constraints carried forward:**
 - Fixed Excel import schema for MVP
 - Import remains atomic at file level
-- Task reruns reuse the same `task_id` and create new execution history attempts
+- Task reruns reuse the same `task_id`, return it to `Ready_For_Execution`, and defer creation of the next execution-history attempt until an explicit start
 - Product entry becomes deny-by-default in Phase 1
 - Access enforcement must align across menus, routes, and APIs
 
@@ -905,7 +905,7 @@ Audit should record at least:
 - Upload creates a new Release Flow and first executable task
 - MANUAL task run -> result record -> review decision -> progression
 - AUTO task submission succeeds and stores external job link
-- Failed task rerun creates a new execution history attempt
+- Failed task rerun returns the task to `Ready_For_Execution`; the subsequent explicit start creates the new execution-history attempt
 - Archived rundown is hidden by default, restorable by admin, and purgeable only after archive
 
 ### State Transition Coverage

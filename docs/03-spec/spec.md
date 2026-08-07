@@ -563,8 +563,8 @@ Valid values:
 - `Executing` → `Failed` (execution failure)
 - `Awaiting_Review` → `Approved` (task owner or DevOps Admin approve decision)
 - `Awaiting_Review` → `Rejected` (task owner or DevOps Admin reject decision)
-- `Rejected` → `Ready_For_Execution` (task owner or DevOps Admin rerun decision; creates new execution history)
-- `Failed` → `Ready_For_Execution` (task owner or DevOps Admin rerun decision; creates new execution history)
+- `Rejected` → `Ready_For_Execution` (task owner or DevOps Admin rerun decision; preserves prior history; the subsequent explicit start creates the next execution attempt)
+- `Failed` → `Ready_For_Execution` (task owner or DevOps Admin rerun decision; preserves prior history; the subsequent explicit start creates the next execution attempt)
 
 > *Previous draft used `Awaiting_Review → Rerun_Queued → Executing` for reruns. The implemented model requires the task to be in a terminal-error state (`Rejected` or `Failed`) before rerun, transitioning back to `Ready_For_Execution`. This is intentionally conservative — explicit rejection before rerun.*
 

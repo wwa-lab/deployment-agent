@@ -31,6 +31,10 @@ export type UserPermission =
   | 'config.manage'
   | 'audit.view'
   | 'access.manage'
+  | 'platform.execution.run'
+  | 'platform.execution.delegate'
+  | 'platform.execution.review'
+  | 'platform.telemetry.view'
 export type ConfigKey =
   | 'jenkins_url'
   | 'jenkins_user'

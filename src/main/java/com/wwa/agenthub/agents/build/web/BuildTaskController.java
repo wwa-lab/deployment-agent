@@ -42,18 +42,23 @@ public class BuildTaskController {
     private final AgentBoundaryGuard boundaryGuard;
 
     @GetMapping
-    public ResponseEntity<List<TaskDto>> listByRequest(@RequestParam String requestId) {
-        boundaryGuard.assertRequestBelongsToAgent(requestId, AgentId.BUILD_AGENT);
+    public ResponseEntity<List<TaskDto>> listByRequest(
+            @RequestParam String requestId,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertLegacyRequestReadable(requestId, AgentId.BUILD_AGENT, user);
         List<TaskDto> dtos = taskService.listByRequestId(requestId)
                 .stream()
+                .filter(task -> !task.isIntegrationBound())
                 .map(TaskDto::from)
                 .toList();
         return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TaskDto> getById(@PathVariable String id) {
-        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+    public ResponseEntity<TaskDto> getById(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertLegacyTaskReadable(id, AgentId.BUILD_AGENT, user);
         return ResponseEntity.ok(TaskDto.from(taskService.getById(id)));
     }
 
@@ -114,8 +119,10 @@ public class BuildTaskController {
     }
 
     @GetMapping("/{id}/executions")
-    public ResponseEntity<List<TaskExecutionHistoryDto>> getExecutions(@PathVariable String id) {
-        boundaryGuard.assertTaskBelongsToAgent(id, AgentId.BUILD_AGENT);
+    public ResponseEntity<List<TaskExecutionHistoryDto>> getExecutions(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserContext user) {
+        boundaryGuard.assertLegacyTaskReadable(id, AgentId.BUILD_AGENT, user);
         List<TaskExecutionHistoryDto> dtos = executionHistoryService.findByTaskId(id)
                 .stream()
                 .map(TaskExecutionHistoryDto::from)

@@ -1,6 +1,7 @@
 package com.wwa.agenthub.domain.task;
 
 import com.wwa.agenthub.contracts.enums.ExecutionType;
+import com.wwa.agenthub.contracts.enums.CapabilityType;
 import com.wwa.agenthub.contracts.enums.RiskLevel;
 import com.wwa.agenthub.contracts.enums.TaskStatus;
 import com.wwa.agenthub.domain.releaseflow.Request;
@@ -9,6 +10,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,7 +49,9 @@ import java.util.UUID;
         @Index(name = "IDX_TASK_REQUEST", columnList = "request_id"),
         @Index(name = "IDX_TASK_STATUS", columnList = "task_status"),
         @Index(name = "IDX_TASK_GROUP_SEQ", columnList = "task_group_id, step_seq"),
-        @Index(name = "IDX_TASK_EXECUTION_TYPE", columnList = "execution_type")
+        @Index(name = "IDX_TASK_EXECUTION_TYPE", columnList = "execution_type"),
+        @Index(name = "IDX_TASK_ACTIVE_EXEC", columnList = "active_execution_id"),
+        @Index(name = "IDX_TASK_CAPABILITY", columnList = "capability_type, capability_id")
     }
 )
 @Getter
@@ -190,6 +194,40 @@ public class Task {
     @Column(name = "latest_execution_id", length = 36)
     private String latestExecutionId;
 
+    /** Active execution identifier; the v1 lease and stale-write fencing token. */
+    @Column(name = "active_execution_id", length = 36)
+    private String activeExecutionId;
+
+    /** Stable user identity used for Integration execution/review authorization. */
+    @Column(name = "assignee_user_id", length = 255)
+    private String assigneeUserId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "capability_type", length = 30)
+    private CapabilityType capabilityType;
+
+    @Column(name = "capability_id", length = 255)
+    private String capabilityId;
+
+    @Column(name = "capability_version", length = 128)
+    private String capabilityVersion;
+
+    @Column(name = "repository_id", length = 255)
+    private String repositoryId;
+
+    @Column(name = "repository_provider", length = 128)
+    private String repositoryProvider;
+
+    /** Server-owned canonical URL; sanitized before the Integration projection uses it. */
+    @Column(name = "repository_url", length = 2048)
+    private String repositoryUrl;
+
+    @Column(name = "repository_branch", length = 1024)
+    private String repositoryBranch;
+
+    @Column(name = "repository_commit", length = 255)
+    private String repositoryCommit;
+
     /** Actual start time populated by the Execution Service (NOT from template). */
     @Column(name = "start_time")
     private Instant startTime;
@@ -197,6 +235,10 @@ public class Task {
     /** Actual end time populated from execution callback (NOT from template). */
     @Column(name = "end_time")
     private Instant endTime;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "last_updated_at", nullable = false)
@@ -215,5 +257,10 @@ public class Task {
         if (id == null) {
             id = UUID.randomUUID().toString();
         }
+    }
+
+    /** True once this Task is bound to the shared Atlas Integration execution plane. */
+    public boolean isIntegrationBound() {
+        return capabilityType != null || capabilityId != null || activeExecutionId != null;
     }
 }

@@ -751,7 +751,7 @@ Applies a human decision to a task and triggers progression logic.
 |----------|----------------------|--------|
 | `approve` | `Awaiting_Review` | Marks task approved and promotes next eligible task |
 | `reject` | `Awaiting_Review` | Marks task rejected and propagates rejected state |
-| `rerun` | `Rejected` or `Failed` | Returns task to `Ready_For_Execution` and creates new attempt context |
+| `rerun` | `Rejected` or `Failed` | Returns task to `Ready_For_Execution`; a later explicit start creates the next attempt |
 | `skip` | `Pending` or `Ready_For_Execution` | Skips task and promotes next eligible task |
 
 **Errors**

@@ -4,6 +4,7 @@ import com.wwa.agenthub.contracts.AccessScope;
 import com.wwa.agenthub.contracts.UserContext;
 import com.wwa.agenthub.contracts.enums.AccessGrantStatus;
 import com.wwa.agenthub.contracts.enums.Role;
+import com.wwa.agenthub.errors.ValidationAppException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -95,5 +97,22 @@ class AccessGrantServiceTest {
         assertThat(result.getContent()).extracting(AccessGrant::getEmployeeId)
                 .contains("emp-scope-001")
                 .doesNotContain("emp-scope-002");
+    }
+
+    @Test
+    @DisplayName("GUEST cannot be persisted in an access grant")
+    void createGrant_rejectsGuestRole() {
+        UserContext admin = new UserContext("admin", Role.DEVOPS_ADMIN.name());
+
+        assertThatThrownBy(() -> accessGrantService.createGrant(
+                "guest-grant",
+                "Guest Grant",
+                AccessGrantStatus.ACTIVE,
+                List.of(Role.DEVOPS_ADMIN.name(), Role.GUEST.name()),
+                List.of(),
+                null,
+                admin))
+                .isInstanceOf(ValidationAppException.class)
+                .hasMessageContaining("GUEST is reserved");
     }
 }

@@ -83,16 +83,9 @@ public class TaskService {
     @Transactional
     public Task updateStatus(String taskId, TaskStatus newStatus, UserContext user, String comment) {
         Task task = getById(taskId);
-        assertTaskRequestActive(task);
-
-        if (!TaskStateMachine.isValid(task.getTaskStatus(), newStatus)) {
-            throw new InvalidStateTransitionException(
-                    task.getTaskStatus().name(), newStatus.name(), "Task");
-        }
-
+        assertLegacyMutable(task);
         TaskStatus previous = task.getTaskStatus();
-        task.setTaskStatus(newStatus);
-        Task saved = save(task);
+        Task saved = updateStatusInternal(task, newStatus);
 
         auditLogger.log(user, AuditActionType.edit,
                 task.getRequest().getReleaseFlow().getId(),
@@ -106,6 +99,33 @@ public class TaskService {
     }
 
     /**
+     * Apply an Integration review transition without emitting the legacy
+     * {@code REQUIRES_NEW} audit row. The Integration review service records
+     * its platform audit in the caller transaction so state and audit cannot
+     * diverge on rollback.
+     */
+    @Transactional
+    public Task updateStatusForIntegrationReview(String taskId, TaskStatus newStatus) {
+        Task task = getById(taskId);
+        if (!task.isIntegrationBound()) {
+            throw new ConflictAppException("Integration review transitions require an Integration-bound Task");
+        }
+        return updateStatusInternal(task, newStatus);
+    }
+
+    private Task updateStatusInternal(Task task, TaskStatus newStatus) {
+        assertTaskRequestActive(task);
+
+        if (!TaskStateMachine.isValid(task.getTaskStatus(), newStatus)) {
+            throw new InvalidStateTransitionException(
+                    task.getTaskStatus().name(), newStatus.name(), "Task");
+        }
+
+        task.setTaskStatus(newStatus);
+        return save(task);
+    }
+
+    /**
      * Edit task input parameters.
      * Only allowed in Pending or Ready_For_Execution states.
      * Validates that the input is a non-null map and audits the change.
@@ -114,6 +134,7 @@ public class TaskService {
     public Task editInput(String taskId, Map<String, Object> newInput, UserContext user) {
         Task task = getById(taskId);
         assertTaskRequestActive(task);
+        assertLegacyMutable(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:editInput");
 
         if (task.getTaskStatus() != TaskStatus.Pending
@@ -156,6 +177,7 @@ public class TaskService {
     public Task editCustomFields(String taskId, Map<String, Object> newCustomFields, UserContext user) {
         Task task = getById(taskId);
         assertTaskRequestActive(task);
+        assertLegacyMutable(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:editCustomFields");
 
         if (newCustomFields == null) {
@@ -191,6 +213,7 @@ public class TaskService {
     public Task editNames(String taskId, String newTaskName, String newTaskGroupName, UserContext user) {
         Task task = getById(taskId);
         assertTaskRequestActive(task);
+        assertLegacyMutable(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:editNames");
 
         if (task.getTaskStatus() != TaskStatus.Pending
@@ -236,6 +259,7 @@ public class TaskService {
     public Task editExecutionType(String taskId, ExecutionType newType, UserContext user) {
         Task task = getById(taskId);
         assertTaskRequestActive(task);
+        assertLegacyMutable(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:editExecutionType");
 
         if (task.getTaskStatus() != TaskStatus.Pending
@@ -273,6 +297,10 @@ public class TaskService {
         Task task = getById(taskId);
         assertTaskRequestActive(task);
         taskPermissionService.assertOwnerOrAdmin(task, user, "task:startManualExecution");
+        if (task.isIntegrationBound()) {
+            throw new ConflictAppException(
+                    "Integration-bound Tasks must be started through the Atlas Integration Execution API");
+        }
 
         if (task.getExecutionType() != ExecutionType.MANUAL) {
             throw new ConflictAppException(
@@ -310,6 +338,7 @@ public class TaskService {
     public Task cloneTask(String taskId, UserContext user) {
         Task source = getById(taskId);
         assertTaskRequestActive(source);
+        assertLegacyMutable(source);
         taskPermissionService.assertOwnerOrAdmin(source, user, "task:clone");
 
         List<Task> siblings = taskRepository.findByRequestIdOrderByTaskGroupIdAscStepSeqAsc(
@@ -367,6 +396,13 @@ public class TaskService {
             throw new NotFoundAppException("Request tasks", requestId);
         }
         assertTaskRequestActive(tasks.get(0));
+        if (tasks.stream().anyMatch(Task::isIntegrationBound)) {
+            throw new ConflictAppException(
+                    "Integration-bound Tasks cannot be reordered through legacy Task endpoints");
+        }
+        if (tasks.stream().anyMatch(task -> !taskPermissionService.hasTaskScope(task, user))) {
+            throw new com.wwa.agenthub.errors.ForbiddenAppException("task:reorder");
+        }
 
         Map<String, Task> taskMap = new LinkedHashMap<>();
         for (Task task : tasks) {
@@ -404,6 +440,13 @@ public class TaskService {
         if (task.getRequest().getArchivedAt() != null
                 || task.getRequest().getReleaseFlow().getArchivedAt() != null) {
             throw new ValidationAppException("Archived rundowns are read-only until restored.");
+        }
+    }
+
+    private static void assertLegacyMutable(Task task) {
+        if (task.isIntegrationBound()) {
+            throw new ConflictAppException(
+                    "Integration-bound Tasks are controlled through the Atlas Integration API");
         }
     }
 
