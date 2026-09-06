@@ -9,8 +9,9 @@
 | 问题、机制、边界 | [README](../README.md)、[完整讲稿](atlas-engineering-delivery-hub-pitch.md) |
 | 报名 | [中文材料](open-collaboration-submission.zh-CN.md)、[English](open-collaboration-submission.md) |
 | 路演 | [离线 HTML](atlas-engineering-delivery-hub-presentation-v2.html)；操作说明见讲稿 |
-| 价值图 | [SVG 源文件](assets/atlas-delivery-value-v2.svg)、[PNG](assets/atlas-delivery-value-v2.png) |
-| 能力协作图 | [SVG 源文件](assets/atlas-delivery-workflow-v2.svg)、[PNG](assets/atlas-delivery-workflow-v2.png) |
+| README 同风格预览 | [沉浸式科技 HTML（4页）](prototypes/atlas-immersive-tech-preview-v3.html)；正式18页路演仍为上一版视觉 |
+| 价值图 | [SVG 源文件](assets/atlas-delivery-value-v3.svg)、[PNG](assets/atlas-delivery-value-v3.png) |
+| 能力协作图 | [SVG 源文件](assets/atlas-delivery-workflow-v3.svg)、[PNG](assets/atlas-delivery-workflow-v3.png) |
 | 案例与收益测量 | [案例索引](samples/README.md)、[案例模板](samples/case-template.md)、[历史文件哈希](samples/evidence/2026-09-07-v1/historical-manifest.json) |
 | 验证边界 | [本次验证记录](00-context/atlas-delivery-showcase-verification-2026-09-07.md) |
 | 参与贡献 | [CONTRIBUTING](../CONTRIBUTING.md) |

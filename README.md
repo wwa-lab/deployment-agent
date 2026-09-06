@@ -8,9 +8,9 @@ Atlas Engineering Delivery Hub 将规范、任务、工具执行、人工评审�
 
 介绍顺序是：先看平台如何承载 Agentic SDLC，再以 **Deployment Agent** 深入说明“原子化 → 自动化 → 智能化”的演进。IBM iSeries 实践背景由项目方确认；仓库中已有的实现、测试和样例，以及尚待补充的运行证据，分别列在[案例与证据索引](docs/samples/README.md)。
 
-![价值图：Agentic SDLC 平台，以 IBM iSeries 实践展示原子化、自动化、智能化](docs/assets/atlas-delivery-value-v2.png)
+![价值图：Agentic SDLC 平台，以 IBM iSeries 实践展示原子化、自动化、智能化](docs/assets/atlas-delivery-value-v3.png)
 
-[可编辑 SVG](docs/assets/atlas-delivery-value-v2.svg) · [中文路演 v2](docs/atlas-engineering-delivery-hub-presentation-v2.html)（离线打开） · [完整讲稿](docs/atlas-engineering-delivery-hub-pitch.md)
+[可编辑 SVG](docs/assets/atlas-delivery-value-v3.svg) · [同风格 HTML 预览（4页）](docs/prototypes/atlas-immersive-tech-preview-v3.html) · [完整中文路演（18页）](docs/atlas-engineering-delivery-hub-presentation-v2.html) · [完整讲稿](docs/atlas-engineering-delivery-hub-pitch.md)
 
 ## Situation：已有经验和工具，怎样形成可持续演进的交付能力？
 
@@ -30,9 +30,9 @@ Atlas Engineering Delivery Hub 将规范、任务、工具执行、人工评审�
 
 三步走是**能力建设路线**，不是一次发布只有三个操作步骤。原子化让工具知道要执行和验证什么，自动化产生可积累的结果与历史，智能化才有明确约束和可引用的依据。人工评审、权限与审计贯穿全过程。
 
-![协作图：Agentic SDLC 平台、原子任务、自动执行与人工评审，以及智能化演进](docs/assets/atlas-delivery-workflow-v2.png)
+![协作图：Agentic SDLC 平台、原子任务、自动执行与人工评审，以及智能化演进](docs/assets/atlas-delivery-workflow-v3.png)
 
-[可编辑协作 SVG](docs/assets/atlas-delivery-workflow-v2.svg) · [当前执行状态详图](docs/assets/atlas-delivery-workflow-v1.svg)
+[可编辑协作 SVG](docs/assets/atlas-delivery-workflow-v3.svg) · [当前执行状态详图](docs/assets/atlas-delivery-workflow-v1.svg)
 
 ## 为什么具有通用性？
 

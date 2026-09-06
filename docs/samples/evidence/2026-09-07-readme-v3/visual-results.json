@@ -1,0 +1,163 @@
+{
+  "date": "2026-09-07",
+  "scope": "README immersive technology v3 images; presentation-only verification, not a business case",
+  "sourceBaseline": "da5d973562dd91b46661ba7ebba58b46694b0896",
+  "environment": "Offline local macOS Chrome; Markdown rendered with marked and responsive GitHub-like styling, not the live GitHub renderer",
+  "assets": [
+    {
+      "path": "docs/assets/atlas-delivery-value-v3.svg",
+      "sha256": "12b438934cdfb64f4732446f224acdda9d0626a10f4f0b0f316c823b80c7eed5"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-value-v3.png",
+      "sha256": "4b75f6d03108a4b7ca70b9cf6a3a699d898b89a54b9255be8a39e1b5a3e70bc8"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-workflow-v3.svg",
+      "sha256": "4ef82d510f4e585d21b816c523de4aa1abfa37b0bf5ccc05120d183e06880bed"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-workflow-v3.png",
+      "sha256": "e45ec9c7574915c21e01eb6cf2ba11ba6f2e71299910342afc02045323c35173"
+    }
+  ],
+  "svgTextBounds": [
+    {
+      "name": "atlas-delivery-value-v3",
+      "height": 1000,
+      "overflow": []
+    },
+    {
+      "name": "atlas-delivery-workflow-v3",
+      "height": 1640,
+      "overflow": []
+    }
+  ],
+  "readmeChecks": [
+    {
+      "file": "README.md",
+      "width": 1200,
+      "images": [
+        {
+          "src": "docs/assets/atlas-delivery-value-v3.png",
+          "loaded": true,
+          "onscreen": true
+        },
+        {
+          "src": "docs/assets/atlas-delivery-workflow-v3.png",
+          "loaded": true,
+          "onscreen": true
+        }
+      ],
+      "languageLink": true,
+      "stylePreviewLink": true,
+      "horizontalOverflow": false
+    },
+    {
+      "file": "README.md",
+      "width": 768,
+      "images": [
+        {
+          "src": "docs/assets/atlas-delivery-value-v3.png",
+          "loaded": true,
+          "onscreen": true
+        },
+        {
+          "src": "docs/assets/atlas-delivery-workflow-v3.png",
+          "loaded": true,
+          "onscreen": true
+        }
+      ],
+      "languageLink": true,
+      "stylePreviewLink": true,
+      "horizontalOverflow": false
+    },
+    {
+      "file": "README.md",
+      "width": 375,
+      "images": [
+        {
+          "src": "docs/assets/atlas-delivery-value-v3.png",
+          "loaded": true,
+          "onscreen": true
+        },
+        {
+          "src": "docs/assets/atlas-delivery-workflow-v3.png",
+          "loaded": true,
+          "onscreen": true
+        }
+      ],
+      "languageLink": true,
+      "stylePreviewLink": true,
+      "horizontalOverflow": false
+    },
+    {
+      "file": "README.en.md",
+      "width": 1200,
+      "images": [
+        {
+          "src": "docs/assets/atlas-delivery-value-v3.png",
+          "loaded": true,
+          "onscreen": true
+        },
+        {
+          "src": "docs/assets/atlas-delivery-workflow-v3.png",
+          "loaded": true,
+          "onscreen": true
+        }
+      ],
+      "languageLink": true,
+      "stylePreviewLink": true,
+      "horizontalOverflow": false
+    },
+    {
+      "file": "README.en.md",
+      "width": 768,
+      "images": [
+        {
+          "src": "docs/assets/atlas-delivery-value-v3.png",
+          "loaded": true,
+          "onscreen": true
+        },
+        {
+          "src": "docs/assets/atlas-delivery-workflow-v3.png",
+          "loaded": true,
+          "onscreen": true
+        }
+      ],
+      "languageLink": true,
+      "stylePreviewLink": true,
+      "horizontalOverflow": false
+    },
+    {
+      "file": "README.en.md",
+      "width": 375,
+      "images": [
+        {
+          "src": "docs/assets/atlas-delivery-value-v3.png",
+          "loaded": true,
+          "onscreen": true
+        },
+        {
+          "src": "docs/assets/atlas-delivery-workflow-v3.png",
+          "loaded": true,
+          "onscreen": true
+        }
+      ],
+      "languageLink": true,
+      "stylePreviewLink": true,
+      "horizontalOverflow": false
+    }
+  ],
+  "pageErrors": [],
+  "networkRequests": [],
+  "originalFilesUnchanged": 21,
+  "priorVisualFilesUnchanged": 10,
+  "manualReview": "Both exported PNGs visually inspected for text, connectors, maturity labels and consistency with the immersive HTML preview.",
+  "limitations": [
+    "Static diagrams, not live telemetry or animation.",
+    "No application build or backend tests rerun for this visual-only change.",
+    "No Windows hardware or live GitHub rendering verification.",
+    "Existing 84-test statement is prior-run evidence; no new business-benefit measurement."
+  ]
+}

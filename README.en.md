@@ -8,9 +8,9 @@ Atlas Engineering Delivery Hub brings specifications, tasks, tool execution, hum
 
 The presentation first introduces the Agentic SDLC platform, then uses **Deployment Agent** to explain the progression from atomization to automation to intelligence. The project owner confirms the IBM iSeries practice background. Repository implementation, tests, examples and missing run evidence are distinguished in the [case index](docs/samples/README.md).
 
-![Agentic SDLC platform value: atomization, automation and intelligence, illustrated through IBM iSeries practice](docs/assets/atlas-delivery-value-v2.png)
+![Agentic SDLC platform value: atomization, automation and intelligence, illustrated through IBM iSeries practice](docs/assets/atlas-delivery-value-v3.png)
 
-[Editable SVG](docs/assets/atlas-delivery-value-v2.svg) · [Chinese offline presentation v2](docs/atlas-engineering-delivery-hub-presentation-v2.html) · [Full narrative](docs/atlas-engineering-delivery-hub-pitch.md)
+[Editable SVG](docs/assets/atlas-delivery-value-v3.svg) · [Matching HTML style preview (4 slides, Chinese)](docs/prototypes/atlas-immersive-tech-preview-v3.html) · [Full Chinese presentation (18 slides)](docs/atlas-engineering-delivery-hub-presentation-v2.html) · [Full narrative](docs/atlas-engineering-delivery-hub-pitch.md)
 
 ## Situation: how do existing experience and tools become an evolving delivery capability?
 
@@ -30,9 +30,9 @@ In this project, SDD supplies constraints for requirements, specifications, desi
 
 These are **capability-development steps**, not three runtime actions in every release. Atomization defines what tools execute and validate; automation supplies results and history; intelligence then has constraints and evidence to reason from. Human review, access controls and audit span the progression.
 
-![Collaboration: Agentic SDLC platform, atomic tasks, automated execution and human review, with intelligence as an evolution direction](docs/assets/atlas-delivery-workflow-v2.png)
+![Collaboration: Agentic SDLC platform, atomic tasks, automated execution and human review, with intelligence as an evolution direction](docs/assets/atlas-delivery-workflow-v3.png)
 
-[Editable collaboration SVG](docs/assets/atlas-delivery-workflow-v2.svg) · [Current execution-state detail](docs/assets/atlas-delivery-workflow-v1.svg)
+[Editable collaboration SVG](docs/assets/atlas-delivery-workflow-v3.svg) · [Current execution-state detail](docs/assets/atlas-delivery-workflow-v1.svg)
 
 ## Why is the approach reusable?
 

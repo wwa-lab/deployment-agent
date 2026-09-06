@@ -40,4 +40,4 @@ The platform serves delivery teams and platform maintainers. Deployment serves r
 
 AUTO submission is not completion and polling defaults to disabled. Owners/admins make current decisions; enforced two-person approval and automatic infrastructure rollback are not claimed.
 
-[Platform value SVG](assets/atlas-delivery-value-v2.svg) · [Collaboration SVG](assets/atlas-delivery-workflow-v2.svg) · [Chinese offline deck v2](atlas-engineering-delivery-hub-presentation-v2.html) · [Contribution guide](../CONTRIBUTING.md)
+[Platform value SVG](assets/atlas-delivery-value-v3.svg) · [Collaboration SVG](assets/atlas-delivery-workflow-v3.svg) · [Chinese offline deck v2](atlas-engineering-delivery-hub-presentation-v2.html) · [Contribution guide](../CONTRIBUTING.md)

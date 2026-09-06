@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Matched both README diagrams to the immersive technology HTML style with new editable v3 SVGs and PNG exports, a dark/cyan/cobalt palette, projected task-network geometry and explicit capability boundaries. Updated bilingual README image/style-preview links and current public image references; preserved prior visual and evidence files.
+
 - Clarified Atlas Engineering Delivery Hub as a concrete Agentic SDLC platform practice following the project owner's direction: IBM iSeries is the current setting and the method is not restricted to one delivery language. Reordered the narrative to introduce the platform before a Deployment Agent deep dive through atomization, automation and intelligence; created v2 visuals and an 18-slide v2 presentation while preserving previous assets and verification evidence.
 
 - Refocused the Atlas Engineering Delivery Hub documentation on team delivery execution and evidence governance, demonstrated through release workflows. Made simplified Chinese the default README, added the complete English entry, and retained legacy Chinese/Deployment links while clarifying shared implementation and competition evidence boundaries.

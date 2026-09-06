@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Atlas Engineering Delivery Hub 四页视觉小样：深海蓝、青绿与暖白。">
+<title>Atlas · 深海蓝与青绿 · 视觉小样</title>
+<style>
+/* Intentionally uses offline CJK system fonts, including Windows fallbacks. */
+:root{--navy:#102e3c;--navy-deep:#0a202c;--teal:#167b70;--mint:#8cddc6;--paper:#f5f4ef;--ink:#18323c;--muted:#536973;--line:#cdd8d4;--white:#fff;--title-size:clamp(2.3rem,5.5vw,6rem);--h2-size:clamp(1.8rem,3.6vw,4rem);--h3-size:clamp(1.2rem,2vw,2rem);--body-size:clamp(1rem,1.35vw,1.5rem);--small-size:clamp(.8rem,1vw,1.1rem);--slide-padding:clamp(1.25rem,4.8vw,6rem);--content-gap:clamp(.8rem,2.6vh,2rem);--element-gap:clamp(.4rem,1vw,1rem)}
+*{box-sizing:border-box}html,body{height:100%;overflow-x:hidden;margin:0}html{scroll-snap-type:y mandatory;scroll-behavior:smooth}body{background:var(--paper);color:var(--ink);font-family:"Avenir Next","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif}
+.slide{width:100vw;height:100vh;height:100dvh;overflow:hidden;scroll-snap-align:start;display:flex;flex-direction:column;position:relative}.slide[hidden]{display:none}
+.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;overflow:hidden;padding:var(--slide-padding);padding-top:clamp(5rem,13vh,9rem);padding-bottom:clamp(5rem,12vh,8rem);gap:var(--content-gap)}
+.masthead{position:absolute;top:clamp(1.2rem,3.3vh,2.8rem);left:var(--slide-padding);right:var(--slide-padding);display:flex;align-items:center;justify-content:space-between;gap:var(--element-gap);font-size:var(--small-size);letter-spacing:.06em;color:var(--muted)}
+.wordmark{display:flex;align-items:center;gap:clamp(.5rem,1vw,1rem);color:var(--ink)}.wordmark b{font-size:clamp(1.2rem,1.9vw,2rem);letter-spacing:.13em}.mark{width:clamp(1.25rem,1.8vw,2rem);height:clamp(1.25rem,1.8vw,2rem);border:2px solid currentColor;position:relative;transform:rotate(45deg)}.mark:after{content:"";position:absolute;inset:24%;background:var(--teal)}
+h1,h2,h3,p{margin:0}h1{font-size:var(--title-size);line-height:1.22;letter-spacing:-.045em;font-weight:650}h2{font-size:var(--h2-size);line-height:1.22;letter-spacing:-.035em;font-weight:650}h3{font-size:var(--h3-size);line-height:1.4;font-weight:650}p{font-size:var(--body-size);line-height:1.6}.eyebrow{font-size:var(--small-size);letter-spacing:.12em;font-weight:600;color:var(--teal)}.subhead{color:var(--muted);max-width:65ch}.footnote{font-size:var(--small-size);color:var(--muted);line-height:1.6}.reveal{opacity:0;transform:translateY(12px);transition:opacity .35s ease,transform .35s ease}.is-visible .reveal{opacity:1;transform:none}.reveal:nth-child(2){transition-delay:.06s}.reveal:nth-child(3){transition-delay:.12s}.reveal:nth-child(4){transition-delay:.18s}
+.dark{background:var(--navy);color:var(--paper)}.dark .masthead,.dark .subhead,.dark .footnote{color:#bdd0d4}.dark .wordmark{color:var(--paper)}.dark .eyebrow{color:var(--mint)}.dark .mark:after{background:var(--mint)}
+.cover-grid{display:grid;grid-template-columns:1.2fr 1fr;align-items:center;gap:clamp(1rem,3vw,3rem)}.cover-copy{display:flex;flex-direction:column;gap:clamp(1.1rem,3.5vh,3rem)}.cover-copy h1 em{font-style:normal;color:var(--mint)}.cover-copy .subhead{max-width:30ch;font-size:clamp(1.1rem,1.6vw,1.7rem)}.cover-graphic{width:100%;max-height:50vh}.cover-caption{display:flex;align-items:center;gap:clamp(.6rem,1.2vw,1.2rem);font-size:var(--small-size);color:#bdd0d4}.cover-caption:before{content:"";width:clamp(1.4rem,3vw,3rem);height:2px;background:var(--mint)}
+.platform-board{display:grid;grid-template-columns:.85fr 2fr;border:1px solid var(--line);border-radius:clamp(.7rem,1.2vw,1.25rem);overflow:hidden;margin-top:clamp(.1rem,1vh,1rem)}.platform-intent{background:var(--navy);color:var(--paper);padding:clamp(1rem,2.4vw,2.5rem);display:flex;flex-direction:column;justify-content:center;gap:clamp(.6rem,1.3vh,1.3rem)}.platform-intent .eyebrow{color:var(--mint)}.platform-intent p{color:#bdd0d4}.workspaces{padding:clamp(1rem,2.4vw,2.5rem);background:#fcfcf9;display:flex;flex-direction:column;gap:clamp(.7rem,1.6vh,1.5rem)}.workspace-row{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:clamp(.5rem,1.2vw,1.3rem)}.workspace{padding:clamp(.65rem,1.3vw,1.4rem);border:1px solid var(--line);border-radius:clamp(.4rem,.7vw,.7rem);display:flex;flex-direction:column;gap:clamp(.4rem,1vh,1rem)}.workspace h3{font-size:clamp(1rem,1.65vw,1.8rem)}.workspace p{font-size:var(--small-size);color:var(--muted)}.workspace.active{background:var(--teal);color:white;border-color:var(--teal)}.workspace.active p{color:#e0f5ee}.tag{font-size:var(--small-size);color:var(--muted)}.active .tag{color:#e0f5ee}.shared{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:clamp(.7rem,1.5vh,1.4rem);gap:clamp(.5rem,1vw,1rem);font-size:var(--small-size)}.shared strong{color:var(--teal)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(.8rem,2vw,2rem);margin-top:clamp(.2rem,1vh,1rem)}.step{display:flex;flex-direction:column;gap:clamp(.55rem,1.3vh,1.4rem);padding:clamp(1rem,2vw,2rem);border:1px solid var(--line);border-radius:clamp(.6rem,1vw,1rem);background:#fcfcf9;position:relative}.step h3{font-size:clamp(1.3rem,2.5vw,2.6rem)}.step p{color:var(--muted);font-size:clamp(.95rem,1.25vw,1.35rem)}.step-top{display:flex;align-items:center;justify-content:space-between;gap:var(--element-gap)}.step-number{font-size:clamp(1.5rem,2.7vw,3rem);line-height:1;color:var(--teal);font-weight:500}.status{font-size:var(--small-size);color:var(--teal)}.step-graphic{width:100%;height:clamp(3.3rem,10vh,7rem);margin:clamp(.1rem,.5vh,.5rem) 0}.step.automated{background:var(--teal);border-color:var(--teal);color:white}.automated p,.automated .status{color:#e0f5ee}.automated .step-number{color:var(--mint)}.step.future{background:transparent;border-style:dashed}.governance{display:flex;align-items:center;gap:clamp(.6rem,1vw,1rem);color:var(--muted);font-size:var(--small-size)}.governance:before{content:"";width:clamp(1rem,2vw,2rem);height:2px;background:var(--teal)}
+.evidence-layout{display:grid;grid-template-columns:1fr 1.4fr;gap:clamp(1rem,3vw,3rem);margin-top:clamp(.1rem,1vh,1rem)}.test-card{background:var(--navy);color:var(--paper);border-radius:clamp(.7rem,1.2vw,1.2rem);padding:clamp(1.2rem,2.6vw,3rem);display:flex;flex-direction:column;justify-content:center;gap:clamp(.6rem,1.6vh,1.5rem)}.test-card .eyebrow{color:var(--mint)}.metric{font-size:clamp(5rem,9vw,10rem);line-height:.95;letter-spacing:-.065em;font-weight:500;color:var(--mint)}.metric small{font-size:var(--body-size);letter-spacing:0;margin-left:clamp(.7rem,1vw,1rem);color:var(--paper)}.test-card .footnote{color:#bdd0d4}.evidence-list{display:flex;flex-direction:column;justify-content:center}.evidence-row{display:grid;grid-template-columns:clamp(4.2rem,7vw,7rem) 1fr;gap:clamp(.8rem,1.8vw,1.8rem);padding:clamp(.85rem,2vh,1.8rem) 0;border-bottom:1px solid var(--line)}.evidence-row:first-child{padding-top:0}.evidence-row:last-child{border-bottom:0}.evidence-row .label{font-size:var(--small-size);color:var(--teal);padding-top:clamp(.15rem,.4vh,.4rem)}.evidence-row h3{font-size:clamp(1.1rem,1.65vw,1.8rem)}.evidence-row p{font-size:var(--small-size);color:var(--muted);margin-top:clamp(.3rem,.8vh,.7rem)}
+nav{position:fixed;bottom:0;left:0;right:0;height:clamp(3.3rem,7.5vh,5rem);padding:0 var(--slide-padding);display:flex;align-items:center;justify-content:space-between;gap:clamp(.5rem,1vw,1rem);background:var(--paper);color:var(--muted);border-top:1px solid var(--line);z-index:10;font-size:var(--small-size)}body[data-dark="true"] nav{background:var(--navy);border-color:#36525c;color:#bdd0d4}.nav-group{display:flex;align-items:center;gap:clamp(.5rem,1.2vw,1.2rem)}button{font:inherit;border:1px solid currentColor;color:inherit;border-radius:clamp(.3rem,.5vw,.5rem);padding:clamp(.4rem,.7vh,.65rem) clamp(.7rem,1vw,1.1rem);background:transparent;cursor:pointer}button:hover:not(:disabled){background:#167b7015}button:disabled{opacity:.35;cursor:default}button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}body[data-dark="true"] button:focus-visible{outline-color:var(--mint)}#counter{font-variant-numeric:tabular-nums;min-width:4ch}#progress{position:fixed;bottom:0;height:3px;left:0;background:var(--teal);z-index:12;transition:width .25s ease}body[data-dark="true"] #progress{background:var(--mint)}dialog{max-width:min(90vw,44rem);max-height:80vh;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:clamp(.7rem,1vw,1rem);padding:clamp(1.2rem,3vw,3rem)}dialog::backdrop{background:#0a202cb0}dialog h2{font-size:var(--h3-size);margin-bottom:clamp(.7rem,1.5vh,1.5rem)}dialog button{margin-top:clamp(1rem,2vh,2rem)}
+/* Short and narrow displays preserve the content hierarchy while reducing decorative space. */
+@media(max-height:700px){:root{--slide-padding:clamp(1rem,4vw,3rem);--title-size:clamp(2.3rem,5vw,4.5rem);--h2-size:clamp(1.8rem,3.3vw,3rem);--content-gap:clamp(.6rem,2vh,1.25rem)}.slide-content{padding-top:clamp(4rem,12vh,6rem);padding-bottom:clamp(4.3rem,11vh,6rem)}.step{gap:clamp(.4rem,1vh,.8rem)}}
+@media(max-height:600px){.keyboard-hint{display:none}.cover-graphic{max-height:46vh}.step-graphic{height:clamp(2.6rem,9vh,4rem)}.platform-intent,.workspaces{padding:clamp(.8rem,1.7vw,1.4rem)}.evidence-row{padding:clamp(.6rem,1.5vh,1rem) 0}}
+@media(max-height:500px){:root{--title-size:clamp(1.8rem,4.5vw,3rem);--h2-size:clamp(1.4rem,3.5vw,2.4rem);--h3-size:clamp(1.05rem,2vw,1.5rem);--body-size:clamp(.9rem,1.35vw,1.1rem);--small-size:clamp(.75rem,1.05vw,.9rem);--content-gap:clamp(.4rem,1.5vh,.8rem)}.slide-content{padding-top:clamp(3.2rem,13vh,4rem);padding-bottom:clamp(3.5rem,14vh,4rem)}.masthead{top:clamp(.6rem,2.5vh,1rem)}.wordmark b{font-size:clamp(1rem,1.8vw,1.4rem)}.step{padding:clamp(.6rem,1.3vw,1rem);gap:clamp(.3rem,.8vh,.5rem)}.step-graphic{height:clamp(1.6rem,7vh,2.5rem)}.step h3{font-size:clamp(1.1rem,2vw,1.5rem)}.step p{font-size:clamp(.85rem,1.3vw,1rem)}.step-number{font-size:clamp(1.1rem,2.2vw,1.6rem)}.metric{font-size:clamp(3rem,8vw,5rem)}.test-card{padding:clamp(.8rem,1.7vw,1.4rem);gap:clamp(.4rem,1vh,.6rem)}.evidence-row{padding:clamp(.4rem,1vh,.7rem) 0}.evidence-row h3{font-size:clamp(1rem,1.6vw,1.3rem)}.workspace{gap:clamp(.2rem,.5vh,.4rem);padding:clamp(.5rem,1vw,.8rem)}.workspaces{gap:clamp(.4rem,1vh,.7rem)}.shared{padding-top:clamp(.4rem,1vh,.7rem)}.cover-copy{gap:clamp(.7rem,2vh,1.3rem)}}
+@media(max-width:600px) and (min-height:501px){:root{--h2-size:clamp(1.65rem,6.5vw,2.5rem);--body-size:clamp(.95rem,3.6vw,1.2rem);--small-size:clamp(.78rem,2.8vw,.95rem);--content-gap:clamp(.7rem,1.8vh,1.2rem)}.slide-content{padding-top:clamp(4rem,10vh,6rem);padding-bottom:clamp(4.3rem,11vh,6rem)}.masthead .series{display:none}.cover-grid{grid-template-columns:1fr;gap:clamp(.7rem,2vh,1.5rem)}.cover-copy{gap:clamp(.8rem,2.5vh,1.4rem)}h1{font-size:clamp(2.25rem,9vw,3.4rem)}.cover-copy .subhead{font-size:clamp(1rem,3.7vw,1.3rem)}.cover-graphic{max-height:24vh}.platform-board{grid-template-columns:1fr}.platform-intent{padding:clamp(.8rem,3vw,1.2rem);display:grid;grid-template-columns:1fr 1.4fr;align-items:center;gap:clamp(.4rem,2vw,.8rem)}.platform-intent .eyebrow{display:none}.platform-intent h3{font-size:clamp(1rem,4vw,1.3rem)}.platform-intent p{font-size:var(--small-size)}.workspace-row{gap:clamp(.4rem,2vw,.8rem);grid-template-columns:1fr 1fr}.workspace.active{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.3fr;align-items:center}.workspace.active .tag{grid-column:1/-1}.workspace h3{font-size:clamp(.95rem,3.3vw,1.3rem)}.workspaces{padding:clamp(.8rem,3vw,1.2rem)}.shared{flex-wrap:wrap;justify-content:flex-start;gap:clamp(.35rem,1.5vw,.7rem)}.steps{grid-template-columns:1fr;gap:clamp(.55rem,1.5vh,1rem)}.step{display:grid;grid-template-columns:clamp(5.4rem,24vw,8rem) 1fr;gap:clamp(.25rem,1vw,.6rem) clamp(.7rem,3vw,1.4rem);padding:clamp(.8rem,3vw,1.2rem)}.step-top{grid-column:1/-1}.step h3{font-size:clamp(1.2rem,4.5vw,1.7rem)}.step p{font-size:clamp(.9rem,3.2vw,1.1rem);grid-column:2;grid-row:2/4;align-self:center}.step-graphic{height:clamp(1.5rem,4vh,2.6rem);grid-column:1;margin:0}.step-number{font-size:clamp(1rem,3.5vw,1.4rem)}.step .status{font-size:clamp(.72rem,2.6vw,.9rem)}.evidence-layout{grid-template-columns:1fr;gap:clamp(1rem,2.5vh,1.7rem)}.test-card{display:grid;grid-template-columns:1fr 1fr;gap:clamp(.6rem,1.4vh,1rem);padding:clamp(1rem,4vw,1.6rem)}.test-card .eyebrow{grid-column:1/-1}.metric{font-size:clamp(4rem,17vw,6rem);grid-row:2/4}.metric small{font-size:var(--small-size)}.test-card p{font-size:clamp(.9rem,3.2vw,1.1rem)}.test-card .footnote{font-size:clamp(.75rem,2.8vw,.95rem)}.evidence-row{padding:clamp(.7rem,1.7vh,1.1rem) 0}.evidence-row h3{font-size:clamp(1rem,3.7vw,1.4rem)}.keyboard-hint{display:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:0s!important;scroll-behavior:auto!important}.reveal{transform:none}}
+@media print{.slide[hidden]{display:flex!important}.slide{break-after:page}nav,#progress,dialog{display:none!important}.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body data-dark="true">
+<main>
+<section class="slide dark" id="slide-1" aria-label="第 1 页：封面">
+<header class="masthead"><div class="wordmark"><span class="mark" aria-hidden="true"></span><b>ATLAS</b></div><span class="series">ENGINEERING DELIVERY HUB</span><span>视觉小样 / 01</span></header>
+<div class="slide-content">
+<div class="cover-grid">
+<div class="cover-copy"><div class="eyebrow reveal">AGENTIC SDLC · 从实践出发</div><h1 class="reveal">让交付经验，<br>成为<em>平台能力。</em></h1><p class="subhead reveal">以 IBM iSeries 为当前实践场景，<br>从 Deployment Agent 展开三步走。</p></div>
+<svg class="cover-graphic reveal" viewBox="0 0 480 390" role="img" aria-label="原子任务汇入可复用的交付工作流；智能辅助为演进方向">
+<g fill="none" stroke="#365866" stroke-width="1"><path d="M45 83H430M45 183H430M45 283H430M100 32V346M200 32V346M300 32V346M400 32V346"/></g>
+<g fill="none" stroke="#83d9c2" stroke-width="2"><path d="M105 94H192V182H285V269H387"/><path d="M105 183H192M105 271H192V182"/></g>
+<g fill="#183c4b" stroke="#62808a"><rect x="74" y="64" width="60" height="60" rx="11"/><rect x="74" y="153" width="60" height="60" rx="11"/><rect x="74" y="241" width="60" height="60" rx="11"/></g>
+<g fill="#8cddc6"><rect x="94" y="84" width="20" height="20" rx="3"/><rect x="94" y="173" width="20" height="20" rx="3"/><rect x="94" y="261" width="20" height="20" rx="3"/><circle cx="192" cy="182" r="6"/></g>
+<rect x="250" y="149" width="72" height="66" rx="12" fill="#167b70" stroke="#8cddc6"/><path d="M272 182H300M291 173L300 182L291 191" fill="none" stroke="#f5f4ef" stroke-width="3"/>
+<rect x="357" y="239" width="60" height="60" rx="12" fill="#102e3c" stroke="#8cddc6" stroke-width="2" stroke-dasharray="6 5"/><path d="M387 252L391 265L404 269L391 273L387 286L383 273L370 269L383 265Z" fill="none" stroke="#8cddc6" stroke-width="1.8"/>
+<g fill="#bdd0d4" font-size="16" font-family="PingFang SC,Microsoft YaHei,sans-serif"><text x="104" y="332" text-anchor="middle">原子任务</text><text x="286" y="246" text-anchor="middle">自动执行</text><text x="387" y="332" text-anchor="middle">智能辅助*</text></g>
+</svg>
+</div>
+<div class="cover-caption reveal">原子化 → 自动化 → 智能化<span>· *演进方向</span></div>
+</div><aside class="speaker-notes" hidden>开场先讲平台。Atlas Engineering Delivery Hub 是 Agentic SDLC 的具体实践，当前以 IBM iSeries 为落地场景，方法不限定单一交付语言。本次将通过 Deployment Agent 展开原子化、自动化和智能化。图形表达能力建设路线；当前智能辅助仍是演进方向。本小样只探索视觉。</aside>
+</section>
+<section class="slide" id="slide-2" aria-label="第 2 页：平台总览" hidden inert>
+<header class="masthead"><div class="wordmark"><span class="mark" aria-hidden="true"></span><b>ATLAS</b></div><span class="series">PLATFORM OVERVIEW</span><span>视觉小样 / 02</span></header>
+<div class="slide-content"><div class="eyebrow reveal">平台总览</div><h2 class="reveal">把规范、执行与证据连接起来。</h2><p class="subhead reveal">以共同任务模型承载交付工作，让不同工作区共享治理基础。</p>
+<div class="platform-board reveal"><div class="platform-intent"><div class="eyebrow">规范协作</div><h3>SDD<br>Agent Skills</h3><p>明确需求与验收<br>支持开发和文档协作</p></div><div class="workspaces"><div class="workspace-row"><article class="workspace"><span class="tag">DEV</span><h3>Build</h3><p>构建与打包工作区</p></article><article class="workspace"><span class="tag">UAT</span><h3>Testing</h3><p>受控测试工作区</p></article><article class="workspace active"><span class="tag">本次深讲 · SIT / UAT / PROD</span><h3>Deployment</h3><p>执行 · 评审 · 交付记录</p></article></div><div class="shared"><strong>共享治理</strong><span>任务模型</span><span>访问控制</span><span>配置与审计</span><span>执行历史</span></div></div></div>
+<p class="footnote reveal">当前实践：IBM iSeries。已有工作区与共享基础；跨阶段自动衔接按具体能力验证。</p></div><aside class="speaker-notes" hidden>左侧是规范和开发协作，右侧是仓库已有的 Build、Testing、Deployment 工作区。图中没有把工作区之间画成已经验收的自动流水线。强调共同任务模型、执行接口与共享治理带来的复用基础，然后聚焦 Deployment。其他平台仍需适配 SOP、执行器和验收规则。</aside>
+</section>
+<section class="slide" id="slide-3" aria-label="第 3 页：三步走" hidden inert>
+<header class="masthead"><div class="wordmark"><span class="mark" aria-hidden="true"></span><b>ATLAS</b></div><span class="series">DEPLOYMENT AGENT</span><span>视觉小样 / 03</span></header>
+<div class="slide-content"><div class="eyebrow reveal">能力建设路线</div><h2 class="reveal">先让工作清晰，再让能力生长。</h2>
+<div class="steps"><article class="step reveal"><div class="step-top"><span class="step-number">01</span><span class="status">已有模型与模板</span></div><h3>原子化</h3><svg class="step-graphic" viewBox="0 0 250 70" aria-hidden="true"><g fill="#e5ede8" stroke="#7b9f99"><rect x="6" y="10" width="48" height="48" rx="7"/><rect x="78" y="10" width="48" height="48" rx="7"/><rect x="150" y="10" width="48" height="48" rx="7"/></g><g fill="#167b70"><rect x="23" y="27" width="14" height="14" rx="2"/><rect x="95" y="27" width="14" height="14" rx="2"/><rect x="167" y="27" width="14" height="14" rx="2"/></g></svg><p>BAU → SOP → 原子任务<br>定义输入、输出与验证</p></article>
+<article class="step automated reveal"><div class="step-top"><span class="step-number">02</span><span class="status">已有执行适配基础</span></div><h3>自动化</h3><svg class="step-graphic" viewBox="0 0 250 70" aria-hidden="true"><path d="M30 35H218M210 28L218 35L210 42" fill="none" stroke="#8cddc6" stroke-width="2"/><g fill="#167b70" stroke="#e0f5ee"><rect x="6" y="11" width="48" height="48" rx="7"/><rect x="78" y="11" width="48" height="48" rx="7"/><rect x="150" y="11" width="48" height="48" rx="7"/></g><g fill="#e0f5ee"><circle cx="30" cy="35" r="6"/><circle cx="102" cy="35" r="6"/><circle cx="174" cy="35" r="6"/></g></svg><p>复用 Jenkins、Ansible<br>连接执行，积累结果</p></article>
+<article class="step future reveal"><div class="step-top"><span class="step-number">03</span><span class="status">演进方向</span></div><h3>智能化</h3><svg class="step-graphic" viewBox="0 0 250 70" aria-hidden="true"><path d="M30 35H174M174 35V7H30V19" fill="none" stroke="#167b70" stroke-width="2" stroke-dasharray="5 4"/><g fill="#f5f4ef" stroke="#7b9f99"><rect x="6" y="19" width="38" height="38" rx="6"/><rect x="78" y="19" width="38" height="38" rx="6"/></g><circle cx="174" cy="36" r="25" fill="#e1eee7" stroke="#167b70" stroke-dasharray="4 4"/><path d="M174 22L178 32L188 36L178 40L174 50L170 40L160 36L170 32Z" fill="#167b70"/></svg><p>利用规范与执行证据<br>辅助编排、解释与决策</p></article></div>
+<p class="governance reveal">人工评审与治理贯穿全过程 · 当前 AI Assist 为预览占位</p></div><aside class="speaker-notes" hidden>三个框的几何语言逐步变化：第一步是分开的任务单元，第二步把单元连接为执行路径，第三步增加反馈和建议。三步是能力建设路线，不是一次发布只有三个动作。SOP 梳理依赖领域人员，自动化已有 Jenkins/AWX 适配和模拟测试；智能编排与辅助决策仍需实现和验证。</aside>
+</section>
+<section class="slide" id="slide-4" aria-label="第 4 页：证据" hidden inert>
+<header class="masthead"><div class="wordmark"><span class="mark" aria-hidden="true"></span><b>ATLAS</b></div><span class="series">EVIDENCE & NEXT STEP</span><span>视觉小样 / 04</span></header>
+<div class="slide-content"><div class="eyebrow reveal">可复核的基础</div><h2 class="reveal">让每个结论，都有对应的依据。</h2>
+<div class="evidence-layout"><article class="test-card reveal"><div class="eyebrow">已有选定测试记录</div><div class="metric">84<small>项通过</small></div><p>10 个测试类<br>局部流程 · 模拟调用</p><p class="footnote">2026-09-07-v2 记录<br>非生产验收或收益数据</p></article><div class="evidence-list reveal"><article class="evidence-row"><span class="label">已有实现</span><div><h3>任务、执行与人工治理</h3><p>多工作区、任务导入、执行适配、评审与历史。</p></div></article><article class="evidence-row"><span class="label">已有样例</span><div><h3>合成发布与采用场景</h3><p>解释交接与证据结构；来源及历史版本保留。</p></div></article><article class="evidence-row"><span class="label">下一步</span><div><h3>补全场景验证，开始测量收益</h3><p>iSeries / UTL 运行包、重复交付与人工投入基线。</p></div></article></div></div>
+</div><aside class="speaker-notes" hidden>84 项通过来自已有的 2026-09-07-v2 选定测试记录，此次视觉小样没有重新运行后端测试。它证明特定断言的本地结果，不是准确率、全量覆盖率或生产成功率。项目方确认 IBM iSeries 是当前实践场景，但仓库尚缺可复核的完整运行包与 UTL 接口证据。下一步测量重复运行、人工投入和交接完整性。智能化与跨平台复用按各自案例验证；收益指标见案例索引。</aside>
+</section>
+</main>
+<nav aria-label="演示控制"><div class="nav-group"><button id="previous" aria-label="上一页">←</button><span id="counter" aria-live="polite">1 / 4</span><button id="next" aria-label="下一页">→</button></div><span class="keyboard-hint">深海蓝 · 青绿 · 暖白 / 四页视觉小样</span><button id="notes-button" aria-haspopup="dialog">备注 N</button></nav>
+<div id="progress" aria-hidden="true"></div>
+<dialog id="notes-dialog" aria-labelledby="notes-title"><h2 id="notes-title">演讲者备注</h2><p id="notes-content"></p><button id="notes-close">关闭（Esc）</button></dialog>
+<!-- The navigation controller is reused from the verified v2 presentation. -->
+<script>
+class Presentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.index = 0;
+    this.lastWheel = 0;
+    this.dialog = document.querySelector('#notes-dialog');
+    this.observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('is-visible');
+    }), {threshold:.3});
+    this.slides.forEach(slide => this.observer.observe(slide));
+    document.querySelector('#previous').addEventListener('click', () => this.go(this.index - 1));
+    document.querySelector('#next').addEventListener('click', () => this.go(this.index + 1));
+    document.querySelector('#notes-button').addEventListener('click', () => this.notes());
+    document.querySelector('#notes-close').addEventListener('click', () => this.dialog.close());
+    document.addEventListener('keydown', event => this.key(event));
+    document.addEventListener('wheel', event => {
+      if (this.dialog.open || Math.abs(event.deltaY) < 20) return;
+      event.preventDefault();
+      if (Date.now() - this.lastWheel > 450) {
+        this.lastWheel = Date.now();
+        this.go(this.index + Math.sign(event.deltaY));
+      }
+    }, {passive:false});
+    document.addEventListener('touchstart', event => {
+      this.touch = {x:event.touches[0].clientX,y:event.touches[0].clientY};
+    }, {passive:true});
+    document.addEventListener('touchend', event => {
+      if (!this.touch || this.dialog.open) return;
+      const dx = this.touch.x - event.changedTouches[0].clientX;
+      const dy = this.touch.y - event.changedTouches[0].clientY;
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      if (Math.abs(delta) > 50) this.go(this.index + Math.sign(delta));
+      this.touch = null;
+    }, {passive:true});
+    window.addEventListener('hashchange', () => this.go(this.hashIndex()));
+    this.go(this.hashIndex());
+  }
+  hashIndex() {
+    const match = location.hash.match(/^#slide-(\d+)$/);
+    return match ? Number(match[1]) - 1 : 0;
+  }
+  go(index) {
+    this.index = Math.min(this.slides.length - 1, Math.max(0, index));
+    document.body.dataset.dark = String(this.slides[this.index].classList.contains('dark'));
+    this.slides.forEach((slide, i) => {
+      slide.hidden = i !== this.index;
+      slide.inert = i !== this.index;
+      if (i !== this.index) slide.classList.remove('is-visible');
+    });
+    document.querySelector('#counter').textContent = (this.index + 1) + ' / ' + this.slides.length;
+    document.querySelector('#previous').disabled = this.index === 0;
+    document.querySelector('#next').disabled = this.index === this.slides.length - 1;
+    document.querySelector('#progress').style.width = ((this.index + 1) / this.slides.length * 100) + '%';
+    history.replaceState(null, '', '#slide-' + (this.index + 1));
+    document.title = 'Atlas Engineering Delivery Hub · ' + (this.index + 1) + '/' + this.slides.length;
+  }
+  notes() {
+    if (this.dialog.open) { this.dialog.close(); return; }
+    document.querySelector('#notes-title').textContent = '第 ' + (this.index + 1) + ' 页 · 演讲者备注';
+    document.querySelector('#notes-content').textContent = this.slides[this.index].querySelector('.speaker-notes').textContent;
+    this.dialog.showModal();
+  }
+  key(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key.toLowerCase() === 'n') { event.preventDefault(); this.notes(); return; }
+    if (this.dialog.open) return;
+    if (event.key === ' ' && event.target instanceof HTMLButtonElement) return;
+    const forward = ['ArrowRight','ArrowDown','PageDown',' '].includes(event.key);
+    const backward = ['ArrowLeft','ArrowUp','PageUp'].includes(event.key);
+    if (forward || backward || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      this.go(event.key === 'Home' ? 0 : event.key === 'End' ? this.slides.length - 1 : this.index + (forward ? 1 : -1));
+    }
+  }
+}
+window.presentation = new Presentation();
+</script>
+</body>
+</html>

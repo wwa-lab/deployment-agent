@@ -15,7 +15,7 @@
 
 源基线：`abf3850dee78b13c597f7da2791dd06d201c1a66`，分支 `2026-codecup`。历史样例内部时间是合成内容，不用作执行日期。新测试的时间和源码改动状态写入摘要。
 
-当前平台叙事 v2 的[视觉验证摘要](evidence/2026-09-07-platform-v2/visual-results.json)记录 18 页演示、9 种尺寸、图片加载与素材哈希。上一版的[16 页验证摘要](evidence/2026-09-07-v2/visual-results.json)及其素材保持原样；这些属于展示材料检查，不增加业务案例数量。
+README 科技风格 v3 的[图片验证摘要](evidence/2026-09-07-readme-v3/visual-results.json)记录两张 SVG/PNG、中英文首页在 3 种宽度下的加载检查及历史素材校验。平台叙事 v2 的[视觉验证摘要](evidence/2026-09-07-platform-v2/visual-results.json)记录 18 页演示、9 种尺寸、图片加载与素材哈希。上一版的[16 页验证摘要](evidence/2026-09-07-v2/visual-results.json)及其素材保持原样；这些属于展示材料检查，不增加业务案例数量。
 
 ## 项目方提供的实践背景
 
