@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Agentic SDLC 的具体实践：当前 IBM iSeries，平台先行，Deployment Agent 深讲原子化、自动化、智能化。">
+<title>Atlas Engineering Delivery Hub · Agentic SDLC 实践</title>
+<style>
+/* Self-contained editorial presentation; system CJK fonts are intentional for offline Windows use. */
+:root{--red:#b91c2b;--ink:#171717;--paper:#faf9f6;--slide-padding:clamp(1.2rem,5vw,6rem);--title-size:clamp(2.1rem,5.5vw,5.8rem);--h2-size:clamp(1.85rem,3.8vw,4rem);--h3-size:clamp(1.05rem,1.6vw,1.65rem);--body-size:clamp(1rem,1.6vw,1.65rem);--small-size:clamp(.8rem,1.05vw,1.1rem);--content-gap:clamp(.7rem,2.4vh,2rem);--element-gap:clamp(.4rem,1vw,1rem)}
+*{box-sizing:border-box}html,body{height:100%;overflow-x:hidden;margin:0}html{scroll-snap-type:y mandatory;scroll-behavior:smooth}body{background:var(--paper);color:var(--ink);font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif}
+.slide{width:100vw;height:100vh;height:100dvh;overflow:hidden;scroll-snap-align:start;display:flex;flex-direction:column;position:relative}
+.slide[hidden]{display:none}.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;overflow:hidden;padding:var(--slide-padding);padding-bottom:clamp(5rem,11vh,7rem);gap:var(--content-gap)}
+.eyebrow{font-size:var(--small-size);letter-spacing:.1em;font-weight:700;color:var(--red)}
+h1,h2,h3,p{margin:0}h1{font-size:var(--title-size);line-height:1.15;letter-spacing:-.035em;max-width:22ch}h2{font-size:var(--h2-size);line-height:1.2;letter-spacing:-.03em;max-width:27ch}h3{font-size:var(--h3-size);line-height:1.4}.lead{font-size:clamp(1.15rem,2.15vw,2.25rem);line-height:1.55;max-width:52ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:clamp(.6rem,1.5vw,1.5rem);width:100%;margin-top:clamp(.2rem,1vh,.8rem)}
+.card{border-top:3px solid var(--ink);padding:clamp(.8rem,1.4vw,1.5rem) 0;max-width:100%;max-height:min(65vh,700px);display:flex;flex-direction:column;gap:var(--element-gap)}
+.card-number{font-size:var(--small-size);color:var(--red);font-weight:700}.card p{font-size:var(--body-size);line-height:1.6;color:#454545}.foot{font-size:var(--small-size);line-height:1.55;color:#5c5c5c;max-width:95ch}
+.cover{background:var(--red);color:white}.cover .eyebrow,.cover .foot{color:#fff}.cover:after{content:"";position:absolute;right:7vw;top:18vh;width:21vw;height:52vh;border:clamp(.4rem,1vw,1rem) solid #ffffff30;transform:skewY(-12deg);pointer-events:none}
+.dark{background:var(--ink);color:var(--paper)}.dark .eyebrow{color:#ff9ca7}
+nav{position:fixed;bottom:0;left:0;width:100%;height:clamp(3.8rem,8vh,5rem);padding:0 clamp(.8rem,3vw,3rem);background:var(--paper);color:var(--ink);border-top:1px solid #d5d5d5;display:flex;align-items:center;justify-content:space-between;gap:clamp(.3rem,1vw,1rem);z-index:10}
+.nav-group{display:flex;align-items:center;gap:clamp(.35rem,1vw,1rem)}button{font:inherit;font-size:clamp(.8rem,1vw,1rem);color:var(--ink);background:transparent;border:1px solid #999;border-radius:4px;min-height:40px;padding:clamp(.35rem,.6vw,.55rem) clamp(.5rem,1vw,1rem);cursor:pointer}button:hover{background:#ece7e3}button:focus-visible{outline:3px solid var(--red);outline-offset:3px}button:disabled{opacity:.35;cursor:default}
+#counter{font-size:var(--small-size);font-variant-numeric:tabular-nums;white-space:nowrap}.keyboard-hint{font-size:var(--small-size);color:#555}#progress{position:fixed;bottom:0;left:0;height:4px;background:var(--red);width:0;z-index:11;transition:width .25s}
+dialog{max-width:min(90vw,880px);max-height:80vh;border:2px solid var(--red);background:var(--paper);padding:clamp(1rem,3vw,2.5rem);color:var(--ink)}dialog::backdrop{background:#0009}dialog h2{font-size:clamp(1.3rem,2vw,2rem)}dialog p{font-size:clamp(1rem,1.5vw,1.3rem);line-height:1.8;margin:clamp(1rem,2vh,2rem) 0}.speaker-notes[hidden]{display:none}
+.reveal{opacity:0;transform:translateY(10px);transition:opacity .3s,transform .3s}.is-visible .reveal{opacity:1;transform:none}.is-visible .grid .card:nth-child(2){transition-delay:.06s}.is-visible .grid .card:nth-child(3){transition-delay:.12s}
+@media(max-height:700px){:root{--slide-padding:clamp(1rem,3vw,2.5rem);--content-gap:clamp(.45rem,1.7vh,1rem);--title-size:clamp(2rem,5vw,3.5rem);--h2-size:clamp(1.7rem,3.7vw,2.8rem)}}
+@media(max-height:600px){:root{--slide-padding:clamp(.8rem,2.5vw,2rem);--content-gap:clamp(.35rem,1.4vh,.8rem);--title-size:clamp(1.8rem,4.5vw,3rem);--body-size:clamp(1rem,1.7vw,1.2rem)}.keyboard-hint,.decorative{display:none}.card{padding:clamp(.3rem,1vh,.6rem) 0}.slide-content{padding-bottom:clamp(4.3rem,15vh,5.3rem)}}
+@media(max-height:500px){:root{--title-size:clamp(1.7rem,4.4vw,2.5rem);--h2-size:clamp(1.45rem,3.7vw,2rem);--small-size:clamp(.8rem,1.4vw,.95rem);--h3-size:clamp(1rem,1.7vw,1.2rem);--element-gap:clamp(.2rem,.6vh,.4rem)}.grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}.card-number{display:none}.lead{font-size:clamp(1.05rem,2vw,1.4rem)}.card p{line-height:1.4}.foot{line-height:1.35}}
+@media(max-width:600px) and (min-height:501px){:root{--title-size:clamp(2rem,9vw,3.2rem);--h2-size:clamp(1.7rem,7vw,2.6rem)}.grid{grid-template-columns:1fr;gap:clamp(.3rem,1vh,.7rem)}.card{display:grid;grid-template-columns:1fr 1.45fr;gap:clamp(.3rem,1vw,.7rem);padding:clamp(.6rem,1.5vh,1rem) 0;align-items:start}.card-number{display:none}.card p{font-size:clamp(1rem,4vw,1.2rem);line-height:1.45}.keyboard-hint{display:none}.cover:after{display:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important}html{scroll-behavior:auto}}
+@media print{.slide[hidden]{display:flex!important}.slide{break-after:page;height:100vh}.reveal{opacity:1;transform:none}nav,#progress,dialog{display:none!important}}
+</style></head>
+<body>
+<main><section class="slide cover" id="slide-1" aria-label="第 1 页">
+<div class="slide-content"><div class="eyebrow reveal">ATLAS / ENGINEERING DELIVERY HUB</div><h1 class="reveal">Agentic SDLC<br>的具体实践</h1><p class="lead reveal">从原子化、自动化，<br>走向智能化交付。</p><p class="foot reveal">当前实践：IBM iSeries · 方法不限定单一交付语言</p></div><aside class="speaker-notes" hidden>先介绍平台，再以Deployment Agent深讲三步走。IBM iSeries是项目方确认的当前实践，而非未来才打算尝试的场景。当前AI能力成熟度另行说明，不把Agentic等同于每一步已自主执行。</aside></section>
+<section class="slide dark" id="slide-2" aria-label="第 2 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">SITUATION</div><h2 class="reveal">已有经验与工具，<br>怎样形成共同的交付方式？</h2><p class="lead reveal">BAU 工作、SOP、Pipeline 与脚本，<br>需要清楚的任务边界与验证方式。</p><p class="foot reveal">目标：让既有资产可以复用、编排和追溯。</p></div><aside class="speaker-notes" hidden>当前IBM iSeries实践提供切入场景。现有需求与合成样例支持问题模型，但耗时、事故损失和节省比例尚未实测。</aside></section>
+<section class="slide " id="slide-3" aria-label="第 3 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">PLATFORM</div><h2 class="reveal">平台怎样承载 Agentic SDLC？</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>规范协作</h3><p>SDD 明确约束<br>Agent Skills 支持协作</p></article><article class="card reveal"><span class="card-number">02</span><h3>任务工作区</h3><p>Build / Testing<br>Deployment</p></article><article class="card reveal"><span class="card-number">03</span><h3>共享治理</h3><p>配置、权限、人工评审<br>历史与证据记录</p></article></div><p class="foot reveal">各阶段按实际成熟度演进，共用任务和治理基础。</p></div><aside class="speaker-notes" hidden>仓库已有SDD技能、多个Agent工作区、配置访问与审计。规范协作是开发流程层；运行时仍由现有任务服务、执行器与人协作，不能说所有AI工作流都已直接集成进产品。</aside></section>
+<section class="slide " id="slide-4" aria-label="第 4 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">PRACTICE</div><h2 class="reveal">IBM iSeries 是当前实践起点</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>落地场景</h3><p>结合现有运维与发布<br>沉淀 SOP 和任务流程</p></article><article class="card reveal"><span class="card-number">02</span><h3>复用基础</h3><p>任务契约与执行器适配<br>不绑定单一业务语言</p></article></div><p class="foot reveal">平台实现语言，与被编排业务系统的语言是两个层次。</p></div><aside class="speaker-notes" hidden>项目方已确认IBM iSeries实践。Java/Vue是平台实现技术，不意味着只能组织Java交付。其他技术栈需对应SOP、执行器与验证，当前不宣称任意平台已兼容。</aside></section>
+<section class="slide " id="slide-5" aria-label="第 5 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">DEPLOYMENT AGENT</div><h2 class="reveal">把平台能力落在发布过程</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>使用者</h3><p>发布负责人<br>执行者与评审人员</p></article><article class="card reveal"><span class="card-number">02</span><h3>输入</h3><p>任务清单、阶段与范围<br>所有者和执行配置</p></article><article class="card reveal"><span class="card-number">03</span><h3>输出</h3><p>任务状态、执行结果<br>尝试历史与人工决策</p></article></div><p class="foot reveal">围绕 SIT / UAT / PROD，组织执行、健康检查与结果确认。</p></div><aside class="speaker-notes" hidden>平台介绍和Deployment深讲是同一方案的两个层次。共用案例不重复计算收益；其他报名项目未检查。健康检查具体工具的实现证据需要独立记录。</aside></section>
+<section class="slide " id="slide-6" aria-label="第 6 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">THREE STEPS</div><h2 class="reveal">原子化 → 自动化 → 智能化</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>原子化</h3><p>让工作有清楚边界<br>让工具知道执行什么</p></article><article class="card reveal"><span class="card-number">02</span><h3>自动化</h3><p>复用已有工具执行<br>积累结果与历史</p></article><article class="card reveal"><span class="card-number">03</span><h3>智能化</h3><p>利用规范与执行证据<br>辅助编排与决策</p></article></div><p class="foot reveal">三步是能力建设路线，人工治理贯穿全过程。</p></div><aside class="speaker-notes" hidden>并非一次发布只有三个动作，也不是宣称三个建设阶段已经全部完成。先有可验证的任务，再有可靠的执行结果，智能辅助才有可引用的上下文。</aside></section>
+<section class="slide " id="slide-7" aria-label="第 7 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">01 / ATOMIZATION</div><h2 class="reveal">BAU → SOP → 原子任务</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>梳理经验</h3><p>明确活动与前置条件<br>由领域人员形成 SOP</p></article><article class="card reveal"><span class="card-number">02</span><h3>定义单元</h3><p>输入、操作、预期输出<br>所有者与验证要求</p></article><article class="card reveal"><span class="card-number">03</span><h3>承载任务</h3><p>Excel 模板与步骤顺序<br>发布 → 请求 → 任务</p></article></div><p class="foot reveal">当前已有模型与模板；SOP 梳理仍需要人的领域判断。</p></div><aside class="speaker-notes" hidden>原子化是清楚、可执行、可评审的工作单元，不是数据库事务原子性，也不是无限细分。一个Excel任务行代表一个原子步骤；合理粒度需人工确定。</aside></section>
+<section class="slide " id="slide-8" aria-label="第 8 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">01 / EXAMPLE</div><h2 class="reveal">把“发布并确认可用”拆开</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>准备与检查</h3><p>候选产物与前置条件<br>形成可执行的输入</p></article><article class="card reveal"><span class="card-number">02</span><h3>执行发布</h3><p>调用工具或人工操作<br>记录对应结果</p></article><article class="card reveal"><span class="card-number">03</span><h3>检查与确认</h3><p>健康检查与结果验证<br>由人作出决策</p></article></div><p class="foot reveal">这是任务拆分示意，不是某次真实发布记录。</p></div><aside class="speaker-notes" hidden>可以用这个例子介绍原子任务的输入输出和验证边界，不能将示意卡片作为系统实际执行结果。对应真实SOP与任务包需要获授权记录。</aside></section>
+<section class="slide " id="slide-9" aria-label="第 9 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">02 / AUTOMATION</div><h2 class="reveal">复用已有自动化资产</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>Jenkins Pipeline</h3><p>提交 AUTO 作业<br>记录外部标识与链接</p></article><article class="card reveal"><span class="card-number">02</span><h3>Ansible 脚本</h3><p>通过 AWX 执行适配<br>传入参数并同步结果</p></article><article class="card reveal"><span class="card-number">03</span><h3>人工任务</h3><p>保留 MANUAL 路径<br>执行后记录结果</p></article></div><p class="foot reveal">已有适配代码与模拟测试；真实环境验收单独记录。</p></div><aside class="speaker-notes" hidden>AUTO提交成功后仍为Executing。execution.monitor.enabled默认false，正确配置并启用、收到外部成功结果后才进入Awaiting_Review。人工记录结果不代表系统自动验真。</aside></section>
+<section class="slide " id="slide-10" aria-label="第 10 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">02 / HEALTH CHECK</div><h2 class="reveal">健康检查也是任务单元</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>实践中的工具</h3><p>IBM iSeries<br>Health Check UTL</p></article><article class="card reveal"><span class="card-number">02</span><h3>接入应明确</h3><p>调用输入与检查输出<br>失败语义与人工确认</p></article></div><p class="foot reveal">本轮未核验 UTL 专用接口及实际运行包。</p></div><aside class="speaker-notes" hidden>截图中的Health Check UTL是实践介绍的一部分。说明它在发布后检查与验证中的任务位置即可；没有源码和执行记录时，不声称这个专用工具的端到端集成已经验收。</aside></section>
+<section class="slide " id="slide-11" aria-label="第 11 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">02 / HUMAN REVIEW</div><h2 class="reveal">自动执行，仍保留人工治理</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>结果评审</h3><p>按有效状态批准或拒绝<br>所有者 / 管理员操作</p></article><article class="card reveal"><span class="card-number">02</span><h3>例外处理</h3><p>失败、拒绝后可重跑<br>保留每次尝试</p></article><article class="card reveal"><span class="card-number">03</span><h3>流程推进</h3><p>关键任务待评审<br>阻止下一任务就绪</p></article></div><p class="foot reveal">允许状态可 Skip；跳过不代表成功，当前不强制双人复核。</p></div><aside class="speaker-notes" hidden>具体状态限制见现有详图和DecisionEngine。人工评审及记录贯穿自动化，并不是自动化完成后才额外拼接。</aside></section>
+<section class="slide " id="slide-12" aria-label="第 12 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">03 / INTELLIGENCE</div><h2 class="reveal">让规范与证据参与下一步判断</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>编排建议</h3><p>结合任务约束<br>建议合适的执行顺序</p></article><article class="card reveal"><span class="card-number">02</span><h3>异常解释</h3><p>结合结果和历史<br>辅助理解失败原因</p></article><article class="card reveal"><span class="card-number">03</span><h3>辅助决策</h3><p>提供有依据的建议<br>由人确认后行动</p></article></div><p class="foot reveal">演进方向：当前 AI Assist 为预览，尚非已运行的智能编排。</p></div><aside class="speaker-notes" hidden>这些是计划能力，不宣称调用模型已经成功。要新增输入输出契约、评价数据集、权限约束和验收标准。智能化不是把审批权直接交给模型。</aside></section>
+<section class="slide " id="slide-13" aria-label="第 13 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">MATURITY</div><h2 class="reveal">同一条路线，不同成熟度</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>原子化基础</h3><p>任务模型与模板已有<br>SOP 梳理由人完成</p></article><article class="card reveal"><span class="card-number">02</span><h3>自动化基础</h3><p>执行适配与模拟测试已有<br>环境及 UTL 证据待补</p></article><article class="card reveal"><span class="card-number">03</span><h3>智能化方向</h3><p>预览与扩展接口已有<br>辅助能力尚待实现验证</p></article></div><p class="foot reveal">用代码和运行证据说明成熟度，不用愿景替代结果。</p></div><aside class="speaker-notes" hidden>Agentic SDLC作为平台实践定位成立，但每个能力仍需单独说明成熟度。没有把IBM iSeries实践整体降级成计划，也没有把用户提供的实践背景升级成已验证运行结果。</aside></section>
+<section class="slide " id="slide-14" aria-label="第 14 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">GENERALITY</div><h2 class="reveal">跨语言复用，靠共同机制</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>可以复用</h3><p>任务契约、执行器接口<br>工作区、治理与证据</p></article><article class="card reveal"><span class="card-number">02</span><h3>需要适配</h3><p>具体 SOP、目标工具<br>结果解析与验收规则</p></article></div><p class="foot reveal">IBM iSeries 起步；通过新场景适配与案例扩大实践范围。</p></div><aside class="speaker-notes" hidden>通用性源自任务模型不绑定业务语言语法和外部工具适配。不是今天已经测试所有语言平台。平台本身Java/Vue与所组织的业务系统技术栈要分开讲。</aside></section>
+<section class="slide " id="slide-15" aria-label="第 15 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">RESULT</div><h2 class="reveal">已有基础与可复核证据</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>实现与样例</h3><p>多工作区、任务与执行适配<br>原有合成发布样例</p></article><article class="card reveal"><span class="card-number">02</span><h3>上一轮选定测试</h3><p>84 项通过 · 10 个测试类<br>局部工作流与模拟调用</p></article></div><p class="foot reveal">本轮是定位与材料修订；未新增运行验收或业务收益数据。</p></div><aside class="speaker-notes" hidden>84项来自2026-09-07-v2既有测试记录，本轮没有重复运行，也没有扩大成完整测试覆盖率。原始样例和上轮图、HTML、报告保持字节不变。</aside></section>
+<section class="slide " id="slide-16" aria-label="第 16 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">MEASUREMENT</div><h2 class="reveal">三步走，也要分步评价</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>原子化</h3><p>任务契约是否完整<br>拆分粒度是否合理</p></article><article class="card reveal"><span class="card-number">02</span><h3>自动化</h3><p>成功、失败与人工兜底<br>重复运行和人工投入</p></article><article class="card reveal"><span class="card-number">03</span><h3>智能化上线后</h3><p>建议正确性与风险<br>人工复核成本</p></article></div><p class="foot reveal">指标口径先定义；没有实测前不填节省比例。</p></div><aside class="speaker-notes" hidden>任务标记AUTO不等于成功自动执行。失败、跳过与人工兜底要保留在分母。智能建议评估需要独立标注样本和风险审查，预览界面不能算智能化成果。</aside></section>
+<section class="slide " id="slide-17" aria-label="第 17 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">DEMO JOURNEY</div><h2 class="reveal">先讲平台，再展开实践</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>平台全貌</h3><p>Agentic SDLC<br>当前 IBM iSeries 实践</p></article><article class="card reveal"><span class="card-number">02</span><h3>Deployment 深讲</h3><p>BAU → SOP → 原子任务<br>自动执行、检查和人工评审</p></article><article class="card reveal"><span class="card-number">03</span><h3>演进与复用</h3><p>智能编排与辅助决策<br>下一场景适配和证据</p></article></div><p class="foot reveal">离线演示无需 Python；产品操作按 README 启动 local。</p></div><aside class="speaker-notes" hidden>方向键、PageUp/PageDown、空格、按钮、滚轮或触摸翻页；Home/End到首尾；N查看备注，Esc关闭。现场只能讲解材料时，不能声称已完成真实执行。Windows浏览器可打开，但本轮未做Windows实机验证。</aside></section>
+<section class="slide cover" id="slide-18" aria-label="第 18 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">ATLAS / ENGINEERING DELIVERY HUB</div><h2 class="reveal">从一次实践，<br>沉淀可复用的交付方法。</h2><p class="lead reveal">原子化，让工作清晰。<br>自动化，让执行可重复。<br>智能化，让决策更有依据。</p><p class="foot reveal">当前 IBM iSeries 实践 · 持续扩展 Agentic SDLC 能力</p></div><aside class="speaker-notes" hidden>结尾表达三步的价值目标，不作为已测收益。待补充iSeries运行包、Health Check UTL接口与检查结果、重复交付和跨平台案例。名称与人工治理边界保留。</aside></section></main>
+<nav aria-label="演示控制"><div class="nav-group"><button id="previous" aria-label="上一页">←</button><button id="next" aria-label="下一页">→</button><span id="counter" aria-live="polite"></span></div><span class="keyboard-hint">方向键 / 空格翻页 · N 备注</span><button id="notes-button" aria-haspopup="dialog">备注 N</button></nav>
+<div id="progress" aria-hidden="true"></div>
+<dialog id="notes-dialog" aria-labelledby="notes-title"><h2 id="notes-title">演讲者备注</h2><p id="notes-content"></p><button id="notes-close">关闭（Esc）</button></dialog>
+<script>
+class Presentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.index = 0;
+    this.lastWheel = 0;
+    this.dialog = document.querySelector('#notes-dialog');
+    this.observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('is-visible');
+    }), {threshold:.3});
+    this.slides.forEach(slide => this.observer.observe(slide));
+    document.querySelector('#previous').addEventListener('click', () => this.go(this.index - 1));
+    document.querySelector('#next').addEventListener('click', () => this.go(this.index + 1));
+    document.querySelector('#notes-button').addEventListener('click', () => this.notes());
+    document.querySelector('#notes-close').addEventListener('click', () => this.dialog.close());
+    document.addEventListener('keydown', event => this.key(event));
+    document.addEventListener('wheel', event => {
+      if (this.dialog.open || Math.abs(event.deltaY) < 20) return;
+      event.preventDefault();
+      if (Date.now() - this.lastWheel > 450) {
+        this.lastWheel = Date.now();
+        this.go(this.index + Math.sign(event.deltaY));
+      }
+    }, {passive:false});
+    document.addEventListener('touchstart', event => {
+      this.touch = {x:event.touches[0].clientX,y:event.touches[0].clientY};
+    }, {passive:true});
+    document.addEventListener('touchend', event => {
+      if (!this.touch || this.dialog.open) return;
+      const dx = this.touch.x - event.changedTouches[0].clientX;
+      const dy = this.touch.y - event.changedTouches[0].clientY;
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      if (Math.abs(delta) > 50) this.go(this.index + Math.sign(delta));
+      this.touch = null;
+    }, {passive:true});
+    window.addEventListener('hashchange', () => this.go(this.hashIndex()));
+    this.go(this.hashIndex());
+  }
+  hashIndex() {
+    const match = location.hash.match(/^#slide-(\d+)$/);
+    return match ? Number(match[1]) - 1 : 0;
+  }
+  go(index) {
+    this.index = Math.min(this.slides.length - 1, Math.max(0, index));
+    this.slides.forEach((slide, i) => {
+      slide.hidden = i !== this.index;
+      slide.inert = i !== this.index;
+      if (i !== this.index) slide.classList.remove('is-visible');
+    });
+    document.querySelector('#counter').textContent = (this.index + 1) + ' / ' + this.slides.length;
+    document.querySelector('#previous').disabled = this.index === 0;
+    document.querySelector('#next').disabled = this.index === this.slides.length - 1;
+    document.querySelector('#progress').style.width = ((this.index + 1) / this.slides.length * 100) + '%';
+    history.replaceState(null, '', '#slide-' + (this.index + 1));
+    document.title = 'Atlas Engineering Delivery Hub · ' + (this.index + 1) + '/' + this.slides.length;
+  }
+  notes() {
+    if (this.dialog.open) { this.dialog.close(); return; }
+    document.querySelector('#notes-title').textContent = '第 ' + (this.index + 1) + ' 页 · 演讲者备注';
+    document.querySelector('#notes-content').textContent = this.slides[this.index].querySelector('.speaker-notes').textContent;
+    this.dialog.showModal();
+  }
+  key(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key.toLowerCase() === 'n') { event.preventDefault(); this.notes(); return; }
+    if (this.dialog.open) return;
+    if (event.key === ' ' && event.target instanceof HTMLButtonElement) return;
+    const forward = ['ArrowRight','ArrowDown','PageDown',' '].includes(event.key);
+    const backward = ['ArrowLeft','ArrowUp','PageUp'].includes(event.key);
+    if (forward || backward || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      this.go(event.key === 'Home' ? 0 : event.key === 'End' ? this.slides.length - 1 : this.index + (forward ? 1 : -1));
+    }
+  }
+}
+window.presentation = new Presentation();
+</script>
+</body></html>

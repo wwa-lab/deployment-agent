@@ -1,76 +1,37 @@
-# Atlas Engineering Delivery Hub Documentation Index
+# Atlas Engineering Delivery Hub 文档索引
 
-**Category:** Framework
-**Status:** Open-collaboration package
-**Primary repository entry:** Atlas Engineering Delivery Hub
-**Companion function entry:** [Atlas Engineering Delivery Hub - Deployment](atlas-engineering-delivery-hub-deployment-index.md)
-**Last updated:** 2026-06-29
+[简体中文首页](../README.md) · [English](../README.en.md)
 
-This index collects the framework-level packaging materials for reviewers, adopting teams, and contributors. The Hub is the team framework; Deployment Agent is one agent/function inside it and is also packaged as a separate Tool / Function entry.
+当前定位：Agentic SDLC 的具体实践平台；IBM iSeries 为当前实践场景，方法不限定单一交付语言。路演先讲平台，再以 Deployment Agent 展开“原子化 → 自动化 → 智能化”。详细价值叙事统一维护在[路演讲稿](atlas-engineering-delivery-hub-pitch.md)。
 
-## Competition Entry Split
+| 阅读目的 | 当前入口 |
+|---|---|
+| 问题、机制、边界 | [README](../README.md)、[完整讲稿](atlas-engineering-delivery-hub-pitch.md) |
+| 报名 | [中文材料](open-collaboration-submission.zh-CN.md)、[English](open-collaboration-submission.md) |
+| 路演 | [离线 HTML](atlas-engineering-delivery-hub-presentation-v2.html)；操作说明见讲稿 |
+| 价值图 | [SVG 源文件](assets/atlas-delivery-value-v2.svg)、[PNG](assets/atlas-delivery-value-v2.png) |
+| 能力协作图 | [SVG 源文件](assets/atlas-delivery-workflow-v2.svg)、[PNG](assets/atlas-delivery-workflow-v2.png) |
+| 案例与收益测量 | [案例索引](samples/README.md)、[案例模板](samples/case-template.md)、[历史文件哈希](samples/evidence/2026-09-07-v1/historical-manifest.json) |
+| 验证边界 | [本次验证记录](00-context/atlas-delivery-showcase-verification-2026-09-07.md) |
+| 参与贡献 | [CONTRIBUTING](../CONTRIBUTING.md) |
+| Deployment 旧入口 | [模块索引](atlas-engineering-delivery-hub-deployment-index.md) |
+| SDD 依据 | [包装追踪链](00-context/atlas-engineering-delivery-hub-traceability.md)、[Deployment 追踪链](00-context/atlas-engineering-delivery-hub-deployment-traceability.md) |
 
-| Entry | Category | Scope | Main materials |
-|---|---|---|---|
-| Atlas Engineering Delivery Hub | Framework | Team operating framework across Seven Mountains SDLC, shared gates, evidence, governance, and contribution patterns. | [README](../README.md), [submission](open-collaboration-submission.md), [pitch](atlas-engineering-delivery-hub-pitch.md) |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent as the M6 Deployment capability for controlled SIT / UAT / PROD release operations and IBM iSeries one-click release UTL design direction. | [Deployment index](atlas-engineering-delivery-hub-deployment-index.md), [Deployment submission](open-collaboration-submission-deployment.md), [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md) |
+本次修订说明与验证见[平台定位修订记录](00-context/atlas-agentic-sdlc-positioning-review-2026-09-07.md)。旧验证记录与素材哈希仍对应旧版本。
 
-## Framework Entry Points
+## 实现参考
 
-- [English README](../README.md)
-- [Chinese README](../README.zh-CN.md)
-- [Framework open collaboration submission](open-collaboration-submission.md)
-- [Chinese framework submission](open-collaboration-submission.zh-CN.md)
-- [Framework pitch](atlas-engineering-delivery-hub-pitch.md)
-- [Contribution guide](../CONTRIBUTING.md)
+[架构](04-architecture/architecture.md) · [设计](05-design/design.md) · [项目规则](../PROJECT_RULES.md) · [SDD Profile](00-context/sdd-profile.md) · [UAT 参考](UAT_RUNBOOK.md)
 
-## Framework Visuals
+[原实现基线](wwa-agent-workspace-hub-current-baseline.md)保留作历史参考，其中端口和部分成熟度描述可能已过时，以当前源码、配置、README 和验证记录为准。
 
-- [Framework lifecycle diagram](assets/atlas-framework-lifecycle.svg)
-- [Framework lifecycle Mermaid source](assets/atlas-framework-lifecycle.mmd)
-- [Seven Mountains SDLC diagram](assets/seven-mountains-sdlc.svg)
-- [Seven Mountains SDLC Mermaid source](assets/seven-mountains-sdlc.mmd)
-- [Seven Gates I-E-O-V diagram](assets/seven-gates-ieov.svg)
-- [Seven Gates I-E-O-V Mermaid source](assets/seven-gates-ieov.mmd)
-- [Mobile vertical artwork](assets/atlas-engineering-delivery-hub-mobile-vertical.png)
+## 历史资料
 
-## Framework Sample
+以下保持原样，不能当成当前集成证明、实测收益或当前流程图：
 
-- [Synthetic framework adoption sample](samples/atlas-framework-adoption-sample.md)
+- [框架采用合成样例](samples/atlas-framework-adoption-sample.md)
+- [发布 mini output 合成样例](samples/atlas-deployment-tool-mini-output/README.md)
+- [旧生命周期图](assets/atlas-framework-lifecycle.svg)、[旧 I-E-O-V 图](assets/seven-gates-ieov.svg)
+- [旧发布工作流图](assets/atlas-deployment-tool-workflow.svg)、[旧上下游图](assets/atlas-deployment-upstream-downstream.svg)
 
-## Framework SDD Traceability
-
-- [Framework traceability index](00-context/atlas-engineering-delivery-hub-traceability.md)
-- [Framework requirements](01-requirements/atlas-engineering-delivery-hub-requirement.md)
-- [Framework user stories](02-user-stories/atlas-engineering-delivery-hub-user-stories.md)
-- [Framework specification](03-spec/atlas-engineering-delivery-hub-spec.md)
-- [Framework architecture](04-architecture/atlas-engineering-delivery-hub-architecture.md)
-- [Framework design](05-design/atlas-engineering-delivery-hub-design.md)
-- [Framework tasks](06-tasks/atlas-engineering-delivery-hub-tasks.md)
-
-## Deployment Function Materials
-
-- [Deployment documentation index](atlas-engineering-delivery-hub-deployment-index.md)
-- [Deployment open collaboration submission](open-collaboration-submission-deployment.md)
-- [Chinese Deployment submission](open-collaboration-submission-deployment.zh-CN.md)
-- [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md)
-- [Deployment sample package](samples/atlas-deployment-tool-mini-output/README.md)
-- [Deployment SDD traceability](00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
-
-## Runtime References
-
-- [Current implementation baseline](wwa-agent-workspace-hub-current-baseline.md)
-- [Platform architecture baseline](04-architecture/architecture.md)
-- [Detailed design baseline](05-design/design.md)
-- [SDD profile](00-context/sdd-profile.md)
-- [Agent Contribute Dashboard requirement](01-requirements/agent-contribute-dashboard-requirement.md)
-- [Agent Contribute Dashboard spec](03-spec/agent-contribute-dashboard-spec.md)
-
-## Validation
-
-Recommended package checks:
-
-```bash
-git diff --check
-node scripts/check-markdown-links.mjs
-```
+旧图可能省略 AUTO 轮询条件或将未来阶段连成流程；当前演示使用上表中的 v2 图。上一版[价值图 v1](assets/atlas-delivery-value-v1.svg)、[执行状态详图 v1](assets/atlas-delivery-workflow-v1.svg)及[16 页旧演示](atlas-engineering-delivery-hub-presentation.html)保留，旧演示的发布中心定位已由本次平台定位修正。

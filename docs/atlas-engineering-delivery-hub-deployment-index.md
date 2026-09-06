@@ -1,75 +1,16 @@
-# Atlas Engineering Delivery Hub - Deployment Documentation Index
+# Atlas Engineering Delivery Hub - Deployment 模块索引
 
-**Category:** Tool / Function
-**Stage:** M6 Deployment
-**Status:** Open-collaboration package
-**Parent framework:** [Atlas Engineering Delivery Hub](atlas-engineering-delivery-hub-index.md)
-**Last updated:** 2026-06-29
+[中文首页](../README.md) · [English](../README.en.md) · [文档总索引](atlas-engineering-delivery-hub-index.md)
 
-This index collects the M6 Deployment Agent packaging materials for reviewers and contributors. Deployment Agent is one agent/function inside Atlas Engineering Delivery Hub and is also packaged as a separate competition project because it carries the controlled release workflow and IBM iSeries one-click release UTL design direction.
+Deployment 是 Agentic SDLC 平台中的重点实践模块，当前围绕 IBM iSeries 发布场景讲解。路演先介绍平台，再用原子化、自动化、智能化展示交付能力的渐进建设；原名称和链接保留。
 
-## Entry Points
+- [统一价值主线与项目边界](atlas-engineering-delivery-hub-pitch.md)
+- [模块讲解入口](atlas-engineering-delivery-hub-deployment-pitch.md)
+- [中文模块报名入口](open-collaboration-submission-deployment.zh-CN.md) · [English module entry](open-collaboration-submission-deployment.md)
+- [案例、来源与验证限制](samples/README.md)
+- [当前能力协作图](assets/atlas-delivery-workflow-v2.svg)
+- [Deployment SDD 追踪](00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
+- [实现架构](04-architecture/architecture.md) · [详细设计](05-design/design.md)
+- [贡献指南](../CONTRIBUTING.md)
 
-- [English README](../README.md)
-- [Chinese README](../README.zh-CN.md)
-- [Contribution guide](../CONTRIBUTING.md)
-- [Deployment open collaboration submission](open-collaboration-submission-deployment.md)
-- [Chinese Deployment open collaboration submission](open-collaboration-submission-deployment.zh-CN.md)
-- [Deployment pitch](atlas-engineering-delivery-hub-deployment-pitch.md)
-- [Parent framework submission](open-collaboration-submission.md)
-
-## Visuals
-
-- [Mobile vertical artwork](assets/atlas-engineering-delivery-hub-mobile-vertical.png)
-- [M6 lifecycle positioning diagram](assets/atlas-deployment-lifecycle-positioning.svg)
-- [M6 lifecycle positioning Mermaid source](assets/atlas-deployment-lifecycle-positioning.mmd)
-- [Deployment tool workflow diagram](assets/atlas-deployment-tool-workflow.svg)
-- [Deployment tool workflow Mermaid source](assets/atlas-deployment-tool-workflow.mmd)
-- [Upstream/downstream relationship diagram](assets/atlas-deployment-upstream-downstream.svg)
-- [Upstream/downstream Mermaid source](assets/atlas-deployment-upstream-downstream.mmd)
-
-## Demo And Samples
-
-- [Sanitized mini output package](samples/atlas-deployment-tool-mini-output/README.md)
-- [Sample release input](samples/atlas-deployment-tool-mini-output/sample-release-input.json)
-- [Sample task output](samples/atlas-deployment-tool-mini-output/sample-task-output.json)
-- [Sample audit trail](samples/atlas-deployment-tool-mini-output/sample-audit-trail.json)
-- [Sample rollback handoff checklist](samples/atlas-deployment-tool-mini-output/sample-rollback-checklist.md)
-
-## SDD Traceability
-
-- [M6 traceability index](00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
-- [Requirements](01-requirements/atlas-engineering-delivery-hub-deployment-requirement.md)
-- [User stories](02-user-stories/atlas-engineering-delivery-hub-deployment-user-stories.md)
-- [Specification](03-spec/atlas-engineering-delivery-hub-deployment-spec.md)
-- [Architecture](04-architecture/atlas-engineering-delivery-hub-deployment-architecture.md)
-- [Data flow](04-architecture/atlas-engineering-delivery-hub-deployment-data-flow.md)
-- [Data model](04-architecture/atlas-engineering-delivery-hub-deployment-data-model.md)
-- [Design](05-design/atlas-engineering-delivery-hub-deployment-design.md)
-- [Tasks](06-tasks/atlas-engineering-delivery-hub-deployment-tasks.md)
-
-## Runtime References
-
-- [Current implementation baseline](wwa-agent-workspace-hub-current-baseline.md)
-- [Deployment Agent requirement baseline](01-requirements/requirement.md)
-- [Deployment Agent spec baseline](03-spec/spec.md)
-- [Platform and Deployment architecture](04-architecture/architecture.md)
-- [Detailed design baseline](05-design/design.md)
-- [UAT runbook](UAT_RUNBOOK.md)
-- [Oracle current schema](sql/ORACLE_CURRENT_SCHEMA.sql)
-
-## Validation
-
-Recommended package checks:
-
-```bash
-git diff --check
-node scripts/check-markdown-links.mjs
-```
-
-Runtime checks for code changes:
-
-```bash
-mvn test
-cd frontend && npm run build
-```
+Jenkins/AWX 适配代码存在；真实环境验收尚未由本次验证证明。IBM iSeries 是项目方确认的当前实践场景；Health Check UTL 专用接口与实际运行证据仍待补充。原始[合成发布样例](samples/atlas-deployment-tool-mini-output/README.md)保持原样，不代表 iSeries 运行证据。

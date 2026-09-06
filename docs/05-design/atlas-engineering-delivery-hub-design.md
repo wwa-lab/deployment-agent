@@ -1,5 +1,20 @@
 # Atlas Engineering Delivery Hub Packaging Design
 
+## Current revision — 2026-09-07, platform clarification
+This revision supersedes conflicting information design below. Runtime design is unchanged.
+
+- Entry: README.md (Chinese), README.en.md (full English), README.zh-CN.md (compatible link).
+- Narrative: docs/atlas-engineering-delivery-hub-pitch.md is the detailed Chinese narrative; submissions are concise form-ready summaries. Sequence: Agentic SDLC platform → current IBM iSeries practice → Deployment Agent → atomization / automation / intelligence → evidence and reuse boundaries. Both existing indexes remain.
+- Evidence: docs/samples/README.md owns the evidence ledger and measurement plan. docs/samples/case-template.md defines source, consent, revision, input/output, raw evidence, method, human intervention, checksums and limitations.
+- Historical bytes: existing samples and assets retain their original content. A JSON manifest records source commit and SHA-256; hash equality checks reject silent edits. New test captures live in unique local output directories; only reviewed shareable summaries are included in the package.
+- Visuals: new value and capability SVGs retain text/groups/arrows and are canonical editable sources; PNGs are browser-rendered derivatives. Old graphics remain historical references.
+- Versioning: prior SVG/PNG, HTML and verification bytes remain intact. Use atlas-delivery-value-v2.svg/png, atlas-delivery-workflow-v2.svg/png and the presentation-v2.html file for the current story.
+- Deck: docs/atlas-engineering-delivery-hub-presentation-v2.html contains inline CSS/JS and Chinese content/notes. Arrow/Page/Space, Home/End, touch, wheel, on-screen buttons, N for notes and Escape are supported. Every slide fits its viewport; motion respects user preference.
+- Compatibility: keep actual Maven/npm commands, Java package names, routes and tool routing directories. No fictional universal CLI.
+- Edge cases: unknown external status stays pending; failed/rejected execution can rerun; skip is permitted only in current valid states and is not success evidence. Broken links, clipping, personal fields or unsupported claims fail the package review.
+
+## Historical packaging baseline (superseded where inconsistent)
+
 **Date:** 2026-06-27
 **Status:** Proposed / Documents-first
 **Source architecture:** [atlas-engineering-delivery-hub-architecture.md](../04-architecture/atlas-engineering-delivery-hub-architecture.md)

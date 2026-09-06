@@ -1,5 +1,25 @@
 # Atlas Engineering Delivery Hub Requirement
 
+## Current revision — 2026-09-07, platform clarification
+**Status:** Authorized documentation revision; implementation below is a historical packaging baseline.
+**Source:** User request to inspect this repository, clarify independent value, use Situation → Solution → Result, and deliver local changes only.
+
+This revision supersedes earlier English-default, full-lifecycle readiness, automatic commit, and two-independent-entry requirements on this page. Keep the project name. Position it as a concrete Agentic SDLC platform practice, with IBM iSeries as the current user-confirmed implementation setting and Deployment Agent as the presentation deep dive. The platform method is not restricted to one delivery language. Framework remains the existing category context, not proof that all lifecycle stages operate.
+
+- **AEDH-REQ-10:** Describe users, work situation, current handling costs (unmeasured), three concrete mechanisms, inputs, outputs, and boundaries from repository evidence.
+- **AEDH-REQ-11:** Make simplified Chinese the default README; provide a complete English README and a compatible old Chinese entry.
+- **AEDH-REQ-12:** Distinguish implemented behavior, synthetic examples, executable test results, authorized field evidence, unmeasured benefit, and plans.
+- **AEDH-REQ-13:** Preserve original samples, historical outputs and diagrams byte-for-byte; register provenance and checksums; put new runs in new locations.
+- **AEDH-REQ-14:** Supply red/white/black editable value and capability SVGs with PNG exports and a Chinese offline HTML deck with notes and keyboard controls.
+- **AEDH-REQ-15:** Use tool-neutral Agent Skills language publicly, retain real integration identifiers, leave personal application fields empty, and make no unverified claims about other entries.
+- **AEDH-REQ-16:** Check links, language navigation, assets, deck behavior and selected implementation claims; record tested and untested scope. Do not commit, push, merge, change runtime or migrate directories.
+
+Acceptance: reviewers can trace each central claim to the case index or code, identify limits of simulated tests, and read the deck offline. Real customer evidence and measured savings are missing inputs, not blockers for this documentation revision.
+
+**AEDH-REQ-17 (user clarification):** Present the platform first, then Deployment Agent through atomization → automation → intelligence. BAU → SOP → atomic tasks is the foundation; reuse existing execution tools, then evolve toward evidence-informed orchestration and assisted decisions. Mark intelligence as an evolution direction and distinguish language-neutral task/adapter contracts from verified portability. The supplied screenshot is narrative context, not a benchmark or runtime trace.
+
+## Historical packaging baseline (superseded where inconsistent)
+
 **Date:** 2026-06-27
 **Status:** Proposed / Documents-first
 **Slice key:** `atlas-engineering-delivery-hub`

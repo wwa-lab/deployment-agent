@@ -1,5 +1,29 @@
 # Atlas Engineering Delivery Hub Specification
 
+## Current revision — 2026-09-07, platform clarification
+**Status:** Authorized docs-only change, prior to document/asset implementation.
+**Source stories:** AEDH-US-09–12. This section supersedes conflicting requirements below, including the two-entry split and English canonical language. Older content remains historical design context.
+
+### Scope and acceptance
+1. Retain Atlas Engineering Delivery Hub. Position it as a concrete Agentic SDLC platform practice. IBM iSeries is the current practice setting confirmed by the user; the platform method is not limited to one delivery language. Introduce the platform before the Deployment Agent deep dive.
+2. Situation → Solution → Result shall lead public materials. Distinguish inferred pain from observed customer feedback (none verified here).
+3. Organize the method as atomization → automation → intelligence: BAU tasks become SOPs and atomic task units; existing pipelines/scripts execute those units through adapters; accumulated structured context supports future intelligent orchestration and assisted decisions. These are capability-development steps, not three runtime task states. Structured intake, human review and traceability support the whole progression.
+4. State exact limits: AUTO submission is not job completion; polling is disabled by default; manual result recording is not validation of external work; owner/admin decisions do not imply two-person separation.
+5. Build and Testing are implemented workflow surfaces, not proof of code-generation or autonomous testing. iSeries one-click release, autonomous approval, automatic rollback and end-to-end lifecycle operations have no verified delivery evidence in this package.
+6. README.md shall be simplified Chinese, README.en.md a complete equivalent, README.zh-CN.md a compatibility landing page. Both full READMEs link each other at the top.
+7. Existing Deployment indexes/submissions/pitch shall remain reachable and describe a module-level view of the same implementation. Do not claim separate originality or count shared evidence/benefit twice. Do not infer the contents of other entries.
+8. Existing samples and historical graphics shall remain unchanged. A case index and template classify synthetic, test execution, and authorized redacted field evidence. Record SHA-256 and source revision. New runs use unique versions.
+9. Two new red/white/black SVGs with editable text and PNG exports explain value and the actual branch/review/output flow; distinguish implemented paths from planned/unverified extensions.
+10. The HTML presentation shall be self-contained, Chinese-first, keyboard-operable, responsive, with notes and reduced-motion support. It shall work without Python or network access.
+11. Public copy uses Agent Skills neutrally. Real CLI/API/file identifiers remain accurate; no directory migration or executor compatibility claim is introduced. No personal submission data.
+12. Verification reports shall distinguish document/visual checks, focused automated tests, real external integration, manual business UAT and production readiness. Last three are not implied by the first two.
+13. Generality shall be explained through task contracts, configuration and adapter boundaries, not claims of tested support for every language/platform. The reference image mentions Jenkins Pipeline, Ansible scripts and IBM iSeries Health Check UTL; treat UTL-specific wiring and outcomes as unverified until actual interface/run evidence is supplied. Do not describe the current IBM iSeries practice itself as merely hypothetical.
+
+### Boundaries and risks
+No Java/Vue runtime, API, schema, auth, executable adapter or integration is changed. No commit/push/merge. Historical baseline technical docs may be stale and must be labelled when linked. Failure paths in diagrams include import rejection, AUTO failure/unknown, reject/rerun and permitted skip. Business return is unmeasured; pilot metrics must define denominators, baseline, human effort and failure cases.
+
+## Historical packaging baseline (superseded where inconsistent)
+
 **Date:** 2026-06-27
 **Status:** Proposed / Documents-first
 **Source stories:** AEDH-US-01 through AEDH-US-07

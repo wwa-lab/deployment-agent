@@ -1,146 +1,43 @@
-# Open Collaboration Submission: Atlas Engineering Delivery Hub
+# Competition submission: Atlas Engineering Delivery Hub
 
-## Summary
+[简体中文](open-collaboration-submission.zh-CN.md) · [English README](../README.en.md) · [Full narrative](atlas-engineering-delivery-hub-pitch.md)
 
-Atlas Engineering Delivery Hub is a Framework category entry for team delivery governance. It organizes engineering work through Seven Mountains SDLC and gives each stage a repeatable I-E-O-V operating model: Input, Execute, Output, Validate.
-
-The current repository demonstrates the framework through the Atlas Engineering Delivery Hub implementation baseline: Spring Boot backend, Vue 3 frontend, shared workspace shell, agent/function workspaces, scoped access governance, configuration management, audit logs, SDD traceability, and human-in-the-loop workflow controls. Legacy technical identifiers such as `/wwa/*` are retained for compatibility, but the visible product brand is Atlas Engineering Delivery Hub.
-
-## Category
-
-**Framework**
-
-This project qualifies as a Framework because it is not only a single tool or deployment script. It defines a reusable way for teams to structure delivery stages, evidence, workflow execution, validation, and contribution across multiple SDLC functions.
-
-## Two Competition Projects
-
-| Project | Category | Relationship |
-|---|---|---|
-| Atlas Engineering Delivery Hub | Framework | The parent team framework and primary repository positioning. |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent inside the Hub, packaged as a separate entry for M6 Deployment and IBM iSeries one-click release UTL design direction. |
-
-Deployment Agent is intentionally presented as an agent/function of the Hub. It is not the whole Hub.
-
-## Problem Solved
-
-Delivery work often becomes fragmented across planning notes, spreadsheets, build jobs, test reports, release runbooks, approvals, and production feedback. Teams lose clarity about:
-
-- which input evidence is required before work starts;
-- who owns each stage and decision;
-- what was executed by humans, agents, or external tools;
-- which output records are durable;
-- how validation and approval happened;
-- how later teams can trace the decision chain.
-
-Atlas Engineering Delivery Hub gives teams a shared framework for those handoffs.
-
-## Framework Model
-
-Seven Mountains SDLC:
-
-```text
-M1 Planning -> M2 Estimation -> M3 Discovery -> M4 Build -> M5 Testing -> M6 Deployment -> M7 Maintenance
-```
-
-Every stage follows Seven Gates / I-E-O-V:
-
-| Element | Meaning |
+| Field | Content |
 |---|---|
-| Input | Required artifacts, scope, owners, constraints, and preconditions. |
-| Execute | Controlled work by people, agents, automations, or external tools. |
-| Output | Durable artifacts, decisions, run records, and traceable results. |
-| Validate | Review checks, evidence gates, approvals, and audit records. |
+| Project | Atlas Engineering Delivery Hub |
+| Existing category | Framework |
+| Positioning | A concrete Agentic SDLC practice platform |
+| Current practice setting | IBM iSeries |
+| Applicant name | |
+| Staff ID | |
+| Contact | |
 
-## What The Repository Provides Today
+## Situation
 
-- A working shared workspace shell for delivery functions.
-- Agent/function workspace patterns for Build, Testing, and Deployment style workflows.
-- Release Flow -> Request -> Task traceability.
-- Human review gates for task decisions.
-- Scoped access governance through local Access Grants.
-- Audit logs with user, action, scope, agent, and correlation context.
-- Configuration management for reusable execution targets.
-- Template and Excel-based onboarding patterns.
-- SDD documents that connect requirements, user stories, specs, architecture, design, and tasks.
-- Framework docs, diagrams, contribution guidance, and synthetic samples for open collaboration.
+Teams already have BAU activities, operational knowledge, Jenkins pipelines and Ansible scripts. They need clear boundaries to make these assets reusable and orchestratable. Current IBM iSeries operations/release practice connects deployment, health checking, result validation and human confirmation. Costs and business benefits have not yet been quantified.
 
-## Deployment As An Independent Function
+## Solution
 
-The Deployment function is the most concrete function currently packaged from this repository. It covers controlled SIT / UAT / PROD release operations with manual and AUTO task execution, Jenkins/Ansible adapters, review decisions, execution history, and auditability.
+Atlas Engineering Delivery Hub organizes specification collaboration, multiple Agent workspaces, execution tools and human governance in one platform. Its method is not limited to a single delivery language. The presentation introduces the platform first, then develops Deployment Agent through three steps:
 
-As a second competition project, Deployment can stand alone because it contains a complete function-level story and design direction for IBM iSeries one-click release UTL workflows. The Hub provides the team framework; Deployment demonstrates how one function becomes a reusable operating tool.
+1. **Atomization:** BAU tasks → standardized SOPs → atomic tasks with inputs, actions, expected outputs and validation requirements.
+2. **Automation:** reuse existing pipelines, scripts and checking tools while retaining manual work, results and approvals. Jenkins/AWX adapters exist; specific IBM iSeries Health Check UTL invocation and validation evidence must still be supplied.
+3. **Intelligence:** progressively use specifications, atomic tasks and execution history for orchestration recommendations, exception explanation and assisted decisions. This remains an evolution direction.
 
-See [Deployment submission](open-collaboration-submission-deployment.md) for the function-level package.
+Atomization defines the work, automation produces reusable execution evidence, and intelligence can then assist within explicit constraints. These are capability-development steps, with human review and audit throughout.
 
-## Reusable Value Across Teams
+## Result
 
-Teams can reuse:
+The project owner confirms current IBM iSeries practice. The repository contains multiple workspaces, atomic tasks, MANUAL/AUTO, human decisions, execution history and shared governance. Original synthetic examples and the previous revision's 84 passing selected tests supply bounded inspectable evidence; see the [case index](samples/README.md).
 
-- the lifecycle and gate vocabulary;
-- the SDD document chain;
-- the workflow shell and task progression pattern;
-- the evidence and audit model;
-- the contribution and validation rules;
-- the function packaging pattern used by Deployment.
+Actual iSeries run packages, UTL interfaces and health-check results, repeated delivery records and cross-platform cases remain to be added. AI Assist is a preview, not operational intelligent orchestration. No measured savings are claimed. Next measurements cover task-contract completeness, automated execution and human fallback, repeated outcomes and human effort.
 
-The framework is intentionally adaptable: different teams may plug in different Discovery, Build, Testing, Deployment, or Maintenance functions without rewriting the top-level operating model.
+## Generality and scope
 
-## Fit With The Open Collaboration Theme
+Reusable elements are task contracts, workspaces, executor interfaces, configuration, human review and evidence mechanisms. Java/Vue is the platform implementation stack, not a restriction on the delivery languages it coordinates. Other platforms require SOP, executor and validation adaptation; arbitrary-platform compatibility is not established.
 
-The Hub is built for co-building:
+The platform serves delivery teams and platform maintainers. Deployment serves release coordinators, operators and reviewers, taking task lists, stage, scope and execution configuration and returning states, results, attempts and decisions. This is a platform introduction followed by a module deep dive; shared evidence is not counted twice. Other competition projects were not inspected.
 
-- Each function can evolve independently while staying aligned to the same stage/gate model.
-- Docs and SDD artifacts make scope clear for humans and AI agents.
-- Synthetic samples allow safe sharing without exposing customer or production data.
-- Contribution rules protect secrets, credentials, approvals, and audit posture.
-- The Deployment function gives contributors a concrete reference implementation.
+AUTO submission is not completion and polling defaults to disabled. Owners/admins make current decisions; enforced two-person approval and automatic infrastructure rollback are not claimed.
 
-## Delivered Materials
-
-- [English README](../README.md)
-- [Chinese README](../README.zh-CN.md)
-- [Framework documentation index](atlas-engineering-delivery-hub-index.md)
-- [Framework pitch](atlas-engineering-delivery-hub-pitch.md)
-- [Contribution guide](../CONTRIBUTING.md)
-- [Framework lifecycle diagram](assets/atlas-framework-lifecycle.svg)
-- [Seven Mountains SDLC diagram](assets/seven-mountains-sdlc.svg)
-- [Seven Gates I-E-O-V diagram](assets/seven-gates-ieov.svg)
-- [Synthetic framework adoption sample](samples/atlas-framework-adoption-sample.md)
-- [Framework SDD traceability](00-context/atlas-engineering-delivery-hub-traceability.md)
-- [Deployment function package](atlas-engineering-delivery-hub-deployment-index.md)
-
-## Demo Story
-
-1. Start from the Seven Mountains SDLC map.
-2. Explain I-E-O-V gates as the common team operating contract.
-3. Show the framework docs and SDD traceability chain.
-4. Open the working WWA Agent Workspace Hub implementation.
-5. Use Deployment as the concrete function example.
-6. Upload or inspect a release rundown, task flow, decision gate, and audit trail.
-7. Explain how another function can reuse the same framework structure.
-
-## Contribution Opportunities
-
-- Add new function-level packaging for Discovery, Build, Testing, or Maintenance.
-- Improve framework adoption samples.
-- Add sanitized stage gate templates and evidence examples.
-- Strengthen Markdown, Mermaid, and SDD validation scripts.
-- Expand the IBM iSeries one-click release UTL design under the Deployment function.
-- Improve frontend clarity for operators, reviewers, and contributors.
-
-## Safety Boundaries
-
-- Secrets and credentials must stay out of docs, samples, screenshots, and committed workbooks.
-- Real environment names and customer data must not be committed.
-- Approval and rollback claims must match implemented behavior.
-- New user-facing or non-trivial changes must update the relevant SDD artifacts.
-
-## Links
-
-- [README](../README.md)
-- [Chinese README](../README.zh-CN.md)
-- [Framework docs index](atlas-engineering-delivery-hub-index.md)
-- [Framework pitch](atlas-engineering-delivery-hub-pitch.md)
-- [Deployment docs index](atlas-engineering-delivery-hub-deployment-index.md)
-- [Contribution guide](../CONTRIBUTING.md)
-- [Current implementation baseline](wwa-agent-workspace-hub-current-baseline.md)
+[Platform value SVG](assets/atlas-delivery-value-v2.svg) · [Collaboration SVG](assets/atlas-delivery-workflow-v2.svg) · [Chinese offline deck v2](atlas-engineering-delivery-hub-presentation-v2.html) · [Contribution guide](../CONTRIBUTING.md)

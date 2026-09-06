@@ -1,146 +1,43 @@
-# 开放协作提交材料：Atlas Engineering Delivery Hub
+# 参赛材料：Atlas Engineering Delivery Hub
 
-## 摘要
+[English](open-collaboration-submission.md) · [中文首页](../README.md) · [完整路演讲稿](atlas-engineering-delivery-hub-pitch.md)
 
-Atlas Engineering Delivery Hub 是一个 Framework 类参赛项目，面向团队交付治理。它用 Seven Mountains SDLC 组织工程工作，并为每个阶段提供统一的 I-E-O-V 运行模型：Input、Execute、Output、Validate。
-
-当前仓库通过 Atlas Engineering Delivery Hub 的实现基线展示这个 framework：Spring Boot 后端、Vue 3 前端、共享工作台、Agent/function 工作区、范围化访问治理、配置管理、审计日志、SDD 追踪链，以及 Human-in-the-Loop 工作流控制。`/wwa/*` 等历史技术标识会为了兼容暂时保留，但可见产品品牌统一为 Atlas Engineering Delivery Hub。
-
-## 参赛类别
-
-**Framework**
-
-本项目符合 Framework 类别，因为它不是一个单一工具或 deployment 脚本，而是一套可复用的方法，用来组织团队在多个 SDLC function 中的阶段、证据、执行、验证和贡献方式。
-
-## 两个参赛项目
-
-| 项目 | 类别 | 关系 |
-|---|---|---|
-| Atlas Engineering Delivery Hub | Framework | 上层 team framework，也是这个仓库的主定位。 |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Hub 中的 Deployment Agent，作为 M6 Deployment 和 IBM iSeries one-click release UTL 设计方向的独立项目。 |
-
-Deployment Agent 是 Hub 的一个 agent/function，不是整个 Hub。
-
-## 解决的问题
-
-交付工作常常散落在 planning notes、表格、build jobs、test reports、release runbooks、审批和生产反馈中。团队容易失去以下清晰度：
-
-- 开始前需要哪些 input evidence；
-- 谁负责每个阶段和每个决策；
-- 哪些工作由人、Agent 或外部工具执行；
-- 哪些 output records 可以长期留存；
-- 验证和审批是如何发生的；
-- 后续团队如何追踪决策链路。
-
-Atlas Engineering Delivery Hub 为这些交接提供统一的 team framework。
-
-## Framework 模型
-
-Seven Mountains SDLC：
-
-```text
-M1 Planning -> M2 Estimation -> M3 Discovery -> M4 Build -> M5 Testing -> M6 Deployment -> M7 Maintenance
-```
-
-每个阶段遵循 Seven Gates / I-E-O-V：
-
-| 元素 | 含义 |
+| 报名字段 | 内容 |
 |---|---|
-| Input | 必需交付物、范围、Owner、约束和前置条件。 |
-| Execute | 由人、Agent、自动化或外部工具完成的受控工作。 |
-| Output | 可留存的产物、决策、运行记录和可追踪结果。 |
-| Validate | 评审检查、证据门、审批和审计记录。 |
+| 项目名称 | Atlas Engineering Delivery Hub |
+| 现有类别 | Framework |
+| 项目定位 | Agentic SDLC 的具体实践平台 |
+| 当前实践场景 | IBM iSeries |
+| 报名人姓名 | |
+| Staff ID | |
+| 联系方式 | |
 
-## 当前仓库提供的能力
+## Situation
 
-- 可运行的共享 delivery workspace shell。
-- 面向 Build、Testing、Deployment 类工作流的 Agent/function 工作区模式。
-- Release Flow -> Request -> Task 追踪模型。
-- 任务决策的人工评审门。
-- 基于本地 Access Grant 的范围化访问治理。
-- 带 user、action、scope、agent 和 correlation context 的审计日志。
-- 面向可复用执行目标的配置管理。
-- 基于模板和 Excel 的工作流 onboarding。
-- 连接 requirements、user stories、specs、architecture、design 和 tasks 的 SDD 文档。
-- 面向开放协作的 framework 文档、图表、贡献指南和合成样例。
+团队已有 BAU 工作、操作经验、Jenkins Pipeline 与 Ansible 脚本，需要将其沉淀为边界明确、可复用、可编排的交付能力。当前以 IBM iSeries 运维与发布实践切入，连接部署、健康检查、结果验证与人工确认。成本和业务收益尚未量化。
 
-## Deployment 作为独立 Function
+## Solution
 
-Deployment 是当前仓库里最具体的 function。它覆盖受控的 SIT / UAT / PROD 发布运行，包括手动和 AUTO 任务执行、Jenkins/Ansible 适配器、评审决策、执行历史和审计。
+Atlas Engineering Delivery Hub 将规范协作、多个 Agent 工作区、执行工具和人工治理组织在同一平台。平台方法不限定单一交付语言；本次先介绍平台，再重点展开 Deployment Agent 的三步走：
 
-作为第二个参赛项目，Deployment 可以独立呈现，因为它有完整的 function-level 故事，并承载 IBM iSeries one-click release UTL 的设计方向。Hub 提供 team framework，Deployment 展示一个 function 如何落成可复用的运行工具。
+1. **原子化：** BAU Tasks → 标准化 SOP → 有输入、操作、预期输出与验证要求的原子任务。
+2. **自动化：** 复用已有 Pipeline、脚本和检查工具执行这些任务，保留人工步骤、结果与审批。当前有 Jenkins/AWX 适配；IBM iSeries Health Check UTL 的具体调用与验证证据需补充。
+3. **智能化：** 利用规范、原子任务与执行历史，逐步支持编排建议、异常解释及辅助决策。当前属于演进方向。
 
-详见 [Deployment 提交材料](open-collaboration-submission-deployment.zh-CN.md)。
+原子化明确工具要做什么，自动化产生可积累的结果，智能化在约束与证据之上提供辅助。三步是建设路线，人工评审与审计贯穿全程。
 
-## 跨团队复用价值
+## Result
 
-团队可以复用：
+项目方确认当前基于 IBM iSeries 实践。仓库已有多工作区、原子任务、MANUAL/AUTO、人工决策、执行历史与共享治理；原有合成样例和上一轮 84 项选定测试提供局部可复核证据，见[案例索引](samples/README.md)。
 
-- 生命周期和 gate 语言；
-- SDD 文档链；
-- 工作流壳和任务推进模式；
-- 证据与审计模型；
-- 贡献和验证规则；
-- Deployment 展示的 function 包装方式。
+真实 iSeries 运行包、UTL 接口和健康检查结果、重复交付与跨平台案例尚待补充。AI Assist 为预览，不将其描述为已经运行的智能编排。暂无可发布的实测收益，下一步按原子任务契约完整性、自动执行与人工兜底、重复交付结果及人工成本开展对照测量。
 
-这个 framework 故意保持可适配：不同团队可以接入不同的 Discovery、Build、Testing、Deployment 或 Maintenance function，而不需要重写上层 operating model。
+## 通用性与范围
 
-## 与开放协作主题的关系
+可复用的是任务契约、工作区、执行器接口、配置、人工评审与证据机制。Java/Vue 是平台实现技术，不限定被编排业务系统的交付语言。其他平台仍需具体 SOP、执行器与验证适配，不能据此宣称任意平台已兼容。
 
-Hub 适合共建：
+平台面向交付团队和平台维护者；Deployment 面向发布负责人、执行者和评审人员，输入任务清单、阶段、范围与执行配置，输出任务状态、结果、尝试和决策。两者是平台与重点模块的展示关系，共享证据不重复计算；其他报名项目未纳入本次检查。
 
-- 每个 function 可以独立演进，同时保持同一套 stage/gate 模型。
-- 文档和 SDD artifact 让范围对人和 AI Agent 都清晰。
-- 合成样例可以安全共享，不暴露客户或生产数据。
-- 贡献规则保护凭证、审批、审计和回滚姿态。
-- Deployment function 提供一个具体的参考实现。
+AUTO 提交不等于完成，轮询默认关闭；现有审批由所有者/管理员执行，不宣称强制双人审批或自动基础设施回滚。
 
-## 已交付材料
-
-- [英文 README](../README.md)
-- [中文 README](../README.zh-CN.md)
-- [Framework 文档索引](atlas-engineering-delivery-hub-index.md)
-- [Framework Pitch](atlas-engineering-delivery-hub-pitch.md)
-- [贡献指南](../CONTRIBUTING.md)
-- [Framework 生命周期图](assets/atlas-framework-lifecycle.svg)
-- [Seven Mountains SDLC 图](assets/seven-mountains-sdlc.svg)
-- [Seven Gates I-E-O-V 图](assets/seven-gates-ieov.svg)
-- [合成 framework adoption sample](samples/atlas-framework-adoption-sample.md)
-- [Framework SDD 追踪链](00-context/atlas-engineering-delivery-hub-traceability.md)
-- [Deployment function package](atlas-engineering-delivery-hub-deployment-index.md)
-
-## 演示故事
-
-1. 从 Seven Mountains SDLC 地图开始。
-2. 说明 I-E-O-V gate 是团队共同的运行契约。
-3. 展示 framework 文档和 SDD 追踪链。
-4. 打开可运行的 WWA Agent Workspace Hub。
-5. 用 Deployment 作为具体 function 示例。
-6. 展示 release rundown、task flow、decision gate 和 audit trail。
-7. 说明其他 function 如何复用同一套 framework 结构。
-
-## 共建机会
-
-- 为 Discovery、Build、Testing 或 Maintenance 增加 function-level package。
-- 改进 framework adoption samples。
-- 增加脱敏的 stage gate 模板和证据样例。
-- 强化 Markdown、Mermaid 和 SDD 验证脚本。
-- 在 Deployment function 下扩展 IBM iSeries one-click release UTL 设计。
-- 优化 operator、reviewer 和 contributor 的前端体验。
-
-## 安全边界
-
-- 凭证不得进入文档、样例、截图或提交的工作簿。
-- 不提交真实环境名称和客户数据。
-- 审批与回滚能力描述必须与实际实现一致。
-- 非平凡或面向用户的变更必须更新相关 SDD artifact。
-
-## 链接
-
-- [README](../README.md)
-- [中文 README](../README.zh-CN.md)
-- [Framework 文档索引](atlas-engineering-delivery-hub-index.md)
-- [Framework Pitch](atlas-engineering-delivery-hub-pitch.md)
-- [Deployment 文档索引](atlas-engineering-delivery-hub-deployment-index.md)
-- [贡献指南](../CONTRIBUTING.md)
-- [当前实现基线](wwa-agent-workspace-hub-current-baseline.md)
+[平台价值图](assets/atlas-delivery-value-v2.svg) · [协作图](assets/atlas-delivery-workflow-v2.svg) · [离线路演 v2](atlas-engineering-delivery-hub-presentation-v2.html) · [贡献指南](../CONTRIBUTING.md)

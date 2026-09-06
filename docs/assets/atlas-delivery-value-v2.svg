@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-labelledby="title desc">
+<title id="title">Agentic SDLC 的具体实践：原子化、自动化、智能化</title><desc id="desc">平台先行，当前以 IBM iSeries 为实践场景。原子任务和执行适配已有基础；智能化为演进方向。可复用方法不限定单一交付语言。</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#171717"/></marker></defs>
+<rect width="1440" height="960" fill="#faf9f6"/><g font-family="'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif">
+<text x="56" y="58" font-size="20" fill="#b91c2b" font-weight="700">ATLAS / ENGINEERING DELIVERY HUB</text>
+<text x="56" y="140" font-size="54" fill="#171717" font-weight="800">Agentic SDLC 的具体实践</text>
+<text x="56" y="196" font-size="29" fill="#171717" font-weight="400">当前以 IBM iSeries 为实践场景 · 平台方法不限定单一交付语言</text>
+<g id="situation"><rect x="56" y="245" width="1328" height="140" rx="8" fill="#fff" stroke="#d5d5d5" /><text x="80" y="288" font-size="28" fill="#171717" font-weight="700">现状：有经验、有工具，交付能力仍需组织起来</text>
+<text x="80" y="335" font-size="24" fill="#454545" font-weight="400">将 BAU 工作、SOP、Pipeline 和脚本，连接为可复用、可编排、可追溯的任务流。</text>
+</g>
+<g id="atomic"><rect x="56" y="450" width="380" height="300" rx="8" fill="#171717" stroke="#d5d5d5" /><text x="80" y="493" font-size="28" fill="#fff" font-weight="700">01  原子化</text>
+<text x="80" y="540" font-size="24" fill="#fff" font-weight="400">BAU Tasks → SOP</text>
+<text x="80" y="575" font-size="24" fill="#fff" font-weight="400">SOP → 原子任务</text>
+<text x="80" y="610" font-size="24" fill="#fff" font-weight="400">明确输入、输出与验证</text>
+<text x="80" y="645" font-size="24" fill="#fff" font-weight="400"></text>
+<text x="80" y="680" font-size="24" fill="#fff" font-weight="400">已有任务模型与模板</text>
+</g>
+<g id="automatic"><rect x="530" y="450" width="380" height="300" rx="8" fill="#b91c2b" stroke="#d5d5d5" /><text x="554" y="493" font-size="28" fill="#fff" font-weight="700">02  自动化</text>
+<text x="554" y="540" font-size="24" fill="#fff" font-weight="400">复用 Pipeline 与脚本</text>
+<text x="554" y="575" font-size="24" fill="#fff" font-weight="400">连接执行、检查与评审</text>
+<text x="554" y="610" font-size="24" fill="#fff" font-weight="400">保留结果和每次尝试</text>
+<text x="554" y="645" font-size="24" fill="#fff" font-weight="400"></text>
+<text x="554" y="680" font-size="24" fill="#fff" font-weight="400">已有执行适配基础</text>
+</g>
+<g id="intelligent"><rect x="1004" y="450" width="380" height="300" rx="8" fill="#fff" stroke="#b91c2b" stroke-width="2" stroke-dasharray="9 6"/><text x="1028" y="493" font-size="28" fill="#171717" font-weight="700">03  智能化</text>
+<text x="1028" y="540" font-size="24" fill="#454545" font-weight="400">基于规范与执行证据</text>
+<text x="1028" y="575" font-size="24" fill="#454545" font-weight="400">支持编排建议</text>
+<text x="1028" y="610" font-size="24" fill="#454545" font-weight="400">异常解释与辅助决策</text>
+<text x="1028" y="645" font-size="24" fill="#454545" font-weight="400"></text>
+<text x="1028" y="680" font-size="24" fill="#454545" font-weight="400">演进方向 · 尚待实现</text>
+</g>
+<path d="M451 590H513" stroke="#171717" stroke-width="3" fill="none"  marker-end="url(#arrow)"/><path d="M925 590H987" stroke="#b91c2b" stroke-width="3" fill="none" stroke-dasharray="9 6" marker-end="url(#arrow)"/><text x="56" y="819" font-size="29" fill="#171717" font-weight="700">平台总览 → Deployment Agent 深讲 → 三步走实践 → 证据与复用</text>
+<text x="56" y="872" font-size="25" fill="#171717" font-weight="400">贯穿全过程：人工评审、权限与证据记录。三步是能力建设路线，不是三条发布指令。</text>
+<text x="56" y="917" font-size="24" fill="#555" font-weight="400">已有证据：源码、合成样例与选定测试；UTL 实际运行包、跨平台案例与量化收益待补。</text>
+
+</g></svg>

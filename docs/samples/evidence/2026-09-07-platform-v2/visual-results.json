@@ -1,0 +1,91 @@
+{
+  "sourceCommit": "abf3850dee78b13c597f7da2791dd06d201c1a66",
+  "recordedAt": "2026-09-06T17:54:52.026Z",
+  "historicalFilesUnchanged": 21,
+  "previousVisualAssetsUnchanged": 5,
+  "checkedViewports": [
+    "1920x1080",
+    "1440x900",
+    "1280x720",
+    "1024x768",
+    "768x1024",
+    "375x667",
+    "414x896",
+    "667x375",
+    "896x414"
+  ],
+  "slides": 18,
+  "viewportChecks": 162,
+  "overflowFindings": [],
+  "networkRequests": [],
+  "pageErrors": [],
+  "controls": {
+    "initial": "1 / 18",
+    "next": "2 / 18",
+    "notes": true,
+    "closed": true,
+    "end": "18 / 18",
+    "previous": "17 / 18",
+    "pageUp": "16 / 18",
+    "space": "17 / 18",
+    "reduced": "0s",
+    "wheel": "2 / 18",
+    "touch": "3 / 18"
+  },
+  "readmePreviews": [
+    {
+      "file": "README.md",
+      "images": [
+        {
+          "loaded": true,
+          "alt": "价值图：Agentic SDLC 平台，以 IBM iSeries 实践展示原子化、自动化、智能化"
+        },
+        {
+          "loaded": true,
+          "alt": "协作图：Agentic SDLC 平台、原子任务、自动执行与人工评审，以及智能化演进"
+        }
+      ]
+    },
+    {
+      "file": "README.en.md",
+      "images": [
+        {
+          "loaded": true,
+          "alt": "Agentic SDLC platform value: atomization, automation and intelligence, illustrated through IBM iSeries practice"
+        },
+        {
+          "loaded": true,
+          "alt": "Collaboration: Agentic SDLC platform, atomic tasks, automated execution and human review, with intelligence as an evolution direction"
+        }
+      ]
+    }
+  ],
+  "publicContentPatternScan": "passed; not a comprehensive privacy/security audit",
+  "assets": [
+    {
+      "path": "docs/assets/atlas-delivery-value-v2.svg",
+      "sha256": "7d566c98fa244dea454cf4f8ff8291c89ff811d8d0d13b97ecc2aac9f81e4aa2"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-value-v2.png",
+      "sha256": "2bfa468f115dbbc3ce76b23b26b50d89cae4c0d57448f1a0abba942d71c74485"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-workflow-v2.svg",
+      "sha256": "0385d65b9901f428f503161d83bc51b164aa139e376fd01bbaf4a4f921b9e874"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-workflow-v2.png",
+      "sha256": "abd1df3080e0ce0c4cf1f537f181a899b2669f44786bc8d107654dbb514654f3"
+    },
+    {
+      "path": "docs/atlas-engineering-delivery-hub-presentation-v2.html",
+      "sha256": "253c1f462306a369f0d2a27e4727c689daad3b69e56296bdf2ff23a6831b4b5d"
+    }
+  ],
+  "limits": [
+    "macOS Chrome only; Windows 11 hardware untested",
+    "Synthetic touch events, not physical device testing",
+    "No application manual UAT or real external deployment"
+  ]
+}

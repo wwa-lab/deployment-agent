@@ -1,0 +1,95 @@
+{
+  "sourceCommit": "abf3850dee78b13c597f7da2791dd06d201c1a66",
+  "recordedAt": "2026-09-06T16:41:55.145Z",
+  "historicalFilesUnchanged": 21,
+  "checkedViewports": [
+    "1920x1080",
+    "1440x900",
+    "1280x720",
+    "1024x768",
+    "768x1024",
+    "375x667",
+    "414x896",
+    "667x375",
+    "896x414"
+  ],
+  "slides": 16,
+  "viewportChecks": 144,
+  "overflowFindings": [],
+  "networkRequests": [],
+  "pageErrors": [],
+  "controls": {
+    "initial": "1 / 16",
+    "next": "2 / 16",
+    "notes": true,
+    "closed": true,
+    "end": "16 / 16",
+    "previous": "15 / 16",
+    "pageUp": "14 / 16",
+    "space": "15 / 16",
+    "reduced": "0s"
+  },
+  "supplementalInteractions": {
+    "wheel": "2 / 16",
+    "touch": "3 / 16",
+    "pageDown": "4 / 16",
+    "animation": "1",
+    "notesCount": 16
+  },
+  "readmePreviews": [
+    {
+      "file": "README.md",
+      "images": [
+        {
+          "loaded": true,
+          "alt": "价值图：从分散交接到可追踪任务、人工决策和执行记录"
+        },
+        {
+          "loaded": true,
+          "alt": "能力协作图：导入、人工与自动执行分支、结果评审、异常重跑和历史输出"
+        }
+      ]
+    },
+    {
+      "file": "README.en.md",
+      "images": [
+        {
+          "loaded": true,
+          "alt": "Value: fragmented handoffs become traceable tasks, human decisions and execution records; Chinese-first graphic"
+        },
+        {
+          "loaded": true,
+          "alt": "Capability flow: intake, manual and automatic branches, review, failure/retry and retained outputs; Chinese-first graphic"
+        }
+      ]
+    }
+  ],
+  "publicContentPatternScan": "passed; not a comprehensive privacy/security audit",
+  "assets": [
+    {
+      "path": "docs/assets/atlas-delivery-value-v1.svg",
+      "sha256": "01e7a09d0eb4d4d0ece186bdb34b83068eab1224368267d4579d7de299a6a184"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-value-v1.png",
+      "sha256": "d94242f468afa541937180f576117949fea4a69403a148bd79f5da492c0534b3"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-workflow-v1.svg",
+      "sha256": "63f5d3b5668ef824e195d1d83eaba2fc7b2a0c98d8bdf6e699dade0bc336af23"
+    },
+    {
+      "path": "docs/assets/atlas-delivery-workflow-v1.png",
+      "sha256": "4b0727c19a1e5e1ddde412ef3c775e113c12492ed3f7f145f64f06550df7a4b2"
+    },
+    {
+      "path": "docs/atlas-engineering-delivery-hub-presentation.html",
+      "sha256": "a199878b8da43dd00d65b30290cd5ddbef04c4905af67fec05d49144ef282ec8"
+    }
+  ],
+  "limits": [
+    "macOS Chrome only; Windows 11 hardware untested",
+    "Synthetic touch events, not physical device testing",
+    "No application manual UAT or real external deployment"
+  ]
+}

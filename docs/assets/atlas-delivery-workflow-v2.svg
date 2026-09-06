@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1500" viewBox="0 0 1440 1500" role="img" aria-labelledby="title desc">
+<title id="title">平台到 Deployment Agent：原子化、自动化、智能化协作</title><desc id="desc">规范协作和多个工作区构成平台基础。Deployment 把 BAU 梳理为 SOP 和原子任务，用人工或 Jenkins/AWX执行并评审。Health Check UTL 接入待核验，智能编排为演进方向。实线代表当前基础，虚线为待核验或后续能力。</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#171717"/></marker></defs>
+<rect width="1440" height="1500" fill="#faf9f6"/><g font-family="'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif">
+<text x="56" y="58" font-size="20" fill="#b91c2b" font-weight="700">ATLAS / PLATFORM → DEPLOYMENT AGENT</text>
+<text x="56" y="128" font-size="48" fill="#171717" font-weight="800">从平台实践，走向三步演进</text>
+<text x="56" y="181" font-size="25" fill="#555" font-weight="400">实线：已有实现基础  ·  虚线：接入待核验 / 后续智能能力</text>
+<g id="platform"><rect x="56" y="225" width="1328" height="150" rx="8" fill="#171717" stroke="#d5d5d5" /><text x="80" y="268" font-size="28" fill="#fff" font-weight="700">Agentic SDLC 平台</text>
+<text x="80" y="315" font-size="24" fill="#fff" font-weight="400">规范与 Agent Skills 协作  ·  Build / Testing / Deployment 工作区  ·  共享配置、权限与审计</text>
+<text x="80" y="350" font-size="24" fill="#fff" font-weight="400">当前实践：IBM iSeries；不同业务语言可复用任务与适配机制，具体场景仍需验证。</text>
+</g>
+<text x="56" y="434" font-size="26" fill="#b91c2b" font-weight="700">01  原子化 / Deployment Agent</text>
+<g id="bau"><rect x="56" y="466" width="365" height="145" rx="8" fill="#fff" stroke="#d5d5d5" /><text x="80" y="509" font-size="28" fill="#171717" font-weight="700">BAU Tasks</text>
+<text x="80" y="556" font-size="24" fill="#454545" font-weight="400">日常运维与发布经验</text>
+<text x="80" y="591" font-size="24" fill="#454545" font-weight="400">由人梳理工作边界</text>
+</g>
+<g id="sop"><rect x="500" y="466" width="335" height="145" rx="8" fill="#fff" stroke="#d5d5d5" /><text x="524" y="509" font-size="28" fill="#171717" font-weight="700">标准化 SOP</text>
+<text x="524" y="556" font-size="24" fill="#454545" font-weight="400">输入 / 操作 / 预期输出</text>
+<text x="524" y="591" font-size="24" fill="#454545" font-weight="400">明确验证与责任</text>
+</g>
+<g id="task"><rect x="914" y="466" width="470" height="145" rx="8" fill="#171717" stroke="#d5d5d5" /><text x="938" y="509" font-size="28" fill="#fff" font-weight="700">原子任务</text>
+<text x="938" y="556" font-size="24" fill="#fff" font-weight="400">模板、分组与步骤顺序</text>
+<text x="938" y="591" font-size="24" fill="#fff" font-weight="400">发布 → 请求 → 任务</text>
+</g>
+<path d="M429 535H485" stroke="#171717" stroke-width="3" fill="none"  marker-end="url(#arrow)"/><path d="M843 535H899" stroke="#171717" stroke-width="3" fill="none"  marker-end="url(#arrow)"/><text x="56" y="676" font-size="26" fill="#b91c2b" font-weight="700">02  自动化 / 复用工具，保留人工步骤</text>
+<path d="M1149 611V635H718V706" stroke="#171717" stroke-width="3" fill="none"  marker-end="url(#arrow)"/><g id="manual"><rect x="56" y="725" width="380" height="165" rx="8" fill="#fff" stroke="#d5d5d5" /><text x="80" y="768" font-size="28" fill="#171717" font-weight="700">MANUAL</text>
+<text x="80" y="815" font-size="24" fill="#454545" font-weight="400">人执行并记录结果</text>
+<text x="80" y="850" font-size="24" fill="#454545" font-weight="400">结果进入待评审</text>
+</g>
+<g id="auto"><rect x="530" y="725" width="380" height="165" rx="8" fill="#b91c2b" stroke="#d5d5d5" /><text x="554" y="768" font-size="28" fill="#fff" font-weight="700">Jenkins / Ansible</text>
+<text x="554" y="815" font-size="24" fill="#fff" font-weight="400">AUTO 提交与同步结果</text>
+<text x="554" y="850" font-size="24" fill="#fff" font-weight="400">轮询需配置启用</text>
+</g>
+<g id="utl"><rect x="1004" y="725" width="380" height="165" rx="8" fill="#fff" stroke="#b91c2b" stroke-width="2" stroke-dasharray="9 6"/><text x="1028" y="768" font-size="28" fill="#171717" font-weight="700">Health Check UTL</text>
+<text x="1028" y="815" font-size="24" fill="#454545" font-weight="400">IBM iSeries 实践工具</text>
+<text x="1028" y="850" font-size="24" fill="#454545" font-weight="400">调用与运行证据待补</text>
+</g>
+<path d="M718 704H246V714" stroke="#171717" stroke-width="3" fill="none"  marker-end="url(#arrow)"/><path d="M718 704H1194V714" stroke="#b91c2b" stroke-width="3" fill="none" stroke-dasharray="9 6" marker-end="url(#arrow)"/><path d="M246 890V944H470V991" stroke="#171717" stroke-width="3" fill="none"  marker-end="url(#arrow)"/><path d="M720 890V944H470" stroke="#171717" stroke-width="3" fill="none"  marker-end="url(#arrow)"/><path d="M1194 890V944H920V1060H914" stroke="#b91c2b" stroke-width="3" fill="none" stroke-dasharray="9 6" marker-end="url(#arrow)"/><g id="review"><rect x="56" y="1008" width="854" height="225" rx="8" fill="#fff" stroke="#d5d5d5" /><text x="80" y="1051" font-size="28" fill="#171717" font-weight="700">执行结果 → 人工评审 → 按规则推进</text>
+<text x="80" y="1098" font-size="24" fill="#454545" font-weight="400">所有者 / 管理员决策；关键任务待评审阻止下一任务就绪</text>
+<text x="80" y="1133" font-size="24" fill="#454545" font-weight="400">失败或拒绝可重跑；允许状态下可跳过，但跳过不等于成功</text>
+<text x="80" y="1168" font-size="24" fill="#454545" font-weight="400">记录输入快照、外部链接、结果、决策与每次尝试</text>
+</g>
+<g id="intelligence"><rect x="1004" y="1008" width="380" height="225" rx="8" fill="#fff" stroke="#b91c2b" stroke-width="2" stroke-dasharray="9 6"/><text x="1028" y="1051" font-size="28" fill="#171717" font-weight="700">03  智能化</text>
+<text x="1028" y="1098" font-size="24" fill="#454545" font-weight="400">规范 + 任务 + 执行证据</text>
+<text x="1028" y="1133" font-size="24" fill="#454545" font-weight="400">编排建议 / 异常解释</text>
+<text x="1028" y="1168" font-size="24" fill="#454545" font-weight="400">辅助决策</text>
+<text x="1028" y="1203" font-size="24" fill="#454545" font-weight="400">演进方向 · 人工确认</text>
+</g>
+<path d="M925 1135H987" stroke="#b91c2b" stroke-width="3" fill="none" stroke-dasharray="9 6" marker-end="url(#arrow)"/><text x="56" y="1300" font-size="31" fill="#171717" font-weight="700">可复用：任务契约、执行器接口、工作区、治理与证据模型</text>
+<text x="56" y="1354" font-size="25" fill="#171717" font-weight="400">需适配：具体语言 / 平台的 SOP、执行工具、结果解析与验收规则。</text>
+<text x="56" y="1406" font-size="24" fill="#555" font-weight="400">现有智能界面为预览；图中 UTL 位置说明实践路线，不代表专用集成已经验收。</text>
+<text x="56" y="1458" font-size="24" fill="#555" font-weight="400">详细执行状态与异常分支参见执行状态详图 v1；智能化不是自动绕过人工审批。</text>
+
+</g></svg>

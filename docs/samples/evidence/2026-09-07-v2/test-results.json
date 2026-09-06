@@ -1,0 +1,112 @@
+{
+  "version": "2026-09-07-v2",
+  "sourceCommit": "abf3850dee78b13c597f7da2791dd06d201c1a66",
+  "sourceChanges": null,
+  "startedAt": "2026-09-06T16:28:05.322Z",
+  "finishedAt": "2026-09-06T16:28:11.061Z",
+  "command": "mvn -B -ntp test -Dtest=ExcelImportWorkflowTest,ManualTaskWorkflowTest,DecisionEngineTest,ReleaseFlowProgressionServiceTest,AutoExecutionServiceTest,AnsibleExecutionAdapterTest,ExecutionTargetResolverTest,ExternalExecutionMonitorServiceTest,TaskExecutionHistoryServiceTest,AgentBoundaryGuardTest",
+  "archivedReports": "target/atlas-evidence/2026-09-07-v2/surefire-reports",
+  "exitCode": 0,
+  "status": "passed",
+  "scope": "Selected local automated tests using synthetic fixtures and mocked external calls; not external deployment, UI UAT, production acceptance or benefit measurement.",
+  "totals": {
+    "tests": 84,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "name": "com.wwa.agenthub.domain.decision.DecisionEngineTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0c1dc5d66268326f460c772f1b6cb7cfce0aaf8af495a8b00c7f1e6c9e8cd1ac"
+    },
+    {
+      "name": "com.wwa.agenthub.domain.decision.ReleaseFlowProgressionServiceTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d7060865cf08748451988426fc4c4cf1c97a6ca4c372342239c426c4c79d1216"
+    },
+    {
+      "name": "com.wwa.agenthub.domain.execution.AnsibleExecutionAdapterTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "72260fbb281489d1dd8bfa3d09a861a61743b06c333d1e335bd1f2815b06857b"
+    },
+    {
+      "name": "com.wwa.agenthub.domain.execution.AutoExecutionServiceTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2375397f8d4712003f167a5370557786d28edf883eab34bc4eef83c0444fd771"
+    },
+    {
+      "name": "com.wwa.agenthub.domain.execution.ExecutionTargetResolverTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "139cb9c51cef72e8a9856d086ed8908d020140a87bd9affa7ba0cb02e040d80b"
+    },
+    {
+      "name": "com.wwa.agenthub.domain.execution.ExternalExecutionMonitorServiceTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f61713be20a18ef0aaf911c02d56d298cb20d783cb613d5c051a3cc177e354c8"
+    },
+    {
+      "name": "com.wwa.agenthub.domain.task.TaskExecutionHistoryServiceTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d6fa1cd14508c5dc5332460f6c7668f59a853df73d72703dab94db809f29a289"
+    },
+    {
+      "name": "com.wwa.agenthub.platform.web.security.AgentBoundaryGuardTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "85a263bfecc262d9d6f2d0e86360537a643d2418725d1e3b068ddd2c01f1d438"
+    },
+    {
+      "name": "com.wwa.agenthub.workflow.ExcelImportWorkflowTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "734d20409ae23b30c7271c4033fdfad285d86d47f1db2df28f1338c73eb930ef"
+    },
+    {
+      "name": "com.wwa.agenthub.workflow.ManualTaskWorkflowTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "444ff9c83b623b07043c077d1ac5661be14ff21689a6d81b04c52af174eade3c"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "target/atlas-evidence/2026-09-07-v2/stdout.txt",
+      "sha256": "5061bbc36cb43e99e9e4b91cc822610524f30379af6cfdc547e9bf46eea67811",
+      "distribution": "local-only; review before sharing"
+    },
+    {
+      "path": "target/atlas-evidence/2026-09-07-v2/stderr.txt",
+      "sha256": "0fce6083d464c12e8bb090e8fb017dad6e6e3b622a86409b952c53089e9ec4f3",
+      "distribution": "local-only; review before sharing"
+    }
+  ]
+}

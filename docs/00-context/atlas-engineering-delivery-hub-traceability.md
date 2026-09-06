@@ -1,5 +1,20 @@
 # Atlas Engineering Delivery Hub Traceability
 
+## Current revision — 2026-09-07
+
+**Latest user clarification:** The platform is a concrete Agentic SDLC practice, with IBM iSeries as the current practice setting, not a platform confined to release handoffs or one delivery language. Introduce the platform first, then Deployment Agent through atomization → automation → intelligence. AEDH-REQ-17 → AEDH-US-13 → current spec clauses 1,3,13 → current narrative/versioned visual design → AEDH-TASK-015. Earlier release-only positioning is superseded; prior verification evidence remains version-specific. See the [platform clarification review](atlas-agentic-sdlc-positioning-review-2026-09-07.md).
+
+Source baseline: `abf3850dee78b13c597f7da2791dd06d201c1a66` on `2026-codecup`. Current user direction supersedes earlier English-default and independent dual-entry packaging. Name, runtime boundaries and historical evidence remain unchanged.
+
+| Requirements | Stories | Specification | Design | Tasks |
+|---|---|---|---|---|
+| AEDH-REQ-10,15 | AEDH-US-09 | Current revision 1–5,7,11 | Current revision: narrative and compatibility | AEDH-TASK-010,011 |
+| AEDH-REQ-11,12 | AEDH-US-10 | Current revision 2,4–6,12 | Entry and evidence | AEDH-TASK-011,012 |
+| AEDH-REQ-13 | AEDH-US-11 | Current revision 8 | Historical bytes and unique runs | AEDH-TASK-012 |
+| AEDH-REQ-14,16 | AEDH-US-12 | Current revision 9,10,12 | Visuals, deck and validation | AEDH-TASK-013,014 |
+
+The existing six-stage packaging chain is amended, not newly generated. No full SDD generation or runtime implementation is claimed. [Verification and review](atlas-delivery-showcase-verification-2026-09-07.md) records scope and remaining field-evidence gaps. Prior tables below describe historical packaging.
+
 **Date:** 2026-06-27
 **Status:** Active
 **Slice key:** `atlas-engineering-delivery-hub`

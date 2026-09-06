@@ -1,46 +1,107 @@
-# Atlas Engineering Delivery Hub Pitch
+# Atlas Engineering Delivery Hub 路演讲稿
 
-## One-Line Pitch
+[中文首页](../README.md) · [English](../README.en.md) · [离线路演 v2](atlas-engineering-delivery-hub-presentation-v2.html) · [案例索引](samples/README.md)
 
-Atlas Engineering Delivery Hub is a team framework that turns SDLC delivery into visible stages, repeatable gates, traceable evidence, and reusable function workspaces.
+## 项目理解与独立边界
 
-## Reviewer Hook
+**Atlas Engineering Delivery Hub 是 Agentic SDLC 的具体实践平台，当前以 IBM iSeries 为实践场景，通过“原子化 → 自动化 → 智能化”逐步建设可复用、可编排、可追溯的交付能力。**
 
-Most delivery problems are not caused by one missing script. They happen between teams: unclear intake, hidden assumptions, scattered approvals, weak evidence handoff, and decisions that cannot be traced after the work moves on. Atlas Engineering Delivery Hub gives those handoffs a shared operating model.
+平台方法不限定单一语言。当前介绍先讲平台，再重点讲 Deployment Agent，展示 BAU 工作怎样从人的经验和分散工具，走向结构化任务、自动执行与智能辅助。项目名称保持不变，Framework 类别体现可复用方法与平台实现。
 
-## What It Is
+这一定位由项目方本次明确；提供的介绍截图作为叙事背景。它确认当前实践方向，不自动成为性能基准、真实运行日志或任意技术栈兼容证明。截图提及 IBM iSeries Health Check UTL，具体调用契约、实现位置与端到端验证结果还需纳入可复核证据。
 
-- A Framework category entry.
-- A Seven Mountains SDLC operating model for Planning, Estimation, Discovery, Build, Testing, Deployment, and Maintenance.
-- A repeatable Seven Gates / I-E-O-V pattern: Input, Execute, Output, Validate.
-- A working Spring Boot + Vue implementation baseline that demonstrates shared workflow surfaces, scoped access, auditability, configuration, templates, and human-in-the-loop review.
-- A parent framework that can host independent functions such as Deployment.
+| 问题 | 当前回答 |
+|---|---|
+| 谁在什么场景遇到问题？ | 交付团队、工程负责人和平台维护者希望把既有经验与工具组织成可持续演进的流程；当前通过 IBM iSeries 的运维与发布实践展开 |
+| 现有处理方式及困难？ | BAU Tasks、SOP、手动操作、Pipeline 与脚本并存。步骤粒度、输入输出和验证标准不统一时，复用、编排、交接和复盘依赖人工对齐；成本尚未测量 |
+| 怎样改善？ | 先原子化定义任务，再自动化复用工具，逐步利用规范、结果和历史支持智能编排与辅助决策 |
+| 为什么具有通用性？ | 共享的是任务契约、执行器适配、配置、人工治理和证据模型；平台实现语言不等于所支持的业务交付语言 |
+| 当前有什么依据？ | 项目方确认的 IBM iSeries 实践背景；仓库中的多工作区、原子任务、执行适配与治理代码；合成样例及选定测试；专用 UTL 和跨平台运行包待补 |
 
-## What It Provides
+平台提供规范协作、任务工作区、执行连接和治理基础。Deployment Agent 将这些机制用于发布负责人、执行者与评审人员的 SIT/UAT/PROD 发布任务。其输入是任务清单、阶段、范围、所有者和执行配置，输出是任务状态、结果、尝试、外部链接及人工决策记录。
 
-- A common vocabulary for team delivery stages.
-- Shared task, evidence, and review patterns across functions.
-- SDD traceability from requirements to implementation tasks.
-- Reusable docs, diagrams, contribution guidance, and adoption samples.
-- A concrete Deployment function that shows how one stage becomes a working tool.
+平台介绍和模块深讲是同一方案的两个层次。保留 Deployment 名称与旧入口，共用实现和案例不重复计算收益；其他报名项目未在本次检查范围内，不推定其内容或集成。
 
-## Two-Project Story
+## Situation：有经验、有工具，怎样形成共同的交付方式？
 
-This repository supports two competition entries:
+团队并非从零开始。现有 BAU 工作已经积累操作经验、SOP、Jenkins Pipeline 和 Ansible 脚本。需要解决的是：怎样把这些资产变成边界清楚、输入输出明确、能够复用和验证的任务，并让不同阶段的参与者沿同一流程协作。
 
-1. **Atlas Engineering Delivery Hub** as the Framework entry.
-2. **Atlas Engineering Delivery Hub - Deployment** as the independent Tool / Function entry.
+在 IBM iSeries 发布场景中，部署操作、健康检查、结果验证与人工确认应当可以被组织起来。只有“有脚本”还不能说明整个交付链可以重复执行，也不能自动解决例外处理和审批责任。
 
-Deployment is not the whole Hub. It is the first deeply packaged function in the Hub and carries the IBM iSeries one-click release UTL design direction: a controlled release shell, stage-aware task model, evidence capture, human review gates, and adapter boundaries for release automation.
+现有需求与合成样例帮助说明这些问题；尚无可引用的现状耗时、事故损失或节省百分比。
 
-## 60-Second Demo Story
+## Solution：先介绍平台，再讲 Deployment 三步走
 
-Start with the framework map: Seven Mountains SDLC plus I-E-O-V gates. Show how a team can define input evidence, execution workflow, output records, and validation for each stage. Then open the working Deployment function to demonstrate the model in real software: upload a release rundown, create a release flow, execute or submit a task, review the result, and inspect the audit trail.
+### 平台：Agentic SDLC 的承载方式
 
-## Co-Build Story
+在本项目中，Agentic SDLC 体现为规范、任务、执行、反馈和人工治理的协作。SDD 帮助明确需求、设计与验收约束，Agent Skills 支持开发和文档协作，平台工作区将任务、执行工具和评审记录连接起来。
 
-Contributors can add new function slices, improve SDD artifacts, contribute sanitized templates, strengthen validation scripts, or extend documentation for stage-specific adoption. The framework keeps the collaboration safe by requiring synthetic samples, secret hygiene, traceable docs, and explicit scope boundaries.
+已有 Build、Testing、Deployment 工作区以及共享配置、访问、审计等服务。Seven Mountains 提供生命周期视角；各阶段按实际实现逐步完善。当前智能化能力的成熟度单独说明，不将“Agentic”解释为每一步都已经由 AI 自主完成。
 
-## Close
+### 第一步：原子化——把经验变成可编排的任务
 
-Atlas Engineering Delivery Hub is the team framework. Deployment is one function inside it. Together they show both the operating model and a concrete, reusable implementation path.
+**BAU Tasks → 标准化 SOP → 原子任务单元。**
+
+先由人梳理日常运维与发布活动，明确步骤、前置条件、输入、操作、预期输出、所有者和验证方式，再拆成能够执行和评审的任务。原子化指清楚、可操作的工作单元，不是越细越好，也不表示数据库事务原子性。
+
+仓库已有 Excel 模板、任务分组与顺序，以及 Release Flow → Request → Task 层级。它们承载拆分后的结果，并不自动完成 SOP 分析。跨阶段汇总需要显式复用 Workflow Identifier。
+
+说明性例子：将一次“发布并确认可用”拆为“准备与检查 → 执行发布 → 健康检查 → 结果确认”。这是讲述拆分方法的示意，不作为某次真实发布输出。
+
+### 第二步：自动化——复用现有工具执行原子任务
+
+在统一任务输入输出的基础上，把适合自动执行的步骤交给已有 Jenkins Pipeline、Ansible 脚本或相应工具；需要人完成的部分保留 MANUAL 路径。
+
+当前实现具有 MANUAL/AUTO 路径、Jenkins/AWX 执行适配与结果同步代码。实践介绍中的 IBM iSeries Health Check UTL 可以按健康检查任务说明其位置；具体如何调用、输出怎样解析以及是否完成运行验收，需要补充对应接口和运行包。
+
+AUTO 提交成功后仍为 Executing。后台轮询默认关闭，正确配置并启用、收到成功结果后才进入 Awaiting_Review。自动化交付需要明确这些状态，不把“触发了作业”写成“验证通过”。
+
+任务所有者或管理员进行人工决策。Approve/Reject 适用于待评审，Failed/Rejected 可 Rerun；允许状态下可 Skip，跳过不是执行成功。关键任务待评审会阻止下一任务就绪，当前未强制双人复核。
+
+### 第三步：智能化——让规范和执行证据参与编排与判断
+
+原子任务提供清楚的语义边界，自动化过程产生结果、异常与历史。后续可以在这些基础上，引入有依据的任务选择与编排建议、异常解释、下一步建议和辅助决策，再由人确认执行或审批。
+
+这是明确的能力演进方向。当前 AI Assist 为预览占位，DecisionGate 提供扩展接口；它们尚不能证明模型辅助决策或智能编排已投入运行。新的智能能力需要输入输出契约、评价样本、权限边界与实际验证。
+
+三步走是建设路线，可以迭代推进；不是要求一次发布恰好执行三个步骤，也不是宣布三个阶段都已完成。人工治理与证据追溯贯穿全程。
+
+## 通用性：复用什么，适配什么？
+
+| 可以复用的基础 | 到新语言或平台时需要适配 |
+|---|---|
+| 原子任务的输入、操作、输出与验证结构 | 对应技术栈的 SOP、业务语义及验收条件 |
+| 工作区、阶段、人工评审和尝试历史 | 团队角色、阶段策略和例外处理规则 |
+| 执行器接口与配置机制 | 实际 CLI/API、目标工具和结果解析 |
+| 证据记录及后续智能辅助思路 | 授权样本、风险边界与评估数据 |
+
+平台使用 Java/Vue 实现，是平台内部技术选择。它编排的交付任务可以由外部工具执行，任务模型不绑定单一业务语言；因此有跨语言、跨平台的复用基础。广泛适用性仍需通过新场景适配和案例逐步证明，不能直接宣称任意平台兼容。
+
+## Result：已经有基础，下一步扩大实践证据
+
+- **项目方确认：** 当前 IBM iSeries 实践背景与平台先行、Deployment 深讲的介绍方式。
+- **代码已实现：** 多工作区、原子任务模型、MANUAL/AUTO、Jenkins/AWX 适配、人工决策、历史与共享治理。
+- **已有验证：** 原有合成样例；上一轮 84 项选定测试通过，证明局部工作流与模拟调用，详见[原验证记录](00-context/atlas-delivery-showcase-verification-2026-09-07.md)。本轮定位修改不重新计算或扩大这些结果。
+- **待补充：** IBM iSeries 实际运行包、Health Check UTL 接口与检查结果、重复交付记录、跨平台复用案例。
+- **未来方向：** 任务编排建议、异常解释和辅助决策；不宣称智能化已经生产落地。
+- **收益测量：** 原子任务是否具有完整契约、自动任务占比及人工兜底、重复运行成功率、查找与恢复成本；智能辅助上线后再评估建议正确性和风险，口径见[案例索引](samples/README.md#如何测量收益)。
+
+## 演示顺序与讲述要点
+
+1. **平台定位：** Agentic SDLC 的具体实践，当前 IBM iSeries 起步，方法不限定单一语言。
+2. **平台全貌：** 规范协作、多个 Agent 工作区、执行工具和人工治理的关系。
+3. **Deployment 场景：** BAU 工作与已有自动化资产需要统一的任务组织方式。
+4. **原子化：** BAU → SOP → 原子任务，展示任务输入输出和验证边界。
+5. **自动化：** 展示 MANUAL/AUTO、Jenkins/AWX 及健康检查任务的位置，再讲结果与人工评审。
+6. **智能化：** 说明结构化任务和执行证据怎样支撑下一步智能辅助，并标明当前成熟度。
+7. **结果与复用：** 展示已有证据、可复用机制及需要补充的实践结果。
+
+[离线演示 v2](atlas-engineering-delivery-hub-presentation-v2.html)不预设时长。方向键、PageUp/PageDown、空格、按钮、滚轮或触摸翻页；Home/End 到首尾，N 查看备注，Esc 关闭。无需 Python，可在 Windows 11 浏览器打开；尚未做 Windows 实机验证。
+
+现场产品操作按 README 启动 local 环境，只读浏览可用访客入口；写操作使用本地测试身份。下载应用 Excel 模板并填入合成任务，原有 JSON 不能直接上传。若只展示材料，明确区分流程示意与真实执行；不在公开演示中展示真实人员、端点、凭据或客户数据。
+
+## 可复用的开场介绍
+
+Atlas Engineering Delivery Hub 是我们对 Agentic SDLC 的具体实践。我们从 IBM iSeries 的交付场景出发，把规范、任务、执行工具和人工治理组织到同一个平台里，逐步沉淀可以跨语言、跨平台复用的交付方法。
+
+这次先介绍平台，再重点展开 Deployment Agent：先把 BAU 工作梳理成 SOP 和原子任务，再复用已有 Pipeline、脚本与检查工具实现自动化，最后基于规范与执行证据，逐步向智能编排和辅助决策演进。

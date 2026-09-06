@@ -1,5 +1,26 @@
 # Atlas Engineering Delivery Hub Packaging Tasks
 
+## Current revision — 2026-09-07, platform clarification
+Prior tasks/results below describe historical packaging and do not authorize a commit in this revision.
+
+| Task | Requirements | Work and acceptance | State |
+|---|---|---|---|
+| AEDH-TASK-010 | REQ-10,12,15 | Inspect code/tests/samples; identify defensible position and limits | Done |
+| AEDH-TASK-011 | REQ-11,15 | Update bilingual entry points, narrative, submissions, contribution and indexes | Done |
+| AEDH-TASK-012 | REQ-12,13 | Register cases and immutable hashes; retain new test evidence separately | Done; v1 capture limitation retained, v2 collected 84 passing tests |
+| AEDH-TASK-013 | REQ-14 | Produce editable SVG/PNG pair and self-contained Chinese deck | Done; 16 slides, 144 viewport checks |
+| AEDH-TASK-014 | REQ-16 | Check documentation/code alignment, links, visuals and focused tests; update handoff last | Done; see current verification report and handoff |
+
+Order: 010 → 011/012 → 013 → 014. Completion requires a recorded verification report with limitations, not production acceptance. All work is local; no commit, push or merge.
+
+[Prior revision verification report](../00-context/atlas-delivery-showcase-verification-2026-09-07.md): selected Maven tests and document/visual checks passed; full runtime suite, real external execution, manual business UAT and measured return were not verified.
+
+### AEDH-TASK-015 — Platform-first three-step narrative (REQ-17 / US-13)
+
+Update both READMEs, pitches, submission summaries and indexes to present Agentic SDLC first and Deployment Agent second. Produce versioned replacement visuals/deck, preserve prior evidence, and verify current links and rendering. No runtime code changes; do not rerun unchanged Java tests solely for editorial changes. Status: Done — 18 slides, 162 viewport checks, 235 Markdown files checked, prior evidence hashes unchanged. See the [current positioning review](../00-context/atlas-agentic-sdlc-positioning-review-2026-09-07.md).
+
+## Historical packaging baseline (superseded where inconsistent)
+
 **Date:** 2026-06-27
 **Status:** Complete
 **Source design:** [atlas-engineering-delivery-hub-design.md](../05-design/atlas-engineering-delivery-hub-design.md)
