@@ -40,4 +40,4 @@ Atlas Engineering Delivery Hub 将规范协作、多个 Agent 工作区、执行
 
 AUTO 提交不等于完成，轮询默认关闭；现有审批由所有者/管理员执行，不宣称强制双人审批或自动基础设施回滚。
 
-[平台价值图](assets/atlas-delivery-value-v2.svg) · [协作图](assets/atlas-delivery-workflow-v2.svg) · [离线路演 v2](atlas-engineering-delivery-hub-presentation-v2.html) · [贡献指南](../CONTRIBUTING.md)
+[平台价值图](assets/atlas-delivery-value-v3.svg) · [协作图](assets/atlas-delivery-workflow-v3.svg) · [离线路演 v2](atlas-engineering-delivery-hub-presentation-v2.html) · [贡献指南](../CONTRIBUTING.md)

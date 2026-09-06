@@ -8,7 +8,7 @@ Deployment 是 Agentic SDLC 平台中的重点实践模块，当前围绕 IBM iS
 - [模块讲解入口](atlas-engineering-delivery-hub-deployment-pitch.md)
 - [中文模块报名入口](open-collaboration-submission-deployment.zh-CN.md) · [English module entry](open-collaboration-submission-deployment.md)
 - [案例、来源与验证限制](samples/README.md)
-- [当前能力协作图](assets/atlas-delivery-workflow-v2.svg)
+- [当前能力协作图](assets/atlas-delivery-workflow-v3.svg)
 - [Deployment SDD 追踪](00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
 - [实现架构](04-architecture/architecture.md) · [详细设计](05-design/design.md)
 - [贡献指南](../CONTRIBUTING.md)

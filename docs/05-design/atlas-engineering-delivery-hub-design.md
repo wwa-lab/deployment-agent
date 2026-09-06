@@ -1,5 +1,9 @@
 # Atlas Engineering Delivery Hub Packaging Design
 
+## README visual adoption — immersive technology, 2026-09-07
+
+The user requested that README images match the immersive HTML concept. Replace the two current README image references with new v3 value/workflow SVGs and PNG exports. Use the same dark stage, cyan/cobalt accents, projected network geometry and typography hierarchy. SVG text, groups and paths remain editable; static images express the HTML style without claiming animation or live state. Retain prior v1/v2 bytes and evidence summaries. Synchronize both language entries and current image links in public indexes. Verify text bounds, PNG rendering, README image loading and existing evidence hashes. This adopts the image style only; the formal 18-slide deck remains a separate artifact.
+
 ## Visual exploration — ocean / teal, 2026-09-07
 
 Third exploration: the user found the overall style insufficiently technological. [Immersive technology preview v3](../prototypes/atlas-immersive-tech-preview-v3.html) replaces the composition with a full dark stage, oversized typography, an animated projected task network, a spatial platform map and open three-step diagrams. It remains a four-page concept using the same evidence boundaries. Animation must have a pause control, respect reduced motion and suspend when the page is hidden. It uses local canvas/SVG and inline code for offline use; no product runtime or completed-integration claims are introduced.

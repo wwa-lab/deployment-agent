@@ -1,5 +1,23 @@
 # Agent Handoff (Active)
 
+## Publication update — README visuals, 2026-09-07
+
+The user explicitly authorized committing, pushing and merging the README image revision. Publish the scoped documentation and four v3 image assets on `codex/atlas-tech-previews` through existing PR #34, targeting `main`. Pre-publication checks passed for 235 Markdown files, all four image hashes, both README image references and diff whitespace. Application code is unchanged; prior rendering checks remain documented below. Remote inspection before this commit showed PR #34 open with an approving review required; do not bypass branch protection. Prior CI secret scanning is blocked by organization Gitleaks license configuration. Leave unrelated `.codegraph/daemon.pid` untracked. Earlier statements that this image revision was not authorized for publication are superseded by this request; confirm actual push/merge status from GitHub before continuing.
+
+---
+
+## Latest session — README immersive visual adoption, 2026-09-07
+
+**Status:** The user requested README diagrams matching the latest immersive HTML preview. Completed locally on `codex/atlas-tech-previews`, baseline `da5d973562dd91b46661ba7ebba58b46694b0896`. This image revision is not yet committed or pushed. PR #34 for the preceding preview publication remains open with `REVIEW_REQUIRED` at that baseline; no merge or protection bypass was performed. The preceding publication also reported the secret-scan action blocked by missing organization Gitleaks license configuration, not a secret finding.
+
+**Changes:** Added versioned v3 value and collaboration diagrams as editable SVG plus PNG. The full dark stage, cyan/cobalt accents, projected task-network sphere and geometric stages match the four-slide immersive HTML concept. Updated Chinese/English README references, public index/submission links, packaging design, changelog and case-index verification link. Value remains platform-first Agentic SDLC, current IBM iSeries practice and atomization → automation → intelligence. The workflow keeps human/manual and automated execution paths, review gates and outputs visible; UTL wiring and intelligence are explicitly unverified/future. The formal 18-slide presentation is unchanged and distinguished from the matching four-slide preview.
+
+**Verification:** Both SVG text-bound checks passed and exported PNGs were visually inspected. Both READMEs passed offline Chrome image, language-link, preview-link and horizontal-overflow checks at 1200, 768 and 375 pixels (six checks). No page errors or network requests observed. All 235 Markdown files passed relative-link checks; diff whitespace passed. Hash comparisons confirmed 21 original evidence files and 10 prior visual assets unchanged. Durable summary: [README v3 visual results](../samples/evidence/2026-09-07-readme-v3/visual-results.json); local rendering outputs: `target/atlas-readme-tech-v3/`. This is macOS Chrome with a Markdown preview, not live GitHub or Windows validation. No backend/application build rerun and no new business evidence.
+
+**Next:** User reviews the new README images; publish this incremental revision when requested and use the existing PR review path. Do not bypass protection or modify CI secrets. Preserve unrelated `.codegraph/daemon.pid`, all old visual versions and historical evidence. Full-deck restyling remains separate from the completed image adoption.
+
+---
+
 ## Publication handoff — visual previews, 2026-09-07
 
 The user explicitly authorized commit, push and merge to main for the three visual previews and their design/handoff notes. Prepared branch: `codex/atlas-tech-previews`, from synchronized `main` / `origin/main` at `3407837`. Use the repository pull-request path to integrate this publication. Earlier "no new commit or push" statements below describe the completed prototype sessions before this authorization.
