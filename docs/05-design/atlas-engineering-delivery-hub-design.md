@@ -1,5 +1,13 @@
 # Atlas Engineering Delivery Hub Packaging Design
 
+## Visual exploration — ocean / teal, 2026-09-07
+
+Third exploration: the user found the overall style insufficiently technological. [Immersive technology preview v3](../prototypes/atlas-immersive-tech-preview-v3.html) replaces the composition with a full dark stage, oversized typography, an animated projected task network, a spatial platform map and open three-step diagrams. It remains a four-page concept using the same evidence boundaries. Animation must have a pause control, respect reduced motion and suspend when the page is hidden. It uses local canvas/SVG and inline code for offline use; no product runtime or completed-integration claims are introduced.
+
+Follow-up: the user requested stronger technology cues and visual impact. Add a second four-slide concept at [technology preview v2](../prototypes/atlas-ocean-tech-preview-v2.html), using midnight navy, luminous cyan/teal accents, layered task geometry, a restrained grid and brief flow animations. Retain the first preview for comparison. These are visual metaphors, not live system status; factual claims and maturity labels remain unchanged. Keep the existing navigation and reduced-motion behavior and validate the revised layout independently.
+
+The user accepted a four-slide visual preview: cover, platform overview, three-step progression and evidence. This prototype uses deep navy, teal and warm white; it explores appearance without introducing a runtime contract. The current 18-slide presentation and evidence assets remain versioned references. Preview: [ocean / teal HTML](../prototypes/atlas-ocean-teal-preview.html). Reuse the current pitch's claims and distinguish existing implementation from planned intelligence. Validate offline navigation, notes and viewport fit before stakeholder review. Full-deck adoption is a subsequent style decision.
+
 ## Current revision — 2026-09-07, platform clarification
 This revision supersedes conflicting information design below. Runtime design is unchanged.
 

@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Atlas Engineering Delivery Hub 沉浸式科技视觉小样：四页、离线、动态任务网络。">
+<title>Atlas · 沉浸式科技视觉 v3</title>
+<style>
+/* Offline typography: use available geometric Latin faces and system CJK fonts. */
+:root{--bg:#050b16;--ink:#eef5ff;--muted:#a0b3ca;--cyan:#62e8ff;--blue:#456cff;--line:#738faf40;--slide-padding:clamp(1.1rem,5vw,6rem);--content-gap:clamp(.75rem,2vh,1.8rem);--element-gap:clamp(.5rem,1vw,1rem);--title-size:clamp(2.8rem,6.2vw,7rem);--h2-size:clamp(2rem,4.2vw,4.8rem);--h3-size:clamp(1.2rem,2.1vw,2.3rem);--body-size:clamp(1rem,1.45vw,1.65rem);--small-size:clamp(.8rem,1vw,1.1rem)}
+*{box-sizing:border-box}html,body{height:100%;overflow-x:hidden;margin:0}html{scroll-snap-type:y mandatory;scroll-behavior:smooth}body{background:var(--bg);color:var(--ink);font-family:"Avenir Next","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 80% 45%,#123b6b60,transparent 54%),radial-gradient(ellipse at 15% 110%,#2345b044,transparent 55%)}
+#network-canvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.slide{width:100vw;height:100vh;height:100dvh;overflow:hidden;scroll-snap-align:start;display:flex;flex-direction:column;position:relative;isolation:isolate}.slide[hidden]{display:none}
+.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;overflow:hidden;padding:clamp(5rem,13vh,9rem) var(--slide-padding) clamp(4.5rem,11vh,7.5rem);gap:var(--content-gap)}
+.masthead{position:absolute;left:var(--slide-padding);right:var(--slide-padding);top:clamp(1.1rem,3vh,2.8rem);display:flex;align-items:center;justify-content:space-between;gap:var(--element-gap);padding-bottom:clamp(.7rem,2vh,1.8rem);border-bottom:1px solid var(--line);font-size:var(--small-size);z-index:2}
+.wordmark{display:flex;align-items:center;gap:clamp(.5rem,1vw,1rem)}.wordmark b{font-weight:750;letter-spacing:.17em;font-size:clamp(1.25rem,2vw,2.2rem)}.brand-symbol{width:clamp(1.25rem,2vw,2.2rem);height:clamp(1.25rem,2vw,2.2rem);color:var(--cyan)}.series,.edition{font-family:"SFMono-Regular",Consolas,monospace;font-size:var(--small-size);letter-spacing:.1em;color:var(--muted)}.edition{color:var(--cyan)}
+h1,h2,h3,p{margin:0}h1{font-size:var(--title-size);line-height:1.17;letter-spacing:-.045em;font-weight:750}h2{font-size:var(--h2-size);line-height:1.2;letter-spacing:-.025em;font-weight:650}h3{font-size:var(--h3-size);line-height:1.4}p{font-size:var(--body-size);line-height:1.65}.eyebrow{font:600 var(--small-size)/1.4 "Avenir Next","PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.1em;color:var(--cyan);display:flex;align-items:center;gap:clamp(.6rem,1vw,1rem)}.eyebrow:before{content:"";width:clamp(1.5rem,3vw,3rem);height:2px;background:linear-gradient(90deg,var(--blue),var(--cyan))}.subhead{color:var(--muted);max-width:54ch}.footnote{font-size:var(--small-size);color:var(--muted);line-height:1.55}.reveal{opacity:0;transform:translateY(14px);transition:opacity .45s ease,transform .45s ease}.is-visible .reveal{opacity:1;transform:none}.reveal:nth-child(2){transition-delay:.07s}.reveal:nth-child(3){transition-delay:.14s}.reveal:nth-child(4){transition-delay:.21s}
+.hero{gap:clamp(1.25rem,4vh,3.5rem);align-items:flex-start}.hero h1{max-width:12ch}.hero h1 em{font-style:normal;color:var(--cyan);text-shadow:0 0 48px #2bddff33}.hero .subhead{max-width:32ch;font-size:clamp(1.05rem,1.65vw,1.8rem)}.hero-trail{display:flex;gap:clamp(.6rem,1.4vw,1.6rem);align-items:center;font-size:clamp(.95rem,1.3vw,1.4rem);padding-top:clamp(.5rem,2vh,1.6rem)}.hero-trail i{font-style:normal;color:var(--cyan)}.hero-trail small{font-size:var(--small-size);color:var(--muted)}.orb-caption{position:absolute;bottom:clamp(5.5rem,15vh,10rem);right:clamp(2rem,11vw,12rem);color:#91c5e0;font-family:Consolas,monospace;font-size:var(--small-size);letter-spacing:.13em}.orbit-caption-line{display:block;margin-top:clamp(.35rem,1vh,.8rem);font:var(--small-size)/1.5 "PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:0}
+.platform-layout{display:grid;grid-template-columns:.85fr 1.4fr;gap:clamp(1rem,3vw,4rem);align-items:center}.platform-copy{display:flex;flex-direction:column;gap:clamp(1rem,3vh,2.6rem)}.platform-copy h2{max-width:9ch}.scope-line{font-size:var(--small-size);color:var(--cyan);border-left:2px solid var(--blue);padding-left:clamp(.7rem,1.2vw,1.4rem)}
+.system-map{position:relative;width:100%;height:clamp(19rem,46vh,34rem)}.system-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible;opacity:.9}.map-node{position:absolute;width:29%;min-height:clamp(5.4rem,13vh,8.5rem);padding:clamp(.7rem,1.2vw,1.5rem);display:flex;flex-direction:column;justify-content:center;gap:clamp(.3rem,.8vh,.8rem);background:linear-gradient(125deg,#142841e8,#071321ee);border:1px solid #496f93;box-shadow:0 12px 30px #00000030;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}.map-node h3{font-size:clamp(1rem,1.5vw,1.6rem)}.map-node p,.map-node span{font-size:var(--small-size);color:#a8bdd5}.node-sdd{left:0;top:36%}.node-build{left:39%;top:0}.node-test{right:0;top:36%}.node-deploy{left:39%;bottom:0;background:linear-gradient(135deg,#1937a3,#0d455d);border-color:var(--cyan);box-shadow:0 0 30px #266dff33}.node-deploy h3{color:#a2efff}.node-deploy p,.node-deploy span{color:#d5e7f9}.map-core{position:absolute;left:40%;top:39%;width:26%;height:23%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:clamp(.2rem,.5vh,.6rem)}.map-core strong{font-size:clamp(1rem,1.65vw,1.8rem);color:var(--cyan)}.map-core span{font-size:var(--small-size);color:#c1d6e7}.platform-foot{border-top:1px solid var(--line);padding-top:clamp(.7rem,2vh,1.5rem);display:flex;gap:clamp(1rem,3vw,4rem);font-size:var(--small-size);color:var(--muted)}.platform-foot b{font-weight:500;color:#dceaff}
+.method-top{display:flex;align-items:flex-end;justify-content:space-between;gap:clamp(1rem,2vw,2rem)}.method-top .footnote{max-width:25ch}.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(1rem,3vw,3.5rem);margin-top:clamp(.5rem,1.8vh,1.5rem)}.stage{display:flex;flex-direction:column;position:relative;gap:clamp(.5rem,1.5vh,1.4rem);padding-top:clamp(.5rem,1.5vh,1.4rem);border-top:1px solid #6987a660}.stage-head{display:flex;align-items:center;justify-content:space-between;gap:var(--element-gap)}.stage-number{font:500 clamp(1.5rem,3vw,3.2rem)/1 Consolas,monospace;letter-spacing:-.08em;color:#7694b6}.stage-label{font-size:var(--small-size);color:#a9c3dc}.stage h3{font-size:clamp(1.5rem,2.8vw,3rem)}.stage p{color:var(--muted);font-size:var(--body-size)}.stage-graphic{width:100%;height:clamp(5rem,19vh,13rem);overflow:visible}.stage.focus{border-top-color:var(--cyan)}.stage.focus .stage-number,.stage.focus .stage-label{color:var(--cyan)}.stage.future{border-top-style:dashed}.governance{border-top:1px solid var(--line);padding-top:clamp(.7rem,2vh,1.5rem);font-size:var(--small-size);color:#c0d2e8;display:flex;align-items:center;gap:clamp(.7rem,1.5vw,1.5rem)}.governance:before{content:"+";color:var(--cyan);font:clamp(1.2rem,2vw,2rem)/1 Consolas,monospace}
+.evidence-layout{display:grid;grid-template-columns:.8fr 1.4fr;gap:clamp(1.5rem,6vw,7rem);align-items:center;margin-top:clamp(.3rem,1.5vh,1.5rem)}.measure{position:relative;display:flex;flex-direction:column;gap:clamp(.7rem,2vh,2rem)}.measure:before{content:"";position:absolute;top:10%;right:3%;width:76%;aspect-ratio:1;background:radial-gradient(ellipse,#134cec55,transparent 67%);z-index:-1}.measure-label{font-size:var(--small-size);letter-spacing:.07em;color:var(--cyan)}.metric{font:650 clamp(6rem,16vw,18rem)/.8 "Avenir Next",sans-serif;letter-spacing:-.1em;color:#e5f3ff;text-shadow:4px 6px 0 #244dc855,0 0 75px #2159ff55;padding:clamp(.35rem,1vh,1rem) 0}.metric span{font-size:clamp(.95rem,1.3vw,1.5rem);letter-spacing:0;margin-left:clamp(.6rem,1vw,1rem);color:var(--cyan);font-weight:500}.measure p{font-size:var(--body-size)}.measure .footnote{font-size:var(--small-size)}.evidence-list{display:flex;flex-direction:column}.evidence-row{display:grid;grid-template-columns:clamp(2rem,3vw,3.5rem) 1fr;gap:clamp(.7rem,2vw,2rem);padding:clamp(.85rem,2.5vh,2rem) 0;border-bottom:1px solid var(--line)}.evidence-row:first-child{padding-top:0}.evidence-row:last-child{border-bottom:none}.evidence-row .index{font:var(--small-size)/1.7 Consolas,monospace;color:var(--cyan)}.evidence-row h3{font-size:clamp(1.2rem,1.8vw,2rem)}.evidence-row p{font-size:var(--small-size);color:var(--muted);margin-top:clamp(.4rem,1vh,1rem)}.evidence-tag{color:#90b5d3;font-size:var(--small-size);display:block;margin-bottom:clamp(.3rem,.8vh,.8rem)}
+nav{position:fixed;bottom:0;left:0;right:0;height:clamp(3.5rem,8vh,5rem);padding:0 var(--slide-padding);display:flex;align-items:center;justify-content:space-between;gap:clamp(.6rem,1vw,1rem);background:#060d19e8;color:var(--muted);border-top:1px solid var(--line);z-index:10;font-size:var(--small-size)}.nav-group{display:flex;align-items:center;gap:clamp(.5rem,1vw,1rem)}button{font:inherit;color:inherit;border:1px solid #6c8ba766;background:#0b182a;border-radius:2px;padding:clamp(.4rem,.8vh,.8rem) clamp(.65rem,1vw,1.2rem);cursor:pointer}button:hover:not(:disabled){color:var(--cyan);border-color:var(--cyan)}button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}button:disabled{opacity:.4;cursor:default}#counter{font-family:Consolas,monospace;min-width:4ch}#progress{height:2px;background:linear-gradient(90deg,#456cff,#62e8ff);position:fixed;bottom:0;left:0;z-index:12;box-shadow:0 0 14px #456cff;transition:width .3s ease}
+dialog{background:#0a1729;color:var(--ink);border:1px solid #517b9f;max-width:min(90vw,46rem);max-height:80vh;padding:clamp(1.2rem,3vw,3rem)}dialog::backdrop{background:#02050dc9}dialog h2{font-size:var(--h3-size);margin-bottom:clamp(.7rem,1.5vh,1.3rem)}dialog button{margin-top:clamp(.8rem,2vh,2rem)}
+@media(max-height:700px){:root{--title-size:clamp(2.6rem,5.6vw,5.5rem);--h2-size:clamp(1.8rem,3.8vw,3.8rem);--content-gap:clamp(.6rem,1.8vh,1.2rem)}.slide-content{padding-top:clamp(4.5rem,13vh,6rem);padding-bottom:clamp(4rem,11vh,5.5rem)}.system-map{height:clamp(16rem,43vh,24rem)}.stage-graphic{height:clamp(4rem,16vh,8rem)}.hero{gap:clamp(1rem,3vh,2rem)}}
+@media(max-height:600px){.keyboard-hint{display:none}.orb-caption{bottom:clamp(4.5rem,13vh,6rem)}.platform-foot{padding-top:clamp(.5rem,1vh,1rem)}.system-map{height:clamp(13rem,42vh,20rem)}.map-node{min-height:clamp(4.5rem,12vh,7rem);padding:clamp(.55rem,1vw,1rem)}.stage-graphic{height:clamp(3rem,14vh,5rem)}}
+@media(max-height:500px){:root{--title-size:clamp(2rem,5.3vw,3.7rem);--h2-size:clamp(1.4rem,3.3vw,2.7rem);--h3-size:clamp(1.05rem,2vw,1.5rem);--body-size:clamp(.85rem,1.4vw,1.15rem);--small-size:clamp(.75rem,1vw,.95rem);--slide-padding:clamp(1rem,4vw,2.5rem);--content-gap:clamp(.4rem,1.3vh,.8rem)}.masthead{top:clamp(.6rem,2vh,1rem);padding-bottom:clamp(.4rem,1vh,.7rem)}.wordmark b{font-size:clamp(1.1rem,1.9vw,1.5rem)}.slide-content{padding-top:clamp(3.2rem,14vh,4.5rem);padding-bottom:clamp(3.8rem,15vh,5rem)}.hero{gap:clamp(.6rem,2vh,1rem)}.hero .subhead{font-size:clamp(.9rem,1.5vw,1.2rem)}.hero-trail{padding-top:0;font-size:var(--small-size)}.orb-caption{bottom:clamp(4.1rem,17vh,5rem);font-size:clamp(.7rem,1vw,.85rem)}.orbit-caption-line{font-size:clamp(.7rem,1vw,.85rem)}.platform-copy{gap:clamp(.5rem,1.4vh,1rem)}.system-map{height:clamp(10.5rem,45vh,14rem)}.map-node{padding:clamp(.4rem,.9vw,.8rem);min-height:clamp(3.6rem,13vh,5rem);gap:clamp(.2rem,.5vh,.4rem)}.map-node h3{font-size:clamp(.85rem,1.4vw,1.1rem)}.map-node p,.map-node span{font-size:clamp(.68rem,1vw,.85rem)}.map-core strong{font-size:clamp(.8rem,1.4vw,1.1rem)}.map-core span{font-size:clamp(.68rem,1vw,.85rem)}.platform-foot{gap:clamp(.6rem,2vw,1.5rem)}.stages{gap:clamp(1rem,3vw,2rem);margin-top:0}.stage{gap:clamp(.3rem,1vh,.6rem);padding-top:clamp(.3rem,1vh,.6rem)}.stage h3{font-size:clamp(1.1rem,2.5vw,1.8rem)}.stage-number{font-size:clamp(1.2rem,2.5vw,1.8rem)}.stage-graphic{height:clamp(2.5rem,12vh,3.5rem)}.governance{padding-top:clamp(.4rem,1vh,.7rem)}.metric{font-size:clamp(5rem,15vw,9rem)}.measure{gap:clamp(.6rem,1.5vh,1rem)}.evidence-row{padding:clamp(.5rem,1.5vh,.9rem) 0}.evidence-row h3{font-size:clamp(1rem,1.6vw,1.3rem)}.evidence-tag{margin-bottom:clamp(.2rem,.5vh,.4rem)}}
+@media(max-width:600px) and (min-height:501px){:root{--title-size:clamp(2.4rem,10vw,3.7rem);--h2-size:clamp(1.65rem,6.8vw,2.6rem);--body-size:clamp(.95rem,3.5vw,1.25rem);--small-size:clamp(.78rem,2.8vw,1rem);--content-gap:clamp(.6rem,1.8vh,1.3rem)}.masthead .series{display:none}.slide-content{padding-top:clamp(4.4rem,11vh,6rem);padding-bottom:clamp(4.2rem,11vh,6rem)}.hero{justify-content:flex-start;padding-top:clamp(6rem,17vh,10rem);gap:clamp(1rem,3vh,2rem)}.hero .subhead{font-size:var(--body-size)}.hero-trail{font-size:clamp(.8rem,3vw,1.1rem);gap:clamp(.4rem,1.4vw,.8rem);padding-top:clamp(.5rem,1.5vh,1rem)}.hero-trail small{font-size:clamp(.68rem,2.4vw,.8rem)}.orb-caption{right:var(--slide-padding);bottom:clamp(4.6rem,12vh,7rem);font-size:clamp(.7rem,2.5vw,.9rem)}.orbit-caption-line{font-size:clamp(.7rem,2.5vw,.9rem)}.platform-layout{grid-template-columns:1fr;gap:clamp(.6rem,1.5vh,1.2rem)}.platform-copy{gap:clamp(.6rem,1.5vh,1.1rem)}.platform-copy h2{max-width:16ch}.platform-copy h2 br{display:none}.system-map{height:clamp(13.5rem,34vh,21rem)}.map-node{min-height:clamp(3.7rem,9vh,6rem);padding:clamp(.5rem,2vw,.9rem);gap:clamp(.15rem,.5vh,.4rem);width:31%}.map-node h3{font-size:clamp(.9rem,3.1vw,1.2rem)}.map-node p,.map-node span{font-size:clamp(.68rem,2.4vw,.9rem)}.node-build,.node-deploy{left:35%}.map-core{left:35%;width:31%}.map-core strong{font-size:clamp(.95rem,3vw,1.2rem)}.map-core span{font-size:clamp(.68rem,2.4vw,.9rem)}.platform-foot{flex-wrap:wrap;gap:clamp(.35rem,1.5vw,.8rem) clamp(.8rem,3vw,1.3rem)}.method-top{display:block}.method-top .footnote{max-width:100%;margin-top:clamp(.5rem,1.2vh,1rem)}.stages{grid-template-columns:1fr;gap:clamp(.5rem,1.5vh,1.2rem);margin:0}.stage{display:grid;grid-template-columns:clamp(5rem,24vw,8rem) 1fr;column-gap:clamp(.7rem,3vw,1.3rem);row-gap:clamp(.3rem,.8vh,.7rem);padding-top:clamp(.5rem,1.4vh,1rem)}.stage-head{grid-column:1/-1}.stage-number{font-size:clamp(1.15rem,4vw,1.5rem)}.stage-label{font-size:clamp(.75rem,2.7vw,.95rem)}.stage h3{grid-column:2;grid-row:2;font-size:clamp(1.25rem,4.5vw,1.8rem)}.stage-graphic{grid-column:1;grid-row:2/4;height:clamp(3.7rem,10vh,6rem);align-self:center}.stage p{grid-column:2;grid-row:3;font-size:clamp(.85rem,3vw,1.1rem)}.governance{padding-top:clamp(.5rem,1.2vh,1rem)}.evidence-layout{grid-template-columns:1fr;gap:clamp(1rem,3vh,2rem);margin:0}.measure{display:grid;grid-template-columns:1fr 1fr;gap:clamp(.6rem,1.5vh,1.2rem)}.measure-label{grid-column:1/-1}.metric{grid-row:2/4;font-size:clamp(5rem,25vw,9rem);align-self:center}.metric span{font-size:clamp(.8rem,3vw,1.1rem);margin-left:clamp(.4rem,1vw,.6rem)}.measure p{font-size:clamp(.85rem,3vw,1.1rem)}.measure .footnote{font-size:clamp(.73rem,2.6vw,.9rem)}.evidence-row{padding:clamp(.7rem,1.7vh,1.2rem) 0;grid-template-columns:clamp(1.2rem,4vw,1.8rem) 1fr;gap:clamp(.6rem,2.5vw,1rem)}.evidence-row h3{font-size:clamp(1.05rem,3.7vw,1.4rem)}.evidence-row p{margin-top:clamp(.2rem,.6vh,.5rem)}.evidence-tag{display:none}.keyboard-hint{display:none}nav{gap:clamp(.3rem,1vw,.6rem)}nav button{padding:clamp(.4rem,.8vh,.7rem) clamp(.45rem,1.5vw,.8rem)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:0s!important;transition-delay:0s!important;scroll-behavior:auto!important}.reveal{transform:none}}
+@media print{#network-canvas,nav,#progress,dialog{display:none!important}.slide[hidden]{display:flex!important}.slide{break-after:page;background:#050b16!important}.reveal{opacity:1;transform:none}}
+/* Final density adjustments for short presentation windows. */
+.platform-copy h2{max-width:none}
+@media(max-height:500px){#slide-4 h2 br{display:none}.metric{font-size:clamp(4rem,10vw,7rem)}.evidence-tag{display:none}.evidence-row{padding:clamp(.4rem,1vh,.7rem) 0}.evidence-layout{margin-top:0}.system-map{height:clamp(9rem,39vh,12rem)}.platform-foot{display:none}.measure{gap:clamp(.45rem,1.3vh,.7rem)}}
+</style></head>
+<body>
+<canvas id="network-canvas" aria-hidden="true"></canvas>
+<main>
+<section class="slide" id="slide-1" aria-label="第 1 页：Agentic SDLC 平台">
+<header class="masthead"><div class="wordmark"><svg class="brand-symbol" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 32L20 3L37 32H28L20 17L12 32Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 27H25L20 36Z" fill="currentColor"/></svg><b>ATLAS</b></div><span class="series">ENGINEERING DELIVERY HUB</span><span class="edition">CONCEPT / 03</span></header>
+<div class="slide-content hero"><div class="eyebrow reveal">AGENTIC SDLC · 从实践出发</div><h1 class="reveal">让交付经验，<br>成为<em>平台能力。</em></h1><p class="subhead reveal">当前实践：IBM iSeries<br>以 Deployment Agent 展开三步走。</p><div class="hero-trail reveal"><span>原子化</span><i>↗</i><span>自动化</span><i>↗</i><span>智能化*</span><small>*演进方向</small></div></div>
+<div class="orb-caption">ATLAS / CONNECTED CAPABILITIES<span class="orbit-caption-line">任务网络概念视觉</span></div>
+<aside class="speaker-notes" hidden>Atlas Engineering Delivery Hub 是 Agentic SDLC 的具体实践平台，当前以 IBM iSeries 为落地场景，方法不限定单一交付语言。先讲平台，再讲 Deployment Agent 的三步走。右侧为可旋转的任务网络概念视觉，不是实时遥测或已经部署的系统拓扑。智能辅助仍为演进方向。</aside></section>
+<section class="slide" id="slide-2" aria-label="第 2 页：平台总览" hidden inert>
+<header class="masthead"><div class="wordmark"><b>ATLAS</b></div><span class="series">PLATFORM / SHARED FOUNDATION</span><span class="edition">01 — PLATFORM</span></header>
+<div class="slide-content"><div class="platform-layout"><div class="platform-copy"><div class="eyebrow reveal">平台总览</div><h2 class="reveal">规范到执行，<br>汇入同一平台。</h2><p class="subhead reveal">以共同任务模型，连接工作区、<br>执行工具与人工治理。</p><p class="scope-line reveal">当前实践：IBM iSeries</p></div>
+<div class="system-map reveal"><svg class="system-lines" viewBox="0 0 600 400" preserveAspectRatio="none" aria-hidden="true"><defs><radialGradient id="core-halo"><stop stop-color="#2b66ff" stop-opacity=".3"/><stop offset="1" stop-color="#2b66ff" stop-opacity="0"/></radialGradient></defs><ellipse cx="318" cy="205" rx="125" ry="100" fill="url(#core-halo)"/><g fill="none" stroke="#387bbb" stroke-width="1.5"><path d="M145 200H268M318 104V153M370 200H465M318 250V305"/><ellipse cx="318" cy="202" rx="83" ry="64" stroke="#63e8ff" stroke-dasharray="3 7"/><ellipse cx="318" cy="202" rx="108" ry="85" opacity=".25"/></g><g fill="#8bf4ff"><circle cx="234" cy="200" r="3"/><circle cx="318" cy="138" r="3"/><circle cx="402" cy="200" r="3"/><circle cx="318" cy="268" r="3"/></g></svg><article class="map-node node-sdd"><span>规范协作</span><h3>SDD / Skills</h3><p>需求与验收约束</p></article><article class="map-node node-build"><span>DEV</span><h3>Build</h3><p>构建与打包</p></article><div class="map-core"><strong>共享治理</strong><span>任务 · 配置 · 证据</span></div><article class="map-node node-test"><span>UAT</span><h3>Testing</h3><p>受控测试</p></article><article class="map-node node-deploy"><span>本次深讲</span><h3>Deployment</h3><p>SIT / UAT / PROD</p></article></div></div>
+<div class="platform-foot reveal"><b>已有工作区与共享基础</b><span>访问控制 · 人工评审 · 审计 · 执行历史</span></div><p class="footnote reveal">跨阶段自动衔接、跨平台适配按具体能力验证。</p></div><aside class="speaker-notes" hidden>空间图表达已有工作区与共享平台能力的关系，不把 Build、Testing、Deployment 画成已经验收的连续自动流水线。SDD 与 Agent Skills 支持规范、开发和文档协作；共享基础承载任务、配置、证据和治理。Deployment 是本次重点。跨平台复用还要适配 SOP、执行器及验收规则。</aside></section>
+<section class="slide" id="slide-3" aria-label="第 3 页：三步走" hidden inert>
+<header class="masthead"><div class="wordmark"><b>ATLAS</b></div><span class="series">DEPLOYMENT / CAPABILITY EVOLUTION</span><span class="edition">02 — EVOLUTION</span></header>
+<div class="slide-content"><div class="eyebrow reveal">DEPLOYMENT AGENT</div><div class="method-top reveal"><h2>交付能力，三步进化。</h2></div><div class="stages">
+<article class="stage reveal"><div class="stage-head"><span class="stage-number">01</span><span class="stage-label">已有模型与模板</span></div><svg class="stage-graphic" viewBox="0 0 320 180" role="img" aria-label="原子任务的独立单元"><g fill="#123654" stroke="#5cabc9" stroke-width="1.5"><path d="M48 70L82 50L116 70L82 90Z M48 70V110L82 130V90 M82 130L116 110V70"/><path d="M133 46L167 26L201 46L167 66Z M133 46V86L167 106V66 M167 106L201 86V46"/><path d="M212 89L246 69L280 89L246 109Z M212 89V129L246 149V109 M246 149L280 129V89"/></g><g fill="#87eaff"><path d="M67 70L82 61L97 70L82 79Z"/><path d="M152 46L167 37L182 46L167 55Z"/><path d="M231 89L246 80L261 89L246 98Z"/></g></svg><h3>原子化</h3><p>BAU → SOP → 原子任务<br>明确输入、输出与验证</p></article>
+<article class="stage focus reveal"><div class="stage-head"><span class="stage-number">02</span><span class="stage-label">已有执行适配</span></div><svg class="stage-graphic" viewBox="0 0 320 180" role="img" aria-label="通过路径连接的执行单元"><defs><linearGradient id="auto-face"><stop stop-color="#456cff"/><stop offset="1" stop-color="#1bb6cb"/></linearGradient></defs><path d="M46 117L123 73L194 115L272 70" fill="none" stroke="#63e8ff" stroke-width="2"/><g stroke="#9decff" stroke-width="1.4"><path d="M23 107L46 94L69 107L46 120Z M23 107V129L46 142L69 129V107 M46 120V142" fill="#18355a"/><path d="M94 65L123 48L152 65L123 82Z M94 65V91L123 108L152 91V65 M123 82V108" fill="url(#auto-face)"/><path d="M171 105L194 92L217 105L194 118Z M171 105V127L194 140L217 127V105 M194 118V140" fill="#18355a"/><path d="M249 60L272 47L295 60L272 73Z M249 60V82L272 95L295 82V60 M272 73V95" fill="#18355a"/></g><path d="M46 77L123 32L194 73L272 31" fill="none" stroke="#527cc9" stroke-dasharray="5 6"/></svg><h3>自动化</h3><p>复用 Jenkins、Ansible<br>连接执行，积累结果</p></article>
+<article class="stage future reveal"><div class="stage-head"><span class="stage-number">03</span><span class="stage-label">演进方向</span></div><svg class="stage-graphic" viewBox="0 0 320 180" role="img" aria-label="基于任务网络和反馈的智能辅助概念"><defs><radialGradient id="future-halo"><stop stop-color="#4c87ff" stop-opacity=".5"/><stop offset="1" stop-color="#4c87ff" stop-opacity="0"/></radialGradient></defs><circle cx="160" cy="90" r="86" fill="url(#future-halo)"/><g fill="none" stroke="#65bae6" stroke-width="1.2"><ellipse cx="160" cy="90" rx="73" ry="30" transform="rotate(-25 160 90)"/><ellipse cx="160" cy="90" rx="73" ry="30" transform="rotate(35 160 90)"/><ellipse cx="160" cy="90" rx="33" ry="65"/><ellipse cx="160" cy="90" rx="108" ry="66" stroke-dasharray="3 7"/></g><path d="M160 65L182 90L160 115L138 90Z" fill="#81ebff"/><g fill="#b9f8ff"><circle cx="92" cy="111" r="4"/><circle cx="213" cy="134" r="4"/><circle cx="175" cy="32" r="4"/><circle cx="248" cy="53" r="3"/></g></svg><h3>智能化</h3><p>利用规范与执行证据<br>辅助编排、解释与决策</p></article>
+</div><p class="governance reveal">人工评审贯穿全过程 · 当前 AI Assist 为预览占位</p></div><aside class="speaker-notes" hidden>独立立方体代表原子任务，连接路径代表自动执行，反馈网络代表未来的智能辅助。三步是能力建设路线。SOP 梳理依赖领域人员，自动化已有执行适配及模拟测试；智能编排、异常解释和辅助决策仍需实现与验证。几何图形是方法示意。</aside></section>
+<section class="slide" id="slide-4" aria-label="第 4 页：证据" hidden inert>
+<header class="masthead"><div class="wordmark"><b>ATLAS</b></div><span class="series">EVIDENCE / TRACEABLE RESULTS</span><span class="edition">03 — EVIDENCE</span></header>
+<div class="slide-content"><div class="eyebrow reveal">可复核的基础</div><h2 class="reveal">每一步进化，<br>都有对应的依据。</h2><div class="evidence-layout"><article class="measure reveal"><div class="measure-label">已有选定测试记录</div><div class="metric">84<span>项通过</span></div><p>10 个测试类<br>局部流程 · 模拟调用</p><p class="footnote">2026-09-07-v2 记录<br>非生产验收或收益数据</p></article><div class="evidence-list reveal"><article class="evidence-row"><span class="index">01</span><div><span class="evidence-tag">已有实现</span><h3>任务、执行与人工治理</h3><p>多工作区、任务导入、执行适配、评审与历史。</p></div></article><article class="evidence-row"><span class="index">02</span><div><span class="evidence-tag">合成样例</span><h3>合成样例与交接结构</h3><p>保留来源与历史版本，供案例解读和复核。</p></div></article><article class="evidence-row"><span class="index">03</span><div><span class="evidence-tag">下一步验证</span><h3>下一步：验证与测量</h3><p>iSeries / UTL 运行包、重复交付与人工投入基线。</p></div></article></div></div></div><aside class="speaker-notes" hidden>84 项通过来自已有的 2026-09-07-v2 选定测试记录，本次视觉小样未重新运行后端测试。它不是业务准确率、全量覆盖率或生产成功率。真实运行包、UTL 接口与收益证据仍需补充。页面右侧依次对应已有实现、合成样例和下一步验证。所有数值固定引用既有来源，没有模拟实时计数。</aside></section>
+</main>
+<nav aria-label="演示控制"><div class="nav-group"><button id="previous" aria-label="上一页">←</button><span id="counter" aria-live="polite">1 / 4</span><button id="next" aria-label="下一页">→</button></div><span class="keyboard-hint">ATLAS / 沉浸式科技视觉 · 四页小样</span><div class="nav-group"><button id="motion-button" aria-pressed="false" aria-label="暂停背景动效">暂停动效</button><button id="notes-button" aria-haspopup="dialog">备注 N</button></div></nav>
+<div id="progress" aria-hidden="true"></div><dialog id="notes-dialog" aria-labelledby="notes-title"><h2 id="notes-title">演讲者备注</h2><p id="notes-content"></p><button id="notes-close">关闭（Esc）</button></dialog>
+<script>
+class Presentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.index = 0;
+    this.lastWheel = 0;
+    this.dialog = document.querySelector('#notes-dialog');
+    this.observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('is-visible');
+    }), {threshold:.3});
+    this.slides.forEach(slide => this.observer.observe(slide));
+    document.querySelector('#previous').addEventListener('click', () => this.go(this.index - 1));
+    document.querySelector('#next').addEventListener('click', () => this.go(this.index + 1));
+    document.querySelector('#notes-button').addEventListener('click', () => this.notes());
+    document.querySelector('#notes-close').addEventListener('click', () => this.dialog.close());
+    document.addEventListener('keydown', event => this.key(event));
+    document.addEventListener('wheel', event => {
+      if (this.dialog.open || Math.abs(event.deltaY) < 20) return;
+      event.preventDefault();
+      if (Date.now() - this.lastWheel > 450) {
+        this.lastWheel = Date.now();
+        this.go(this.index + Math.sign(event.deltaY));
+      }
+    }, {passive:false});
+    document.addEventListener('touchstart', event => {
+      this.touch = {x:event.touches[0].clientX,y:event.touches[0].clientY};
+    }, {passive:true});
+    document.addEventListener('touchend', event => {
+      if (!this.touch || this.dialog.open) return;
+      const dx = this.touch.x - event.changedTouches[0].clientX;
+      const dy = this.touch.y - event.changedTouches[0].clientY;
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      if (Math.abs(delta) > 50) this.go(this.index + Math.sign(delta));
+      this.touch = null;
+    }, {passive:true});
+    window.addEventListener('hashchange', () => this.go(this.hashIndex()));
+    this.go(this.hashIndex());
+  }
+  hashIndex() {
+    const match = location.hash.match(/^#slide-(\d+)$/);
+    return match ? Number(match[1]) - 1 : 0;
+  }
+  go(index) {
+    this.index = Math.min(this.slides.length - 1, Math.max(0, index));
+
+    this.slides.forEach((slide, i) => {
+      slide.hidden = i !== this.index;
+      slide.inert = i !== this.index;
+      if (i !== this.index) slide.classList.remove('is-visible');
+    });
+    document.querySelector('#counter').textContent = (this.index + 1) + ' / ' + this.slides.length;
+    document.querySelector('#previous').disabled = this.index === 0;
+    document.querySelector('#next').disabled = this.index === this.slides.length - 1;
+    document.querySelector('#progress').style.width = ((this.index + 1) / this.slides.length * 100) + '%';
+    history.replaceState(null, '', '#slide-' + (this.index + 1));
+    document.title = 'Atlas · 沉浸式科技视觉 · ' + (this.index + 1) + '/' + this.slides.length;
+    window.dispatchEvent(new CustomEvent('slidechange', {detail:this.index}));
+  }
+  notes() {
+    if (this.dialog.open) { this.dialog.close(); return; }
+    document.querySelector('#notes-title').textContent = '第 ' + (this.index + 1) + ' 页 · 演讲者备注';
+    document.querySelector('#notes-content').textContent = this.slides[this.index].querySelector('.speaker-notes').textContent;
+    this.dialog.showModal();
+  }
+  key(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key.toLowerCase() === 'n') { event.preventDefault(); this.notes(); return; }
+    if (this.dialog.open) return;
+    if (event.key === ' ' && event.target instanceof HTMLButtonElement) return;
+    const forward = ['ArrowRight','ArrowDown','PageDown',' '].includes(event.key);
+    const backward = ['ArrowLeft','ArrowUp','PageUp'].includes(event.key);
+    if (forward || backward || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      this.go(event.key === 'Home' ? 0 : event.key === 'End' ? this.slides.length - 1 : this.index + (forward ? 1 : -1));
+    }
+  }
+}
+window.presentation = new Presentation();
+
+/* A deterministic projected 3D mesh. This is illustrative geometry, never live telemetry. */
+class TaskNetwork {
+  constructor() {
+    this.canvas = document.querySelector('#network-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    if (!this.ctx) { this.canvas.hidden = true; return; }
+    this.reduced = matchMedia('(prefers-reduced-motion: reduce)');
+    this.paused = this.reduced.matches;
+    this.angle = .45;
+    this.last = 0;
+    this.pointer = {x:0,y:0};
+    this.button = document.querySelector('#motion-button');
+    this.vertices = Array.from({length:19*36}, (_,i) => {
+      const lat = Math.PI*(Math.floor(i/36)+1)/20;
+      const lon = 2*Math.PI*(i%36)/36;
+      return {x:Math.sin(lat)*Math.cos(lon),y:Math.cos(lat),z:Math.sin(lat)*Math.sin(lon)};
+    });
+    this.button.addEventListener('click', () => { this.paused = !this.paused; this.sync(); });
+    this.reduced.addEventListener('change', () => { this.paused=this.reduced.matches; this.sync(); });
+    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('slidechange', () => this.draw());
+    document.addEventListener('visibilitychange', () => this.sync());
+    window.addEventListener('pointermove', e => {
+      this.pointer={x:(e.clientX/innerWidth-.5)*.12,y:(e.clientY/innerHeight-.5)*.1};
+    },{passive:true});
+    this.resize();
+    this.sync();
+  }
+  resize() {
+    this.width=innerWidth; this.height=innerHeight;
+    const ratio=Math.min(devicePixelRatio||1,2);
+    this.canvas.width=Math.round(this.width*ratio);
+    this.canvas.height=Math.round(this.height*ratio);
+    this.ctx.setTransform(ratio,0,0,ratio,0,0);
+    this.draw();
+  }
+  sync() {
+    cancelAnimationFrame(this.frameId);
+    this.button.textContent=this.paused?'播放动效':'暂停动效';
+    this.button.setAttribute('aria-label',this.paused?'播放背景动效':'暂停背景动效');
+    this.button.setAttribute('aria-pressed',String(this.paused));
+    this.draw();
+    if (!this.paused && !document.hidden) this.frameId=requestAnimationFrame(t=>this.frame(t));
+  }
+  frame(time) {
+    if (time-this.last>38) { this.angle+=.003; this.last=time; this.draw(); }
+    if (!this.paused && !document.hidden) this.frameId=requestAnimationFrame(t=>this.frame(t));
+  }
+  project(v,cx,cy,radius) {
+    const a=this.angle+this.pointer.x, ca=Math.cos(a),sa=Math.sin(a);
+    const x=v.x*ca-v.z*sa,z0=v.x*sa+v.z*ca;
+    const tilt=.27+this.pointer.y,ct=Math.cos(tilt),st=Math.sin(tilt);
+    const y=v.y*ct-z0*st,z=v.y*st+z0*ct;
+    const scale=2.8/(2.8-z);
+    return {x:cx+x*radius*scale,y:cy+y*radius*scale,z};
+  }
+  draw() {
+    const c=this.ctx,w=this.width,h=this.height;if(!w||!h)return;
+    c.clearRect(0,0,w,h);
+    const index=window.presentation?.index||0,mobile=w<600&&h>500;
+    // A sparse atmospheric field creates depth without adding display-only metrics.
+    for(let i=0;i<74;i++){
+      const x=((Math.sin(i*78.23)*43758.5)%1+1)%1*w;
+      const y=((Math.cos(i*34.79)*19543.4)%1+1)%1*h;
+      c.fillStyle=i%6===0?'#88b8e455':'#718cac25';c.fillRect(x,y,i%6===0?1.6:1,1);
+    }
+    if(index===1) { this.mapField(c,w,h); return; }
+    const primary=index===0;
+    const radius=primary?(mobile?Math.min(w*.39,h*.19):Math.min(w*.255,h*.34)):Math.min(w*.21,h*.32);
+    const cx=primary?(mobile?w*.68:w*.77):w*.92;
+    const cy=primary?(mobile?h*.69:h*.47):h*.62;
+    c.save();c.globalAlpha=primary?(mobile?.62:1):.14;
+    const aura=c.createRadialGradient(cx,cy,0,cx,cy,radius*1.6);
+    aura.addColorStop(0,'#205fd039');aura.addColorStop(.55,'#1e58d51c');aura.addColorStop(1,'#1458c000');
+    c.fillStyle=aura;c.fillRect(cx-radius*1.6,cy-radius*1.6,radius*3.2,radius*3.2);
+    const points=this.vertices.map(v=>this.project(v,cx,cy,radius));
+    for(let i=0;i<points.length;i++){
+      const p=points[i],row=Math.floor(i/36),next=points[row*36+(i+1)%36];
+      const alpha=.07+(p.z+1)*.14;
+      c.strokeStyle='rgba(69,156,225,'+alpha+')';c.lineWidth=p.z>0?.85:.6;
+      c.beginPath();c.moveTo(p.x,p.y);c.lineTo(next.x,next.y);c.stroke();
+      if(row<18){const q=points[i+36];c.beginPath();c.moveTo(p.x,p.y);c.lineTo(q.x,q.y);c.stroke();}
+      if(p.z>-.25){c.fillStyle=i%17===0?'#c5f8ff':'rgba(96,215,255,'+(.3+(p.z+1)*.24)+')';c.beginPath();c.arc(p.x,p.y,i%17===0?2.1:1,0,Math.PI*2);c.fill();}
+    }
+    // Inclined orbital paths connect a small number of highlighted task nodes.
+    for(let orbit=0;orbit<3;orbit++){
+      c.strokeStyle=orbit===0?'#76eaff75':'#5d83df50';c.lineWidth=orbit===0?1.3:.8;c.beginPath();
+      for(let step=0;step<=100;step++){
+        const a=step/100*Math.PI*2,tilt=.5+orbit*.8;
+        const q=this.project({x:Math.cos(a)*1.28,y:Math.sin(a)*Math.cos(tilt)*1.28,z:Math.sin(a)*Math.sin(tilt)*1.28},cx,cy,radius);
+        if(step===0)c.moveTo(q.x,q.y);else c.lineTo(q.x,q.y);
+      }c.stroke();
+      const a=this.angle*(orbit+1)+orbit*2,tilt=.5+orbit*.8;
+      const p=this.project({x:Math.cos(a)*1.28,y:Math.sin(a)*Math.cos(tilt)*1.28,z:Math.sin(a)*Math.sin(tilt)*1.28},cx,cy,radius);
+      const glow=c.createRadialGradient(p.x,p.y,0,p.x,p.y,14);glow.addColorStop(0,'#c9fbff');glow.addColorStop(.2,'#6adfffaa');glow.addColorStop(1,'#39aaff00');c.fillStyle=glow;c.fillRect(p.x-14,p.y-14,28,28);
+    }
+    c.restore();
+  }
+  mapField(c,w,h) {
+    const glow=c.createRadialGradient(w*.72,h*.48,0,w*.72,h*.48,w*.36);
+    glow.addColorStop(0,'#1a4eb229');glow.addColorStop(1,'#1a4eb200');c.fillStyle=glow;c.fillRect(0,0,w,h);
+  }
+}
+window.taskNetwork = new TaskNetwork();
+</script>
+</body></html>

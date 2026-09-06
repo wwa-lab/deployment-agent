@@ -1,5 +1,51 @@
 # Agent Handoff (Active)
 
+## Publication handoff — visual previews, 2026-09-07
+
+The user explicitly authorized commit, push and merge to main for the three visual previews and their design/handoff notes. Prepared branch: `codex/atlas-tech-previews`, from synchronized `main` / `origin/main` at `3407837`. Use the repository pull-request path to integrate this publication. Earlier "no new commit or push" statements below describe the completed prototype sessions before this authorization.
+
+Scope: the three four-slide HTML previews and two existing documentation files only. Existing formal deck/README/assets remain unchanged. Unrelated `.codegraph/daemon.pid` stays untracked. Each preview already passed 36 viewport checks; v3 also passed canvas/pause/resume/reduced-motion checks. Publication checks reconfirmed 235 Markdown links, inline JavaScript syntax, four slides per preview and diff whitespace. Product runtime/build tests were not rerun for this visual-only publication. This publication does not imply selection of a style for the full deck; that remains the next product decision.
+
+---
+
+## Latest session — immersive technology preview v3, 2026-09-07
+
+**Status:** User found v2 insufficiently technological overall. Added [immersive technology preview v3](../prototypes/atlas-immersive-tech-preview-v3.html) as a new local four-page concept on `main` at `3407837`. Earlier previews remain for comparison; no new commit or push.
+
+**Changes:** Rebuilt the composition with a full dark stage, large typography, a projected rotating task-network sphere and orbiting points, a spatial platform map, open three-step geometry and a large evidence figure. The sphere responds gently to pointer position; a visible pause/play button controls motion, reduced-motion starts paused, and rendering suspends when the document is hidden. Everything is inline canvas/SVG/CSS/JS and works offline. Diagrams and animation are explicitly conceptual, not live system telemetry. Current platform positioning, maturity caveats and prior 84-test source remain intact. Packaging design records prototype scope.
+
+**Verification:** 36 viewport checks passed (4 slides × 9 sizes) in offline macOS Chrome, with no detected overflow, network requests or page errors. Keyboard, notes, wheel and synthetic touch passed. Canvas produced visible pixels, rotation advanced, pause froze it, resume restarted it and reduced-motion froze it. Desktop contact sheet, full cover/platform and phone views inspected. Link check passed for 235 Markdown files; whitespace passed. Output/screenshots and animation checks: `target/atlas-immersive-tech-preview-v3/`. No application build, backend rerun, business UAT or Windows hardware testing for this visual prototype.
+
+**Next:** User evaluates the substantially revised visual direction before full-deck adoption. Existing prototypes, formal deck/evidence assets and unrelated `.codegraph/daemon.pid` remain. Content remains linked to the current pitch rather than a new product scope.
+
+---
+
+## Latest session — technology visual preview v2, 2026-09-07
+
+**Status:** User requested more technology character and visual impact. Added [four-slide technology preview v2](../prototypes/atlas-ocean-tech-preview-v2.html) locally on `main` at `3407837`; first ocean/teal preview remains for comparison. No new commit or push.
+
+**Changes:** Midnight navy with brighter cyan/teal, restrained background grids, layered geometric platform concept and short animated light paths. Cover and three-step slides are dark; platform and evidence slides are light. The same factual content and maturity caveats remain visible. These visuals represent a method, not live execution or system status. Updated the existing packaging design's prototype note; no runtime code or formal deck assets changed.
+
+**Verification:** 36 viewport checks (four slides × nine sizes) passed in offline macOS Chrome with no detected overflow, network requests or page errors. Keyboard, notes, wheel, synthetic touch and settled transitions passed. Flow animation is limited to three iterations and disabled by reduced-motion preference. Desktop contact sheet, full cover and phone three-step screenshot visually inspected. Link check passed for 235 Markdown files and diff whitespace passed. Local screenshots/report: `target/atlas-ocean-tech-preview-v2/`. No application tests/build or Windows hardware validation for this visual-only revision.
+
+**Next:** Review the technology preview's visual direction before extending it to the full presentation. Existing prototype and unrelated `.codegraph/daemon.pid` retained. Formal platform/evidence content and prior test records remain as described below.
+
+---
+
+## Latest session — ocean / teal visual prototype, 2026-09-07
+
+**Status:** Four-slide visual preview complete locally on `main` at `3407837`. The preceding documentation package was committed as `f078ca0`, merged as `3407837`, and pushed to origin/main in the prior turn. No new commit/push was requested for this prototype.
+
+**Scope and result:** The user accepted a preview of cover, platform overview, three-step progression and evidence using deep navy, teal and warm white. [Preview HTML](../prototypes/atlas-ocean-teal-preview.html) is self-contained with keyboard/wheel/touch navigation and notes. Existing v2 deck, README and evidence assets are unchanged. The existing [packaging design](../05-design/atlas-engineering-delivery-hub-design.md) records this prototype-only exploration; no runtime contracts changed.
+
+**Verification:** 4 slides × 9 viewport sizes = 36 checks passed in offline macOS Chrome, with no detected content overflow, network requests or page errors. Keyboard, notes, wheel, synthetic touch, reduced motion and settled default animation were checked. Four-page desktop contact sheet and representative phone views were visually inspected. Evidence-page copy was shortened to fit small displays without reducing text below the chosen readable sizes. Markdown links passed for 235 files; diff whitespace passed. Local verification output and screenshots: `target/atlas-ocean-preview/`. The 84-test figure is explicitly prior evidence; no backend tests or application build were rerun for this visual prototype. Windows hardware is untested.
+
+**Review:** Current content retains platform-first Agentic SDLC positioning, current IBM iSeries practice and the three-step maturity boundaries. No new capability or benefit claims added. Ready for visual selection only. `frontend-slides` viewport and density guidance informed responsive layout and verification.
+
+**Next:** User reviews the four-page visual direction. Full 18-slide restyling or README image replacement can follow acceptance; this preview is retained as the requested review artifact. Existing unrelated `.codegraph/daemon.pid` remains untracked.
+
+---
+
 ## Latest session — 2026-09-07 platform clarification
 
 **Status:** Local revision complete on `2026-codecup`, baseline `abf3850dee78b13c597f7da2791dd06d201c1a66`. No commit, push or merge. This section supersedes the release-only positioning in the earlier session below; prior test and visual evidence remain version-specific.
