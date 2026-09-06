@@ -1,185 +1,95 @@
 # Atlas Engineering Delivery Hub
 
-**Category:** Framework
-**Primary story:** Team delivery framework
-**Companion function:** [Atlas Engineering Delivery Hub - Deployment](docs/atlas-engineering-delivery-hub-deployment-index.md)
-**Chinese README:** [README.zh-CN.md](README.zh-CN.md)
+简体中文（默认） · [English](README.en.md)
 
-Atlas Engineering Delivery Hub is a team framework for making software delivery visible, governed, traceable, and reusable across the full engineering lifecycle. It organizes delivery work around the Seven Mountains SDLC and a repeatable I-E-O-V gate model: Input, Execute, Output, Validate.
+**Agentic SDLC 的具体实践：从原子化、自动化，走向智能化交付。**
 
-This repository is the current Atlas Engineering Delivery Hub implementation baseline that demonstrates the framework in working software. The visible product brand is **WWA-Atlas Engineering Delivery Hub** / **WWA-Atlas Hub**, preserving the WWA name that early adopters already recognize while connecting it to the Atlas framework. Some technical identifiers still use `WWA` or `deployment-agent` for compatibility. Deployment Agent is one implemented agent inside the Hub, not the whole story. For the open-collaboration competition, the repository supports two related entries:
+Atlas Engineering Delivery Hub 将规范、任务、工具执行、人工评审与交付证据组织在同一个平台中，让团队逐步把依赖经验的交付活动变成可复用、可编排、可追溯的工作流。**当前以 IBM iSeries 为实践场景，平台方法不限定单一交付语言。**
 
-| Entry | Category | What it shows | Where to start |
-|---|---|---|---|
-| Atlas Engineering Delivery Hub | Framework | A reusable team operating model for SDLC stages, shared workflow surfaces, human-in-the-loop governance, evidence, auditability, and contribution patterns. | This README, [framework docs index](docs/atlas-engineering-delivery-hub-index.md), [framework submission](docs/open-collaboration-submission.md) |
-| Atlas Engineering Delivery Hub - Deployment | Tool / Function | Deployment Agent as the M6 Deployment capability: controlled SIT / UAT / PROD release operations, including the design direction for IBM iSeries one-click release UTL workflows. | [Deployment docs index](docs/atlas-engineering-delivery-hub-deployment-index.md), [Deployment submission](docs/open-collaboration-submission-deployment.md) |
+介绍顺序是：先看平台如何承载 Agentic SDLC，再以 **Deployment Agent** 深入说明“原子化 → 自动化 → 智能化”的演进。IBM iSeries 实践背景由项目方确认；仓库中已有的实现、测试和样例，以及尚待补充的运行证据，分别列在[案例与证据索引](docs/samples/README.md)。
 
-![Atlas Engineering Delivery Hub framework lifecycle](docs/assets/atlas-framework-lifecycle.svg)
+![价值图：Agentic SDLC 平台，以 IBM iSeries 实践展示原子化、自动化、智能化](docs/assets/atlas-delivery-value-v2.png)
 
-## Framework Positioning
+[可编辑 SVG](docs/assets/atlas-delivery-value-v2.svg) · [中文路演 v2](docs/atlas-engineering-delivery-hub-presentation-v2.html)（离线打开） · [完整讲稿](docs/atlas-engineering-delivery-hub-pitch.md)
 
-The Hub is designed as a team framework rather than a single automation script or one deployment page. It gives teams a common way to describe each delivery stage, collect the right evidence, run controlled work, validate outcomes, and preserve decisions for later review.
+## Situation：已有经验和工具，怎样形成可持续演进的交付能力？
 
-The current implementation demonstrates this through a Spring Boot backend, Vue 3 frontend, shared platform shell, agent workspaces, access governance, audit logs, configuration management, Excel-based onboarding, and human review gates. Some lifecycle functions are implemented deeply, some are represented as framework direction, and each function can become its own project entry when it has enough working value.
+团队已有日常运维与发布任务（BAU Tasks）、操作经验、Jenkins Pipeline 和 Ansible 脚本，但这些资产需要共同的任务边界、输入输出和验证方式，才能被稳定复用和编排。人工步骤、执行结果与审批分散时，交接和异常处理还需要反复补齐上下文。
 
-## Seven Mountains SDLC
+当前以 IBM iSeries 发布实践切入：先梳理 BAU 工作和 SOP，再把部署、健康检查与结果验证组织成任务流。已有需求和合成样例支撑这一问题模型；具体人工成本及收益尚待测量。
 
-```text
-M1 Planning -> M2 Estimation -> M3 Discovery -> M4 Build -> M5 Testing -> M6 Deployment -> M7 Maintenance
-```
+## Solution：平台承载 Agentic SDLC，Deployment 展示三步走
 
-| Stage | Team framework purpose | Current repository signal |
+在本项目中，SDD 为需求、规范、设计与验收提供约束；Agent Skills 支持开发和文档协作；平台工作区连接具体任务、外部执行工具与人工治理。Build、Testing、Deployment 和共享服务提供已有实现基础，各阶段按实际成熟度逐步扩展。
+
+| 演进步骤 | Deployment Agent 中怎样体现 | 当前基础与后续方向 |
 |---|---|---|
-| M1 Planning | Align goals, scope, stakeholders, and approval readiness. | Agent Contribute Dashboard and framework docs. |
-| M2 Estimation | Capture effort, schedule, risk, and resource expectations. | Agent Contribute Dashboard and framework docs. |
-| M3 Discovery | Convert business intent into requirements, specs, and design evidence. | Framework target stage; Atlas Phoenix Lens / Legacy Spec Factory can plug in as an upstream example. |
-| M4 Build | Turn approved design into code, tasks, verification notes, and artifacts. | Build Agent workspace and shared task workflow baseline. |
-| M5 Testing | Produce validation evidence before release. | Testing Agent workspace direction and shared workflow baseline. |
-| M6 Deployment | Coordinate release execution, approvals, rollback posture, and auditability. | Implemented Deployment function in this repo. |
-| M7 Maintenance | Feed incidents, production learning, and improvement work back into delivery. | Framework target stage and roadmap area. |
+| **原子化** | BAU Tasks → 标准化 SOP → 明确输入、操作、预期输出、所有者与验证要求的原子任务 | 已有 Excel 模板、任务分组/顺序及 Release Flow → Request → Task 模型；SOP 梳理与拆分仍需要人的领域判断 |
+| **自动化** | 复用 Jenkins Pipeline、Ansible 脚本，将适合自动执行的任务交给执行器，保留人工步骤与评审 | 已有 MANUAL/AUTO 路径和 Jenkins/AWX 适配；实践介绍涉及 IBM iSeries Health Check UTL，其专用接口与端到端运行证据待补充 |
+| **智能化** | 在结构化任务与执行证据之上，逐步支持任务编排建议、异常解释和辅助决策 | 演进方向；现有 AI Assist 是预览占位，尚未证明智能编排或模型辅助决策已运行 |
 
-## Seven Gates: I-E-O-V
+三步走是**能力建设路线**，不是一次发布只有三个操作步骤。原子化让工具知道要执行和验证什么，自动化产生可积累的结果与历史，智能化才有明确约束和可引用的依据。人工评审、权限与审计贯穿全过程。
 
-Each lifecycle stage follows the same operating shape:
+![协作图：Agentic SDLC 平台、原子任务、自动执行与人工评审，以及智能化演进](docs/assets/atlas-delivery-workflow-v2.png)
 
-| Gate element | Meaning |
+[可编辑协作 SVG](docs/assets/atlas-delivery-workflow-v2.svg) · [当前执行状态详图](docs/assets/atlas-delivery-workflow-v1.svg)
+
+## 为什么具有通用性？
+
+平台抽象的是任务、阶段、输入输出、执行目标、结果和决策，而不是某种业务语言的语法。Jenkins/AWX 的任务适配、范围配置和人工评审机制，为不同技术栈复用提供了基础。平台自身使用 Java/Vue，与它所组织交付的业务系统语言是两个层次。
+
+IBM iSeries 是当前落地起点。迁移到其他语言或平台时，可复用任务契约、工作流和治理机制，但仍要适配具体 SOP、执行器及验证规则，并补充对应案例；目前不声称任意语言或平台已经验证兼容。
+
+## Result：实践背景、实现和验证分别说明
+
+| 层次 | 当前结论 |
 |---|---|
-| Input | Required intake artifacts, owners, scope, constraints, and preconditions. |
-| Execute | Controlled work performed by humans, agents, automations, or external tools. |
-| Output | Durable artifacts, decisions, run records, and traceable results. |
-| Validate | Review checks, test evidence, approvals, audit records, and acceptance decisions. |
+| 实践背景 | 项目方确认当前基于 IBM iSeries 实践，并以 Deployment Agent 作为重点展示；这不等于仓库已收录完整环境运行包 |
+| 已实现 | 多工作区与共享治理；发布清单导入、原子任务模型、MANUAL/AUTO、人工决策、执行历史、访问控制和审计 |
+| 可复核证据 | 原有合成发布/采用样例；上一轮 84 项选定测试通过，覆盖局部工作流与模拟外部调用，见[测试记录](docs/00-context/atlas-delivery-showcase-verification-2026-09-07.md) |
+| 尚待补充 | IBM iSeries 实际运行包、Health Check UTL 接口与验证结果、跨平台复用案例、重复交付记录 |
+| 演进与收益 | 智能编排与辅助决策仍为方向；暂无可引用的实测节省比例，按[测量口径](docs/samples/README.md#如何测量收益)开展对照 |
 
-This lets teams reuse one governance language across planning, build, testing, deployment, and maintenance, while still allowing each function to have its own workflow and tooling.
+执行边界：AUTO 提交成功不等于作业完成；轮询默认关闭，正确配置并启用后才同步外部状态。人工结果不自动验真；所有者或管理员可决策，当前没有强制双人审批。关键任务待评审会阻止下一任务就绪，跳过不等于执行成功。
 
-![Seven Gates I-E-O-V](docs/assets/seven-gates-ieov.svg)
+## 平台、Deployment 与其他项目的边界
 
-## Framework Capabilities
+平台面向组织交付流程的团队、工程负责人和平台维护者，提供规范协作、任务工作区、执行连接与治理基础。Deployment Agent 面向发布负责人、执行者和评审人员，将这些能力落实到 SIT/UAT/PROD 发布任务。
 
-Implemented and documented capability areas include:
+Deployment 的输入是任务工作簿、阶段、范围、所有者、流程标识和执行配置；输出是任务状态、结果、执行尝试、外部链接与人工决策记录。它接收上游产物和验证依据，治理发布过程；平台的更广目标不代表全部阶段已完成自动化交付。
 
-- Shared workspace shell for multiple delivery functions.
-- Agent/function workspaces for Build Agent, Testing Agent, and Deployment Agent workflows.
-- Human-in-the-loop task progression and review decisions.
-- Release Flow -> Request -> Task traceability model.
-- Scoped access governance with local Access Grants.
-- Audit logs with user, action, scope, agent, and correlation context.
-- Configuration management for reusable execution targets and team-owned settings.
-- Template and Excel-based onboarding for repeatable workflow setup.
-- SDD artifact chains that make requirements, stories, specs, architecture, design, and tasks explicit for human and AI collaborators.
+现有 [Deployment 模块入口](docs/atlas-engineering-delivery-hub-deployment-index.md)继续保留。平台介绍与模块深讲是同一展示的两个层次，共用证据不重复计算成果；其他参赛项目未纳入本次检查，不推定其能力或集成关系。
 
-## Deployment Function
+## 本地体验
 
-Deployment Agent is the most concrete agent currently packaged from this repository. It sits at M6 Deployment and converts validated build/testing outputs into controlled SIT / UAT / PROD release work.
+需要 JDK 21、Maven，以及能运行当前 Vite 5 工具链的 Node.js/npm。以下是实际项目命令，不需要通用 Agent CLI。
 
-Deployment Agent includes:
-
-- Excel-based deployment request onboarding.
-- Stage-aware release flow tracking for `SIT`, `UAT`, and `PROD`.
-- Manual task execution and AUTO submission paths.
-- Jenkins and Ansible/AWX execution adapters.
-- Human review decisions: approve, reject, rerun, skip.
-- Execution history, external job/log links, and audit records.
-- Access governance and release safety controls.
-
-For the second competition project, this agent can be presented independently as **Atlas Engineering Delivery Hub - Deployment**. Its differentiator is the one-click release UTL direction for IBM iSeries: the framework provides the controlled release shell, while Deployment Agent captures the task model, evidence, review gates, and adapter design needed to package iSeries release activity into a repeatable one-click operating flow.
-
-![Deployment tool workflow](docs/assets/atlas-deployment-tool-workflow.svg)
-
-## Current Scope And Boundaries
-
-This package does claim:
-
-- A working implementation baseline for shared delivery workflows.
-- A framework narrative that can host multiple SDLC functions.
-- A fully documented Deployment function slice with SDD traceability and sample outputs.
-- Bilingual reviewer entry points for the framework and Deployment function.
-
-Compatibility note:
-
-- Visible product brand: WWA-Atlas Engineering Delivery Hub / WWA-Atlas Hub.
-- Agent name: Deployment Agent.
-- Compatibility identifiers retained for now: `/wwa/*`, `/wwa/deployment-agent`, `/api/deployment-agent`, Maven `artifactId=agenthub`, and Java package `com.wwa.agenthub`.
-
-This package does not claim:
-
-- Full autonomous delivery approval.
-- Complete production rollout for every Seven Mountains stage.
-- Real enterprise Team Book production integration in this open package.
-- One-click infrastructure rollback.
-- Real credentials, customer data, kubeconfigs, internal screenshots, or production environment names.
-
-## Quick Start
-
-Backend:
+在仓库根目录启动后端：
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Frontend:
+另开终端启动前端（已有锁文件时使用 `npm ci`）：
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Open:
+打开 [本地工作台](http://localhost:5173/wwa/deployment-agent)。local 后端为 8081，前端代理与之匹配；H2 为内存数据。首次可使用登录页的访客入口只读浏览。写操作需要本地配置的测试身份与权限，不能用真实 Staff ID 演示。
 
-```text
-http://localhost:5173/wwa/deployment-agent
-```
+本地认证桩接受非空密码，仅用于开发；不是企业认证兼容证明。路演无需启动应用，直接打开单文件 HTML 即可，Windows 11 可用浏览器打开；尚未在 Windows 实机验证。
 
-Local/test stub users are documented in [the preserved implementation baseline](docs/wwa-agent-workspace-hub-current-baseline.md). In local mode, any non-empty password works for the configured stub authentication provider.
+## 文档与参与
 
-## Documentation Map
+- [文档总索引](docs/atlas-engineering-delivery-hub-index.md)：技术参考、模块入口、SDD 追踪。
+- [案例索引与模板](docs/samples/README.md)：原始来源、版本、人工介入、校验值和验证边界。
+- [中文报名材料](docs/open-collaboration-submission.zh-CN.md) · [English submission](docs/open-collaboration-submission.md)：个人字段留空。
+- [贡献指南](CONTRIBUTING.md)：新增案例、执行器适配和验证约定。
+- [历史实现基线](docs/wwa-agent-workspace-hub-current-baseline.md)：保留参考，运行端口等旧说明以本页和配置为准。
 
-Framework entry:
+下一步先在获授权的非生产环境跑通包含失败与重跑的发布流程，保留输入、原始输出和人工记录；再用多个同等复杂度案例测量收益。在 IBM iSeries 实践基础上补全 UTL 专用执行证据，再逐步扩展平台复用和智能化能力。
 
-- [Framework documentation index](docs/atlas-engineering-delivery-hub-index.md)
-- [Framework open collaboration submission](docs/open-collaboration-submission.md)
-- [Chinese framework submission](docs/open-collaboration-submission.zh-CN.md)
-- [Framework pitch](docs/atlas-engineering-delivery-hub-pitch.md)
-- [Framework adoption sample](docs/samples/atlas-framework-adoption-sample.md)
-- [Framework SDD traceability](docs/00-context/atlas-engineering-delivery-hub-traceability.md)
-
-Deployment function entry:
-
-- [Deployment documentation index](docs/atlas-engineering-delivery-hub-deployment-index.md)
-- [Deployment open collaboration submission](docs/open-collaboration-submission-deployment.md)
-- [Chinese Deployment submission](docs/open-collaboration-submission-deployment.zh-CN.md)
-- [Deployment pitch](docs/atlas-engineering-delivery-hub-deployment-pitch.md)
-- [Deployment sample package](docs/samples/atlas-deployment-tool-mini-output/README.md)
-- [Deployment SDD traceability](docs/00-context/atlas-engineering-delivery-hub-deployment-traceability.md)
-
-Runtime and contribution references:
-
-- [Contribution guide](CONTRIBUTING.md)
-- [Current implementation baseline](docs/wwa-agent-workspace-hub-current-baseline.md)
-- [Platform and Deployment architecture](docs/04-architecture/architecture.md)
-- [Detailed design baseline](docs/05-design/design.md)
-- [SDD profile](docs/00-context/sdd-profile.md)
-
-## Roadmap
-
-- Clarify function-level project packaging for Discovery, Build, Testing, Deployment, and Maintenance.
-- Expand the IBM iSeries one-click release UTL design under the Deployment function without exposing real environment details.
-- Add clearer upstream evidence contracts between Build, Testing, and Deployment.
-- Strengthen reusable templates for stage gates, task manifests, evidence capture, and review decisions.
-- Continue improving SDD, Markdown, Mermaid, and documentation validation automation.
-
-## Verification
-
-Recommended documentation/package checks:
-
-```bash
-git diff --check
-node scripts/check-markdown-links.mjs
-```
-
-Runtime checks for code changes:
-
-```bash
-mvn test
-cd frontend && npm run build
-```
+开发校验：`mvn test`；前端目录执行 `npm run build`；文档执行 `node scripts/check-markdown-links.mjs`。任何检查通过都只代表对应范围。

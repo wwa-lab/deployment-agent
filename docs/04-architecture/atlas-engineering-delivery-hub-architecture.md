@@ -1,5 +1,16 @@
 # Atlas Engineering Delivery Hub Packaging Architecture
 
+## Current revision — 2026-09-07, platform clarification
+This revision changes information architecture only; runtime boundaries and ownership are unchanged. It supersedes earlier default-language and dual-entry packaging descriptions below.
+
+The entry layer introduces the Agentic SDLC platform, its current IBM iSeries practice setting and language-independent method in Chinese and English. It then focuses on Deployment Agent: atomization, automation and intelligence as a staged capability path. The narrative layer uses one primary pitch with submission summaries referring to it. The evidence layer owns case provenance, maturity and verification results. The presentation and two diagrams are views of those same claims. Historical Deployment entry points resolve to a module-level view, not an asserted independent solution.
+
+Shared intake, task services, execution adapters and human decisions remain the implemented system boundary. External work is performed by people or configured tools; the Hub records and governs its workflow. Generic task metadata, scoped configuration and execution-adapter boundaries are the reuse basis across delivery languages. New platform adapters and intelligence remain subject to explicit contracts and validation. Repository Agent Skills guide development and documentation; they are not the running release engine. No other project's implementation or evidence is imported.
+
+Historical evidence stays immutable; new evidence references its source version. Known limits are simulated external calls, unverified deployment environments, and absent field-benefit measurements. This information model prevents a sample or framework aspiration from being treated as an operational result.
+
+## Historical packaging baseline (superseded where inconsistent)
+
 **Date:** 2026-06-27
 **Status:** Proposed / Documents-first
 **Source spec:** [atlas-engineering-delivery-hub-spec.md](../03-spec/atlas-engineering-delivery-hub-spec.md)
@@ -97,4 +108,3 @@ The package follows repository safety rails:
 - [Agent Contribute Dashboard Architecture](agent-contribute-dashboard-architecture.md)
 - [WWA Product Positioning](../00-context/wwa-product-positioning.md)
 - [SDD Profile](../00-context/sdd-profile.md)
-

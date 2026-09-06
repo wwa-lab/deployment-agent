@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Atlas Engineering Delivery Hub：团队交付执行与证据治理工作台。中文离线路演，明确实现、合成案例、测试和未验证收益的边界。">
+<title>Atlas Engineering Delivery Hub · 发布交接有依据</title>
+<style>
+/* Self-contained editorial presentation; system CJK fonts are intentional for offline Windows use. */
+:root{--red:#b91c2b;--ink:#171717;--paper:#faf9f6;--slide-padding:clamp(1.2rem,5vw,6rem);--title-size:clamp(2.1rem,5.5vw,5.8rem);--h2-size:clamp(1.85rem,3.8vw,4rem);--h3-size:clamp(1.05rem,1.6vw,1.65rem);--body-size:clamp(1rem,1.6vw,1.65rem);--small-size:clamp(.8rem,1.05vw,1.1rem);--content-gap:clamp(.7rem,2.4vh,2rem);--element-gap:clamp(.4rem,1vw,1rem)}
+*{box-sizing:border-box}html,body{height:100%;overflow-x:hidden;margin:0}html{scroll-snap-type:y mandatory;scroll-behavior:smooth}body{background:var(--paper);color:var(--ink);font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif}
+.slide{width:100vw;height:100vh;height:100dvh;overflow:hidden;scroll-snap-align:start;display:flex;flex-direction:column;position:relative}
+.slide[hidden]{display:none}.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;overflow:hidden;padding:var(--slide-padding);padding-bottom:clamp(5rem,11vh,7rem);gap:var(--content-gap)}
+.eyebrow{font-size:var(--small-size);letter-spacing:.1em;font-weight:700;color:var(--red)}
+h1,h2,h3,p{margin:0}h1{font-size:var(--title-size);line-height:1.15;letter-spacing:-.035em;max-width:22ch}h2{font-size:var(--h2-size);line-height:1.2;letter-spacing:-.03em;max-width:27ch}h3{font-size:var(--h3-size);line-height:1.4}.lead{font-size:clamp(1.15rem,2.15vw,2.25rem);line-height:1.55;max-width:52ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:clamp(.6rem,1.5vw,1.5rem);width:100%;margin-top:clamp(.2rem,1vh,.8rem)}
+.card{border-top:3px solid var(--ink);padding:clamp(.8rem,1.4vw,1.5rem) 0;max-width:100%;max-height:min(65vh,700px);display:flex;flex-direction:column;gap:var(--element-gap)}
+.card-number{font-size:var(--small-size);color:var(--red);font-weight:700}.card p{font-size:var(--body-size);line-height:1.6;color:#454545}.foot{font-size:var(--small-size);line-height:1.55;color:#5c5c5c;max-width:95ch}
+.cover{background:var(--red);color:white}.cover .eyebrow{color:#fff}.cover:after{content:"";position:absolute;right:7vw;top:18vh;width:21vw;height:52vh;border:clamp(.4rem,1vw,1rem) solid #ffffff30;transform:skewY(-12deg);pointer-events:none}
+.dark{background:var(--ink);color:var(--paper)}.dark .eyebrow{color:#ff9ca7}
+nav{position:fixed;bottom:0;left:0;width:100%;height:clamp(3.8rem,8vh,5rem);padding:0 clamp(.8rem,3vw,3rem);background:var(--paper);color:var(--ink);border-top:1px solid #d5d5d5;display:flex;align-items:center;justify-content:space-between;gap:clamp(.3rem,1vw,1rem);z-index:10}
+.nav-group{display:flex;align-items:center;gap:clamp(.35rem,1vw,1rem)}button{font:inherit;font-size:clamp(.8rem,1vw,1rem);color:var(--ink);background:transparent;border:1px solid #999;border-radius:4px;min-height:40px;padding:clamp(.35rem,.6vw,.55rem) clamp(.5rem,1vw,1rem);cursor:pointer}button:hover{background:#ece7e3}button:focus-visible{outline:3px solid var(--red);outline-offset:3px}button:disabled{opacity:.35;cursor:default}
+#counter{font-size:var(--small-size);font-variant-numeric:tabular-nums;white-space:nowrap}.keyboard-hint{font-size:var(--small-size);color:#555}#progress{position:fixed;bottom:0;left:0;height:4px;background:var(--red);width:0;z-index:11;transition:width .25s}
+dialog{max-width:min(90vw,880px);max-height:80vh;border:2px solid var(--red);background:var(--paper);padding:clamp(1rem,3vw,2.5rem);color:var(--ink)}dialog::backdrop{background:#0009}dialog h2{font-size:clamp(1.3rem,2vw,2rem)}dialog p{font-size:clamp(1rem,1.5vw,1.3rem);line-height:1.8;margin:clamp(1rem,2vh,2rem) 0}.speaker-notes[hidden]{display:none}
+.reveal{opacity:0;transform:translateY(10px);transition:opacity .3s,transform .3s}.is-visible .reveal{opacity:1;transform:none}.is-visible .grid .card:nth-child(2){transition-delay:.06s}.is-visible .grid .card:nth-child(3){transition-delay:.12s}
+@media(max-height:700px){:root{--slide-padding:clamp(1rem,3vw,2.5rem);--content-gap:clamp(.45rem,1.7vh,1rem);--title-size:clamp(2rem,5vw,3.5rem);--h2-size:clamp(1.7rem,3.7vw,2.8rem)}}
+@media(max-height:600px){:root{--slide-padding:clamp(.8rem,2.5vw,2rem);--content-gap:clamp(.35rem,1.4vh,.8rem);--title-size:clamp(1.8rem,4.5vw,3rem);--body-size:clamp(1rem,1.7vw,1.2rem)}.keyboard-hint,.decorative{display:none}.card{padding:clamp(.3rem,1vh,.6rem) 0}.slide-content{padding-bottom:clamp(4.3rem,15vh,5.3rem)}}
+@media(max-height:500px){:root{--title-size:clamp(1.7rem,4.4vw,2.5rem);--h2-size:clamp(1.45rem,3.7vw,2rem);--small-size:clamp(.8rem,1.4vw,.95rem);--h3-size:clamp(1rem,1.7vw,1.2rem);--element-gap:clamp(.2rem,.6vh,.4rem)}.grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}.card-number{display:none}.lead{font-size:clamp(1.05rem,2vw,1.4rem)}.card p{line-height:1.4}.foot{line-height:1.35}}
+@media(max-width:600px) and (min-height:501px){:root{--title-size:clamp(2rem,9vw,3.2rem);--h2-size:clamp(1.7rem,7vw,2.6rem)}.grid{grid-template-columns:1fr;gap:clamp(.3rem,1vh,.7rem)}.card{display:grid;grid-template-columns:1fr 1.45fr;gap:clamp(.3rem,1vw,.7rem);padding:clamp(.6rem,1.5vh,1rem) 0;align-items:start}.card-number{display:none}.card p{font-size:clamp(1rem,4vw,1.2rem);line-height:1.45}.keyboard-hint{display:none}.cover:after{display:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important}html{scroll-behavior:auto}}
+@media print{.slide[hidden]{display:flex!important}.slide{break-after:page;height:100vh}.reveal{opacity:1;transform:none}nav,#progress,dialog{display:none!important}}
+</style></head>
+<body>
+<main><section class="slide cover" id="slide-1" aria-label="第 1 页">
+<div class="slide-content"><div class="eyebrow reveal">ATLAS / ENGINEERING DELIVERY HUB</div><h1 class="reveal">让发布交接<br>有依据</h1><p class="lead reveal">把任务、执行结果和人工决策<br>放进同一个可追踪工作台。</p></div><aside class="speaker-notes" hidden>保留项目名称 Atlas Engineering Delivery Hub。定位为团队交付执行与证据治理工作台，以发布协作展示已实现机制。已有 Framework 分类继续作为背景，不暗示全部生命周期已经交付。</aside></section>
+<section class="slide dark" id="slide-2" aria-label="第 2 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">SITUATION / 01</div><h2 class="reveal">执行完了，<br>为什么还不能继续？</h2><p class="lead reveal">表格里有任务，外部工具里有作业。<br>交接时，还要找到对应结果和人工确认。</p></div><aside class="speaker-notes" hidden>场景依据是仓库既有发布需求与合成样例，不是可核验访谈。本次没有真实用户反馈或损失数据。讲述人工查找和对齐的具体工作，不虚构时间成本。</aside></section>
+<section class="slide " id="slide-3" aria-label="第 3 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">SITUATION / 02</div><h2 class="reveal">一次交接，三个问题</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>任务</h3><p>在哪个阶段？<br>做到哪一步？</p></article><article class="card reveal"><span class="card-number">02</span><h3>结果</h3><p>哪次执行？<br>依据在哪里？</p></article><article class="card reveal"><span class="card-number">03</span><h3>决策</h3><p>谁认可了什么？<br>失败后如何继续？</p></article></div><p class="foot reveal">使用者：发布负责人、任务执行者、评审人员</p></div><aside class="speaker-notes" hidden>聚焦 SIT/UAT/PROD 发布协作。管理员负责范围权限和外部执行配置。问题的合理性有需求依据，但发生频率和业务成本尚未测量。</aside></section>
+<section class="slide " id="slide-4" aria-label="第 4 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">POSITION / 03</div><h2 class="reveal">本项目交付的闭环</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>输入</h3><p>任务工作簿<br>阶段、范围、所有者</p></article><article class="card reveal"><span class="card-number">02</span><h3>处理</h3><p>组织任务<br>执行、记录、人工决策</p></article><article class="card reveal"><span class="card-number">03</span><h3>输出</h3><p>状态与结果<br>尝试历史、外部链接、审计</p></article></div><p class="foot reveal">Workflow Identifier 关联阶段；上游构建包与测试结论由人确认。</p></div><aside class="speaker-notes" hidden>跨阶段汇总要显式复用 Workflow Identifier；空标识上传创建新流程，不自动关联。输入还有执行配置。输出当前分布在界面/API和存储，不宣称一键导出的认证证据包。</aside></section>
+<section class="slide " id="slide-5" aria-label="第 5 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">SOLUTION / 04</div><h2 class="reveal">三个机制，各解决一个问题</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>结构化接收</h3><p>从表格找到<br>具体任务与阶段</p></article><article class="card reveal"><span class="card-number">02</span><h3>执行和决策分开</h3><p>把“已运行”与<br>“已认可”区分开</p></article><article class="card reveal"><span class="card-number">03</span><h3>保留每次尝试</h3><p>把这次操作与<br>当时的输入、结果关联</p></article></div><p class="foot reveal">当前依据：共享服务、状态机、执行适配与历史记录代码。</p></div><aside class="speaker-notes" hidden>这是现有机制的组合价值，不声称行业首创。外部作业系统负责执行，Hub补充任务、阶段和交接上下文。文档 SDD 和 Agent Skills 支持开发协作，不作为运行时自动决策证据。</aside></section>
+<section class="slide " id="slide-6" aria-label="第 6 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">MECHANISM / 05</div><h2 class="reveal">两条执行路径，<br>不能混为一次“成功”</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>MANUAL</h3><p>人完成外部工作<br>填写结果 → 待评审</p></article><article class="card reveal"><span class="card-number">02</span><h3>AUTO</h3><p>提交 Jenkins / AWX<br>同步成功结果 → 待评审</p></article></div><p class="foot reveal">AUTO 轮询默认关闭；提交成功后仍处于 Executing。</p></div><aside class="speaker-notes" hidden>AutoExecutionAdapter 定义 submit 与 pollStatus，Jenkins/AWX有实现。必须正确配置并启用 execution.monitor.enabled 才会后台同步。本次模拟测试不证明真实连接。MANUAL记录不自动验证业务正确性。</aside></section>
+<section class="slide " id="slide-7" aria-label="第 7 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">MECHANISM / 06</div><h2 class="reveal">人在有效状态下作出决策</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>待评审</h3><p>Approve / Reject<br>也可按规则 Skip</p></article><article class="card reveal"><span class="card-number">02</span><h3>失败或拒绝</h3><p>修正后 Rerun<br>留下新的执行尝试</p></article><article class="card reveal"><span class="card-number">03</span><h3>任务推进</h3><p>关键任务待评审<br>阻止下一任务就绪</p></article></div><p class="foot reveal">所有者或管理员操作；没有强制双人审批。</p></div><aside class="speaker-notes" hidden>DecisionEngine校验状态与权限。Skip允许Pending、Ready_For_Execution、Awaiting_Review，Executing不允许。非关键任务待评审不具有同等阻断。全部Approved或Skipped可以完成请求，因此完成不等于每项都成功执行。</aside></section>
+<section class="slide " id="slide-8" aria-label="第 8 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">MECHANISM / 07</div><h2 class="reveal">留下记录，才有复盘依据</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>执行历史</h3><p>输入快照、结果<br>尝试编号、外部链接</p></article><article class="card reveal"><span class="card-number">02</span><h3>操作审计</h3><p>任务、操作<br>决策与上下文</p></article></div><p class="foot reveal">追溯基础已实现；不是不可篡改合规归档认证。</p></div><aside class="speaker-notes" hidden>审计和历史有代码与选定测试，不宣称全字段正确性或合规认证。基础设施回滚仍需执行团队批准的恢复方案。历史审计字段的完整性还需专项验证。</aside></section>
+<section class="slide " id="slide-9" aria-label="第 9 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">CASE / 08</div><h2 class="reveal">已有案例：先看来源</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>C01 · 合成发布样例</h3><p>输入、任务输出、审计<br>与回滚交接检查表</p></article><article class="card reveal"><span class="card-number">02</span><h3>C02 · 合成采用模板</h3><p>角色与阶段<br>I-E-O-V 证据清单</p></article></div><p class="foot reveal">两组均为手写合成说明，不是客户案例或实际运行输出。</p></div><aside class="speaker-notes" hidden>源材料在docs/samples/原有位置，保留原字节并新增SHA-256清单。C01的提交成功与Awaiting_Review同时出现是简化，不符合当前提交即保持Executing的精确语义；不改写旧证据，在案例索引解释。C02提及别的项目是设想，不证明集成。</aside></section>
+<section class="slide " id="slide-10" aria-label="第 10 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">RESULT / 09</div><h2 class="reveal">本次复验：84 项通过</h2><p class="lead reveal">10 个选定测试类 · 0 失败 · 0 错误 · 0 跳过</p><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>验证了什么</h3><p>导入、状态决策、历史<br>以及模拟执行与同步</p></article><article class="card reveal"><span class="card-number">02</span><h3>没有验证什么</h3><p>真实外部作业<br>业务验收与生产可用性</p></article></div><p class="foot reveal">证据版本：2026-09-07-v2；84 是测试数，不是业务覆盖率。</p></div><aside class="speaker-notes" hidden>来源是docs/samples/evidence/2026-09-07-v2/test-results.json，基线abf3850dee78b13c597f7da2791dd06d201c1a66。测试编译/运行成功。v1 Maven也通过，但采集脚本报告目录参数未生效，导致摘要缺失；保留v1，修正采集器后产生v2，不覆盖旧结果。模拟调用和方法级同步测试不等于真实调度、网络或部署验收。</aside></section>
+<section class="slide " id="slide-11" aria-label="第 11 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">BOUNDARY / 10</div><h2 class="reveal">共享工作台，<br>不等于全部阶段已交付</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>已有工作区</h3><p>Deployment<br>Build（DEV） / Testing（UAT）</p></article><article class="card reveal"><span class="card-number">02</span><h3>证据没有覆盖</h3><p>自主生成业务代码<br>自主测试与端到端生产交付</p></article></div><p class="foot reveal">Agent Skills 用于开发与文档协作；AI Assist 为预览占位。</p></div><aside class="speaker-notes" hidden>保持名称，收紧成熟度声明。Seven Mountains与I-E-O-V作为参考模型，不从贡献目录状态推断功能已落地。iSeries一键发布、自动回滚、更广生命周期接入是计划或未验证。</aside></section>
+<section class="slide " id="slide-12" aria-label="第 12 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">BOUNDARY / 11</div><h2 class="reveal">独立问题，要有独立证据</h2><p class="lead reveal">本项目评价：<br>发布任务 → 有结果与人工决策记录的工作流。</p><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>Deployment</h3><p>同仓库模块<br>共享证据不能计两次</p></article><article class="card reveal"><span class="card-number">02</span><h3>其他报名项目</h3><p>本次没有检查<br>不推定能力和集成</p></article></div></div><aside class="speaker-notes" hidden>仓库旧材料把Hub与Deployment分别包装为框架与工具，但共用实现与样例不足以证明两个独立方案。保持旧入口，统一价值和证据。没有改动报名系统；如果实际仍分开报名，需要新增独立交付物和验证才能主张独立，不能通过更换文案规避。</aside></section>
+<section class="slide " id="slide-13" aria-label="第 13 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">MEASUREMENT / 12</div><h2 class="reveal">收益暂不填数字</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>查找时间</h3><p>提出问题 → 找对证据<br>记录样本和时间分布</p></article><article class="card reveal"><span class="card-number">02</span><h3>交接完整率</h3><p>材料齐全任务<br>÷ 全部评价任务</p></article><article class="card reveal"><span class="card-number">03</span><h3>恢复人工投入</h3><p>异常处理的操作分钟<br>等待时间单独统计</p></article></div><p class="foot reveal">先冻结口径、匹配复杂度，再做基线与试点对照。</p></div><aside class="speaker-notes" hidden>测量计划尚未执行。净人工节省=基线人工分钟−Hub人工分钟−额外配置维护和复核分钟，各活动计时互斥。失败、跳过与人工兜底不能剔除。测试耗时不是节省时间，测试数也不是业务准确率或覆盖率。</aside></section>
+<section class="slide " id="slide-14" aria-label="第 14 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">NEXT / 13</div><h2 class="reveal">下一步，补一条真实证据链</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>获授权试点</h3><p>非生产环境<br>固定输入与版本</p></article><article class="card reveal"><span class="card-number">02</span><h3>完整记录</h3><p>成功、失败、重跑<br>原始输出与人工介入</p></article><article class="card reveal"><span class="card-number">03</span><h3>重复对照</h3><p>多个可比任务<br>验收结果与成本基线</p></article></div><p class="foot reveal">真实案例授权、业务结果与实测收益，目前仍待补充。</p></div><aside class="speaker-notes" hidden>记录原始数据的获批准位置和SHA-256，再生成可公开的脱敏摘要。新增运行必须进入新版本。不要在报名材料填写个人信息，也不要公开内部端点、凭据或客户数据。</aside></section>
+<section class="slide " id="slide-15" aria-label="第 15 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">DEMO / 14</div><h2 class="reveal">从材料到现场演示</h2><div class="grid"><article class="card reveal"><span class="card-number">01</span><h3>离线讲解</h3><p>直接打开本 HTML<br>看机制、案例和验证边界</p></article><article class="card reveal"><span class="card-number">02</span><h3>产品体验</h3><p>按 README 启动 local<br>访客只读；写操作用测试身份</p></article></div><p class="foot reveal">原有 JSON 不是上传文件；写演示需下载应用 Excel 模板。</p></div><aside class="speaker-notes" hidden>方向键、PageUp/PageDown、空格、按钮、滚轮或触摸翻页。Home/End到首尾，N打开本页备注，Esc关闭。Windows 11可用浏览器打开HTML，不需要Python；本次未在Windows实机验证。现场无法跑通时明确称为合成讲解，不能把静态展示称作执行成功。</aside></section>
+<section class="slide dark" id="slide-16" aria-label="第 16 页" hidden inert>
+<div class="slide-content"><div class="eyebrow reveal">ATLAS / ENGINEERING DELIVERY HUB</div><h2 class="reveal">把交接落实到任务，<br>把结论留给证据。</h2><p class="lead reveal">已有机制与局部测试。<br>下一步，用获授权真实实践检验价值。</p></div><aside class="speaker-notes" hidden>结束时强调项目的独立问题和下一步证据，而非虚构节省数字。详细定位见README与路演讲稿，案例状态和测量定义在docs/samples/README.md维护。此演示只做本地交付，未提交报名、commit、push或merge。</aside></section></main>
+<nav aria-label="演示控制"><div class="nav-group"><button id="previous" aria-label="上一页">←</button><button id="next" aria-label="下一页">→</button><span id="counter" aria-live="polite"></span></div><span class="keyboard-hint">方向键 / 空格翻页 · N 备注</span><button id="notes-button" aria-haspopup="dialog">备注 N</button></nav>
+<div id="progress" aria-hidden="true"></div>
+<dialog id="notes-dialog" aria-labelledby="notes-title"><h2 id="notes-title">演讲者备注</h2><p id="notes-content"></p><button id="notes-close">关闭（Esc）</button></dialog>
+<script>
+class Presentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.index = 0;
+    this.lastWheel = 0;
+    this.dialog = document.querySelector('#notes-dialog');
+    this.observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('is-visible');
+    }), {threshold:.3});
+    this.slides.forEach(slide => this.observer.observe(slide));
+    document.querySelector('#previous').addEventListener('click', () => this.go(this.index - 1));
+    document.querySelector('#next').addEventListener('click', () => this.go(this.index + 1));
+    document.querySelector('#notes-button').addEventListener('click', () => this.notes());
+    document.querySelector('#notes-close').addEventListener('click', () => this.dialog.close());
+    document.addEventListener('keydown', event => this.key(event));
+    document.addEventListener('wheel', event => {
+      if (this.dialog.open || Math.abs(event.deltaY) < 20) return;
+      event.preventDefault();
+      if (Date.now() - this.lastWheel > 450) {
+        this.lastWheel = Date.now();
+        this.go(this.index + Math.sign(event.deltaY));
+      }
+    }, {passive:false});
+    document.addEventListener('touchstart', event => {
+      this.touch = {x:event.touches[0].clientX,y:event.touches[0].clientY};
+    }, {passive:true});
+    document.addEventListener('touchend', event => {
+      if (!this.touch || this.dialog.open) return;
+      const dx = this.touch.x - event.changedTouches[0].clientX;
+      const dy = this.touch.y - event.changedTouches[0].clientY;
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      if (Math.abs(delta) > 50) this.go(this.index + Math.sign(delta));
+      this.touch = null;
+    }, {passive:true});
+    window.addEventListener('hashchange', () => this.go(this.hashIndex()));
+    this.go(this.hashIndex());
+  }
+  hashIndex() {
+    const match = location.hash.match(/^#slide-(\d+)$/);
+    return match ? Number(match[1]) - 1 : 0;
+  }
+  go(index) {
+    this.index = Math.min(this.slides.length - 1, Math.max(0, index));
+    this.slides.forEach((slide, i) => {
+      slide.hidden = i !== this.index;
+      slide.inert = i !== this.index;
+      if (i !== this.index) slide.classList.remove('is-visible');
+    });
+    document.querySelector('#counter').textContent = (this.index + 1) + ' / ' + this.slides.length;
+    document.querySelector('#previous').disabled = this.index === 0;
+    document.querySelector('#next').disabled = this.index === this.slides.length - 1;
+    document.querySelector('#progress').style.width = ((this.index + 1) / this.slides.length * 100) + '%';
+    history.replaceState(null, '', '#slide-' + (this.index + 1));
+    document.title = 'Atlas Engineering Delivery Hub · ' + (this.index + 1) + '/' + this.slides.length;
+  }
+  notes() {
+    if (this.dialog.open) { this.dialog.close(); return; }
+    document.querySelector('#notes-title').textContent = '第 ' + (this.index + 1) + ' 页 · 演讲者备注';
+    document.querySelector('#notes-content').textContent = this.slides[this.index].querySelector('.speaker-notes').textContent;
+    this.dialog.showModal();
+  }
+  key(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key.toLowerCase() === 'n') { event.preventDefault(); this.notes(); return; }
+    if (this.dialog.open) return;
+    if (event.key === ' ' && event.target instanceof HTMLButtonElement) return;
+    const forward = ['ArrowRight','ArrowDown','PageDown',' '].includes(event.key);
+    const backward = ['ArrowLeft','ArrowUp','PageUp'].includes(event.key);
+    if (forward || backward || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      this.go(event.key === 'Home' ? 0 : event.key === 'End' ? this.slides.length - 1 : this.index + (forward ? 1 : -1));
+    }
+  }
+}
+window.presentation = new Presentation();
+</script>
+</body></html>

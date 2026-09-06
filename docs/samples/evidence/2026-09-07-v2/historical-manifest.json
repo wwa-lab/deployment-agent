@@ -1,0 +1,112 @@
+{
+  "sourceCommit": "abf3850dee78b13c597f7da2791dd06d201c1a66",
+  "capturedAt": "2026-09-06T16:28:05.321Z",
+  "interpretation": "Original tracked samples and assets; unchanged bytes do not validate their claims.",
+  "files": [
+    {
+      "path": "docs/assets/atlas-deployment-lifecycle-positioning.mmd",
+      "bytes": 838,
+      "sha256": "29c81eba5ecd1b86e954685c17b41cc71f33ca014afa60e9d12a6aa52994d6be"
+    },
+    {
+      "path": "docs/assets/atlas-deployment-lifecycle-positioning.svg",
+      "bytes": 25150,
+      "sha256": "808b5a88b8fd619eb394f160a56b6683f3061091b6a220cd283c565aa4889dd9"
+    },
+    {
+      "path": "docs/assets/atlas-deployment-tool-workflow.mmd",
+      "bytes": 1638,
+      "sha256": "516a2db27715c20758eb5cb500737c853a9f200c790f7da190609562d9d3af34"
+    },
+    {
+      "path": "docs/assets/atlas-deployment-tool-workflow.svg",
+      "bytes": 42091,
+      "sha256": "ea22b9b665c5ffc0a0b1a8edce1b79774d052bd1daeeea1db61d99410a433be2"
+    },
+    {
+      "path": "docs/assets/atlas-deployment-upstream-downstream.mmd",
+      "bytes": 1031,
+      "sha256": "7cab1fb214f766021ed02ee17d94b7dd5e8ff4131f322d26ccea3a497186dcb0"
+    },
+    {
+      "path": "docs/assets/atlas-deployment-upstream-downstream.svg",
+      "bytes": 21901,
+      "sha256": "9027b5e1b419e1516d5921246efc312e39ca1e7ca15962d2c0da3424f6e27e37"
+    },
+    {
+      "path": "docs/assets/atlas-engineering-delivery-hub-mobile-vertical.png",
+      "bytes": 310314,
+      "sha256": "757b223edddf86bd48cf87eb638aa9b2166ce3566d5df6374e57f8a561477c28"
+    },
+    {
+      "path": "docs/assets/atlas-framework-lifecycle.mmd",
+      "bytes": 938,
+      "sha256": "e8c592677ea5b3fb9fd5277a55e7a8ad3b2b9be364eab4e39b3a89daf40499e0"
+    },
+    {
+      "path": "docs/assets/atlas-framework-lifecycle.svg",
+      "bytes": 12674,
+      "sha256": "e2d73eb8232cda68d4473ac288f69f27ecc1af2fc6c1c25ae6cc0916f2cf5b5a"
+    },
+    {
+      "path": "docs/assets/screenshots/atlas-hub-login-after.png",
+      "bytes": 622051,
+      "sha256": "30b3539e230b4ffa27799662bb411c05af93808a418b1c4bf38e432a2f663ed4"
+    },
+    {
+      "path": "docs/assets/screenshots/wwa-atlas-home-responsive-after.png",
+      "bytes": 769551,
+      "sha256": "7c15c4c8481f488b02334f1e30a5429e828a6e5367bd97ee50e69b1e9855e71b"
+    },
+    {
+      "path": "docs/assets/seven-gates-ieov.mmd",
+      "bytes": 572,
+      "sha256": "ac24c1c1fe2640a61b07ef90103d57756002b3661954ae600a71ba84c825afc5"
+    },
+    {
+      "path": "docs/assets/seven-gates-ieov.svg",
+      "bytes": 9011,
+      "sha256": "289ba2bac87b510234780d01ac82fe732ee85f0bed73f6d20bbd4d6fb92f8053"
+    },
+    {
+      "path": "docs/assets/seven-mountains-sdlc.mmd",
+      "bytes": 630,
+      "sha256": "dbe55dbbdfd8b6168d2557a3f6c35de5b23fb23dfb314950076cdafc766ece14"
+    },
+    {
+      "path": "docs/assets/seven-mountains-sdlc.svg",
+      "bytes": 9835,
+      "sha256": "eb0205fe09e9bf5b18bf6f438211d1d64503d83708f96826b658bbe329504af6"
+    },
+    {
+      "path": "docs/samples/atlas-deployment-tool-mini-output/README.md",
+      "bytes": 1439,
+      "sha256": "35ef09de0526598224d79b1aa4d1d3de8a90ea6eec571c6d52e4cbfecaf6244d"
+    },
+    {
+      "path": "docs/samples/atlas-deployment-tool-mini-output/sample-audit-trail.json",
+      "bytes": 1198,
+      "sha256": "7232fec648fec2116bfac68c59f27a5f72ffa82c22f90d13d3ccbec882eafdaf"
+    },
+    {
+      "path": "docs/samples/atlas-deployment-tool-mini-output/sample-release-input.json",
+      "bytes": 1316,
+      "sha256": "2da5a7155505c0a086f605b55f42d47bf15c227b2ffaae5190f85aa72cf5d2d2"
+    },
+    {
+      "path": "docs/samples/atlas-deployment-tool-mini-output/sample-rollback-checklist.md",
+      "bytes": 1428,
+      "sha256": "b28a1c9a3fa8a749dfff9ed22180af6886948040c1bcb710027155f314d4e7da"
+    },
+    {
+      "path": "docs/samples/atlas-deployment-tool-mini-output/sample-task-output.json",
+      "bytes": 1251,
+      "sha256": "78eb234d0b1f8df536e73694c5effab0ce19da80806dfb84502955cd69727558"
+    },
+    {
+      "path": "docs/samples/atlas-framework-adoption-sample.md",
+      "bytes": 2987,
+      "sha256": "cccf5e13d0066fd54e65be528e3d2b777f610f7fb9583312dd7f5d8a99ab988b"
+    }
+  ]
+}

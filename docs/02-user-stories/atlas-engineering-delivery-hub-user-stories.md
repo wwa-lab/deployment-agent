@@ -1,5 +1,19 @@
 # Atlas Engineering Delivery Hub User Stories
 
+## Current revision — 2026-09-07, platform clarification
+This revision supersedes earlier language-default and independent-entry claims. Previous stories below are historical context.
+
+- **AEDH-US-09 (REQ-10,15):** As a reviewer, understand the Hub's independently useful problem, users, inputs/outputs and metrics; see Deployment identified as an implemented module. Acceptance: no claim of independent competing projects based on module naming, no invented information about other projects.
+- **AEDH-US-10 (REQ-11,12):** As an adopter, read Chinese or English and trace the same capability claims to evidence. Acceptance: two complete current READMEs, reciprocal links, legacy Chinese compatibility link, explicit implemented/example/measured/planned distinctions.
+- **AEDH-US-11 (REQ-13):** As a maintainer, preserve original evidence and register new versions. Acceptance: case source, version, inputs, outputs, verification, human involvement and result are recorded with checksums.
+- **AEDH-US-12 (REQ-14,16):** As a presenter, show an offline deck and readable diagrams. Acceptance: red/white/black Chinese visuals, SVG/PNG assets, keyboard navigation, notes, reduced motion, viewport checks and a verification report.
+
+Dependencies: inspect current code before writing claims; finish the evidence registry before finalizing presentation results. No authorized field case or measured return is assumed.
+
+**AEDH-US-13 (REQ-17):** As a presenter, first introduce the Agentic SDLC platform and its IBM iSeries practice, then demonstrate Deployment Agent using atomization, automation and intelligence. Acceptance: the deck and both READMEs preserve platform breadth, distinguish framework technology from supported delivery languages, explain prerequisites between the three steps, and label runtime intelligence/UTL integration evidence accurately.
+
+## Historical packaging baseline (superseded where inconsistent)
+
 **Date:** 2026-06-27
 **Status:** Proposed / Documents-first
 **Source requirement:** [atlas-engineering-delivery-hub-requirement.md](../01-requirements/atlas-engineering-delivery-hub-requirement.md)

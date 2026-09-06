@@ -1,0 +1,31 @@
+{
+  "version": "2026-09-07-v1",
+  "sourceCommit": "abf3850dee78b13c597f7da2791dd06d201c1a66",
+  "sourceChanges": null,
+  "startedAt": "2026-09-06T16:25:43.356Z",
+  "finishedAt": "2026-09-06T16:25:53.735Z",
+  "command": "mvn -B -ntp test -Dtest=ExcelImportWorkflowTest,ManualTaskWorkflowTest,DecisionEngineTest,ReleaseFlowProgressionServiceTest,AutoExecutionServiceTest,AnsibleExecutionAdapterTest,ExecutionTargetResolverTest,ExternalExecutionMonitorServiceTest,TaskExecutionHistoryServiceTest,AgentBoundaryGuardTest",
+  "reportsOverride": "target/atlas-evidence/2026-09-07-v1/surefire-reports",
+  "exitCode": 0,
+  "status": "failed-or-incomplete",
+  "scope": "Selected local automated tests using synthetic fixtures and mocked external calls; not external deployment, UI UAT, production acceptance or benefit measurement.",
+  "totals": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [],
+  "rawArtifacts": [
+    {
+      "path": "target/atlas-evidence/2026-09-07-v1/stdout.txt",
+      "sha256": "281e7ec65e697a7c73c8914bbac726ec43877e3692449c018b0ce832afcc05b1",
+      "distribution": "local-only; review before sharing"
+    },
+    {
+      "path": "target/atlas-evidence/2026-09-07-v1/stderr.txt",
+      "sha256": "0fce6083d464c12e8bb090e8fb017dad6e6e3b622a86409b952c53089e9ec4f3",
+      "distribution": "local-only; review before sharing"
+    }
+  ]
+}

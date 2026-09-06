@@ -1,104 +1,57 @@
-# Contributing To Atlas Engineering Delivery Hub - Deployment
+# 参与 Atlas Engineering Delivery Hub
 
-Thank you for contributing. This repository is packaged for the internal open collaboration competition as the **Atlas Engineering Delivery Hub - Deployment** Tool entry, the M6 Deployment-stage capability in the Atlas Engineering Delivery Hub / Seven Mountains SDLC narrative.
+[中文首页](README.md) · [English overview](README.en.md) · [文档索引](docs/atlas-engineering-delivery-hub-index.md)
 
-Contributions should strengthen controlled release operations: traceability, validation, approval safety, rollout repeatability, rollback readiness, and reusable deployment adapters/templates.
+贡献围绕 Agentic SDLC 平台实践：先定义原子任务与输入输出，再适配自动执行，逐步验证智能编排与辅助决策。当前以 IBM iSeries 为实践场景，Deployment 为重点展示模块；任务契约、执行器适配和治理机制应保持可复用。新增贡献不自动成为独立参赛方案。
 
-## Who Should Contribute
+## 从哪里开始
 
-- Release engineers and DevOps practitioners who operate SIT / UAT / PROD releases.
-- Build and testing owners who want cleaner handoff evidence into deployment.
-- Platform engineers improving shared auth, audit, access, configuration, and task services.
-- Frontend contributors improving the release-flow workspace experience.
-- Documentation contributors who can make release workflows easier to understand and reuse.
-- Security and compliance reviewers who can improve credential safety, auditability, and approval controls.
+- 完善[案例索引与模板](docs/samples/README.md)，提交获授权的脱敏案例或明确标记的合成样例。
+- 为导入、状态决策、执行适配与权限增加有意义的验证。
+- 改进 README、路演与图片的可读性，并按证据限制能力声明。
+- 贡献 Jenkins/AWX 的配置、失败、状态同步测试；接入新执行器须说明真实接口与实际验证环境。
 
-## Good First Contribution Areas
+## 文档与证据
 
-- Improve sanitized sample release inputs and outputs under `docs/samples/`.
-- Add or refine Mermaid diagrams that explain M6 Deployment workflows.
-- Improve README, submission, pitch, or contribution-guide clarity.
-- Add documentation links from the deployment index to existing verified docs.
-- Add focused tests around validation, state transitions, or adapter edge cases.
-- Improve error messages for upload, task action, and decision failures.
+README.md 为简体中文默认入口，README.en.md 提供完整英文；README.zh-CN.md 保留兼容链接。详细价值叙事在路演讲稿，证据与收益口径在案例索引维护，报名材料引用它们。
 
-## Deployment Adapter Contribution Areas
+不要改写历史样例、截图、运行输出或来源以统一品牌。新运行、新修正放入新的版本目录，记录来源 commit、输入/输出 SHA-256、验证方式、人工介入和结果。合成案例不能称为真实实践；测试通过不能推导生产可用或业务收益。
 
-Deployment adapters and execution integrations must be scoped carefully. Good areas include:
+对外文案使用 Agent Skills 等工具中立表述。带工具品牌的现有技术目录、桥接文件和真实 CLI 命令有实际用途；迁移前必须核查调用、引用与受影响入口，不能机械替换为假想的通用命令。当前文档调整不进行目录迁移，也不宣称新增执行器兼容。
 
-- Jenkins target resolution and submission hardening.
-- Ansible/AWX target handling and status mapping.
-- External execution polling behavior, when explicitly enabled.
-- Adapter tests with mocked HTTP clients and sanitized URLs.
-- Configuration validation for endpoint/credential readiness.
-- Clear user-facing failure messages without leaking secrets.
+项目规则及 SDD 继续使用英文。开始非平凡实现前阅读 [项目规则](PROJECT_RULES.md)、[开发标准](DEVELOPMENT_STANDARDS.md)和[SDD Profile](docs/00-context/sdd-profile.md)，更新相关规格与任务。
 
-Adapter contributions must not hardcode endpoints, tokens, kubeconfigs, environment names, or customer-specific assumptions.
+## 安全与发布职责
 
-## Documentation Rules
+样例使用合成值或获授权脱敏数据；不得加入个人姓名、真实 Staff ID、客户数据、凭据或未经授权内部信息。报名个人字段留空。原始运行输出留在获批准位置，先检查公开范围再提供衍生摘要，保留原始校验值。
 
-- Keep `README.md` reviewer-friendly and focused on the M6 Deployment Tool.
-- Keep the larger Atlas Engineering Delivery Hub narrative as context, not as the repo's competition category.
-- Put deeper detail under `docs/` and link it from `docs/atlas-engineering-delivery-hub-deployment-index.md`.
-- Preserve useful technical detail by linking existing reference docs instead of deleting it.
-- For non-trivial or user-facing changes, update or backfill the relevant SDD artifacts before implementation.
-- Mark backfilled SDD documents as `Backfilled` when they describe existing code.
-- Use synthetic names and sanitized sample data.
-- Prefer Mermaid source plus rendered SVG when diagram tooling is available.
+AUTO 执行器必须使用现有配置与凭据管理机制，不能硬编码端点和密钥。适配变更须给出接口、模拟测试、实际验证范围和未验证项。默认关闭的轮询不是已完成的生产同步验证。
 
-## Testing And Validation Expectations
+人工批准、拒绝、重跑和跳过必须保留现有状态及权限约束。跳过不是成功证明。当前所有者/管理员决策不等于强制双人审批。基础设施回滚由团队批准的恢复流程负责，不能仅凭检查表宣称一键回滚。
 
-Use the smallest validation set that safely matches the change:
+## 如何验证
 
-- Documentation-only package changes: `git diff --check` and `node scripts/check-markdown-links.mjs`.
-- Diagram changes: render Mermaid to SVG when `mmdc` or `npx @mermaid-js/mermaid-cli` is available.
-- Backend changes: `mvn test`.
-- API changes: update controller or contract tests under `src/test/java/`.
-- Frontend changes: `cd frontend && npm run build`; run frontend tests when relevant.
-- UI changes: capture before/after screenshots when practical and safe.
-- Release workflow changes: include at least one happy path and one blocked/failure path in tests or docs.
+| 改动 | 最低验证 |
+|---|---|
+| 文档 | `git diff --check`、`node scripts/check-markdown-links.mjs`，人工核对声明与源码 |
+| SVG/PNG/HTML | 查看实际渲染；检查文字裁切、分支/箭头、图片链接、离线加载、键盘与备注 |
+| 后端 | `mvn test` |
+| API | 对应控制器/契约测试 |
+| 前端应用 | frontend 目录执行 `npm run build`，UI 改动提供安全的前后截图 |
+| 新执行器 | 模拟调用与状态映射测试；真实环境验收单独记录，不混写 |
 
-## Secret Handling And Environment Safety
+演示直接用浏览器打开，不需要 Python。若运行文档一致性扫描，在仓库根目录使用：
 
-- Never commit secrets, passwords, API tokens, private keys, kubeconfigs, cloud credentials, or real production endpoint values.
-- Never include customer data, internal confidential screenshots, or real environment names in samples.
-- Use environment variables, configuration management, or a secret manager for runtime credentials.
-- Redact credential values in docs, logs, samples, and screenshots.
-- If a secret is exposed, stop, rotate it, remove it through the approved history-cleanup process, and inspect for similar leaks.
-- Samples should use values such as `SAMPLE_APP`, `SAMPLE_GROUP`, and `https://example.invalid/...`.
-
-## Release Safety And Rollback Expectations
-
-- Human review remains mandatory for release progression in the current baseline.
-- Do not introduce autonomous approval without a documented SDD slice and security review.
-- New task-state behavior must preserve audit history and execution attempts.
-- Rerun, reject, skip, fail, archive, restore, and purge semantics must be documented and tested when changed.
-- Do not claim one-click rollback unless the code implements it. Current rollback support is traceability, failure marking, rerun/reject flows, and documented recovery handoff.
-- User-facing release changes must update `CHANGELOG.md`.
-
-## PR Checklist
-
-- [ ] Scope is clear and tied to an SDD artifact when required.
-- [ ] M6 Deployment positioning remains accurate and does not present this repo as the whole Atlas framework.
-- [ ] README and deployment docs index links are updated when discoverability changes.
-- [ ] Diagrams include Mermaid source and rendered output when tooling is available.
-- [ ] Samples are synthetic and contain no credentials or customer data.
-- [ ] Backend/API changes include focused tests.
-- [ ] Frontend/UI changes build successfully and screenshots are safe when included.
-- [ ] Validation commands and results are included in the PR.
-- [ ] `CHANGELOG.md` is updated for user-facing changes.
-- [ ] No unrelated files, lockfiles, `.env` files, or credentials are included.
-
-## Commit Message Style
-
-Use conventional commits:
-
-```text
-docs: package atlas engineering delivery hub deployment tool
-feat: add deployment adapter validation
-fix: correct release decision audit metadata
-test: add auto execution adapter coverage
-chore: refresh deployment diagrams
+```bash
+python3 .agents/skills/review-docs-against-code/scripts/doc_consistency_scan.py README.md README.en.md
 ```
 
-Keep commits focused. Stage only files related to the change.
+Windows 11 对应命令：
+
+```powershell
+py -3 .agents/skills/review-docs-against-code/scripts/doc_consistency_scan.py README.md README.en.md
+```
+
+## 提交前检查
+
+确认双语主张一致、链接和图片有效、案例来源可追溯、无个人或机密数据；在变更说明里写出测试范围、结果与未验证事项。保护现有工作区改动，不修改凭据、锁文件或 CI secrets。提交采用 conventional commit；只有明确要求时才执行 commit、push 或 merge。

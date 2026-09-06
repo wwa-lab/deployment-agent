@@ -1,5 +1,7 @@
 # Design: Atlas Engineering Delivery Hub - Deployment Package
 
+> **Historical packaging baseline — 2026-09-07 notice.** Current presentation scope is governed by the [Hub specification, current revision](../03-spec/atlas-engineering-delivery-hub-spec.md). Deployment remains an implemented module with its existing name; the evidence does not establish a second independent competition solution. Earlier English-default, separate-entry and commit requirements below are superseded for this documentation revision. Original samples remain unchanged; runtime contracts are not modified.
+
 **Slice key:** `atlas-engineering-delivery-hub-deployment`
 **Status:** Backfilled
 

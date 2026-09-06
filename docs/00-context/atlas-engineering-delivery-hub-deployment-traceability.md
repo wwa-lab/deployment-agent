@@ -1,5 +1,7 @@
 # Atlas Engineering Delivery Hub - Deployment Traceability
 
+> **2026-09-07:** This is the retained module packaging chain. The [current Hub revision](atlas-engineering-delivery-hub-traceability.md) governs public positioning, Chinese-first entry points and evidence. Deployment shares the Hub implementation; this chain does not establish a separate independently validated competition solution. Original sample files are preserved; no runtime change or commit is authorized by historical tasks below.
+
 **Slice key:** `atlas-engineering-delivery-hub-deployment`
 **Status:** Backfilled package slice
 **Category:** Tool / Function
